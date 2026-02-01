@@ -8,6 +8,27 @@
 $ npm install
 ```
 
+**Quickstart (run locally)**
+
+```bash
+# clone repo
+git clone https://github.com/lawaloy/stead.git
+cd stead/api
+
+# copy example env and start Postgres
+cp .env.example .env
+docker compose up -d
+
+# install deps and generate prisma client
+npm install
+npx prisma generate
+npx prisma db push
+
+# run in development
+npm run start:dev
+```
+
+
 ## Compile and run the project
 
 ```bash
