@@ -1,3 +1,63 @@
+## Description
+
+[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+
+## Project setup
+
+```bash
+$ npm install
+```
+
+**Quickstart (run locally)**
+
+```bash
+# clone repo
+git clone https://github.com/lawaloy/stead.git
+cd stead/api
+
+# copy example env and start Postgres
+cp .env.example .env
+docker compose up -d
+
+# install deps and generate prisma client
+npm install
+npx prisma generate
+npx prisma db push
+
+# run in development
+npm run start:dev
+```
+
+## Compile and run the project
+
+```bash
+# development
+$ npm run start
+
+# watch mode
+$ npm run start:dev
+
+# production mode
+$ npm run start:prod
+```
+
+## Run tests
+
+```bash
+# unit tests
+$ npm run test
+
+# e2e tests
+$ npm run test:e2e
+
+# test coverage
+$ npm run test:cov
+```
+
+## License
+
+Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+
 <p align="center">
   <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
 </p>
