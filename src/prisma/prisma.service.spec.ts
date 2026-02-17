@@ -1,4 +1,9 @@
 import { Test, TestingModule } from '@nestjs/testing';
+
+jest.mock('@prisma/client', () => ({
+  PrismaClient: class PrismaClientMock {},
+}));
+
 import { PrismaService } from './prisma.service';
 
 describe('PrismaService', () => {
