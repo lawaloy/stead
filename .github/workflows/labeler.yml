@@ -1,0 +1,18 @@
+dependencies:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "package.json"
+          - "package-lock.json"
+
+security:
+  - changed-files:
+      - any-glob-to-any-file:
+          - ".github/workflows/deps-maintenance.yml"
+          - ".github/workflows/dependency-review.yml"
+          - "package.json"
+          - "package-lock.json"
+
+ci:
+  - changed-files:
+      - any-glob-to-any-file:
+          - ".github/workflows/**"
