@@ -2,7 +2,7 @@
 
 ## Context
 - Product: Stead Financial Stability Layer.
-- Current state: one backend API (`api`) and one Expo mobile app (`mobile`) in the same repository.
+- Current state: one backend API (`src`/`prisma`/`test` at repo root) and one Expo mobile app (`mobile`) in the same repository.
 - Constraint: long-term direction is multiple services, without locking into a monorepo as the end state.
 
 ## v2 Goals
