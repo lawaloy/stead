@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import type { Request } from 'express';
 import * as jwt from 'jsonwebtoken';
+import type { JwtPayload } from 'jsonwebtoken';
 import type { JwtUser } from './jwt-user.interface';
 
 @Injectable()
@@ -23,10 +24,14 @@ export class JwtAuthGuard implements CanActivate {
     const secret = process.env.JWT_SECRET || 'change_me_now';
 
     try {
-      const payload = jwt.verify(token, secret) as {
-        sub: string;
-        phone: string;
-      };
+      const decoded = jwt.verify(token, secret);
+      if (typeof decoded !== 'object' || decoded === null) {
+        throw new UnauthorizedException('Invalid token payload');
+      }
+      const payload = decoded as JwtPayload & { sub?: string; phone?: string };
+      if (!payload.sub || !payload.phone) {
+        throw new UnauthorizedException('Invalid token payload');
+      }
       req.user = { userId: payload.sub, phone: payload.phone };
       return true;
     } catch {
