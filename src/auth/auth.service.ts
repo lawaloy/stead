@@ -5,7 +5,7 @@ import {
   Injectable,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { SmsService } from '../sms/sms.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import * as bcrypt from 'bcrypt';
 import { JwtService } from '@nestjs/jwt';
 
@@ -21,7 +21,7 @@ function randomOtp(len = 6) {
 export class AuthService {
   constructor(
     private prisma: PrismaService,
-    private sms: SmsService,
+    private notifications: NotificationsService,
     private jwt: JwtService,
   ) {}
 
@@ -55,7 +55,7 @@ export class AuthService {
       return { ok: true, otp };
     }
 
-    await this.sms.sendOtp(phone, otp);
+    this.notifications.enqueueOtpRequested(phone, otp);
 
     return { ok: true };
   }

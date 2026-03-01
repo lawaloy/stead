@@ -2,7 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { JwtService } from '@nestjs/jwt';
 import { AuthService } from './auth.service';
 import { PrismaService } from '../prisma/prisma.service';
-import { SmsService } from '../sms/sms.service';
+import { NotificationsService } from '../notifications/notifications.service';
 
 describe('AuthService', () => {
   let service: AuthService;
@@ -27,9 +27,9 @@ describe('AuthService', () => {
           },
         },
         {
-          provide: SmsService,
+          provide: NotificationsService,
           useValue: {
-            sendOtp: jest.fn(),
+            enqueueOtpRequested: jest.fn(),
           },
         },
         {

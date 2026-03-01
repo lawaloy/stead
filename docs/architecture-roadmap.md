@@ -1,5 +1,7 @@
 # Architecture Roadmap
 
+> Updated roadmap: see `docs/architecture-roadmap-v2.md`.
+
 ## Phase 1 (Current)
 - Single repository with two deployable apps:
   - `src/` for API
