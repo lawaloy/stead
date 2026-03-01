@@ -5,7 +5,6 @@ import { ConfigService } from '@nestjs/config';
 import type { StringValue } from 'ms';
 import { envSchema } from './config/env.schema';
 import { PrismaModule } from './prisma/prisma.module';
-import { SmsModule } from './sms/sms.module';
 import { AuthModule } from './auth/auth.module';
 import { GoalsModule } from './goals/goals.module';
 import { TransactionsModule } from './transactions/transactions.module';
@@ -18,7 +17,6 @@ import { DashboardModule } from './dashboard/dashboard.module';
       validationSchema: envSchema,
     }),
     PrismaModule,
-    SmsModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],
       useFactory: (config: ConfigService) => ({
