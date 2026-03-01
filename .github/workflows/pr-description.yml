@@ -25,9 +25,9 @@ jobs:
           COMMITS=$(git log --format="- %s" origin/$BASE_REF..HEAD)
           [ -z "$COMMITS" ] && COMMITS="- (no new commits)"
 
-          # Get changed files (plain lines for readability)
-          FILES=$(git diff --name-only origin/$BASE_REF...HEAD)
-          [ -z "$FILES" ] && FILES="(no files changed)"
+          # Get changed files (bullet list)
+          FILES=$(git diff --name-only origin/$BASE_REF...HEAD | sed 's/^/- `/' | sed 's/$/`/')
+          [ -z "$FILES" ] && FILES="- (no files changed)"
 
           {
             echo "## Summary"
@@ -36,9 +36,7 @@ jobs:
             echo ""
             echo "## Files changed"
             echo ""
-            echo '```txt'
             echo "$FILES"
-            echo '```'
           } > pr-body.md
 
       - name: Update PR description
