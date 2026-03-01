@@ -21,18 +21,36 @@ jobs:
           BASE_REF="${{ github.event.pull_request.base.ref }}"
           git fetch origin $BASE_REF
 
-          # Get commit messages (summary)
-          COMMITS=$(git log --format="- %s" origin/$BASE_REF..HEAD)
-          [ -z "$COMMITS" ] && COMMITS="- (no new commits)"
-
           # Get changed files (bullet list)
-          FILES=$(git diff --name-only origin/$BASE_REF...HEAD | sed 's/^/- `/' | sed 's/$/`/')
+          FILE_LIST=$(git diff --name-only origin/$BASE_REF...HEAD)
+          FILES=$(echo "$FILE_LIST" | sed '/^$/d' | sed 's/^/- `/' | sed 's/$/`/')
           [ -z "$FILES" ] && FILES="- (no files changed)"
+
+          # Generate human-readable summary from changed areas (not commit titles)
+          SUMMARY=""
+          if echo "$FILE_LIST" | grep -Eq '^api/'; then
+            SUMMARY="${SUMMARY}- Backend API updated (code/config/tests).\n"
+          fi
+          if echo "$FILE_LIST" | grep -Eq '^mobile/'; then
+            SUMMARY="${SUMMARY}- Mobile app updated (screens/state/tests).\n"
+          fi
+          if echo "$FILE_LIST" | grep -Eq '^\\.github/workflows/'; then
+            SUMMARY="${SUMMARY}- CI/workflows updated.\n"
+          fi
+          if echo "$FILE_LIST" | grep -Eq '^\\.github/labeler\\.yml'; then
+            SUMMARY="${SUMMARY}- PR labeling rules updated.\n"
+          fi
+          if echo "$FILE_LIST" | grep -Eq '^docs/|^README\\.md$'; then
+            SUMMARY="${SUMMARY}- Documentation and project structure notes updated.\n"
+          fi
+          if [ -z "$SUMMARY" ]; then
+            SUMMARY="- Maintenance update across repository files."
+          fi
 
           {
             echo "## Summary"
             echo ""
-            echo "$COMMITS"
+            echo -e "$SUMMARY"
             echo ""
             echo "## Files changed"
             echo ""
