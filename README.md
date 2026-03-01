@@ -1,15 +1,13 @@
 ## Repository Layout
 
 ```txt
-src/       NestJS backend source
-prisma/    Prisma schema and migrations
-test/      API tests
+api/       NestJS backend
 mobile/    Expo React Native app
 ```
 
 ## API Commands
 
-Run from repo root:
+Run from `api/`:
 
 ```bash
 npm install
