@@ -22,7 +22,9 @@ export class TwilioClient {
       To: payload.to,
       Body: payload.body,
       ...(payload.from ? { From: payload.from } : {}),
-      ...(payload.messagingServiceSid ? { MessagingServiceSid: payload.messagingServiceSid } : {}),
+      ...(payload.messagingServiceSid
+        ? { MessagingServiceSid: payload.messagingServiceSid }
+        : {}),
     });
 
     const options: https.RequestOptions = {
@@ -40,12 +42,12 @@ export class TwilioClient {
   }
 
   private postForm(options: https.RequestOptions, data: string) {
-    return new Promise((resolve, reject) => {
+    return new Promise<unknown>((resolve, reject) => {
       const req = https.request(options, (res) => {
         let raw = '';
         res.on('data', (chunk) => (raw += chunk));
         res.on('end', () => {
-          let parsed: any = raw;
+          let parsed: unknown = raw;
           try {
             parsed = raw ? JSON.parse(raw) : {};
           } catch {
@@ -53,8 +55,12 @@ export class TwilioClient {
           }
 
           if (res.statusCode && res.statusCode >= 400) {
-            const err = new Error(`Twilio API error ${res.statusCode}`);
-            (err as any).response = parsed;
+            const err = new Error(
+              `Twilio API error ${res.statusCode}`,
+            ) as Error & {
+              response?: unknown;
+            };
+            err.response = parsed;
             return reject(err);
           }
 

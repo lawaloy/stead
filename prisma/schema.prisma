@@ -4,15 +4,16 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
 }
 
 model User {
-  id        String   @id @default(uuid())
-  phone     String   @unique
-  createdAt DateTime @default(now())
+  id           String        @id @default(uuid())
+  phone        String        @unique
+  createdAt    DateTime      @default(now())
 
-  otpCodes  OtpCode[]
+  otpCodes     OtpCode[]
+  goals        Goal[]
+  transactions Transaction[]
 }
 
 model OtpCode {
@@ -27,4 +28,34 @@ model OtpCode {
 
   ip          String?
   userAgent   String?
+}
+
+model Goal {
+  id              String        @id @default(uuid())
+  userId          String
+  user            User          @relation(fields: [userId], references: [id])
+
+  name            String        // e.g. "Rent", "School Fees"
+  amountTotalKobo BigInt
+  dueDate         DateTime
+  monthlyIncomeKobo BigInt?     // optional, improves forecasts
+  isActive        Boolean       @default(true)
+  createdAt       DateTime      @default(now())
+
+  transactions    Transaction[]
+}
+
+model Transaction {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+
+  goalId      String?
+  goal        Goal?    @relation(fields: [goalId], references: [id])
+
+  amountKobo  BigInt
+  direction   String   // 'in' or 'out'
+  occurredAt  DateTime
+  note        String?
+  createdAt   DateTime @default(now())
 }
