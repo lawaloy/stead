@@ -5,9 +5,14 @@ import { ConfigService } from '@nestjs/config';
 import { PrismaModule } from './prisma/prisma.module';
 import { SmsModule } from './sms/sms.module';
 import { AuthModule } from './auth/auth.module';
+import { GoalsModule } from './goals/goals.module';
+import { TransactionsModule } from './transactions/transactions.module';
+import { DashboardModule } from './dashboard/dashboard.module';
+import { Prisma } from '@prisma/client';
 
 @Module({
   imports: [
+    PrismaModule,
     ConfigModule.forRoot({ isGlobal: true }),
     PrismaModule,
     SmsModule,
@@ -20,6 +25,9 @@ import { AuthModule } from './auth/auth.module';
       inject: [ConfigService],
     }),
     AuthModule,
+    GoalsModule,
+    TransactionsModule,
+    DashboardModule,
   ],
 })
 export class AppModule {}

@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { SmsService } from './sms.service';
 import { TwilioClient } from './twilio.client';
+import { TermiiClient } from './termii.client';
 
 describe('SmsService', () => {
   let service: SmsService;
@@ -11,6 +12,12 @@ describe('SmsService', () => {
         SmsService,
         {
           provide: TwilioClient,
+          useValue: {
+            sendMessage: jest.fn(),
+          },
+        },
+        {
+          provide: TermiiClient,
           useValue: {
             sendMessage: jest.fn(),
           },
