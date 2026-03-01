@@ -45,7 +45,7 @@ jobs:
           script: |
             const fs = require('fs');
             const MAX_LENGTH = 1000;
-            const TRUNCATE_SUFFIX = '\n\n... (truncated)';
+            const TRUNCATE_SUFFIX = '\n\n...';
 
             let body = fs.readFileSync('pr-body.md', 'utf8');
 
