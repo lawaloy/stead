@@ -1,0 +1,34 @@
+name: Bug Report
+description: Report an unexpected behavior
+title: "bug: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a bug. Please provide enough detail to reproduce.
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened?
+      description: A concise description of the bug.
+      placeholder: Describe expected and actual behavior.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Go to ...
+        2. Run ...
+        3. Observe ...
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      placeholder: e.g., local, staging, production
+    validations:
+      required: true
