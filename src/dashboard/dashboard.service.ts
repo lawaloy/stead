@@ -40,7 +40,9 @@ export class DashboardService {
       dueDate: goal.dueDate,
       today: new Date(),
       estimatedBalanceKobo,
-      monthlyIncomeKobo: goal.monthlyIncomeKobo ? Number(goal.monthlyIncomeKobo) : null,
+      monthlyIncomeKobo: goal.monthlyIncomeKobo
+        ? Number(goal.monthlyIncomeKobo)
+        : null,
     });
 
     return {
@@ -50,7 +52,9 @@ export class DashboardService {
         name: goal.name,
         amountTotalKobo: Number(goal.amountTotalKobo),
         dueDate: goal.dueDate,
-        monthlyIncomeKobo: goal.monthlyIncomeKobo ? Number(goal.monthlyIncomeKobo) : null,
+        monthlyIncomeKobo: goal.monthlyIncomeKobo
+          ? Number(goal.monthlyIncomeKobo)
+          : null,
       },
       metrics: {
         ...result,

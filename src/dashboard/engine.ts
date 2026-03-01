@@ -19,7 +19,8 @@ export interface StabilityOutput {
   status: StabilityStatus;
 }
 
-const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
+const clamp = (value: number, min: number, max: number) =>
+  Math.min(max, Math.max(min, value));
 
 export function computeStability(input: StabilityInputs): StabilityOutput {
   const goalTotal = Math.max(0, input.goalTotalKobo);
@@ -35,7 +36,9 @@ export function computeStability(input: StabilityInputs): StabilityOutput {
 
   const paceRequiredMonthlyKobo =
     daysRemaining > 0
-      ? Math.ceil(remainingObligationKobo / Math.max(daysRemaining / 30, 1 / 30))
+      ? Math.ceil(
+          remainingObligationKobo / Math.max(daysRemaining / 30, 1 / 30),
+        )
       : remainingObligationKobo;
 
   const safeToSpendKobo = Math.max(0, balance - remainingObligationKobo);
@@ -53,11 +56,18 @@ export function computeStability(input: StabilityInputs): StabilityOutput {
       : 1;
 
   const stabilityScore = Math.round(
-    readinessRatio * 40 + coverageRatio * 30 + incomeSupportRatio * 20 + bufferRatio * 10,
+    readinessRatio * 40 +
+      coverageRatio * 30 +
+      incomeSupportRatio * 20 +
+      bufferRatio * 10,
   );
 
   const status: StabilityStatus =
-    stabilityScore >= 70 ? 'stable' : stabilityScore >= 40 ? 'warning' : 'critical';
+    stabilityScore >= 70
+      ? 'stable'
+      : stabilityScore >= 40
+        ? 'warning'
+        : 'critical';
 
   return {
     daysRemaining,

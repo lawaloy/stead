@@ -68,7 +68,10 @@ export class SmsService {
       }
     }
 
-    throw new HttpException(`Unsupported SMS provider: ${provider}`, HttpStatus.BAD_REQUEST);
+    throw new HttpException(
+      `Unsupported SMS provider: ${provider}`,
+      HttpStatus.BAD_REQUEST,
+    );
   }
 
   private extractErrorDetails(error: unknown) {

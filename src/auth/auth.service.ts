@@ -1,4 +1,9 @@
-import { BadRequestException, HttpException, HttpStatus, Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  HttpException,
+  HttpStatus,
+  Injectable,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { SmsService } from '../sms/sms.service';
 import * as bcrypt from 'bcrypt';
@@ -7,7 +12,8 @@ import { JwtService } from '@nestjs/jwt';
 function randomOtp(len = 6) {
   const digits = '0123456789';
   let out = '';
-  for (let i = 0; i < len; i++) out += digits[Math.floor(Math.random() * digits.length)];
+  for (let i = 0; i < len; i++)
+    out += digits[Math.floor(Math.random() * digits.length)];
   return out;
 }
 
@@ -25,7 +31,10 @@ export class AuthService {
       where: { user: { phone }, createdAt: { gte: oneHourAgo } },
     });
     if (recent >= 10) {
-      throw new HttpException('Too many OTP requests. Try again later.', HttpStatus.TOO_MANY_REQUESTS);
+      throw new HttpException(
+        'Too many OTP requests. Try again later.',
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
     }
 
     const user = await this.prisma.user.upsert({
@@ -42,11 +51,11 @@ export class AuthService {
       data: { userId: user.id, codeHash, expiresAt },
     });
 
-    await this.sms.sendOtp(phone, otp);
-
     if (process.env.DEV_EXPOSE_OTP === 'true') {
       return { ok: true, otp };
     }
+
+    await this.sms.sendOtp(phone, otp);
 
     return { ok: true };
   }
@@ -56,7 +65,11 @@ export class AuthService {
     if (!user) throw new BadRequestException('Invalid phone or code');
 
     const record = await this.prisma.otpCode.findFirst({
-      where: { userId: user.id, consumedAt: null, expiresAt: { gt: new Date() } },
+      where: {
+        userId: user.id,
+        consumedAt: null,
+        expiresAt: { gt: new Date() },
+      },
       orderBy: { createdAt: 'desc' },
     });
     if (!record) throw new BadRequestException('OTP expired or not found');

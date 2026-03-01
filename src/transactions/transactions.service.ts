@@ -40,7 +40,9 @@ export class TransactionsService {
       orderBy: { occurredAt: 'desc' },
     });
 
-    return transactions.map((transaction) => this.serializeTransaction(transaction));
+    return transactions.map((transaction) =>
+      this.serializeTransaction(transaction),
+    );
   }
 
   async update(userId: string, id: string, dto: UpdateTransactionDto) {
@@ -51,8 +53,10 @@ export class TransactionsService {
       where: { id },
       data: {
         direction: dto.direction,
-        amountKobo: dto.amountKobo === undefined ? undefined : BigInt(dto.amountKobo),
-        occurredAt: dto.occurredAt === undefined ? undefined : new Date(dto.occurredAt),
+        amountKobo:
+          dto.amountKobo === undefined ? undefined : BigInt(dto.amountKobo),
+        occurredAt:
+          dto.occurredAt === undefined ? undefined : new Date(dto.occurredAt),
         goalId: dto.goalId,
         note: dto.note,
       },

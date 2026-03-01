@@ -24,12 +24,18 @@ export class TransactionsController {
   constructor(private readonly transactions: TransactionsService) {}
 
   @Post()
-  create(@Req() req: Request & { user: JwtUser }, @Body() dto: CreateTransactionDto) {
+  create(
+    @Req() req: Request & { user: JwtUser },
+    @Body() dto: CreateTransactionDto,
+  ) {
     return this.transactions.create(req.user.userId, dto);
   }
 
   @Get()
-  list(@Req() req: Request & { user: JwtUser }, @Query() query: ListTransactionsQueryDto) {
+  list(
+    @Req() req: Request & { user: JwtUser },
+    @Query() query: ListTransactionsQueryDto,
+  ) {
     return this.transactions.list(req.user.userId, query);
   }
 

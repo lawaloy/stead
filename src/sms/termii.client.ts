@@ -50,7 +50,9 @@ export class TermiiClient {
           }
 
           if (res.statusCode && res.statusCode >= 400) {
-            const err = new Error(`Termii API error ${res.statusCode}`) as Error & {
+            const err = new Error(
+              `Termii API error ${res.statusCode}`,
+            ) as Error & {
               response?: unknown;
             };
             err.response = parsed;

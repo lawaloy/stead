@@ -20,7 +20,9 @@ export class GoalsService {
         amountTotalKobo: BigInt(dto.amountTotalKobo),
         dueDate: new Date(dto.dueDate),
         monthlyIncomeKobo:
-          dto.monthlyIncomeKobo === undefined ? null : BigInt(dto.monthlyIncomeKobo),
+          dto.monthlyIncomeKobo === undefined
+            ? null
+            : BigInt(dto.monthlyIncomeKobo),
         isActive: true,
       },
     });
@@ -56,10 +58,14 @@ export class GoalsService {
       data: {
         name: dto.name,
         amountTotalKobo:
-          dto.amountTotalKobo === undefined ? undefined : BigInt(dto.amountTotalKobo),
+          dto.amountTotalKobo === undefined
+            ? undefined
+            : BigInt(dto.amountTotalKobo),
         dueDate: dto.dueDate === undefined ? undefined : new Date(dto.dueDate),
         monthlyIncomeKobo:
-          dto.monthlyIncomeKobo === undefined ? undefined : BigInt(dto.monthlyIncomeKobo),
+          dto.monthlyIncomeKobo === undefined
+            ? undefined
+            : BigInt(dto.monthlyIncomeKobo),
         isActive: dto.isActive,
       },
     });

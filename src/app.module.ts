@@ -2,17 +2,16 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
+import type { StringValue } from 'ms';
 import { PrismaModule } from './prisma/prisma.module';
 import { SmsModule } from './sms/sms.module';
 import { AuthModule } from './auth/auth.module';
 import { GoalsModule } from './goals/goals.module';
 import { TransactionsModule } from './transactions/transactions.module';
 import { DashboardModule } from './dashboard/dashboard.module';
-import { Prisma } from '@prisma/client';
 
 @Module({
   imports: [
-    PrismaModule,
     ConfigModule.forRoot({ isGlobal: true }),
     PrismaModule,
     SmsModule,
@@ -20,7 +19,10 @@ import { Prisma } from '@prisma/client';
       imports: [ConfigModule],
       useFactory: (config: ConfigService) => ({
         secret: config.get<string>('JWT_SECRET'),
-        signOptions: { expiresIn: (config.get<string>('JWT_EXPIRES_IN') as any) || '7d' },
+        signOptions: {
+          expiresIn: (config.get<string>('JWT_EXPIRES_IN') ||
+            '7d') as StringValue,
+        },
       }),
       inject: [ConfigService],
     }),
