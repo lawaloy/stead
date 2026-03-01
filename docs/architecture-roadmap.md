@@ -4,8 +4,8 @@
 
 ## Phase 1 (Current)
 - Single repository with two deployable apps:
-  - `src/` for API
-  - `mobile/` for Expo app
+  - `apps/api/src/` for API
+  - `apps/mobile/` for Expo app
 - Split CI by path:
   - `.github/workflows/ci.yml` for API
   - `.github/workflows/mobile-ci.yml` for mobile

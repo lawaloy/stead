@@ -2,7 +2,7 @@
 
 ## Context
 - Product: Stead Financial Stability Layer.
-- Current state: one backend API and one Expo mobile app in the same repository.
+- Current state: one backend API (`apps/api`) and one Expo mobile app (`apps/mobile`) in the same repository.
 - Constraint: long-term direction is multiple services, without locking into a monorepo as the end state.
 
 ## v2 Goals

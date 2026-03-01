@@ -8,20 +8,20 @@
   "scripts": {
     "postinstall": "prisma generate",
     "build": "nest build",
-    "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
+    "format": "prettier --write \"apps/api/src/**/*.ts\" \"apps/api/test/**/*.ts\"",
     "start": "nest start",
     "start:dev": "nest start --watch",
     "start:debug": "nest start --debug --watch",
-    "start:prod": "node dist/main",
-    "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
+    "start:prod": "node dist/apps/api/src/main",
+    "lint": "eslint \"{apps/api/src,apps/api/test}/**/*.ts\" --fix",
     "pretest": "prisma generate",
     "test": "jest",
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
-    "test:e2e": "jest --config ./test/jest-e2e.json",
-    "mobile:test": "npm --prefix mobile test -- --runInBand",
-    "mobile:typecheck": "npm --prefix mobile run typecheck"
+    "test:e2e": "jest --config ./apps/api/test/jest-e2e.json",
+    "mobile:test": "npm --prefix apps/mobile test -- --runInBand",
+    "mobile:typecheck": "npm --prefix apps/mobile run typecheck"
   },
   "dependencies": {
     "@nestjs/common": "^11.1.14",
@@ -79,7 +79,7 @@
       "json",
       "ts"
     ],
-    "rootDir": "src",
+    "rootDir": "apps/api/src",
     "testRegex": ".*\\.spec\\.ts$",
     "transform": {
       "^.+\\.(t|j)s$": "ts-jest"
@@ -87,7 +87,7 @@
     "collectCoverageFrom": [
       "**/*.(t|j)s"
     ],
-    "coverageDirectory": "../coverage",
+    "coverageDirectory": "coverage/api",
     "testEnvironment": "node"
   }
 }

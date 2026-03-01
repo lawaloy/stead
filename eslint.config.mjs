@@ -6,7 +6,7 @@ import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
   {
-    ignores: ['eslint.config.mjs', 'mobile/**'],
+    ignores: ['eslint.config.mjs', 'apps/mobile/**'],
   },
   eslint.configs.recommended,
   ...tseslint.configs.recommendedTypeChecked,
