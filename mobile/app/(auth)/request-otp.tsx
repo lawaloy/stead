@@ -1,0 +1,78 @@
+import React, { useMemo, useState } from 'react';
+import { useRouter } from 'expo-router';
+import { useMutation } from '@tanstack/react-query';
+import { Pressable, StyleSheet, Text, TextInput } from 'react-native';
+import { requestOtp, ApiError } from '../../src/lib/api';
+import { useAuth } from '../../src/lib/auth-state';
+import { ScreenShell } from '../../src/components/screen-shell';
+
+const phoneRegex = /^\+[1-9]\d{9,14}$/;
+
+export default function RequestOtpScreen() {
+  const [phone, setPhone] = useState('');
+  const router = useRouter();
+  const { setPendingPhone, setDevOtpHint } = useAuth();
+
+  const validation = useMemo(() => {
+    if (!phone) return '';
+    if (!phoneRegex.test(phone)) return 'Use E.164 format, e.g. +2348012345678';
+    return '';
+  }, [phone]);
+
+  const mutation = useMutation({
+    mutationFn: async () => requestOtp(phone),
+    onSuccess: (data) => {
+      setPendingPhone(phone);
+      setDevOtpHint(data.otp || '');
+      router.push('/(auth)/verify-otp');
+    },
+  });
+
+  return (
+    <ScreenShell title="Stead Login">
+      <Text style={styles.label}>Phone Number</Text>
+      <TextInput
+        value={phone}
+        onChangeText={setPhone}
+        placeholder="+2348012345678"
+        keyboardType="phone-pad"
+        autoCapitalize="none"
+        style={styles.input}
+      />
+      {validation ? <Text style={styles.error}>{validation}</Text> : null}
+      {mutation.error ? (
+        <Text style={styles.error}>{(mutation.error as ApiError).message}</Text>
+      ) : null}
+      <Pressable
+        style={[styles.button, (!!validation || mutation.isPending) && styles.buttonDisabled]}
+        disabled={!!validation || mutation.isPending}
+        onPress={() => mutation.mutate()}
+      >
+        <Text style={styles.buttonText}>
+          {mutation.isPending ? 'Requesting...' : 'Request OTP'}
+        </Text>
+      </Pressable>
+    </ScreenShell>
+  );
+}
+
+const styles = StyleSheet.create({
+  label: { fontWeight: '600', color: '#25324a' },
+  input: {
+    borderWidth: 1,
+    borderColor: '#c8d1e1',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 11,
+    backgroundColor: '#ffffff',
+  },
+  button: {
+    backgroundColor: '#0f6fff',
+    borderRadius: 10,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  buttonDisabled: { opacity: 0.5 },
+  buttonText: { color: '#fff', fontWeight: '700' },
+  error: { color: '#c02020' },
+});
