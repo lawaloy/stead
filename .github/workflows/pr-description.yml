@@ -21,36 +21,47 @@ jobs:
           BASE_REF="${{ github.event.pull_request.base.ref }}"
           git fetch origin $BASE_REF
 
-          # Get changed files (bullet list)
-          FILE_LIST=$(git diff --name-only origin/$BASE_REF...HEAD)
+          # Gather changed files and statuses
+          FILE_STATUS=$(git diff --name-status origin/$BASE_REF...HEAD)
+          FILE_LIST=$(echo "$FILE_STATUS" | awk '
+            $1 ~ /^R/ { print $3; next }
+            NF >= 2 { print $2 }
+          ')
+
+          # Files changed (bullet list)
           FILES=$(echo "$FILE_LIST" | sed '/^$/d' | sed 's/^/- `/' | sed 's/$/`/')
           [ -z "$FILES" ] && FILES="- (no files changed)"
 
-          # Generate human-readable summary from changed areas (not commit titles)
-          SUMMARY=""
-          if echo "$FILE_LIST" | grep -Eq '^api/'; then
-            SUMMARY="${SUMMARY}- Backend API updated (code/config/tests).\n"
-          fi
-          if echo "$FILE_LIST" | grep -Eq '^mobile/'; then
-            SUMMARY="${SUMMARY}- Mobile app updated (screens/state/tests).\n"
-          fi
-          if echo "$FILE_LIST" | grep -Eq '^\\.github/workflows/'; then
-            SUMMARY="${SUMMARY}- CI/workflows updated.\n"
-          fi
-          if echo "$FILE_LIST" | grep -Eq '^\\.github/labeler\\.yml'; then
-            SUMMARY="${SUMMARY}- PR labeling rules updated.\n"
-          fi
-          if echo "$FILE_LIST" | grep -Eq '^docs/|^README\\.md$'; then
-            SUMMARY="${SUMMARY}- Documentation and project structure notes updated.\n"
-          fi
-          if [ -z "$SUMMARY" ]; then
-            SUMMARY="- Maintenance update across repository files."
+          # Scalable summary: counts by change type and top-level area
+          TOTAL_CHANGED=$(echo "$FILE_LIST" | sed '/^$/d' | wc -l | tr -d ' ')
+          ADDED=$(echo "$FILE_STATUS" | grep -Ec '^A[[:space:]]' || true)
+          MODIFIED=$(echo "$FILE_STATUS" | grep -Ec '^M[[:space:]]' || true)
+          DELETED=$(echo "$FILE_STATUS" | grep -Ec '^D[[:space:]]' || true)
+          RENAMED=$(echo "$FILE_STATUS" | grep -Ec '^R[0-9]*[[:space:]]' || true)
+
+          AREA_COUNTS=$(echo "$FILE_LIST" | sed '/^$/d' | awk -F/ '
+            {
+              area = (NF == 1) ? "root" : $1
+              count[area]++
+            }
+            END {
+              for (a in count) {
+                printf "- %s: %d files\n", a, count[a]
+              }
+            }
+          ' | sort)
+
+          if [ -z "$AREA_COUNTS" ]; then
+            AREA_COUNTS="- none"
           fi
 
           {
             echo "## Summary"
             echo ""
-            echo -e "$SUMMARY"
+            echo "- ${TOTAL_CHANGED} files changed."
+            echo "- Change types: ${ADDED} added, ${MODIFIED} modified, ${RENAMED} renamed, ${DELETED} deleted."
+            echo "- Areas touched:"
+            echo "$AREA_COUNTS"
             echo ""
             echo "## Files changed"
             echo ""
