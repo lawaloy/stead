@@ -1,6 +1,11 @@
-## Summary
+## What + Why
 - 
 
-## Quick check
-- [ ] `npm run build`
-- [ ] `npm run test`
+## Checks
+- [ ] `api`: `npm run build`
+- [ ] `api`: `npm run test -- --ci --runInBand`
+
+<!-- AUTO:START -->
+## Auto
+- Waiting for CI to generate change summary.
+<!-- AUTO:END -->

@@ -1,39 +1,28 @@
-## Description
+## Repository Layout
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
-
-## Project setup
-
-```bash
-$ npm install
+```txt
+api/       NestJS backend
+mobile/    Expo React Native app
 ```
 
-## Compile and run the project
+## API Commands
+
+Run from `api/`:
 
 ```bash
-# development
-$ npm run start
-
-# watch mode
-$ npm run start:dev
-
-# production mode
-$ npm run start:prod
+npm install
+npm run start:dev
+npm run lint -- --no-fix
+npm run test -- --ci --runInBand
+npm run build
 ```
 
-## Run tests
+## Mobile Commands
+
+Run from `mobile/`:
 
 ```bash
-# unit tests
-$ npm run test
-
-# e2e tests
-$ npm run test:e2e
-
-# test coverage
-$ npm run test:cov
+npm install
+npm run typecheck
+npm test -- --runInBand
 ```
-
-## License
-
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).

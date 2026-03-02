@@ -4,7 +4,7 @@
 
 ## Phase 1 (Current)
 - Single repository with two deployable apps:
-  - `src/` for API
+  - `api/src/` for API
   - `mobile/` for Expo app
 - Split CI by path:
   - `.github/workflows/ci.yml` for API
@@ -19,8 +19,8 @@
 
 ## Phase 2 (Next)
 - Restructure to workspace layout:
-  - `apps/api`
-  - `apps/mobile`
+  - `api`
+  - `mobile`
   - `packages/shared-contracts` (zod schemas and TS types)
 - Promote API response schemas to shared package.
 - Add contract-compat test:
