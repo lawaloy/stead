@@ -104,8 +104,6 @@ jobs:
               const before = existing.slice(0, startIdx).trimEnd();
               const after = existing.slice(endIdx + END.length).trimStart();
               body = `${before}\n\n${autoSection}${after ? `\n\n${after}` : ''}`;
-            } else if (existing.trim().length > 0) {
-              body = `${existing.trimEnd()}\n\n${autoSection}`;
             } else {
               body = `## What + Why\n- \n\n## Checks\n- [ ] \`api\`: \`npm run build\`\n- [ ] \`api\`: \`npm run test -- --ci --runInBand\`\n\n${autoSection}`;
             }
