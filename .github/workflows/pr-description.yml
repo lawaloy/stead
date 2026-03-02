@@ -56,7 +56,7 @@ jobs:
           fi
 
           {
-            echo "## Summary"
+            echo "## Auto"
             echo ""
             echo "- ${TOTAL_CHANGED} files changed."
             echo "- ${ADDED} added, ${MODIFIED} modified, ${RENAMED} renamed, ${DELETED} deleted."
@@ -68,7 +68,7 @@ jobs:
             echo "## Files changed"
             echo ""
             echo "$FILES"
-          } > pr-body.md
+          } > pr-auto.md
 
       - name: Update PR description
         uses: actions/github-script@v7
@@ -77,19 +77,37 @@ jobs:
             const fs = require('fs');
             const MAX_LENGTH = 1000;
             const TRUNCATE_SUFFIX = '\n\n...';
+            const START = '<!-- AUTO:START -->';
+            const END = '<!-- AUTO:END -->';
 
-            let body = fs.readFileSync('pr-body.md', 'utf8');
+            let autoBody = fs.readFileSync('pr-auto.md', 'utf8');
 
-            if (body.length > MAX_LENGTH) {
+            if (autoBody.length > MAX_LENGTH) {
               // Keep whole lines; never cut file paths mid-line.
-              const lines = body.split('\n');
+              const lines = autoBody.split('\n');
               let out = '';
               for (const line of lines) {
                 const candidate = out ? `${out}\n${line}` : line;
                 if (candidate.length + TRUNCATE_SUFFIX.length > MAX_LENGTH) break;
                 out = candidate;
               }
-              body = out + TRUNCATE_SUFFIX;
+              autoBody = out + TRUNCATE_SUFFIX;
+            }
+            const autoSection = `${START}\n${autoBody}\n${END}`;
+
+            const existing = context.payload.pull_request.body || '';
+            let body;
+            const startIdx = existing.indexOf(START);
+            const endIdx = existing.indexOf(END);
+
+            if (startIdx !== -1 && endIdx !== -1 && endIdx > startIdx) {
+              const before = existing.slice(0, startIdx).trimEnd();
+              const after = existing.slice(endIdx + END.length).trimStart();
+              body = `${before}\n\n${autoSection}${after ? `\n\n${after}` : ''}`;
+            } else if (existing.trim().length > 0) {
+              body = `${existing.trimEnd()}\n\n${autoSection}`;
+            } else {
+              body = `## What + Why\n- \n\n## Checks\n- [ ] \`api\`: \`npm run build\`\n- [ ] \`api\`: \`npm run test -- --ci --runInBand\`\n\n${autoSection}`;
             }
 
             const { owner, repo } = context.repo;
