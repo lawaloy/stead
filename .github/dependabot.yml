@@ -5,8 +5,18 @@
 
 version: 2
 updates:
-  - package-ecosystem: "npm" # See documentation for possible values
-    directory: "/" # Location of package manifests
+  - package-ecosystem: "npm"
+    directory: "/api"
+    schedule:
+      interval: "cron"
+      cronjob: "0 13 * * *"
+    groups:
+      npm-all:
+        patterns:
+          - "*"
+
+  - package-ecosystem: "npm"
+    directory: "/mobile"
     schedule:
       interval: "cron"
       cronjob: "0 13 * * *"

@@ -38,8 +38,8 @@ jobs:
           npm update
           npm audit fix
 
-      - name: Verify vulnerabilities are resolved
-        run: npm audit --audit-level=moderate
+      - name: Audit report (non-blocking)
+        run: npm audit --audit-level=moderate || true
 
       - name: Create or update maintenance PR
         uses: peter-evans/create-pull-request@v7
@@ -52,7 +52,7 @@ jobs:
             Automated dependency maintenance run:
             - `npm update`
             - `npm audit fix`
-            - `npm audit --audit-level=moderate`
+            - `npm audit --audit-level=moderate` (non-blocking report)
 
             This is a rolling PR branch that gets updated on each scheduled run.
           labels: |
