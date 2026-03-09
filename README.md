@@ -1,28 +1,37 @@
-## Repository Layout
+# Stead
 
-```txt
-api/       NestJS backend
-mobile/    Expo React Native app
-```
+Monorepo for Stead: NestJS API and Expo React Native mobile app.
 
-## API Commands
+## Repository layout
 
-Run from `api/`:
+- `api/` — NestJS backend
+- `mobile/` — Expo React Native app
+- `docs/` — design and architecture notes
+
+## Quick start
+
+API (from `api/`):
 
 ```bash
-npm install
+npm ci
 npm run start:dev
-npm run lint -- --no-fix
-npm run test -- --ci --runInBand
-npm run build
 ```
 
-## Mobile Commands
-
-Run from `mobile/`:
+Mobile (from `mobile/`):
 
 ```bash
 npm install
-npm run typecheck
-npm test -- --runInBand
+npm run start
 ```
+
+## Tests & lint
+
+Run tests and linters from the package directory. See each package's `package.json` for available scripts.
+
+## Contributing
+
+See `CONTRIBUTING.md` for contribution guidelines.
+
+## License
+
+See the repository root for license information.
