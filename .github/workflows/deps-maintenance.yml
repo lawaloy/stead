@@ -36,7 +36,7 @@ jobs:
       - name: Update lockfile and patch vulnerabilities
         run: |
           npm update
-          npm audit fix
+          npm audit fix || true
 
       - name: Audit report (non-blocking)
         run: npm audit --audit-level=moderate || true
