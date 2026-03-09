@@ -1,5 +1,13 @@
 # Overview
 
+## Table of contents
+
+- [Vision](#11-vision)
+- [Problem Statement](#2-problem-statement)
+- [Product Strategy](#3-product-strategy)
+- [MVP Scope (v1)](#4-mvp-scope-v1)
+- [System Architecture](#5-system-architecture)
+
 ## 1.1 Vision
 
 Stead is a Financial Stability Layer that helps Nigerians stay prepared for future financial obligations by translating their cashflow into decision intelligence.
