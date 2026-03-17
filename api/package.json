@@ -24,12 +24,12 @@
     "mobile:typecheck": "npm --prefix ../mobile run typecheck"
   },
   "dependencies": {
-    "@nestjs/common": "^11.1.16",
+    "@nestjs/common": "^11.1.17",
     "@nestjs/config": "^4.0.3",
-    "@nestjs/core": "^11.1.16",
+    "@nestjs/core": "^11.1.17",
     "@nestjs/jwt": "^11.0.2",
     "@nestjs/passport": "^11.0.5",
-    "@nestjs/platform-express": "^11.1.16",
+    "@nestjs/platform-express": "^11.1.17",
     "@prisma/adapter-pg": "^7.5.0",
     "@prisma/client": "^7.5.0",
     "@types/ms": "^2.1.0",
@@ -50,7 +50,7 @@
     "@eslint/js": "^10.0.1",
     "@nestjs/cli": "^11.0.0",
     "@nestjs/schematics": "^11.0.0",
-    "@nestjs/testing": "^11.1.16",
+    "@nestjs/testing": "^11.1.17",
     "@types/bcrypt": "^6.0.0",
     "@types/express": "^5.0.0",
     "@types/jest": "^30.0.0",
@@ -69,7 +69,7 @@
     "ts-node": "^10.9.2",
     "tsconfig-paths": "^4.2.0",
     "typescript": "^5.7.3",
-    "typescript-eslint": "^8.56.1"
+    "typescript-eslint": "^8.57.1"
   },
   "overrides": {
     "@angular-devkit/core": "21.2.2",
