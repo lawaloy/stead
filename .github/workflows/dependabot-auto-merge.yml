@@ -82,7 +82,7 @@ jobs:
           github-token: ${{ steps.app-token.outputs.token }}
           script: |
             const pullRequestNodeId = context.payload.pull_request.node_id;
-            await github.graphql(`
+            const mutation = `
               mutation EnableAutoMerge($pullRequestId: ID!) {
                 enablePullRequestAutoMerge(input: {
                   pullRequestId: $pullRequestId,
@@ -96,9 +96,35 @@ jobs:
                   }
                 }
               }
-            `, {
-              pullRequestId: pullRequestNodeId
-            });
+            `;
+
+            const maxAttempts = 20;
+            const delayMs = 30000;
+
+            for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+              try {
+                await github.graphql(mutation, {
+                  pullRequestId: pullRequestNodeId,
+                });
+                core.info(`Auto-merge enabled on attempt ${attempt}.`);
+                return;
+              } catch (error) {
+                const message = String(error.message || error);
+                const retryable =
+                  message.includes('Pull request is in unstable status') ||
+                  message.includes('Base branch was modified') ||
+                  message.includes('Head branch was modified');
+
+                if (!retryable || attempt === maxAttempts) {
+                  throw error;
+                }
+
+                core.info(
+                  `Auto-merge not ready yet (attempt ${attempt}/${maxAttempts}): ${message}`,
+                );
+                await new Promise((resolve) => setTimeout(resolve, delayMs));
+              }
+            }
 
       - name: Comment when auto-merge is skipped
         if: |
