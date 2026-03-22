@@ -48,40 +48,6 @@ jobs:
               core.info('Auto-merge disabled by automerge-blocked label.');
             }
 
-      - name: Mark auto-merge candidates
-        uses: actions/github-script@v7
-        with:
-          github-token: ${{ steps.app-token.outputs.token }}
-          script: |
-            const { owner, repo } = context.repo;
-            const issue_number = context.payload.pull_request.number;
-            const labels = context.payload.pull_request.labels.map((label) => label.name);
-            const candidate = 'automerge-candidate';
-            const eligible =
-              (
-                '${{ steps.metadata.outputs.update-type }}' === 'version-update:semver-patch' ||
-                '${{ steps.metadata.outputs.update-type }}' === 'version-update:semver-minor'
-              ) &&
-              '${{ steps.policy.outputs.allowed }}' === 'true';
-
-            if (eligible && !labels.includes(candidate)) {
-              await github.rest.issues.addLabels({
-                owner,
-                repo,
-                issue_number,
-                labels: [candidate],
-              });
-            }
-
-            if (!eligible && labels.includes(candidate)) {
-              await github.rest.issues.removeLabel({
-                owner,
-                repo,
-                issue_number,
-                name: candidate,
-              });
-            }
-
       - name: Auto-approve safe updates
         if: |
           (
@@ -153,11 +119,14 @@ jobs:
           script: |
             const { owner, repo } = context.repo;
             const pull_number = context.payload.workflow_run.pull_requests[0].number;
-            const candidateLabel = 'automerge-candidate';
             const maxAttempts = 10;
             const delayMs = 15000;
 
             const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+            const safeUpdateTypes = new Set([
+              'version-update:semver-patch',
+              'version-update:semver-minor',
+            ]);
 
             let pullRequest;
             for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
@@ -174,8 +143,23 @@ jobs:
                 return;
               }
 
-              if (!labels.includes(candidateLabel)) {
-                core.info('Skipping because PR is not marked as an auto-merge candidate.');
+              if (labels.includes('automerge-blocked')) {
+                core.info('Skipping because automerge-blocked label is present.');
+                return;
+              }
+
+              const updateTypes = Array.from(
+                pullRequest.body.matchAll(/update-type:\s*(version-update:semver-[a-z]+)/g),
+                (match) => match[1],
+              );
+
+              if (updateTypes.length === 0) {
+                core.info('Skipping because no Dependabot update-type metadata was found in the PR body.');
+                return;
+              }
+
+              if (updateTypes.some((type) => !safeUpdateTypes.has(type))) {
+                core.info(`Skipping because PR contains a non-safe update type: ${updateTypes.join(', ')}`);
                 return;
               }
 
