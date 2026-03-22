@@ -7,25 +7,7 @@ on:
     branches: [main]
 
 jobs:
-  changes:
-    runs-on: ubuntu-latest
-    outputs:
-      mobile: ${{ steps.filter.outputs.mobile }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Detect mobile changes
-        id: filter
-        uses: dorny/paths-filter@v3
-        with:
-          filters: |
-            mobile:
-              - 'mobile/**'
-              - '.github/workflows/mobile-ci.yml'
-
   mobile-test:
-    needs: changes
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -34,12 +16,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Skip when mobile is unchanged
-        if: needs.changes.outputs.mobile != 'true'
-        run: echo "No mobile changes detected; skipping mobile checks."
-
       - name: Setup Node
-        if: needs.changes.outputs.mobile == 'true'
         uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -47,13 +24,10 @@ jobs:
           cache-dependency-path: mobile/package-lock.json
 
       - name: Install dependencies
-        if: needs.changes.outputs.mobile == 'true'
         run: npm ci --legacy-peer-deps
 
       - name: Type check
-        if: needs.changes.outputs.mobile == 'true'
         run: npm run typecheck
 
       - name: Unit tests
-        if: needs.changes.outputs.mobile == 'true'
         run: npm test -- --runInBand
