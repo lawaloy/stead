@@ -3,14 +3,18 @@ name: Dependabot Auto Merge
 on:
   pull_request_target:
     types: [opened, reopened, synchronize]
+  workflow_run:
+    workflows: ["ci", "mobile-ci", "CodeQL Advanced", "Dependency review"]
+    types: [completed]
 
 permissions:
   contents: write
   pull-requests: write
+  issues: write
 
 jobs:
-  auto-merge:
-    if: github.actor == 'dependabot[bot]'
+  prepare:
+    if: github.event_name == 'pull_request_target' && github.actor == 'dependabot[bot]'
     runs-on: ubuntu-latest
     steps:
       - name: Generate GitHub App token
@@ -42,6 +46,40 @@ jobs:
               core.info('Auto-merge disabled by automerge-blocked label.');
             }
 
+      - name: Mark auto-merge candidates
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ steps.app-token.outputs.token }}
+          script: |
+            const { owner, repo } = context.repo;
+            const issue_number = context.payload.pull_request.number;
+            const labels = context.payload.pull_request.labels.map((label) => label.name);
+            const candidate = 'automerge-candidate';
+            const eligible =
+              (
+                '${{ steps.metadata.outputs.update-type }}' === 'version-update:semver-patch' ||
+                '${{ steps.metadata.outputs.update-type }}' === 'version-update:semver-minor'
+              ) &&
+              '${{ steps.policy.outputs.allowed }}' === 'true';
+
+            if (eligible && !labels.includes(candidate)) {
+              await github.rest.issues.addLabels({
+                owner,
+                repo,
+                issue_number,
+                labels: [candidate],
+              });
+            }
+
+            if (!eligible && labels.includes(candidate)) {
+              await github.rest.issues.removeLabel({
+                owner,
+                repo,
+                issue_number,
+                name: candidate,
+              });
+            }
+
       - name: Auto-approve safe updates
         if: |
           (
@@ -70,45 +108,6 @@ jobs:
               }
             }
 
-      - name: Wait before auto-merge
-        if: |
-          (
-            steps.metadata.outputs.update-type == 'version-update:semver-patch' ||
-            steps.metadata.outputs.update-type == 'version-update:semver-minor'
-          ) &&
-          steps.policy.outputs.allowed == 'true'
-        run: sleep 300
-
-      - name: Enable auto-merge for safe updates
-        if: |
-          (
-            steps.metadata.outputs.update-type == 'version-update:semver-patch' ||
-            steps.metadata.outputs.update-type == 'version-update:semver-minor'
-          ) &&
-          steps.policy.outputs.allowed == 'true'
-        uses: actions/github-script@v7
-        with:
-          github-token: ${{ steps.app-token.outputs.token }}
-          script: |
-            const pullRequestNodeId = context.payload.pull_request.node_id;
-            await github.graphql(`
-              mutation EnableAutoMerge($pullRequestId: ID!) {
-                enablePullRequestAutoMerge(input: {
-                  pullRequestId: $pullRequestId,
-                  mergeMethod: SQUASH
-                }) {
-                  pullRequest {
-                    number
-                    autoMergeRequest {
-                      enabledAt
-                    }
-                  }
-                }
-              }
-            `, {
-              pullRequestId: pullRequestNodeId
-            });
-
       - name: Comment when auto-merge is skipped
         if: |
           (
@@ -129,3 +128,86 @@ jobs:
               issue_number,
               body: 'Auto-merge skipped because the `automerge-blocked` label is present.'
             });
+
+  enable-auto-merge:
+    if: |
+      github.event_name == 'workflow_run' &&
+      github.event.workflow_run.event == 'pull_request' &&
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.pull_requests[0]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Generate GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ vars.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+
+      - name: Enable auto-merge when PR is ready
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ steps.app-token.outputs.token }}
+          script: |
+            const { owner, repo } = context.repo;
+            const pull_number = context.payload.workflow_run.pull_requests[0].number;
+            const candidateLabel = 'automerge-candidate';
+            const maxAttempts = 10;
+            const delayMs = 15000;
+
+            const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+            let pullRequest;
+            for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+              const response = await github.rest.pulls.get({
+                owner,
+                repo,
+                pull_number,
+              });
+              pullRequest = response.data;
+
+              const labels = pullRequest.labels.map((label) => label.name);
+              if (pullRequest.user?.login !== 'dependabot[bot]') {
+                core.info('Skipping because PR author is not dependabot[bot].');
+                return;
+              }
+
+              if (!labels.includes(candidateLabel)) {
+                core.info('Skipping because PR is not marked as an auto-merge candidate.');
+                return;
+              }
+
+              const state = pullRequest.mergeable_state;
+              core.info(`Mergeable state on attempt ${attempt}: ${state}`);
+
+              if (state === 'clean') {
+                break;
+              }
+
+              if (attempt === maxAttempts) {
+                core.info('PR is not yet fully ready for auto-merge. A later workflow_run will retry.');
+                return;
+              }
+
+              await sleep(delayMs);
+            }
+
+            await github.graphql(`
+              mutation EnableAutoMerge($pullRequestId: ID!) {
+                enablePullRequestAutoMerge(input: {
+                  pullRequestId: $pullRequestId,
+                  mergeMethod: SQUASH
+                }) {
+                  pullRequest {
+                    number
+                    autoMergeRequest {
+                      enabledAt
+                    }
+                  }
+                }
+              }
+            `, {
+              pullRequestId: pullRequest.node_id,
+            });
+
+            core.info(`Auto-merge enabled for PR #${pull_number}.`);
