@@ -61,6 +61,25 @@ jobs:
           script: |
             const { owner, repo } = context.repo;
             const pull_number = context.payload.pull_request.number;
+            const headSha = context.payload.pull_request.head.sha;
+            const botLogin = 'stead-deps-bot[bot]';
+            const reviews = await github.paginate(github.rest.pulls.listReviews, {
+              owner,
+              repo,
+              pull_number,
+              per_page: 100,
+            });
+
+            const alreadyApproved = reviews.some((review) =>
+              review.user?.login === botLogin &&
+              review.state === 'APPROVED' &&
+              review.commit_id === headSha,
+            );
+
+            if (alreadyApproved) {
+              core.info('Skipping auto-approval because the bot already approved this head commit.');
+              return;
+            }
 
             try {
               await github.rest.pulls.createReview({
@@ -89,12 +108,24 @@ jobs:
           script: |
             const { owner, repo } = context.repo;
             const issue_number = context.payload.pull_request.number;
+            const body = 'Auto-merge skipped because the `automerge-blocked` label is present.';
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner,
+              repo,
+              issue_number,
+              per_page: 100,
+            });
+
+            if (comments.some((comment) => comment.body === body)) {
+              core.info('Skipping blocked comment because the same comment already exists.');
+              return;
+            }
 
             await github.rest.issues.createComment({
               owner,
               repo,
               issue_number,
-              body: 'Auto-merge skipped because the `automerge-blocked` label is present.'
+              body,
             });
 
   enable-auto-merge:
@@ -148,13 +179,27 @@ jobs:
                 return;
               }
 
-              const updateTypes = Array.from(
-                pullRequest.body.matchAll(/update-type:\s*(version-update:semver-[a-z]+)/g),
-                (match) => match[1],
+              const commits = await github.paginate(github.rest.pulls.listCommits, {
+                owner,
+                repo,
+                pull_number,
+                per_page: 100,
+              });
+
+              const dependabotCommits = commits.filter((commit) =>
+                commit.author?.login === 'dependabot[bot]' ||
+                commit.commit?.author?.name === 'dependabot[bot]',
+              );
+
+              const updateTypes = dependabotCommits.flatMap((commit) =>
+                Array.from(
+                  commit.commit.message.matchAll(/update-type:\s*(version-update:semver-[a-z]+)/g),
+                  (match) => match[1],
+                ),
               );
 
               if (updateTypes.length === 0) {
-                core.info('Skipping because no Dependabot update-type metadata was found in the PR body.');
+                core.info('Skipping because no Dependabot update-type metadata was found in PR commits.');
                 return;
               }
 
