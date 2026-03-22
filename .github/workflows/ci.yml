@@ -3,12 +3,8 @@ name: ci
 on:
   pull_request:
     branches: [main]
-    paths-ignore:
-      - 'mobile/**'
   push:
     branches: [main]
-    paths-ignore:
-      - 'mobile/**'
 
 jobs:
   lint:
@@ -38,7 +34,23 @@ jobs:
       - name: Lint
         run: npm run lint -- --no-fix
 
+      - name: Setup Node for mobile lint
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+
+      - name: Install mobile dependencies
+        working-directory: mobile
+        run: npm ci --legacy-peer-deps
+
+      - name: Lint mobile
+        working-directory: mobile
+        run: npm run lint
+
   test:
+    name: api-test
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -91,4 +103,19 @@ jobs:
         run: npx prisma generate
 
       - name: Build
+        run: npm run build
+
+      - name: Setup Node for mobile build
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+
+      - name: Install mobile dependencies
+        working-directory: mobile
+        run: npm ci --legacy-peer-deps
+
+      - name: Build mobile
+        working-directory: mobile
         run: npm run build

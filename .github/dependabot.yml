@@ -11,9 +11,17 @@ updates:
       interval: "cron"
       cronjob: "0 13 * * *"
     groups:
-      npm-all:
+      npm-safe:
         patterns:
           - "*"
+        update-types:
+          - "minor"
+          - "patch"
+      npm-major:
+        patterns:
+          - "*"
+        update-types:
+          - "major"
 
   - package-ecosystem: "npm"
     directory: "/mobile"
@@ -21,6 +29,14 @@ updates:
       interval: "cron"
       cronjob: "0 13 * * *"
     groups:
-      npm-all:
+      npm-safe:
         patterns:
           - "*"
+        update-types:
+          - "minor"
+          - "patch"
+      npm-major:
+        patterns:
+          - "*"
+        update-types:
+          - "major"
