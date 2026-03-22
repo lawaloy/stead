@@ -70,15 +70,6 @@ jobs:
               }
             }
 
-      - name: Wait before auto-merge
-        if: |
-          (
-            steps.metadata.outputs.update-type == 'version-update:semver-patch' ||
-            steps.metadata.outputs.update-type == 'version-update:semver-minor'
-          ) &&
-          steps.policy.outputs.allowed == 'true'
-        run: sleep 300
-
       - name: Enable auto-merge for safe updates
         if: |
           (
