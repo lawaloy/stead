@@ -5,5 +5,10 @@ module.exports = defineConfig([
   expoConfig,
   {
     ignores: ['dist/**'],
+    settings: {
+      react: {
+        version: '19.2',
+      },
+    },
   },
 ]);
