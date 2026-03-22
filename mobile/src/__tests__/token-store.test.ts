@@ -1,3 +1,5 @@
+import { tokenStore } from '../lib/token-store';
+
 const store = new Map<string, string>();
 
 jest.mock('expo-secure-store', () => ({
@@ -9,8 +11,6 @@ jest.mock('expo-secure-store', () => ({
     store.delete(key);
   }),
 }));
-
-import { tokenStore } from '../lib/token-store';
 
 describe('tokenStore', () => {
   it('writes and reads token', async () => {

@@ -1,15 +1,14 @@
 import MockAdapter from 'axios-mock-adapter';
-
-jest.mock('../lib/base-url', () => ({
-  resolveApiBaseUrl: () => 'http://localhost:3000',
-}));
-
 import {
   apiClient,
   configureApiAuth,
   requestOtp,
   verifyOtp,
 } from '../lib/api';
+
+jest.mock('../lib/base-url', () => ({
+  resolveApiBaseUrl: () => 'http://localhost:3000',
+}));
 
 describe('api client', () => {
   const mock = new MockAdapter(apiClient);

@@ -1,4 +1,4 @@
-import axios, { AxiosHeaders } from 'axios';
+import axios, { AxiosHeaders, isAxiosError } from 'axios';
 import { z } from 'zod';
 import { resolveApiBaseUrl } from './base-url';
 import {
@@ -50,7 +50,7 @@ apiClient.interceptors.request.use(async (config) => {
 apiClient.interceptors.response.use(
   (response) => response,
   async (error: unknown) => {
-    if (!axios.isAxiosError(error)) {
+    if (!isAxiosError(error)) {
       throw new ApiError({ message: 'Unexpected network error' });
     }
 
