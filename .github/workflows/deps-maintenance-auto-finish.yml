@@ -5,104 +5,14 @@ on:
     workflows: ["ci", "mobile-ci", "CodeQL Advanced", "Dependency review"]
     types: [completed]
 
-permissions:
-  contents: write
-  pull-requests: write
-
 jobs:
   finish:
     if: |
       github.event.workflow_run.event == 'pull_request' &&
       github.event.workflow_run.conclusion == 'success' &&
       github.event.workflow_run.pull_requests[0]
-    runs-on: ubuntu-latest
-    steps:
-      - name: Generate GitHub App token
-        id: app-token
-        uses: actions/create-github-app-token@v2
-        with:
-          app-id: ${{ vars.APP_ID }}
-          private-key: ${{ secrets.APP_PRIVATE_KEY }}
-
-      - name: Merge maintenance PR when ready
-        uses: actions/github-script@v7
-        with:
-          github-token: ${{ steps.app-token.outputs.token }}
-          script: |
-            const { owner, repo } = context.repo;
-            const pull_number = context.payload.workflow_run.pull_requests[0].number;
-            const expectedHeadRef = 'security/deps-maintenance';
-            const trustedAuthorLogins = new Set([
-              'app/github-actions',
-              'github-actions[bot]',
-              'stead-deps-bot[bot]',
-              'app/stead-deps-bot',
-            ]);
-            const maxAttempts = 10;
-            const delayMs = 15000;
-
-            const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-
-            for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
-              const response = await github.rest.pulls.get({
-                owner,
-                repo,
-                pull_number,
-              });
-              const pullRequest = response.data;
-              const labels = pullRequest.labels.map((label) => label.name);
-              const trusted =
-                pullRequest.head.repo?.full_name === `${owner}/${repo}` &&
-                pullRequest.base?.ref === 'main' &&
-                pullRequest.head?.ref === expectedHeadRef &&
-                trustedAuthorLogins.has(pullRequest.user?.login || '') &&
-                labels.includes('dependencies') &&
-                labels.includes('security');
-
-              if (!trusted) {
-                core.info(
-                  `Skipping because PR is not trusted maintenance provenance. author=${pullRequest.user?.login}, branch=${pullRequest.head?.ref}`,
-                );
-                return;
-              }
-
-              if (labels.includes('automerge-blocked')) {
-                core.info('Skipping because automerge-blocked label is present.');
-                return;
-              }
-
-              const commits = await github.paginate(github.rest.pulls.listCommits, {
-                owner,
-                repo,
-                pull_number,
-                per_page: 100,
-              });
-              const hasExpectedCommit = commits.some((commit) =>
-                commit.commit?.message?.startsWith('chore(deps): automated dependency maintenance'),
-              );
-
-              if (!hasExpectedCommit) {
-                core.info('Skipping because PR does not contain the expected maintenance commit.');
-                return;
-              }
-
-              core.info(`Mergeable state on attempt ${attempt}: ${pullRequest.mergeable_state}`);
-
-              if (pullRequest.mergeable_state === 'clean') {
-                await github.rest.pulls.merge({
-                  owner,
-                  repo,
-                  pull_number,
-                  merge_method: 'squash',
-                });
-                core.info(`Merged PR #${pull_number}.`);
-                return;
-              }
-
-              if (attempt === maxAttempts) {
-                core.info('PR is not yet fully ready to merge. A later workflow_run will retry.');
-                return;
-              }
-
-              await sleep(delayMs);
-            }
+    uses: ./.github/workflows/pr-auto-finish-reusable.yml
+    with:
+      lane: maintenance
+      pull_number: ${{ github.event.workflow_run.pull_requests[0].number }}
+    secrets: inherit

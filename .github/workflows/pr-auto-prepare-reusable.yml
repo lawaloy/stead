@@ -1,0 +1,168 @@
+name: PR Auto Prepare Reusable
+
+on:
+  workflow_call:
+    inputs:
+      lane:
+        required: true
+        type: string
+      pull_number:
+        required: true
+        type: number
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Generate GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ vars.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+
+      - name: Prepare PR for automation
+        uses: actions/github-script@v7
+        env:
+          LANE: ${{ inputs.lane }}
+          PULL_NUMBER: ${{ inputs.pull_number }}
+        with:
+          github-token: ${{ steps.app-token.outputs.token }}
+          script: |
+            const lane = process.env.LANE;
+            const pull_number = Number(process.env.PULL_NUMBER);
+            const { owner, repo } = context.repo;
+            const pr = (
+              await github.rest.pulls.get({
+                owner,
+                repo,
+                pull_number,
+              })
+            ).data;
+            const labels = pr.labels.map((label) => label.name);
+            const blocked = labels.includes('automerge-blocked');
+            const reviews = await github.paginate(github.rest.pulls.listReviews, {
+              owner,
+              repo,
+              pull_number,
+              per_page: 100,
+            });
+            const commits = await github.paginate(github.rest.pulls.listCommits, {
+              owner,
+              repo,
+              pull_number,
+              per_page: 100,
+            });
+
+            const isTrustedDependabot = () => {
+              const authorLogin = pr.user?.login || '';
+              const headRef = pr.head?.ref || '';
+              return (
+                ['dependabot[bot]', 'app/dependabot'].includes(authorLogin) &&
+                headRef.startsWith('dependabot/')
+              );
+            };
+
+            const isTrustedMaintenance = () => {
+              const authorLogin = pr.user?.login || '';
+              return (
+                pr.head.repo?.full_name === `${owner}/${repo}` &&
+                pr.base.ref === 'main' &&
+                pr.head.ref === 'security/deps-maintenance' &&
+                ['app/github-actions', 'github-actions[bot]', 'stead-deps-bot[bot]', 'app/stead-deps-bot'].includes(authorLogin) &&
+                labels.includes('dependencies') &&
+                labels.includes('security')
+              );
+            };
+
+            const trusted = lane === 'dependabot' ? isTrustedDependabot() : isTrustedMaintenance();
+            if (!trusted) {
+              core.info(`Skipping because PR does not satisfy trusted ${lane} provenance.`);
+              return;
+            }
+
+            let safeToPrepare = false;
+            let approvalBody = '';
+            let approverLogin = 'stead-deps-bot[bot]';
+
+            if (lane === 'dependabot') {
+              const dependabotCommits = commits.filter((commit) =>
+                commit.author?.login === 'dependabot[bot]' ||
+                commit.commit?.author?.name === 'dependabot[bot]',
+              );
+              const updateTypes = dependabotCommits.flatMap((commit) =>
+                Array.from(
+                  commit.commit.message.matchAll(/update-type:\s*(version-update:semver-[a-z]+)/g),
+                  (match) => match[1],
+                ),
+              );
+              safeToPrepare =
+                updateTypes.length > 0 &&
+                updateTypes.every((type) =>
+                  ['version-update:semver-patch', 'version-update:semver-minor'].includes(type),
+                );
+              approvalBody = 'Auto-approving safe Dependabot update.';
+            } else {
+              safeToPrepare = commits.some((commit) =>
+                commit.commit?.message?.startsWith('chore(deps): automated dependency maintenance'),
+              );
+              approvalBody = 'Auto-approving dependency maintenance PR.';
+            }
+
+            if (!safeToPrepare) {
+              core.info(`Skipping because ${lane} PR is not eligible for automatic approval.`);
+              return;
+            }
+
+            if (blocked) {
+              const body = 'Auto-merge skipped because the `automerge-blocked` label is present.';
+              const comments = await github.paginate(github.rest.issues.listComments, {
+                owner,
+                repo,
+                issue_number: pull_number,
+                per_page: 100,
+              });
+
+              if (comments.some((comment) => comment.body === body)) {
+                core.info('Skipping blocked comment because the same comment already exists.');
+                return;
+              }
+
+              await github.rest.issues.createComment({
+                owner,
+                repo,
+                issue_number: pull_number,
+                body,
+              });
+              return;
+            }
+
+            const alreadyApproved = reviews.some((review) =>
+              review.user?.login === approverLogin &&
+              review.state === 'APPROVED' &&
+              review.commit_id === pr.head.sha,
+            );
+
+            if (alreadyApproved) {
+              core.info('Skipping auto-approval because the bot already approved this head commit.');
+              return;
+            }
+
+            try {
+              await github.rest.pulls.createReview({
+                owner,
+                repo,
+                pull_number,
+                event: 'APPROVE',
+                body: approvalBody,
+              });
+            } catch (error) {
+              if (!String(error.message).includes('Can not approve your own pull request')) {
+                throw error;
+              }
+            }
