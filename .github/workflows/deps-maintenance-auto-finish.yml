@@ -1,4 +1,4 @@
-name: Dependabot Auto Finish
+name: Dependency Maintenance Auto Finish
 
 on:
   workflow_run:
@@ -12,5 +12,5 @@ jobs:
       github.event.workflow_run.conclusion == 'success'
     uses: ./.github/workflows/pr-auto-finish-reusable.yml
     with:
-      lane: dependabot
+      lane: maintenance
     secrets: inherit

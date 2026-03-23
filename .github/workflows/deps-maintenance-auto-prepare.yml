@@ -1,4 +1,4 @@
-name: Dependabot Auto Prepare
+name: Dependency Maintenance Auto Prepare
 
 on:
   pull_request_target:
@@ -8,6 +8,6 @@ jobs:
   prepare:
     uses: ./.github/workflows/pr-auto-prepare-reusable.yml
     with:
-      lane: dependabot
+      lane: maintenance
       pull_number: ${{ github.event.pull_request.number }}
     secrets: inherit
