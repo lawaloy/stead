@@ -88,7 +88,7 @@ jobs:
 
             let safeToPrepare = false;
             let approvalBody = '';
-            let approverLogin = 'stead-deps-bot[bot]';
+            const approverLogin = 'stead-deps-bot[bot]';
 
             if (lane === 'dependabot') {
               const dependabotCommits = commits.filter((commit) =>
