@@ -5,6 +5,10 @@ on:
     workflows: ["ci", "mobile-ci", "CodeQL Advanced", "Dependency review"]
     types: [completed]
 
+permissions:
+  contents: write
+  pull-requests: write
+
 jobs:
   finish:
     if: |
