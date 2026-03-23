@@ -5,12 +5,143 @@ on:
     workflows: ["ci", "mobile-ci", "CodeQL Advanced", "Dependency review"]
     types: [completed]
 
+permissions:
+  contents: write
+  pull-requests: write
+
 jobs:
   finish:
     if: |
       github.event.workflow_run.event == 'pull_request' &&
-      github.event.workflow_run.conclusion == 'success'
-    uses: ./.github/workflows/pr-auto-finish-reusable.yml
-    with:
-      lane: dependabot
-    secrets: inherit
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.pull_requests[0]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Generate GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ vars.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+
+      - name: Merge or enable auto-merge when PR is ready
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ steps.app-token.outputs.token }}
+          script: |
+            const { owner, repo } = context.repo;
+            const pull_number = context.payload.workflow_run.pull_requests[0].number;
+            const maxAttempts = 10;
+            const delayMs = 15000;
+            const trustedAuthorLogins = new Set(['dependabot[bot]', 'app/dependabot']);
+
+            const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+            const safeUpdateTypes = new Set([
+              'version-update:semver-patch',
+              'version-update:semver-minor',
+            ]);
+
+            let pullRequest;
+            let updateTypes = [];
+
+            for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+              const response = await github.rest.pulls.get({
+                owner,
+                repo,
+                pull_number,
+              });
+              pullRequest = response.data;
+
+              const labels = pullRequest.labels.map((label) => label.name);
+              const authorLogin = pullRequest.user?.login || '';
+              const headRef = pullRequest.head?.ref || '';
+              const trustedPr =
+                trustedAuthorLogins.has(authorLogin) &&
+                headRef.startsWith('dependabot/');
+
+              if (!trustedPr) {
+                core.info(
+                  `Skipping because PR is not trusted Dependabot provenance. author=${authorLogin}, branch=${headRef}`,
+                );
+                return;
+              }
+
+              if (labels.includes('automerge-blocked')) {
+                core.info('Skipping because automerge-blocked label is present.');
+                return;
+              }
+
+              const commits = await github.paginate(github.rest.pulls.listCommits, {
+                owner,
+                repo,
+                pull_number,
+                per_page: 100,
+              });
+
+              const dependabotCommits = commits.filter((commit) =>
+                commit.author?.login === 'dependabot[bot]' ||
+                commit.commit?.author?.name === 'dependabot[bot]',
+              );
+
+              updateTypes = dependabotCommits.flatMap((commit) =>
+                Array.from(
+                  commit.commit.message.matchAll(/update-type:\s*(version-update:semver-[a-z]+)/g),
+                  (match) => match[1],
+                ),
+              );
+
+              if (updateTypes.length === 0) {
+                core.info('Skipping because no Dependabot update-type metadata was found in PR commits.');
+                return;
+              }
+
+              if (updateTypes.some((type) => !safeUpdateTypes.has(type))) {
+                core.info(`Skipping because PR contains a non-safe update type: ${updateTypes.join(', ')}`);
+                return;
+              }
+
+              const state = pullRequest.mergeable_state;
+              core.info(`Mergeable state on attempt ${attempt}: ${state}`);
+
+              if (state === 'clean') {
+                break;
+              }
+
+              if (attempt === maxAttempts) {
+                core.info('PR is not yet fully ready to merge. A later workflow_run will retry.');
+                return;
+              }
+
+              await sleep(delayMs);
+            }
+
+            if (pullRequest.mergeable_state === 'clean') {
+              await github.rest.pulls.merge({
+                owner,
+                repo,
+                pull_number,
+                merge_method: 'squash',
+              });
+              core.info(`Merged PR #${pull_number}.`);
+              return;
+            }
+
+            await github.graphql(`
+              mutation EnableAutoMerge($pullRequestId: ID!) {
+                enablePullRequestAutoMerge(input: {
+                  pullRequestId: $pullRequestId,
+                  mergeMethod: SQUASH
+                }) {
+                  pullRequest {
+                    number
+                    autoMergeRequest {
+                      enabledAt
+                    }
+                  }
+                }
+              }
+            `, {
+              pullRequestId: pullRequest.node_id,
+            });
+
+            core.info(`Auto-merge enabled for PR #${pull_number}.`);
