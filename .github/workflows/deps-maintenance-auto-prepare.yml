@@ -4,82 +4,10 @@ on:
   pull_request_target:
     types: [opened, reopened, synchronize]
 
-permissions:
-  pull-requests: write
-
 jobs:
   prepare:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Verify maintenance PR provenance
-        id: provenance
-        uses: actions/github-script@v7
-        with:
-          github-token: ${{ github.token }}
-          script: |
-            const pr = context.payload.pull_request;
-            const labels = pr.labels.map((label) => label.name);
-            const expectedHeadRef = 'security/deps-maintenance';
-            const trustedAuthorLogins = new Set([
-              'app/github-actions',
-              'github-actions[bot]',
-              'stead-deps-bot[bot]',
-              'app/stead-deps-bot',
-            ]);
-            const trusted =
-              pr.head.repo?.full_name === `${context.repo.owner}/${context.repo.repo}` &&
-              pr.base.ref === 'main' &&
-              pr.head.ref === expectedHeadRef &&
-              trustedAuthorLogins.has(pr.user.login) &&
-              labels.includes('dependencies') &&
-              labels.includes('security');
-
-            core.setOutput('trusted', String(trusted));
-            core.setOutput('blocked', String(labels.includes('automerge-blocked')));
-            core.info(
-              `Maintenance provenance: author=${pr.user.login}, branch=${pr.head.ref}, trusted=${trusted}`,
-            );
-
-      - name: Auto-approve maintenance PR
-        if: |
-          steps.provenance.outputs.trusted == 'true' &&
-          steps.provenance.outputs.blocked != 'true'
-        uses: actions/github-script@v7
-        with:
-          github-token: ${{ github.token }}
-          script: |
-            const { owner, repo } = context.repo;
-            const pull_number = context.payload.pull_request.number;
-            const headSha = context.payload.pull_request.head.sha;
-            const botLogin = 'github-actions[bot]';
-            const reviews = await github.paginate(github.rest.pulls.listReviews, {
-              owner,
-              repo,
-              pull_number,
-              per_page: 100,
-            });
-
-            const alreadyApproved = reviews.some((review) =>
-              review.user?.login === botLogin &&
-              review.state === 'APPROVED' &&
-              review.commit_id === headSha,
-            );
-
-            if (alreadyApproved) {
-              core.info('Skipping auto-approval because the workflow already approved this head commit.');
-              return;
-            }
-
-            try {
-              await github.rest.pulls.createReview({
-                owner,
-                repo,
-                pull_number,
-                event: 'APPROVE',
-                body: 'Auto-approving dependency maintenance PR.',
-              });
-            } catch (error) {
-              if (!String(error.message).includes('Can not approve your own pull request')) {
-                throw error;
-              }
-            }
+    uses: ./.github/workflows/pr-auto-prepare-reusable.yml
+    with:
+      lane: maintenance
+      pull_number: ${{ github.event.pull_request.number }}
+    secrets: inherit
