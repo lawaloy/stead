@@ -7,8 +7,9 @@ on:
         required: true
         type: string
       pull_number:
-        required: true
+        required: false
         type: number
+        default: 0
 
 permissions:
   contents: write
@@ -34,11 +35,18 @@ jobs:
           github-token: ${{ steps.app-token.outputs.token }}
           script: |
             const lane = process.env.LANE;
-            const pull_number = Number(process.env.PULL_NUMBER);
+            const eventPullNumber = context.payload.workflow_run?.pull_requests?.[0]?.number;
+            const inputPullNumber = Number(process.env.PULL_NUMBER || 0);
+            const pull_number = eventPullNumber || inputPullNumber;
             const { owner, repo } = context.repo;
             const maxAttempts = 10;
             const delayMs = 15000;
             const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+            if (!pull_number) {
+              core.info('Skipping because no pull request number was available on the workflow_run payload.');
+              return;
+            }
 
             const isTrustedDependabot = (pr) => {
               const authorLogin = pr.user?.login || '';
