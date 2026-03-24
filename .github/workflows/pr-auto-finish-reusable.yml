@@ -111,14 +111,21 @@ jobs:
                     (match) => match[1],
                   ),
                 );
+                const allowedUpdateTypes = ['version-update:semver-patch', 'version-update:semver-minor'];
 
-                if (
-                  updateTypes.length === 0 ||
-                  updateTypes.some((type) =>
-                    !['version-update:semver-patch', 'version-update:semver-minor'].includes(type),
-                  )
-                ) {
-                  core.info('Skipping because Dependabot PR is not eligible for automatic merge.');
+                if (updateTypes.length === 0) {
+                  core.info('Skipping because no Dependabot update-type metadata was found in PR commits.');
+                  return;
+                }
+
+                const disallowedUpdateTypes = updateTypes.filter(
+                  (type) => !allowedUpdateTypes.includes(type),
+                );
+
+                if (disallowedUpdateTypes.length > 0) {
+                  core.info(
+                    `Skipping because PR contains unsupported Dependabot update types: ${disallowedUpdateTypes.join(', ')}.`,
+                  );
                   return;
                 }
               } else {
