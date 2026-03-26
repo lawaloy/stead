@@ -10,6 +10,10 @@ updates:
     schedule:
       interval: "cron"
       cronjob: "0 13 * * *"
+    ignore:
+      - dependency-name: "typescript"
+        update-types:
+          - "version-update:semver-major"
     groups:
       npm-safe:
         patterns:
@@ -30,6 +34,9 @@ updates:
       cronjob: "0 13 * * *"
     ignore:
       - dependency-name: "eslint"
+        update-types:
+          - "version-update:semver-major"
+      - dependency-name: "typescript"
         update-types:
           - "version-update:semver-major"
     groups:
