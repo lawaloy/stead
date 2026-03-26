@@ -10,6 +10,10 @@ updates:
     schedule:
       interval: "cron"
       cronjob: "0 13 * * *"
+    # Temporary: revisit TypeScript 6 support monthly.
+    # Current blockers:
+    # - ts-jest requires TypeScript < 6
+    # - typescript-eslint currently requires TypeScript < 6
     ignore:
       - dependency-name: "typescript"
         update-types:
@@ -32,6 +36,9 @@ updates:
     schedule:
       interval: "cron"
       cronjob: "0 13 * * *"
+    # Temporary: revisit TypeScript 6 support monthly.
+    # Current blockers:
+    # - Expo/mobile lint stack currently requires TypeScript < 6
     ignore:
       - dependency-name: "eslint"
         update-types:
