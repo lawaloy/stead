@@ -30,8 +30,8 @@
     "@nestjs/jwt": "^11.0.2",
     "@nestjs/passport": "^11.0.5",
     "@nestjs/platform-express": "^11.1.17",
-    "@prisma/adapter-pg": "^7.5.0",
-    "@prisma/client": "^7.5.0",
+    "@prisma/adapter-pg": "^7.6.0",
+    "@prisma/client": "^7.6.0",
     "@types/ms": "^2.1.0",
     "bcrypt": "^6.0.0",
     "class-transformer": "^0.5.1",
@@ -41,7 +41,7 @@
     "passport": "^0.7.0",
     "passport-jwt": "^4.0.1",
     "pg": "^8.20.0",
-    "prisma": "^7.5.0",
+    "prisma": "^7.6.0",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1"
   },
@@ -72,13 +72,43 @@
     "typescript-eslint": "^8.57.2"
   },
   "overrides": {
-    "@angular-devkit/core": "21.2.2",
-    "@angular-devkit/schematics": "21.2.2",
-    "@angular-devkit/schematics-cli": "21.2.2",
+    "@angular-devkit/core": "21.2.5",
+    "@angular-devkit/schematics": "21.2.5",
+    "@angular-devkit/schematics-cli": "21.2.5",
     "@hono/node-server": "1.19.11",
-    "file-type": "21.3.1",
+    "file-type": "21.3.2",
     "hono": "4.12.7",
-    "lodash": "4.17.23"
+    "lodash": "4.17.23",
+    "anymatch": {
+      "picomatch": "2.3.2"
+    },
+    "micromatch": {
+      "picomatch": "2.3.2"
+    },
+    "fdir": {
+      "picomatch": "4.0.4"
+    },
+    "tinyglobby": {
+      "picomatch": "4.0.4"
+    },
+    "@angular-devkit/core@21.2.5": {
+      "picomatch": "4.0.4"
+    },
+    "jest-haste-map": {
+      "picomatch": "4.0.4"
+    },
+    "minimatch@3": {
+      "brace-expansion": "1.1.13"
+    },
+    "minimatch@9": {
+      "brace-expansion": "2.0.3"
+    },
+    "minimatch@10": {
+      "brace-expansion": "5.0.5"
+    },
+    "ts-jest": {
+      "handlebars": "4.7.9"
+    }
   },
   "jest": {
     "moduleFileExtensions": [

@@ -41,5 +41,40 @@
     "ts-jest": "^29.4.4",
     "typescript": "~6.0.2"
   },
+  "overrides": {
+    "node-forge": "1.4.0",
+    "yaml": "2.8.3",
+    "handlebars": "4.7.9",
+    "anymatch": {
+      "picomatch": "2.3.2"
+    },
+    "micromatch": {
+      "picomatch": "2.3.2"
+    },
+    "fdir": {
+      "picomatch": "4.0.4"
+    },
+    "tinyglobby": {
+      "picomatch": "4.0.4"
+    },
+    "jest-haste-map": {
+      "picomatch": "4.0.4"
+    },
+    "metro": {
+      "picomatch": "2.3.2"
+    },
+    "metro-file-map": {
+      "picomatch": "2.3.2"
+    },
+    "minimatch@3": {
+      "brace-expansion": "1.1.13"
+    },
+    "minimatch@9": {
+      "brace-expansion": "2.0.3"
+    },
+    "minimatch@10": {
+      "brace-expansion": "5.0.5"
+    }
+  },
   "private": true
 }
