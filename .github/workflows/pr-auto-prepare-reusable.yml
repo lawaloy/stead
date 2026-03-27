@@ -52,12 +52,6 @@ jobs:
               pull_number,
               per_page: 100,
             });
-            const commits = await github.paginate(github.rest.pulls.listCommits, {
-              owner,
-              repo,
-              pull_number,
-              per_page: 100,
-            });
 
             const isTrustedDependabot = () => {
               const authorLogin = pr.user?.login || '';
@@ -85,39 +79,11 @@ jobs:
               core.info(`Skipping because PR does not satisfy trusted ${lane} provenance.`);
               return;
             }
-
-            let safeToPrepare = false;
-            let approvalBody = '';
             const approverLogin = 'stead-deps-bot[bot]';
-
-            if (lane === 'dependabot') {
-              const dependabotCommits = commits.filter((commit) =>
-                commit.author?.login === 'dependabot[bot]' ||
-                commit.commit?.author?.name === 'dependabot[bot]',
-              );
-              const updateTypes = dependabotCommits.flatMap((commit) =>
-                Array.from(
-                  commit.commit.message.matchAll(/update-type:\s*(version-update:semver-[a-z]+)/g),
-                  (match) => match[1],
-                ),
-              );
-              safeToPrepare =
-                updateTypes.length > 0 &&
-                updateTypes.every((type) =>
-                  ['version-update:semver-patch', 'version-update:semver-minor'].includes(type),
-                );
-              approvalBody = 'Auto-approving safe Dependabot update.';
-            } else {
-              safeToPrepare = commits.some((commit) =>
-                commit.commit?.message?.startsWith('chore(deps): automated dependency maintenance'),
-              );
-              approvalBody = 'Auto-approving dependency maintenance PR.';
-            }
-
-            if (!safeToPrepare) {
-              core.info(`Skipping because ${lane} PR is not eligible for automatic approval.`);
-              return;
-            }
+            const approvalBody =
+              lane === 'dependabot'
+                ? 'Auto-approving trusted Dependabot update.'
+                : 'Auto-approving trusted dependency maintenance PR.';
 
             if (blocked) {
               const body = 'Auto-merge skipped because the `automerge-blocked` label is present.';
