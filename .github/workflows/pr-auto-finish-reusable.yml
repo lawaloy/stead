@@ -93,52 +93,6 @@ jobs:
                 return;
               }
 
-              const commits = await github.paginate(github.rest.pulls.listCommits, {
-                owner,
-                repo,
-                pull_number,
-                per_page: 100,
-              });
-
-              if (lane === 'dependabot') {
-                const dependabotCommits = commits.filter((commit) =>
-                  commit.author?.login === 'dependabot[bot]' ||
-                  commit.commit?.author?.name === 'dependabot[bot]',
-                );
-                const updateTypes = dependabotCommits.flatMap((commit) =>
-                  Array.from(
-                    commit.commit.message.matchAll(/update-type:\s*(version-update:semver-[a-z]+)/g),
-                    (match) => match[1],
-                  ),
-                );
-                const allowedUpdateTypes = ['version-update:semver-patch', 'version-update:semver-minor'];
-
-                if (updateTypes.length === 0) {
-                  core.info('Skipping because no Dependabot update-type metadata was found in PR commits.');
-                  return;
-                }
-
-                const disallowedUpdateTypes = updateTypes.filter(
-                  (type) => !allowedUpdateTypes.includes(type),
-                );
-
-                if (disallowedUpdateTypes.length > 0) {
-                  core.info(
-                    `Skipping because PR contains unsupported Dependabot update types: ${disallowedUpdateTypes.join(', ')}.`,
-                  );
-                  return;
-                }
-              } else {
-                const hasExpectedCommit = commits.some((commit) =>
-                  commit.commit?.message?.startsWith('chore(deps): automated dependency maintenance'),
-                );
-
-                if (!hasExpectedCommit) {
-                  core.info('Skipping because PR does not contain the expected maintenance commit.');
-                  return;
-                }
-              }
-
               core.info(`Mergeable state on attempt ${attempt}: ${pullRequest.mergeable_state}`);
 
               if (pullRequest.mergeable_state === 'clean') {
