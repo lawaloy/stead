@@ -152,6 +152,7 @@ jobs:
           git push
 
       - name: Prepare PR for automation
+        if: steps.pr.outputs.trusted == 'true'
         uses: actions/github-script@v7
         env:
           LANE: ${{ inputs.lane }}
@@ -177,33 +178,6 @@ jobs:
               pull_number,
               per_page: 100,
             });
-
-            const isTrustedDependabot = () => {
-              const authorLogin = pr.user?.login || '';
-              const headRef = pr.head?.ref || '';
-              return (
-                ['dependabot[bot]', 'app/dependabot'].includes(authorLogin) &&
-                headRef.startsWith('dependabot/')
-              );
-            };
-
-            const isTrustedMaintenance = () => {
-              const authorLogin = pr.user?.login || '';
-              return (
-                pr.head.repo?.full_name === `${owner}/${repo}` &&
-                pr.base.ref === 'main' &&
-                pr.head.ref === 'security/deps-maintenance' &&
-                ['app/github-actions', 'github-actions[bot]', 'stead-deps-bot[bot]', 'app/stead-deps-bot'].includes(authorLogin) &&
-                labels.includes('dependencies') &&
-                labels.includes('security')
-              );
-            };
-
-            const trusted = lane === 'dependabot' ? isTrustedDependabot() : isTrustedMaintenance();
-            if (!trusted) {
-              core.info(`Skipping because PR does not satisfy trusted ${lane} provenance.`);
-              return;
-            }
             const approverLogin = 'stead-deps-bot[bot]';
             const approvalBody =
               lane === 'dependabot'
