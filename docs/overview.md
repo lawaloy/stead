@@ -16,7 +16,7 @@ Stead answers one question:
 
 “What can I safely spend today without creating future financial pressure?”
 
-Stead is not:
+Today, Stead is not:
 
 - A wallet
 - A neobank
@@ -28,6 +28,8 @@ Stead is:
 - A financial stability engine
 - A cashflow interpretation layer
 - A decision-support system
+
+Long term, Stead can evolve from a financial stability layer into a broader financial platform. The wedge is decision intelligence and financial stability first; over time, that layer can expand into richer money movement, account, and operating capabilities without losing the core focus on helping users act safely and stay financially prepared.
 
 ## 2. Problem Statement
 
@@ -62,6 +64,8 @@ This sits above wallets and banks.
 
 Wallets move money.
 Stead interprets money.
+
+In the current phase, that positioning is intentional. Over time, Stead can grow from infrastructure and decisioning into a fuller financial product surface, closer to the breadth of modern fintech platforms, while keeping stability and pre-spend intelligence as the differentiator.
 
 ### 3.2 Wedge Use Case (v1)
 
