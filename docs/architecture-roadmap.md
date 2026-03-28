@@ -12,6 +12,19 @@
 - Move from "modular monolith" to "multi-service" with low migration risk.
 - Standardize contracts, observability, and delivery quality gates.
 
+## Product Surface Sequence
+- Core product surfaces first:
+  - Mobile application as the primary user product.
+  - Website for marketing, onboarding, trust, waitlist/docs, and eventual web access.
+- Internal tooling next:
+  - Admin and operations surfaces for support, oversight, and manual workflows.
+  - Internal CLI for developer, support, and ops automation.
+- Agentic infrastructure later:
+  - Project-specific internal agent for support, operations, and workflow automation.
+  - MCP server only when the agent needs Stead-specific tools, data access, and safe action boundaries.
+
+This sequence is intentional. Stead should prioritize user-facing product surfaces first, then operational leverage, then agent and MCP capabilities once the domain model, workflows, and safety boundaries are mature enough to support them.
+
 ## Guiding Principles
 - Keep domain boundaries strict before splitting repos.
 - Prefer asynchronous integration for non-request-critical workflows.
@@ -109,6 +122,16 @@
 - Exit criteria:
   - Independent deployment of core API, notifications, and mobile.
   - Cross-repo integration tests passing in release pipeline.
+
+### Stage 5: Internal Platform and Agent Layer (long term)
+- Build internal admin and ops tooling on top of stable product and service boundaries.
+- Add an internal CLI for recurring support, maintenance, migration, and developer workflows.
+- Introduce a Stead-specific internal agent once operational workflows are explicit and auditable.
+- Add an MCP server only when agents need structured project context and scoped actions across customer, account, or workflow systems.
+- Exit criteria:
+  - Internal operations can be executed through stable tooling rather than ad hoc scripts.
+  - Agent actions are scoped, observable, and auditable.
+  - MCP capabilities expose only intentional, safe tools and resources.
 
 ## KPIs and Guardrails
 - Product KPIs:
