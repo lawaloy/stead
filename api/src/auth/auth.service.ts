@@ -42,7 +42,10 @@ export class AuthService {
     const normalizedPhone = normalizePhoneNumber(phone, countryIso);
     const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
     const recent = await this.prisma.otpCode.count({
-      where: { user: { phone: normalizedPhone }, createdAt: { gte: oneHourAgo } },
+      where: {
+        user: { phone: normalizedPhone },
+        createdAt: { gte: oneHourAgo },
+      },
     });
     if (recent >= OTP_REQUEST_LIMIT_PER_HOUR) {
       throw new HttpException(

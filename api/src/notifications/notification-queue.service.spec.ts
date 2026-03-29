@@ -11,6 +11,8 @@ describe('NotificationQueueService', () => {
       findUniqueOrThrow: jest.Mock;
       update: jest.Mock;
       count: jest.Mock;
+      groupBy: jest.Mock;
+      findMany: jest.Mock;
     };
   };
 
@@ -23,6 +25,8 @@ describe('NotificationQueueService', () => {
         findUniqueOrThrow: jest.fn(),
         update: jest.fn(),
         count: jest.fn(),
+        groupBy: jest.fn(),
+        findMany: jest.fn(),
       },
     };
     queue = new NotificationQueueService(prisma as never as PrismaService);
@@ -75,15 +79,16 @@ describe('NotificationQueueService', () => {
       new Error('provider down'),
     );
 
-    expect(prisma.notificationJob.update).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: { id: 'job_1' },
-        data: expect.objectContaining({
-          attempts: 3,
-          status: 'dead_letter',
-          lastError: 'provider down',
-        }),
-      }),
-    );
+    expect(prisma.notificationJob.update).toHaveBeenCalledWith({
+      where: { id: 'job_1' },
+      data: {
+        attempts: 3,
+        status: 'dead_letter',
+        nextRunAt: expect.any(Date) as unknown as Date,
+        failedAt: expect.any(Date) as unknown as Date,
+        lastError: 'provider down',
+        lockedAt: null,
+      },
+    });
   });
 });

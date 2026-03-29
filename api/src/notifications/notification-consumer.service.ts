@@ -60,7 +60,10 @@ export class NotificationConsumerService
   private async processJob(job: NotificationJob) {
     switch (job.type) {
       case 'otp.requested': {
-        const result = await this.sms.sendOtp(job.payload.phone, job.payload.otp);
+        const result = await this.sms.sendOtp(
+          job.payload.phone,
+          job.payload.otp,
+        );
         return {
           provider: result.provider,
           providerMessageId: this.extractProviderMessageId(result.response),

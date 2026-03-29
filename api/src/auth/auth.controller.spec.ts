@@ -34,18 +34,14 @@ describe('AuthController', () => {
       get: jest.fn().mockReturnValue('jest-agent'),
     };
 
-    controller.requestOtp(
+    void controller.requestOtp(
       { phone: '08012345678', countryIso: 'NG' },
       req as never,
     );
 
-    expect(authService.requestOtp).toHaveBeenCalledWith(
-      '08012345678',
-      'NG',
-      {
-        ip: '127.0.0.1',
-        userAgent: 'jest-agent',
-      },
-    );
+    expect(authService.requestOtp).toHaveBeenCalledWith('08012345678', 'NG', {
+      ip: '127.0.0.1',
+      userAgent: 'jest-agent',
+    });
   });
 });

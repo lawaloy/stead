@@ -105,16 +105,32 @@ export class NotificationQueueService {
     });
   }
 
+  async getStatusSummary(): Promise<Record<string, number>> {
+    const grouped = await this.prisma.notificationJob.groupBy({
+      by: ['status'],
+      _count: { _all: true },
+    });
+
+    return grouped.reduce<Record<string, number>>((summary, row) => {
+      summary[row.status] = row._count._all;
+      return summary;
+    }, {});
+  }
+
+  async listRecentJobs(limit = 20): Promise<NotificationJob[]> {
+    const jobs = await this.prisma.notificationJob.findMany({
+      orderBy: { updatedAt: 'desc' },
+      take: limit,
+    });
+
+    return jobs.map((job) => this.mapJob(job));
+  }
+
   private mapJob(job: {
     id: string;
     type: string;
     payloadJson: string;
-    status:
-      | 'pending'
-      | 'processing'
-      | 'sent'
-      | 'failed'
-      | 'dead_letter';
+    status: 'pending' | 'processing' | 'sent' | 'failed' | 'dead_letter';
     attempts: number;
     maxAttempts: number;
     nextRunAt: Date;

@@ -8,6 +8,13 @@ import { NotificationsService } from '../notifications/notifications.service';
 
 describe('AuthService', () => {
   let service: AuthService;
+  type MockUser = { id: string; phone: string };
+  type MockOtpRecord = {
+    id: string;
+    codeHash?: string;
+    expiresAt?: Date;
+    consumedAt?: Date | null;
+  };
   let prisma: {
     otpCode: {
       count: jest.Mock;
@@ -71,7 +78,10 @@ describe('AuthService', () => {
 
   it('normalizes phone numbers, stores metadata, and enqueues otp', async () => {
     prisma.otpCode.count.mockResolvedValue(0);
-    prisma.user.upsert.mockResolvedValue({ id: 'user_1', phone: '+2348012345678' });
+    prisma.user.upsert.mockResolvedValue({
+      id: 'user_1',
+      phone: '+2348012345678',
+    } satisfies MockUser);
     prisma.otpCode.findFirst.mockResolvedValue(null);
     prisma.otpCode.create.mockResolvedValue({ id: 'otp_1' });
 
@@ -85,15 +95,15 @@ describe('AuthService', () => {
       update: {},
       create: { phone: '+2348012345678' },
     });
-    expect(prisma.otpCode.create).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({
-          userId: 'user_1',
-          ip: '127.0.0.1',
-          userAgent: 'jest-agent',
-        }),
-      }),
-    );
+    expect(prisma.otpCode.create).toHaveBeenCalledWith({
+      data: {
+        userId: 'user_1',
+        codeHash: expect.any(String) as unknown as string,
+        expiresAt: expect.any(Date) as unknown as Date,
+        ip: '127.0.0.1',
+        userAgent: 'jest-agent',
+      },
+    });
     expect(notifications.enqueueOtpRequested).toHaveBeenCalledWith(
       '+2348012345678',
       expect.any(String),
@@ -102,20 +112,28 @@ describe('AuthService', () => {
 
   it('rejects otp resend during cooldown window', async () => {
     prisma.otpCode.count.mockResolvedValue(0);
-    prisma.user.upsert.mockResolvedValue({ id: 'user_1', phone: '+2348012345678' });
+    prisma.user.upsert.mockResolvedValue({
+      id: 'user_1',
+      phone: '+2348012345678',
+    } satisfies MockUser);
     prisma.otpCode.findFirst.mockResolvedValue({ id: 'otp_recent' });
 
     await expect(service.requestOtp('+2348012345678', 'NG')).rejects.toThrow(
       HttpException,
     );
-    await expect(service.requestOtp('+2348012345678', 'NG')).rejects.toMatchObject({
+    await expect(
+      service.requestOtp('+2348012345678', 'NG'),
+    ).rejects.toMatchObject({
       message: 'Please wait before requesting another OTP.',
     });
   });
 
   it('normalizes using the selected country', async () => {
     prisma.otpCode.count.mockResolvedValue(0);
-    prisma.user.upsert.mockResolvedValue({ id: 'user_us', phone: '+14155552671' });
+    prisma.user.upsert.mockResolvedValue({
+      id: 'user_us',
+      phone: '+14155552671',
+    } satisfies MockUser);
     prisma.otpCode.findFirst.mockResolvedValue(null);
     prisma.otpCode.create.mockResolvedValue({ id: 'otp_us' });
 
@@ -133,13 +151,13 @@ describe('AuthService', () => {
     prisma.user.findUnique.mockResolvedValue({
       id: 'user_1',
       phone: '+2348012345678',
-    });
+    } satisfies MockUser);
     prisma.otpCode.findFirst.mockResolvedValue({
       id: 'otp_1',
       codeHash: await bcrypt.hash(otp, 1),
       expiresAt: new Date(Date.now() + 60_000),
       consumedAt: null,
-    });
+    } satisfies MockOtpRecord);
     prisma.otpCode.update.mockResolvedValue({});
     jwt.signAsync.mockResolvedValue('jwt_token');
 
@@ -150,7 +168,9 @@ describe('AuthService', () => {
     });
     expect(prisma.otpCode.update).toHaveBeenCalledWith({
       where: { id: 'otp_1' },
-      data: { consumedAt: expect.any(Date) },
+      data: {
+        consumedAt: expect.any(Date) as unknown as Date,
+      },
     });
     expect(result).toEqual({ token: 'jwt_token' });
   });
