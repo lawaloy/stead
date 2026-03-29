@@ -21,6 +21,7 @@
     "expo-router": "~55.0.8",
     "expo-secure-store": "~55.0.9",
     "expo-status-bar": "~55.0.4",
+    "libphonenumber-js": "^1.12.41",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "react-native": "0.84.1",
@@ -31,9 +32,9 @@
     "zod": "^4.3.6"
   },
   "devDependencies": {
-    "@typescript-eslint/parser": "^8.57.2",
     "@types/jest": "^30.0.0",
     "@types/react": "~19.2.2",
+    "@typescript-eslint/parser": "^8.57.2",
     "axios-mock-adapter": "^2.1.0",
     "babel-preset-expo": "~55.0.13",
     "eslint": "^9.39.4",

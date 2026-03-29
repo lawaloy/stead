@@ -11,8 +11,7 @@ import {
   defaultAuthCountryIso,
   getAuthCountry,
 } from '../../src/lib/countries';
-
-const phoneRegex = /^(?:\+?\d{6,15}|0\d{6,14}|00\d{6,15})$/;
+import { isValidPhoneForCountry } from '../../src/lib/phone';
 
 export default function RequestOtpScreen() {
   const [phone, setPhone] = useState('');
@@ -24,10 +23,10 @@ export default function RequestOtpScreen() {
 
   const validation = useMemo(() => {
     if (!phone) return '';
-    if (!phoneRegex.test(phone))
-      return 'Enter a local or international phone number';
+    if (!isValidPhoneForCountry(phone, countryIso))
+      return 'Enter a valid phone number for the selected country';
     return '';
-  }, [phone]);
+  }, [countryIso, phone]);
 
   const mutation = useMutation({
     mutationFn: async () => requestOtp(phone, countryIso),
