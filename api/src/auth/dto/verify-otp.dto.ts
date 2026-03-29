@@ -2,7 +2,9 @@ import { IsString, Length, Matches } from 'class-validator';
 
 export class VerifyOtpDto {
   @IsString()
-  @Matches(/^\+?\d{10,15}$/, { message: 'phone must look like +2348012345678' })
+  @Matches(/^(?:\+?\d{10,15}|0\d{10}|00\d{10,15})$/, {
+    message: 'phone must look like +2348012345678',
+  })
   phone!: string;
 
   @IsString()
