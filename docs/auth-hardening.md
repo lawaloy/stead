@@ -7,6 +7,7 @@ Move OTP authentication from "implemented in code" to "operationally usable" for
 ## Phase 1
 
 - Normalize phone numbers before lookup, storage, and SMS dispatch.
+- Make auth input country-aware so local numbers can be normalized without assuming Nigeria by default.
 - Capture request metadata for OTP issuance.
 - Add basic OTP resend cooldown.
 - Strengthen auth service tests around request and verify behavior.

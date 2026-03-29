@@ -83,13 +83,20 @@ export const configureApiAuth = (config: AuthConfig) => {
   onUnauthorizedFn = config.onUnauthorized;
 };
 
-export const requestOtp = async (phone: string) => {
-  const response = await apiClient.post('/auth/request-otp', { phone });
+export const requestOtp = async (
+  phone: string,
+  countryIso: 'NG' | 'US' | 'GB',
+) => {
+  const response = await apiClient.post('/auth/request-otp', { phone, countryIso });
   return AuthRequestOtpResponseSchema.parse(response.data);
 };
 
-export const verifyOtp = async (phone: string, otp: string) => {
-  const response = await apiClient.post('/auth/verify-otp', { phone, otp });
+export const verifyOtp = async (
+  phone: string,
+  countryIso: 'NG' | 'US' | 'GB',
+  otp: string,
+) => {
+  const response = await apiClient.post('/auth/verify-otp', { phone, countryIso, otp });
   return AuthVerifyOtpResponseSchema.parse(response.data);
 };
 

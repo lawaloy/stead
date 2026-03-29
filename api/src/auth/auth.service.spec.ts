@@ -75,7 +75,7 @@ describe('AuthService', () => {
     prisma.otpCode.findFirst.mockResolvedValue(null);
     prisma.otpCode.create.mockResolvedValue({ id: 'otp_1' });
 
-    await service.requestOtp('08012345678', {
+    await service.requestOtp('08012345678', 'NG', {
       ip: '127.0.0.1',
       userAgent: 'jest-agent',
     });
@@ -105,11 +105,26 @@ describe('AuthService', () => {
     prisma.user.upsert.mockResolvedValue({ id: 'user_1', phone: '+2348012345678' });
     prisma.otpCode.findFirst.mockResolvedValue({ id: 'otp_recent' });
 
-    await expect(service.requestOtp('+2348012345678')).rejects.toThrow(
+    await expect(service.requestOtp('+2348012345678', 'NG')).rejects.toThrow(
       HttpException,
     );
-    await expect(service.requestOtp('+2348012345678')).rejects.toMatchObject({
+    await expect(service.requestOtp('+2348012345678', 'NG')).rejects.toMatchObject({
       message: 'Please wait before requesting another OTP.',
+    });
+  });
+
+  it('normalizes using the selected country', async () => {
+    prisma.otpCode.count.mockResolvedValue(0);
+    prisma.user.upsert.mockResolvedValue({ id: 'user_us', phone: '+14155552671' });
+    prisma.otpCode.findFirst.mockResolvedValue(null);
+    prisma.otpCode.create.mockResolvedValue({ id: 'otp_us' });
+
+    await service.requestOtp('4155552671', 'US');
+
+    expect(prisma.user.upsert).toHaveBeenCalledWith({
+      where: { phone: '+14155552671' },
+      update: {},
+      create: { phone: '+14155552671' },
     });
   });
 
@@ -128,7 +143,7 @@ describe('AuthService', () => {
     prisma.otpCode.update.mockResolvedValue({});
     jwt.signAsync.mockResolvedValue('jwt_token');
 
-    const result = await service.verifyOtp('08012345678', otp);
+    const result = await service.verifyOtp('08012345678', 'NG', otp);
 
     expect(prisma.user.findUnique).toHaveBeenCalledWith({
       where: { phone: '+2348012345678' },

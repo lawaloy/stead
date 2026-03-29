@@ -8,7 +8,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import * as bcrypt from 'bcrypt';
 import { JwtService } from '@nestjs/jwt';
-import { normalizePhoneNumber } from './phone.util';
+import { CountryIso, normalizePhoneNumber } from './phone.util';
 
 const OTP_REQUEST_LIMIT_PER_HOUR = 10;
 const OTP_RESEND_COOLDOWN_MS = 60_000;
@@ -34,8 +34,12 @@ export class AuthService {
     private jwt: JwtService,
   ) {}
 
-  async requestOtp(phone: string, context: OtpRequestContext = {}) {
-    const normalizedPhone = normalizePhoneNumber(phone);
+  async requestOtp(
+    phone: string,
+    countryIso: CountryIso,
+    context: OtpRequestContext = {},
+  ) {
+    const normalizedPhone = normalizePhoneNumber(phone, countryIso);
     const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
     const recent = await this.prisma.otpCode.count({
       where: { user: { phone: normalizedPhone }, createdAt: { gte: oneHourAgo } },
@@ -90,8 +94,8 @@ export class AuthService {
     return { ok: true };
   }
 
-  async verifyOtp(phone: string, otp: string) {
-    const normalizedPhone = normalizePhoneNumber(phone);
+  async verifyOtp(phone: string, countryIso: CountryIso, otp: string) {
+    const normalizedPhone = normalizePhoneNumber(phone, countryIso);
     const user = await this.prisma.user.findUnique({
       where: { phone: normalizedPhone },
     });

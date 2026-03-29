@@ -8,13 +8,19 @@ import React, {
 } from 'react';
 import { tokenStore } from './token-store';
 import { configureApiAuth } from './api';
+import {
+  AuthCountryIso,
+  defaultAuthCountryIso,
+} from './countries';
 
 type AuthContextValue = {
   token: string | null;
   bootstrapping: boolean;
   pendingPhone: string;
+  pendingCountryIso: AuthCountryIso;
   devOtpHint: string;
   setPendingPhone: (phone: string) => void;
+  setPendingCountryIso: (countryIso: AuthCountryIso) => void;
   setDevOtpHint: (otp: string) => void;
   completeAuth: (token: string) => Promise<void>;
   logout: () => Promise<void>;
@@ -26,6 +32,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [token, setToken] = useState<string | null>(null);
   const [bootstrapping, setBootstrapping] = useState(true);
   const [pendingPhone, setPendingPhone] = useState('');
+  const [pendingCountryIso, setPendingCountryIso] =
+    useState<AuthCountryIso>(defaultAuthCountryIso);
   const [devOtpHint, setDevOtpHint] = useState('');
 
   const logout = useCallback(async () => {
@@ -67,13 +75,23 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       token,
       bootstrapping,
       pendingPhone,
+      pendingCountryIso,
       devOtpHint,
       setPendingPhone,
+      setPendingCountryIso,
       setDevOtpHint,
       completeAuth,
       logout,
     }),
-    [bootstrapping, completeAuth, devOtpHint, logout, pendingPhone, token],
+    [
+      bootstrapping,
+      completeAuth,
+      devOtpHint,
+      logout,
+      pendingCountryIso,
+      pendingPhone,
+      token,
+    ],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

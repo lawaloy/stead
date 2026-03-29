@@ -10,7 +10,7 @@ export class AuthController {
 
   @Post('request-otp')
   requestOtp(@Body() dto: RequestOtpDto, @Req() req: Request) {
-    return this.auth.requestOtp(dto.phone, {
+    return this.auth.requestOtp(dto.phone, dto.countryIso, {
       ip: req.ip,
       userAgent: req.get('user-agent'),
     });
@@ -18,6 +18,6 @@ export class AuthController {
 
   @Post('verify-otp')
   verifyOtp(@Body() dto: VerifyOtpDto) {
-    return this.auth.verifyOtp(dto.phone, dto.otp);
+    return this.auth.verifyOtp(dto.phone, dto.countryIso, dto.otp);
   }
 }
