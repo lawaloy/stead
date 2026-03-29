@@ -1,87 +1,149 @@
 import { Injectable } from '@nestjs/common';
-import {
-  DeadLetterNotificationJob,
-  NotificationJob,
-  OtpRequestedPayload,
-} from './notification.types';
+import { PrismaService } from '../prisma/prisma.service';
+import { NotificationJob, OtpRequestedPayload } from './notification.types';
 
 @Injectable()
 export class NotificationQueueService {
-  private readonly queue: NotificationJob[] = [];
-  private readonly inFlight = new Set<string>();
-  private readonly deadLetterQueue: DeadLetterNotificationJob[] = [];
+  constructor(private readonly prisma: PrismaService) {}
 
-  enqueueOtpRequested(payload: OtpRequestedPayload): string {
-    const now = new Date();
-    const id = this.newJobId();
-    this.queue.push({
-      id,
-      type: 'otp.requested',
-      payload,
-      attempts: 0,
-      maxAttempts: 3,
-      nextRunAt: now,
-      createdAt: now,
-      updatedAt: now,
+  async enqueueOtpRequested(payload: OtpRequestedPayload): Promise<string> {
+    const job = await this.prisma.notificationJob.create({
+      data: {
+        type: 'otp.requested',
+        payloadJson: JSON.stringify(payload),
+        status: 'pending',
+        attempts: 0,
+        maxAttempts: 3,
+        nextRunAt: new Date(),
+      },
     });
 
-    return id;
+    return job.id;
   }
 
-  claimReadyJob(): NotificationJob | null {
-    const now = Date.now();
-    const idx = this.queue.findIndex(
-      (job) => !this.inFlight.has(job.id) && job.nextRunAt.getTime() <= now,
+  async claimReadyJob(): Promise<NotificationJob | null> {
+    const now = new Date();
+    const candidate = await this.prisma.notificationJob.findFirst({
+      where: {
+        status: 'pending',
+        nextRunAt: { lte: now },
+      },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    if (!candidate) return null;
+
+    const claimed = await this.prisma.notificationJob.updateMany({
+      where: {
+        id: candidate.id,
+        status: 'pending',
+      },
+      data: {
+        status: 'processing',
+        lockedAt: now,
+      },
+    });
+
+    if (claimed.count === 0) return null;
+
+    return this.mapJob(
+      await this.prisma.notificationJob.findUniqueOrThrow({
+        where: { id: candidate.id },
+      }),
     );
-
-    if (idx === -1) return null;
-
-    const [job] = this.queue.splice(idx, 1);
-    this.inFlight.add(job.id);
-    return job;
   }
 
-  markSucceeded(jobId: string): void {
-    this.inFlight.delete(jobId);
+  async markSucceeded(
+    jobId: string,
+    input?: { provider?: string | null; providerMessageId?: string | null },
+  ): Promise<void> {
+    await this.prisma.notificationJob.update({
+      where: { id: jobId },
+      data: {
+        status: 'sent',
+        sentAt: new Date(),
+        provider: input?.provider || undefined,
+        providerMessageId: input?.providerMessageId || undefined,
+        lastError: null,
+        failedAt: null,
+        lockedAt: null,
+      },
+    });
   }
 
-  markFailed(job: NotificationJob, error: unknown): void {
-    this.inFlight.delete(job.id);
-
+  async markFailed(job: NotificationJob, error: unknown): Promise<void> {
     const attempts = job.attempts + 1;
+    const terminal = attempts >= job.maxAttempts;
     const now = new Date();
     const errorMessage =
       error instanceof Error ? error.message : 'Unknown notification error';
 
-    if (attempts >= job.maxAttempts) {
-      this.deadLetterQueue.push({
-        ...job,
+    await this.prisma.notificationJob.update({
+      where: { id: job.id },
+      data: {
         attempts,
-        updatedAt: now,
+        status: terminal ? 'dead_letter' : 'pending',
+        nextRunAt: terminal
+          ? job.nextRunAt
+          : new Date(Date.now() + this.backoffMs(attempts)),
         failedAt: now,
         lastError: errorMessage,
-      });
-      return;
-    }
-
-    this.queue.push({
-      ...job,
-      attempts,
-      nextRunAt: new Date(Date.now() + this.backoffMs(attempts)),
-      updatedAt: now,
+        lockedAt: null,
+      },
     });
   }
 
-  getQueueDepth(): number {
-    return this.queue.length;
+  async getQueueDepth(): Promise<number> {
+    return this.prisma.notificationJob.count({
+      where: { status: { in: ['pending', 'processing'] } },
+    });
   }
 
-  getDeadLetterDepth(): number {
-    return this.deadLetterQueue.length;
+  async getDeadLetterDepth(): Promise<number> {
+    return this.prisma.notificationJob.count({
+      where: { status: 'dead_letter' },
+    });
   }
 
-  private newJobId(): string {
-    return `notif_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+  private mapJob(job: {
+    id: string;
+    type: string;
+    payloadJson: string;
+    status:
+      | 'pending'
+      | 'processing'
+      | 'sent'
+      | 'failed'
+      | 'dead_letter';
+    attempts: number;
+    maxAttempts: number;
+    nextRunAt: Date;
+    lockedAt: Date | null;
+    sentAt: Date | null;
+    failedAt: Date | null;
+    lastError: string | null;
+    provider: string | null;
+    providerMessageId: string | null;
+    createdAt: Date;
+    updatedAt: Date;
+  }): NotificationJob {
+    return {
+      id: job.id,
+      type: 'otp.requested',
+      payload: JSON.parse(job.payloadJson) as OtpRequestedPayload,
+      status: job.status,
+      attempts: job.attempts,
+      maxAttempts: job.maxAttempts,
+      nextRunAt: job.nextRunAt,
+      lockedAt: job.lockedAt,
+      sentAt: job.sentAt,
+      failedAt: job.failedAt,
+      lastError: job.lastError,
+      provider: job.provider,
+      providerMessageId: job.providerMessageId,
+      createdAt: job.createdAt,
+      updatedAt: job.updatedAt,
+    };
   }
 
   private backoffMs(attempt: number): number {

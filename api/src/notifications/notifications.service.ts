@@ -6,7 +6,7 @@ export class NotificationsService {
   constructor(private readonly queue: NotificationQueueService) {}
 
   enqueueOtpRequested(phone: string, otp: string): { ok: true } {
-    this.queue.enqueueOtpRequested({ phone, otp });
+    void this.queue.enqueueOtpRequested({ phone, otp });
     return { ok: true };
   }
 }

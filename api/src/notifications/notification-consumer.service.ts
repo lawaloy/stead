@@ -37,19 +37,20 @@ export class NotificationConsumerService
   private async tick() {
     if (this.isProcessing) return;
 
-    const job = this.queue.claimReadyJob();
+    const job = await this.queue.claimReadyJob();
     if (!job) return;
 
     this.isProcessing = true;
     try {
-      await this.processJob(job);
-      this.queue.markSucceeded(job.id);
+      const result = await this.processJob(job);
+      await this.queue.markSucceeded(job.id, result);
+      this.logger.log(
+        `Notification job sent id=${job.id} type=${job.type} provider=${result.provider ?? 'unknown'} phone=${this.maskPhone(job.payload.phone)}`,
+      );
     } catch (error: unknown) {
-      this.queue.markFailed(job, error);
+      await this.queue.markFailed(job, error);
       this.logger.warn(
-        `Notification job failed id=${job.id} type=${job.type} attempts=${
-          job.attempts + 1
-        }`,
+        `Notification job failed id=${job.id} type=${job.type} attempts=${job.attempts + 1} phone=${this.maskPhone(job.payload.phone)}`,
       );
     } finally {
       this.isProcessing = false;
@@ -59,11 +60,27 @@ export class NotificationConsumerService
   private async processJob(job: NotificationJob) {
     switch (job.type) {
       case 'otp.requested': {
-        await this.sms.sendOtp(job.payload.phone, job.payload.otp);
-        return;
+        const result = await this.sms.sendOtp(job.payload.phone, job.payload.otp);
+        return {
+          provider: result.provider,
+          providerMessageId: this.extractProviderMessageId(result.response),
+        };
       }
       default:
         throw new Error('Unsupported notification job type');
     }
+  }
+
+  private extractProviderMessageId(response: unknown): string | null {
+    if (!response || typeof response !== 'object') return null;
+    const body = response as Record<string, unknown>;
+    if (typeof body.sid === 'string') return body.sid;
+    if (typeof body.message_id === 'string') return body.message_id;
+    return null;
+  }
+
+  private maskPhone(phone: string): string {
+    if (phone.length <= 4) return phone;
+    return `${phone.slice(0, 4)}***${phone.slice(-2)}`;
   }
 }
