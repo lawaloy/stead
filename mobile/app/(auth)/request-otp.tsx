@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { useRouter } from 'expo-router';
 import { useMutation } from '@tanstack/react-query';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
-import { requestOtp, ApiError } from '../../src/lib/api';
+import { requestOtp } from '../../src/lib/api';
 import { useAuth } from '../../src/lib/auth-state';
 import { ScreenShell } from '../../src/components/screen-shell';
 import {
@@ -12,13 +12,19 @@ import {
   getAuthCountry,
 } from '../../src/lib/countries';
 import { isValidPhoneForCountry } from '../../src/lib/phone';
+import { getAuthErrorMessage } from '../../src/lib/auth-feedback';
 
 export default function RequestOtpScreen() {
   const [phone, setPhone] = useState('');
   const [countryIso, setCountryIso] =
     useState<AuthCountryIso>(defaultAuthCountryIso);
   const router = useRouter();
-  const { setPendingPhone, setPendingCountryIso, setDevOtpHint } = useAuth();
+  const {
+    setPendingPhone,
+    setPendingCountryIso,
+    setPendingOtpRequestedAt,
+    setDevOtpHint,
+  } = useAuth();
   const selectedCountry = getAuthCountry(countryIso);
 
   const validation = useMemo(() => {
@@ -33,6 +39,7 @@ export default function RequestOtpScreen() {
     onSuccess: (data) => {
       setPendingPhone(phone);
       setPendingCountryIso(countryIso);
+      setPendingOtpRequestedAt(Date.now());
       setDevOtpHint(data.otp || '');
       router.push('/(auth)/verify-otp');
     },
@@ -76,7 +83,9 @@ export default function RequestOtpScreen() {
       </Text>
       {validation ? <Text style={styles.error}>{validation}</Text> : null}
       {mutation.error ? (
-        <Text style={styles.error}>{(mutation.error as ApiError).message}</Text>
+        <Text style={styles.error}>
+          {getAuthErrorMessage(mutation.error, 'request')}
+        </Text>
       ) : null}
       <Pressable
         style={[styles.button, (!!validation || mutation.isPending) && styles.buttonDisabled]}

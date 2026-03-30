@@ -62,13 +62,13 @@ Move OTP authentication from "implemented in code" to "operationally usable" for
 
 - Verify the mobile request OTP -> verify OTP -> authenticated session flow end to end.
 - Confirm token persistence and app restart behavior against a real API environment.
-- Improve user-facing handling for provider downtime, expired codes, and repeated invalid attempts.
+- Continue refining user-facing handling now that the auth flow has clearer resend, cooldown, invalid-code, and lockout states.
 
 #### Checklist
 
 - Test request OTP, receive code, verify OTP, and land in the authenticated app flow on a real device.
 - Verify token persistence survives app restart.
-- Add clearer UI states for invalid code, expired code, resend cooldown, and too-many-attempts cases.
+- Verify the new UI states for invalid code, expired code, resend cooldown, and too-many-attempts cases against a real provider-backed flow.
 - Confirm unauthorized session expiry still clears auth state and returns the user to the auth flow.
 
 ## Earlier Phase Framing

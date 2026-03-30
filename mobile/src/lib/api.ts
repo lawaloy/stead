@@ -2,6 +2,7 @@ import axios, { AxiosHeaders, isAxiosError } from 'axios';
 import { z } from 'zod';
 import { appConfig } from './app-config';
 import { resolveApiBaseUrl } from './base-url';
+import { ApiError } from './api-error';
 import {
   AuthRequestOtpResponseSchema,
   AuthVerifyOtpResponseSchema,
@@ -10,28 +11,12 @@ import {
   TransactionSchema,
 } from '../types/api';
 
+export { ApiError } from './api-error';
+
 type AuthConfig = {
   getToken: () => Promise<string | null>;
   onUnauthorized: () => Promise<void> | void;
 };
-
-type ApiErrorShape = {
-  message: string;
-  status?: number;
-  details?: unknown;
-};
-
-export class ApiError extends Error {
-  status?: number;
-  details?: unknown;
-
-  constructor(input: ApiErrorShape) {
-    super(input.message);
-    this.name = 'ApiError';
-    this.status = input.status;
-    this.details = input.details;
-  }
-}
 
 let getTokenFn: AuthConfig['getToken'] = async () => null;
 let onUnauthorizedFn: AuthConfig['onUnauthorized'] = () => undefined;
