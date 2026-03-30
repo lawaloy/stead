@@ -13,6 +13,7 @@ Move OTP authentication from "implemented in code" to "operationally usable" for
 - Use `libphonenumber-js` for phone parsing instead of custom string rules.
 - Capture request metadata for OTP issuance.
 - Add basic OTP resend cooldown.
+- Add verify-attempt throttling and OTP invalidation after repeated failed verification attempts.
 - Strengthen auth service tests around request and verify behavior.
 
 ### Delivery reliability
@@ -22,20 +23,24 @@ Move OTP authentication from "implemented in code" to "operationally usable" for
 - Add provider and environment validation for the active SMS provider.
 - Add a protected notification inspection endpoint for recent OTP job visibility.
 
+### Auth telemetry and inspection
+
+- Persist auth behavior events for OTP request, resend blocking, verify failure, verify lockout, and verify success.
+- Capture request metadata on OTP verification as well as OTP request.
+- Add a protected auth inspection endpoint for recent auth event visibility and summary counts.
+
 ## Remaining
 
 ### Auth controls
 
-- Add verify-attempt throttling and stronger abuse controls.
-- Add resend and verify telemetry that is easier to inspect over time.
+- Add stronger abuse controls beyond the current verify-attempt throttle.
 - Consider whether OTP request and verify should capture more device/request context.
 
 #### Checklist
 
-- Persist failed verify attempts on the active OTP record.
-- Reject verification once the active OTP exceeds the allowed invalid-attempt limit.
-- Invalidate or lock the OTP after the limit is exceeded so it cannot be brute-forced.
-- Add tests for invalid OTP retries, lockout, and happy-path verification after fewer failed attempts.
+- Add IP- or device-aware throttling in addition to OTP-level attempt limits.
+- Decide whether verify-attempt limits should be configurable per environment.
+- Add operator-facing visibility for lockout trends and repeated auth failures by phone or IP.
 
 ### Provider and operations
 
@@ -95,4 +100,5 @@ Move OTP authentication from "implemented in code" to "operationally usable" for
 - Auth tests cover the critical request and verify paths.
 - OTP jobs survive process restarts and persist retry/dead-letter state.
 - Active SMS provider configuration fails fast when required env is missing.
-- Remaining work focuses on real-provider validation, abuse controls, and operator visibility.
+- Auth events persist resend and verify outcomes for later inspection.
+- Remaining work focuses on real-provider validation, stronger abuse controls, and operator visibility.
