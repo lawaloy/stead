@@ -4,32 +4,6 @@
 
 Move OTP authentication from "implemented in code" to "operationally usable" for early environments.
 
-## Completed
-
-### Auth foundation
-
-- Normalize phone numbers before lookup, storage, and SMS dispatch.
-- Make auth input country-aware so local numbers can be normalized without assuming Nigeria by default.
-- Use `libphonenumber-js` for phone parsing instead of custom string rules.
-- Capture request metadata for OTP issuance.
-- Add basic OTP resend cooldown.
-- Add verify-attempt throttling and OTP invalidation after repeated failed verification attempts.
-- Strengthen auth service tests around request and verify behavior.
-
-### Delivery reliability
-
-- Replace the in-memory notification queue with a durable database-backed notification job queue.
-- Persist retry, dead-letter, provider, and delivery metadata for OTP jobs.
-- Add provider and environment validation for the active SMS provider.
-- Add a protected notification inspection endpoint for recent OTP job visibility.
-
-### Auth telemetry and inspection
-
-- Persist auth behavior events for OTP request, resend blocking, verify failure, verify lockout, and verify success.
-- Capture request metadata on OTP verification as well as OTP request.
-- Add a protected auth inspection endpoint for recent auth event visibility and summary counts.
-- Add IP-aware throttling for OTP requests and repeated verification failures.
-
 ## Remaining
 
 ### Auth controls
@@ -40,7 +14,6 @@ Move OTP authentication from "implemented in code" to "operationally usable" for
 #### Checklist
 
 - Add device-aware throttling in addition to OTP- and IP-level attempt limits.
-- Decide whether verify-attempt limits should be configurable per environment.
 - Add operator-facing visibility for lockout trends and repeated auth failures by phone or IP.
 
 ### Provider and operations
@@ -70,28 +43,6 @@ Move OTP authentication from "implemented in code" to "operationally usable" for
 - Verify token persistence survives app restart.
 - Verify the new UI states for invalid code, expired code, resend cooldown, and too-many-attempts cases against a real provider-backed flow.
 - Confirm unauthorized session expiry still clears auth state and returns the user to the auth flow.
-
-## Earlier Phase Framing
-
-### Phase 1
-
-- Normalize phone numbers before lookup, storage, and SMS dispatch.
-- Make auth input country-aware so local numbers can be normalized without assuming Nigeria by default.
-- Capture request metadata for OTP issuance.
-- Add basic OTP resend cooldown.
-- Strengthen auth service tests around request and verify behavior.
-
-### Phase 2
-
-- Replace the in-memory notification queue with a durable queue or outbox.
-- Add structured delivery logs for enqueue, send, retry, and dead-letter events.
-- Add provider and environment validation for the active SMS provider.
-
-### Phase 3
-
-- Add verify-attempt throttling and layered abuse controls.
-- Add end-to-end mobile verification in a real environment.
-- Add support tooling for OTP delivery inspection and failure diagnosis.
 
 ## Acceptance Criteria
 

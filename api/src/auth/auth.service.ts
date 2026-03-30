@@ -4,6 +4,7 @@ import {
   HttpStatus,
   Injectable,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import * as bcrypt from 'bcrypt';
@@ -11,12 +12,12 @@ import { JwtService } from '@nestjs/jwt';
 import { AuthTelemetryService } from './auth-telemetry.service';
 import { CountryIso, normalizePhoneNumber } from './phone.util';
 
-const OTP_REQUEST_LIMIT_PER_HOUR = 10;
-const OTP_RESEND_COOLDOWN_MS = 60_000;
-const OTP_MAX_VERIFY_ATTEMPTS = 5;
-const OTP_REQUEST_LIMIT_PER_IP_PER_HOUR = 20;
-const OTP_VERIFY_FAILURE_LIMIT_PER_IP_WINDOW = 10;
-const OTP_VERIFY_FAILURE_WINDOW_MS = 15 * 60 * 1000;
+const DEFAULT_OTP_REQUEST_LIMIT_PER_HOUR = 10;
+const DEFAULT_OTP_RESEND_COOLDOWN_MS = 60_000;
+const DEFAULT_OTP_MAX_VERIFY_ATTEMPTS = 5;
+const DEFAULT_OTP_REQUEST_LIMIT_PER_IP_PER_HOUR = 20;
+const DEFAULT_OTP_VERIFY_FAILURE_LIMIT_PER_IP_WINDOW = 10;
+const DEFAULT_OTP_VERIFY_FAILURE_WINDOW_MS = 15 * 60 * 1000;
 
 type OtpRequestContext = {
   ip?: string;
@@ -38,7 +39,50 @@ export class AuthService {
     private notifications: NotificationsService,
     private jwt: JwtService,
     private telemetry: AuthTelemetryService,
+    private readonly config: ConfigService,
   ) {}
+
+  private get otpRequestLimitPerHour() {
+    return (
+      this.config.get<number>('AUTH_OTP_REQUEST_LIMIT_PER_HOUR') ??
+      DEFAULT_OTP_REQUEST_LIMIT_PER_HOUR
+    );
+  }
+
+  private get otpResendCooldownMs() {
+    return (
+      this.config.get<number>('AUTH_OTP_RESEND_COOLDOWN_MS') ??
+      DEFAULT_OTP_RESEND_COOLDOWN_MS
+    );
+  }
+
+  private get otpMaxVerifyAttempts() {
+    return (
+      this.config.get<number>('AUTH_OTP_MAX_VERIFY_ATTEMPTS') ??
+      DEFAULT_OTP_MAX_VERIFY_ATTEMPTS
+    );
+  }
+
+  private get otpRequestLimitPerIpPerHour() {
+    return (
+      this.config.get<number>('AUTH_OTP_REQUEST_LIMIT_PER_IP_PER_HOUR') ??
+      DEFAULT_OTP_REQUEST_LIMIT_PER_IP_PER_HOUR
+    );
+  }
+
+  private get otpVerifyFailureLimitPerIpWindow() {
+    return (
+      this.config.get<number>('AUTH_OTP_VERIFY_FAILURE_LIMIT_PER_IP_WINDOW') ??
+      DEFAULT_OTP_VERIFY_FAILURE_LIMIT_PER_IP_WINDOW
+    );
+  }
+
+  private get otpVerifyFailureWindowMs() {
+    return (
+      this.config.get<number>('AUTH_OTP_VERIFY_FAILURE_WINDOW_MS') ??
+      DEFAULT_OTP_VERIFY_FAILURE_WINDOW_MS
+    );
+  }
 
   async requestOtp(
     phone: string,
@@ -54,7 +98,7 @@ export class AuthService {
         since: oneHourAgo,
         ip: context.ip,
       });
-      if (recentByIp >= OTP_REQUEST_LIMIT_PER_IP_PER_HOUR) {
+      if (recentByIp >= this.otpRequestLimitPerIpPerHour) {
         this.telemetry.recordEvent({
           type: 'otp_request_rate_limited',
           phone: normalizedPhone,
@@ -62,7 +106,7 @@ export class AuthService {
           ip: context.ip,
           userAgent: context.userAgent,
           metadata: {
-            limit: OTP_REQUEST_LIMIT_PER_IP_PER_HOUR,
+            limit: this.otpRequestLimitPerIpPerHour,
             window: '1h',
             scope: 'ip',
           },
@@ -80,14 +124,14 @@ export class AuthService {
         createdAt: { gte: oneHourAgo },
       },
     });
-    if (recent >= OTP_REQUEST_LIMIT_PER_HOUR) {
+    if (recent >= this.otpRequestLimitPerHour) {
       this.telemetry.recordEvent({
         type: 'otp_request_rate_limited',
         phone: normalizedPhone,
         countryIso,
         ip: context.ip,
         userAgent: context.userAgent,
-        metadata: { limit: OTP_REQUEST_LIMIT_PER_HOUR, window: '1h' },
+        metadata: { limit: this.otpRequestLimitPerHour, window: '1h' },
       });
       throw new HttpException(
         'Too many OTP requests. Try again later.',
@@ -104,7 +148,7 @@ export class AuthService {
     const latestOtp = await this.prisma.otpCode.findFirst({
       where: {
         userId: user.id,
-        createdAt: { gt: new Date(Date.now() - OTP_RESEND_COOLDOWN_MS) },
+        createdAt: { gt: new Date(Date.now() - this.otpResendCooldownMs) },
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -117,7 +161,7 @@ export class AuthService {
         userAgent: context.userAgent,
         userId: user.id,
         otpCodeId: latestOtp.id,
-        metadata: { cooldownMs: OTP_RESEND_COOLDOWN_MS },
+        metadata: { cooldownMs: this.otpResendCooldownMs },
       });
       throw new HttpException(
         'Please wait before requesting another OTP.',
@@ -167,11 +211,11 @@ export class AuthService {
     if (context.ip) {
       const recentVerifyFailuresByIp = await this.telemetry.countRecentEvents({
         types: ['otp_verify_failed', 'otp_verify_locked'],
-        since: new Date(Date.now() - OTP_VERIFY_FAILURE_WINDOW_MS),
+        since: new Date(Date.now() - this.otpVerifyFailureWindowMs),
         ip: context.ip,
       });
 
-      if (recentVerifyFailuresByIp >= OTP_VERIFY_FAILURE_LIMIT_PER_IP_WINDOW) {
+      if (recentVerifyFailuresByIp >= this.otpVerifyFailureLimitPerIpWindow) {
         this.telemetry.recordEvent({
           type: 'otp_verify_locked',
           phone: normalizedPhone,
@@ -181,8 +225,8 @@ export class AuthService {
           attemptNumber: recentVerifyFailuresByIp,
           metadata: {
             reason: 'ip_window_limit_reached',
-            limit: OTP_VERIFY_FAILURE_LIMIT_PER_IP_WINDOW,
-            windowMs: OTP_VERIFY_FAILURE_WINDOW_MS,
+            limit: this.otpVerifyFailureLimitPerIpWindow,
+            windowMs: this.otpVerifyFailureWindowMs,
           },
         });
         throw new HttpException(
@@ -207,7 +251,7 @@ export class AuthService {
     });
     if (!record) throw new BadRequestException('OTP expired or not found');
 
-    if (record.verifyAttempts >= OTP_MAX_VERIFY_ATTEMPTS) {
+    if (record.verifyAttempts >= this.otpMaxVerifyAttempts) {
       this.telemetry.recordEvent({
         type: 'otp_verify_locked',
         phone: normalizedPhone,
@@ -233,11 +277,13 @@ export class AuthService {
         data: {
           verifyAttempts,
           consumedAt:
-            verifyAttempts >= OTP_MAX_VERIFY_ATTEMPTS ? new Date() : undefined,
+            verifyAttempts >= this.otpMaxVerifyAttempts
+              ? new Date()
+              : undefined,
         },
       });
 
-      if (verifyAttempts >= OTP_MAX_VERIFY_ATTEMPTS) {
+      if (verifyAttempts >= this.otpMaxVerifyAttempts) {
         this.telemetry.recordEvent({
           type: 'otp_verify_locked',
           phone: normalizedPhone,

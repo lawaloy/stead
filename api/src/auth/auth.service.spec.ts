@@ -1,5 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { JwtService } from '@nestjs/jwt';
+import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
 import { BadRequestException, HttpException, HttpStatus } from '@nestjs/common';
 import { AuthService } from './auth.service';
@@ -32,6 +33,7 @@ describe('AuthService', () => {
   let notifications: { enqueueOtpRequested: jest.Mock };
   let jwt: { signAsync: jest.Mock };
   let telemetry: { recordEvent: jest.Mock; countRecentEvents: jest.Mock };
+  let config: { get: jest.Mock };
 
   beforeEach(async () => {
     prisma = {
@@ -56,6 +58,14 @@ describe('AuthService', () => {
       recordEvent: jest.fn(),
       countRecentEvents: jest.fn().mockResolvedValue(0),
     };
+    config = {
+      get: jest.fn((key: string) => {
+        const values: Record<string, number | string | undefined> = {
+          DEV_EXPOSE_OTP: process.env.DEV_EXPOSE_OTP,
+        };
+        return values[key];
+      }),
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -75,6 +85,10 @@ describe('AuthService', () => {
         {
           provide: AuthTelemetryService,
           useValue: telemetry,
+        },
+        {
+          provide: ConfigService,
+          useValue: config,
         },
       ],
     }).compile();
@@ -177,6 +191,40 @@ describe('AuthService', () => {
         type: 'otp_resend_blocked',
         phone: '+2348012345678',
         countryIso: 'NG',
+      }),
+    );
+  });
+
+  it('uses configured resend cooldown values', async () => {
+    config.get.mockImplementation((key: string) => {
+      if (key === 'AUTH_OTP_RESEND_COOLDOWN_MS') return 120_000;
+      return undefined;
+    });
+    prisma.otpCode.count.mockResolvedValue(0);
+    prisma.user.upsert.mockResolvedValue({
+      id: 'user_1',
+      phone: '+2348012345678',
+    } satisfies MockUser);
+    prisma.otpCode.findFirst.mockResolvedValue({ id: 'otp_recent' });
+
+    await expect(
+      service.requestOtp('+2348012345678', 'NG'),
+    ).rejects.toMatchObject({
+      message: 'Please wait before requesting another OTP.',
+      status: HttpStatus.TOO_MANY_REQUESTS,
+    });
+
+    expect(prisma.otpCode.findFirst).toHaveBeenCalledWith({
+      where: {
+        userId: 'user_1',
+        createdAt: { gt: expect.any(Date) as unknown as Date },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+    expect(telemetry.recordEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'otp_resend_blocked',
+        metadata: { cooldownMs: 120_000 },
       }),
     );
   });
