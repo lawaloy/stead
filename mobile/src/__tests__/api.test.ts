@@ -28,7 +28,7 @@ describe('api client', () => {
       return [200, { ok: true, otp: '123456' }];
     });
 
-    const response = await requestOtp('+2348012345678');
+    const response = await requestOtp('08012345678', 'NG');
     expect(response.ok).toBe(true);
     expect(response.otp).toBe('123456');
   });
@@ -42,7 +42,9 @@ describe('api client', () => {
 
     mock.onPost('/auth/verify-otp').reply(401, { message: 'Unauthorized' });
 
-    await expect(verifyOtp('+2348012345678', '000000')).rejects.toThrow(
+    await expect(
+      verifyOtp('08012345678', 'NG', '000000'),
+    ).rejects.toThrow(
       'Unauthorized',
     );
     expect(onUnauthorized).toHaveBeenCalledTimes(1);

@@ -5,11 +5,19 @@ import { Pressable, StyleSheet, Text, TextInput } from 'react-native';
 import { ApiError, verifyOtp } from '../../src/lib/api';
 import { useAuth } from '../../src/lib/auth-state';
 import { ScreenShell } from '../../src/components/screen-shell';
+import { getAuthCountry } from '../../src/lib/countries';
 
 export default function VerifyOtpScreen() {
   const [otp, setOtp] = useState('');
   const router = useRouter();
-  const { pendingPhone, devOtpHint, completeAuth, setDevOtpHint } = useAuth();
+  const {
+    pendingPhone,
+    pendingCountryIso,
+    devOtpHint,
+    completeAuth,
+    setDevOtpHint,
+  } = useAuth();
+  const country = getAuthCountry(pendingCountryIso);
 
   useEffect(() => {
     if (devOtpHint) setOtp(devOtpHint);
@@ -22,7 +30,7 @@ export default function VerifyOtpScreen() {
   }, [otp]);
 
   const mutation = useMutation({
-    mutationFn: async () => verifyOtp(pendingPhone, otp),
+    mutationFn: async () => verifyOtp(pendingPhone, pendingCountryIso, otp),
     retry: false,
     onSuccess: async (data) => {
       await completeAuth(data.token);
@@ -44,7 +52,9 @@ export default function VerifyOtpScreen() {
 
   return (
     <ScreenShell title="Verify OTP">
-      <Text style={styles.label}>Code sent to {pendingPhone}</Text>
+      <Text style={styles.label}>
+        Code sent to {country.label} number {pendingPhone}
+      </Text>
       {devOtpHint ? <Text style={styles.hint}>Dev OTP: {devOtpHint}</Text> : null}
       <TextInput
         value={otp}

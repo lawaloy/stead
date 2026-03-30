@@ -16,6 +16,14 @@ model User {
   transactions Transaction[]
 }
 
+enum NotificationJobStatus {
+  pending
+  processing
+  sent
+  failed
+  dead_letter
+}
+
 model OtpCode {
   id          String   @id @default(uuid())
   userId      String
@@ -58,4 +66,24 @@ model Transaction {
   occurredAt  DateTime
   note        String?
   createdAt   DateTime @default(now())
+}
+
+model NotificationJob {
+  id                 String                @id @default(uuid())
+  type               String
+  payloadJson        String
+  status             NotificationJobStatus @default(pending)
+  attempts           Int                   @default(0)
+  maxAttempts        Int                   @default(3)
+  nextRunAt          DateTime              @default(now())
+  lockedAt           DateTime?
+  sentAt             DateTime?
+  failedAt           DateTime?
+  lastError          String?
+  provider           String?
+  providerMessageId  String?
+  createdAt          DateTime              @default(now())
+  updatedAt          DateTime              @updatedAt
+
+  @@index([status, nextRunAt])
 }

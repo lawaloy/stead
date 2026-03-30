@@ -1,5 +1,6 @@
 import { Platform } from 'react-native';
 import Constants from 'expo-constants';
+import { appConfig } from './app-config';
 import { env } from './env';
 
 const trimTrailingSlash = (url: string) => url.replace(/\/+$/, '');
@@ -16,8 +17,11 @@ export const resolveApiBaseUrl = () => {
   if (fromEnv) return trimTrailingSlash(fromEnv);
 
   const expoHost = parseExpoHost();
-  if (expoHost) return `http://${expoHost}:3000`;
+  if (expoHost) return `http://${expoHost}:${appConfig.api.defaultPort}`;
 
-  if (Platform.OS === 'android') return 'http://10.0.2.2:3000';
-  return 'http://localhost:3000';
+  if (Platform.OS === 'android') {
+    return `http://${appConfig.api.androidEmulatorHost}:${appConfig.api.defaultPort}`;
+  }
+
+  return `http://${appConfig.api.localhost}:${appConfig.api.defaultPort}`;
 };

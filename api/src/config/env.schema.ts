@@ -1,5 +1,15 @@
 import * as Joi from 'joi';
 
+type EnvInput = {
+  SMS_PROVIDER?: string;
+  TWILIO_ACCOUNT_SID?: string;
+  TWILIO_AUTH_TOKEN?: string;
+  TWILIO_FROM?: string;
+  TWILIO_MESSAGING_SERVICE_SID?: string;
+  TERMII_API_KEY?: string;
+  TERMII_SENDER_ID?: string;
+};
+
 export const envSchema = Joi.object({
   NODE_ENV: Joi.string()
     .valid('development', 'test', 'production')
@@ -17,4 +27,45 @@ export const envSchema = Joi.object({
   TERMII_API_KEY: Joi.string().allow('').optional(),
   TERMII_SENDER_ID: Joi.string().allow('').optional(),
   TERMII_CHANNEL: Joi.string().allow('').optional(),
-}).unknown(true);
+})
+  .custom((rawValue: unknown, helpers) => {
+    const value = rawValue as EnvInput;
+    const provider = (value.SMS_PROVIDER || 'twilio').toLowerCase();
+
+    if (provider === 'twilio') {
+      if (!value.TWILIO_ACCOUNT_SID) {
+        return helpers.message({
+          custom: 'TWILIO_ACCOUNT_SID is required when SMS_PROVIDER=twilio',
+        });
+      }
+
+      if (!value.TWILIO_AUTH_TOKEN) {
+        return helpers.message({
+          custom: 'TWILIO_AUTH_TOKEN is required when SMS_PROVIDER=twilio',
+        });
+      }
+
+      if (!value.TWILIO_FROM && !value.TWILIO_MESSAGING_SERVICE_SID) {
+        return helpers.message({
+          custom:
+            'Set TWILIO_FROM or TWILIO_MESSAGING_SERVICE_SID when SMS_PROVIDER=twilio',
+        });
+      }
+    }
+
+    if (provider === 'termii') {
+      if (!value.TERMII_API_KEY) {
+        return helpers.message({
+          custom: 'TERMII_API_KEY is required when SMS_PROVIDER=termii',
+        });
+      }
+
+      if (!value.TERMII_SENDER_ID) {
+        return helpers.message({
+          custom: 'TERMII_SENDER_ID is required when SMS_PROVIDER=termii',
+        });
+      }
+    }
+    return value;
+  }, 'sms provider validation')
+  .unknown(true);
