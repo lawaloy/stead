@@ -1,4 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { JwtAuthGuard } from './jwt-auth.guard';
+import { AuthTelemetryService } from './auth-telemetry.service';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 
@@ -7,6 +9,9 @@ describe('AuthController', () => {
   const authService = {
     requestOtp: jest.fn(),
     verifyOtp: jest.fn(),
+  };
+  const telemetryService = {
+    getInspection: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -17,8 +22,15 @@ describe('AuthController', () => {
           provide: AuthService,
           useValue: authService,
         },
+        {
+          provide: AuthTelemetryService,
+          useValue: telemetryService,
+        },
       ],
-    }).compile();
+    })
+      .overrideGuard(JwtAuthGuard)
+      .useValue({ canActivate: () => true })
+      .compile();
 
     controller = module.get<AuthController>(AuthController);
     jest.clearAllMocks();
@@ -65,5 +77,20 @@ describe('AuthController', () => {
         userAgent: 'jest-agent',
       },
     );
+  });
+
+  it('returns auth telemetry inspection', async () => {
+    telemetryService.getInspection.mockResolvedValue({
+      summary: { otp_requested: 1 },
+      recent: [],
+    });
+
+    const result = await controller.getInspection(5);
+
+    expect(telemetryService.getInspection).toHaveBeenCalledWith(5);
+    expect(result).toEqual({
+      summary: { otp_requested: 1 },
+      recent: [],
+    });
   });
 });
