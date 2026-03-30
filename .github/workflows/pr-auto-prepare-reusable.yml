@@ -119,10 +119,10 @@ jobs:
           for workspace in $(node -pe "JSON.parse(process.env.CHANGED_WORKSPACES).join(' ')"); do
             case "$workspace" in
               mobile)
-                (cd "$workspace" && npm install --package-lock-only --legacy-peer-deps)
+                (cd "$workspace" && npm install --package-lock-only --legacy-peer-deps --ignore-scripts)
                 ;;
               *)
-                (cd "$workspace" && npm install --package-lock-only)
+                (cd "$workspace" && npm install --package-lock-only --ignore-scripts)
                 ;;
             esac
           done
