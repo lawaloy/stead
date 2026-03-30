@@ -1,5 +1,6 @@
 import axios, { AxiosHeaders, isAxiosError } from 'axios';
 import { z } from 'zod';
+import { appConfig } from './app-config';
 import { resolveApiBaseUrl } from './base-url';
 import {
   AuthRequestOtpResponseSchema,
@@ -37,7 +38,7 @@ let onUnauthorizedFn: AuthConfig['onUnauthorized'] = () => undefined;
 
 export const apiClient = axios.create({
   baseURL: resolveApiBaseUrl(),
-  timeout: 15_000,
+  timeout: appConfig.api.timeoutMs,
 });
 
 apiClient.interceptors.request.use(async (config) => {
@@ -87,7 +88,10 @@ export const requestOtp = async (
   phone: string,
   countryIso: 'NG' | 'US' | 'GB',
 ) => {
-  const response = await apiClient.post('/auth/request-otp', { phone, countryIso });
+  const response = await apiClient.post(
+    appConfig.api.routes.auth.requestOtp,
+    { phone, countryIso },
+  );
   return AuthRequestOtpResponseSchema.parse(response.data);
 };
 
@@ -96,12 +100,15 @@ export const verifyOtp = async (
   countryIso: 'NG' | 'US' | 'GB',
   otp: string,
 ) => {
-  const response = await apiClient.post('/auth/verify-otp', { phone, countryIso, otp });
+  const response = await apiClient.post(
+    appConfig.api.routes.auth.verifyOtp,
+    { phone, countryIso, otp },
+  );
   return AuthVerifyOtpResponseSchema.parse(response.data);
 };
 
 export const getActiveGoal = async () => {
-  const response = await apiClient.get('/goals/active');
+  const response = await apiClient.get(appConfig.api.routes.goals.active);
   return GoalSchema.parse(response.data);
 };
 
@@ -111,7 +118,7 @@ export const createGoal = async (payload: {
   dueDate: string;
   monthlyIncomeKobo?: number;
 }) => {
-  const response = await apiClient.post('/goals', payload);
+  const response = await apiClient.post(appConfig.api.routes.goals.create, payload);
   return GoalSchema.parse(response.data);
 };
 
@@ -122,12 +129,15 @@ export const createTransaction = async (payload: {
   note?: string;
   goalId?: string;
 }) => {
-  const response = await apiClient.post('/transactions', payload);
+  const response = await apiClient.post(
+    appConfig.api.routes.transactions.create,
+    payload,
+  );
   return TransactionSchema.parse(response.data);
 };
 
 export const getDashboardStability = async () => {
-  const response = await apiClient.get('/dashboard/stability');
+  const response = await apiClient.get(appConfig.api.routes.dashboard.stability);
   return DashboardStabilityResponseSchema.parse(response.data);
 };
 
