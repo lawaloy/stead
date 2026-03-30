@@ -3,6 +3,7 @@ import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { BadRequestException, HttpException, HttpStatus } from '@nestjs/common';
 import { AuthService } from './auth.service';
+import { AuthTelemetryService } from './auth-telemetry.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 
@@ -30,6 +31,7 @@ describe('AuthService', () => {
   };
   let notifications: { enqueueOtpRequested: jest.Mock };
   let jwt: { signAsync: jest.Mock };
+  let telemetry: { recordEvent: jest.Mock };
 
   beforeEach(async () => {
     prisma = {
@@ -50,6 +52,9 @@ describe('AuthService', () => {
     jwt = {
       signAsync: jest.fn(),
     };
+    telemetry = {
+      recordEvent: jest.fn(),
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -65,6 +70,10 @@ describe('AuthService', () => {
         {
           provide: JwtService,
           useValue: jwt,
+        },
+        {
+          provide: AuthTelemetryService,
+          useValue: telemetry,
         },
       ],
     }).compile();
@@ -109,6 +118,13 @@ describe('AuthService', () => {
       '+2348012345678',
       expect.any(String),
     );
+    expect(telemetry.recordEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'otp_requested',
+        phone: '+2348012345678',
+        countryIso: 'NG',
+      }),
+    );
   });
 
   it('rejects otp resend during cooldown window', async () => {
@@ -127,6 +143,13 @@ describe('AuthService', () => {
     ).rejects.toMatchObject({
       message: 'Please wait before requesting another OTP.',
     });
+    expect(telemetry.recordEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'otp_resend_blocked',
+        phone: '+2348012345678',
+        countryIso: 'NG',
+      }),
+    );
   });
 
   it('normalizes using the selected country', async () => {
@@ -163,7 +186,10 @@ describe('AuthService', () => {
     prisma.otpCode.update.mockResolvedValue({});
     jwt.signAsync.mockResolvedValue('jwt_token');
 
-    const result = await service.verifyOtp('08012345678', 'NG', otp);
+    const result = await service.verifyOtp('08012345678', 'NG', otp, {
+      ip: '127.0.0.1',
+      userAgent: 'jest-agent',
+    });
 
     expect(prisma.user.findUnique).toHaveBeenCalledWith({
       where: { phone: '+2348012345678' },
@@ -174,6 +200,15 @@ describe('AuthService', () => {
         consumedAt: expect.any(Date) as unknown as Date,
       },
     });
+    expect(telemetry.recordEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'otp_verify_succeeded',
+        phone: '+2348012345678',
+        countryIso: 'NG',
+        ip: '127.0.0.1',
+        userAgent: 'jest-agent',
+      }),
+    );
     expect(result).toEqual({ token: 'jwt_token' });
   });
 
@@ -202,6 +237,14 @@ describe('AuthService', () => {
         consumedAt: undefined,
       },
     });
+    expect(telemetry.recordEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'otp_verify_failed',
+        phone: '+2348012345678',
+        countryIso: 'NG',
+        attemptNumber: 2,
+      }),
+    );
   });
 
   it('invalidates otp after too many invalid verify attempts', async () => {
@@ -232,6 +275,14 @@ describe('AuthService', () => {
         consumedAt: expect.any(Date) as unknown as Date,
       },
     });
+    expect(telemetry.recordEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'otp_verify_locked',
+        phone: '+2348012345678',
+        countryIso: 'NG',
+        attemptNumber: 5,
+      }),
+    );
   });
 
   it('rejects verification when otp is already maxed out', async () => {
@@ -255,5 +306,13 @@ describe('AuthService', () => {
     });
 
     expect(prisma.otpCode.update).not.toHaveBeenCalled();
+    expect(telemetry.recordEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'otp_verify_locked',
+        phone: '+2348012345678',
+        countryIso: 'NG',
+        attemptNumber: 5,
+      }),
+    );
   });
 });

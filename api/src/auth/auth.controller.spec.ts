@@ -44,4 +44,26 @@ describe('AuthController', () => {
       userAgent: 'jest-agent',
     });
   });
+
+  it('passes request metadata when verifying otp', () => {
+    const req = {
+      ip: '127.0.0.1',
+      get: jest.fn().mockReturnValue('jest-agent'),
+    };
+
+    void controller.verifyOtp(
+      { phone: '08012345678', countryIso: 'NG', otp: '123456' },
+      req as never,
+    );
+
+    expect(authService.verifyOtp).toHaveBeenCalledWith(
+      '08012345678',
+      'NG',
+      '123456',
+      {
+        ip: '127.0.0.1',
+        userAgent: 'jest-agent',
+      },
+    );
+  });
 });

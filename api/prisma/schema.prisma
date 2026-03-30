@@ -11,9 +11,19 @@ model User {
   phone        String        @unique
   createdAt    DateTime      @default(now())
 
+  authEvents   AuthEvent[]
   otpCodes     OtpCode[]
   goals        Goal[]
   transactions Transaction[]
+}
+
+enum AuthEventType {
+  otp_requested
+  otp_request_rate_limited
+  otp_resend_blocked
+  otp_verify_failed
+  otp_verify_locked
+  otp_verify_succeeded
 }
 
 enum NotificationJobStatus {
@@ -37,6 +47,28 @@ model OtpCode {
 
   ip          String?
   userAgent   String?
+
+  authEvents  AuthEvent[]
+}
+
+model AuthEvent {
+  id            String        @id @default(uuid())
+  type          AuthEventType
+  phone         String
+  countryIso    String
+  ip            String?
+  userAgent     String?
+  attemptNumber Int?
+  metadataJson  String?
+  createdAt     DateTime      @default(now())
+
+  userId        String?
+  user          User?         @relation(fields: [userId], references: [id])
+  otpCodeId     String?
+  otpCode       OtpCode?      @relation(fields: [otpCodeId], references: [id])
+
+  @@index([phone, createdAt])
+  @@index([type, createdAt])
 }
 
 model Goal {

@@ -17,7 +17,10 @@ export class AuthController {
   }
 
   @Post('verify-otp')
-  verifyOtp(@Body() dto: VerifyOtpDto) {
-    return this.auth.verifyOtp(dto.phone, dto.countryIso, dto.otp);
+  verifyOtp(@Body() dto: VerifyOtpDto, @Req() req: Request) {
+    return this.auth.verifyOtp(dto.phone, dto.countryIso, dto.otp, {
+      ip: req.ip,
+      userAgent: req.get('user-agent'),
+    });
   }
 }

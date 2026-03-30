@@ -8,6 +8,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import * as bcrypt from 'bcrypt';
 import { JwtService } from '@nestjs/jwt';
+import { AuthTelemetryService } from './auth-telemetry.service';
 import { CountryIso, normalizePhoneNumber } from './phone.util';
 
 const OTP_REQUEST_LIMIT_PER_HOUR = 10;
@@ -33,6 +34,7 @@ export class AuthService {
     private prisma: PrismaService,
     private notifications: NotificationsService,
     private jwt: JwtService,
+    private telemetry: AuthTelemetryService,
   ) {}
 
   async requestOtp(
@@ -49,6 +51,14 @@ export class AuthService {
       },
     });
     if (recent >= OTP_REQUEST_LIMIT_PER_HOUR) {
+      this.telemetry.recordEvent({
+        type: 'otp_request_rate_limited',
+        phone: normalizedPhone,
+        countryIso,
+        ip: context.ip,
+        userAgent: context.userAgent,
+        metadata: { limit: OTP_REQUEST_LIMIT_PER_HOUR, window: '1h' },
+      });
       throw new HttpException(
         'Too many OTP requests. Try again later.',
         HttpStatus.TOO_MANY_REQUESTS,
@@ -69,6 +79,16 @@ export class AuthService {
       orderBy: { createdAt: 'desc' },
     });
     if (latestOtp) {
+      this.telemetry.recordEvent({
+        type: 'otp_resend_blocked',
+        phone: normalizedPhone,
+        countryIso,
+        ip: context.ip,
+        userAgent: context.userAgent,
+        userId: user.id,
+        otpCodeId: latestOtp.id,
+        metadata: { cooldownMs: OTP_RESEND_COOLDOWN_MS },
+      });
       throw new HttpException(
         'Please wait before requesting another OTP.',
         HttpStatus.TOO_MANY_REQUESTS,
@@ -89,6 +109,15 @@ export class AuthService {
       },
     });
 
+    this.telemetry.recordEvent({
+      type: 'otp_requested',
+      phone: normalizedPhone,
+      countryIso,
+      ip: context.ip,
+      userAgent: context.userAgent,
+      userId: user.id,
+    });
+
     if (process.env.DEV_EXPOSE_OTP === 'true') {
       return { ok: true, otp };
     }
@@ -98,7 +127,12 @@ export class AuthService {
     return { ok: true };
   }
 
-  async verifyOtp(phone: string, countryIso: CountryIso, otp: string) {
+  async verifyOtp(
+    phone: string,
+    countryIso: CountryIso,
+    otp: string,
+    context: OtpRequestContext = {},
+  ) {
     const normalizedPhone = normalizePhoneNumber(phone, countryIso);
     const user = await this.prisma.user.findUnique({
       where: { phone: normalizedPhone },
@@ -116,6 +150,17 @@ export class AuthService {
     if (!record) throw new BadRequestException('OTP expired or not found');
 
     if (record.verifyAttempts >= OTP_MAX_VERIFY_ATTEMPTS) {
+      this.telemetry.recordEvent({
+        type: 'otp_verify_locked',
+        phone: normalizedPhone,
+        countryIso,
+        ip: context.ip,
+        userAgent: context.userAgent,
+        userId: user.id,
+        otpCodeId: record.id,
+        attemptNumber: record.verifyAttempts,
+        metadata: { reason: 'already_locked' },
+      });
       throw new HttpException(
         'Too many invalid OTP attempts. Request a new code.',
         HttpStatus.TOO_MANY_REQUESTS,
@@ -135,18 +180,50 @@ export class AuthService {
       });
 
       if (verifyAttempts >= OTP_MAX_VERIFY_ATTEMPTS) {
+        this.telemetry.recordEvent({
+          type: 'otp_verify_locked',
+          phone: normalizedPhone,
+          countryIso,
+          ip: context.ip,
+          userAgent: context.userAgent,
+          userId: user.id,
+          otpCodeId: record.id,
+          attemptNumber: verifyAttempts,
+          metadata: { reason: 'max_attempts_reached' },
+        });
         throw new HttpException(
           'Too many invalid OTP attempts. Request a new code.',
           HttpStatus.TOO_MANY_REQUESTS,
         );
       }
 
+      this.telemetry.recordEvent({
+        type: 'otp_verify_failed',
+        phone: normalizedPhone,
+        countryIso,
+        ip: context.ip,
+        userAgent: context.userAgent,
+        userId: user.id,
+        otpCodeId: record.id,
+        attemptNumber: verifyAttempts,
+      });
       throw new BadRequestException('Invalid phone or code');
     }
 
     await this.prisma.otpCode.update({
       where: { id: record.id },
       data: { consumedAt: new Date() },
+    });
+
+    this.telemetry.recordEvent({
+      type: 'otp_verify_succeeded',
+      phone: normalizedPhone,
+      countryIso,
+      ip: context.ip,
+      userAgent: context.userAgent,
+      userId: user.id,
+      otpCodeId: record.id,
+      attemptNumber: record.verifyAttempts,
     });
 
     const token = await this.jwt.signAsync({ sub: user.id, phone: user.phone });
