@@ -14,6 +14,9 @@ import { CountryIso, normalizePhoneNumber } from './phone.util';
 const OTP_REQUEST_LIMIT_PER_HOUR = 10;
 const OTP_RESEND_COOLDOWN_MS = 60_000;
 const OTP_MAX_VERIFY_ATTEMPTS = 5;
+const OTP_REQUEST_LIMIT_PER_IP_PER_HOUR = 20;
+const OTP_VERIFY_FAILURE_LIMIT_PER_IP_WINDOW = 10;
+const OTP_VERIFY_FAILURE_WINDOW_MS = 15 * 60 * 1000;
 
 type OtpRequestContext = {
   ip?: string;
@@ -44,6 +47,33 @@ export class AuthService {
   ) {
     const normalizedPhone = normalizePhoneNumber(phone, countryIso);
     const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+
+    if (context.ip) {
+      const recentByIp = await this.telemetry.countRecentEvents({
+        types: ['otp_requested'],
+        since: oneHourAgo,
+        ip: context.ip,
+      });
+      if (recentByIp >= OTP_REQUEST_LIMIT_PER_IP_PER_HOUR) {
+        this.telemetry.recordEvent({
+          type: 'otp_request_rate_limited',
+          phone: normalizedPhone,
+          countryIso,
+          ip: context.ip,
+          userAgent: context.userAgent,
+          metadata: {
+            limit: OTP_REQUEST_LIMIT_PER_IP_PER_HOUR,
+            window: '1h',
+            scope: 'ip',
+          },
+        });
+        throw new HttpException(
+          'Too many OTP requests from this network. Try again later.',
+          HttpStatus.TOO_MANY_REQUESTS,
+        );
+      }
+    }
+
     const recent = await this.prisma.otpCode.count({
       where: {
         user: { phone: normalizedPhone },
@@ -134,6 +164,34 @@ export class AuthService {
     context: OtpRequestContext = {},
   ) {
     const normalizedPhone = normalizePhoneNumber(phone, countryIso);
+    if (context.ip) {
+      const recentVerifyFailuresByIp = await this.telemetry.countRecentEvents({
+        types: ['otp_verify_failed', 'otp_verify_locked'],
+        since: new Date(Date.now() - OTP_VERIFY_FAILURE_WINDOW_MS),
+        ip: context.ip,
+      });
+
+      if (recentVerifyFailuresByIp >= OTP_VERIFY_FAILURE_LIMIT_PER_IP_WINDOW) {
+        this.telemetry.recordEvent({
+          type: 'otp_verify_locked',
+          phone: normalizedPhone,
+          countryIso,
+          ip: context.ip,
+          userAgent: context.userAgent,
+          attemptNumber: recentVerifyFailuresByIp,
+          metadata: {
+            reason: 'ip_window_limit_reached',
+            limit: OTP_VERIFY_FAILURE_LIMIT_PER_IP_WINDOW,
+            windowMs: OTP_VERIFY_FAILURE_WINDOW_MS,
+          },
+        });
+        throw new HttpException(
+          'Too many invalid OTP attempts from this network. Try again later.',
+          HttpStatus.TOO_MANY_REQUESTS,
+        );
+      }
+    }
+
     const user = await this.prisma.user.findUnique({
       where: { phone: normalizedPhone },
     });

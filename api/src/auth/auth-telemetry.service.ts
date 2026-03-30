@@ -21,6 +21,13 @@ type RecordAuthEventInput = {
   metadata?: Record<string, unknown>;
 };
 
+type CountRecentEventsInput = {
+  types: AuthTelemetryEventType[];
+  since: Date;
+  ip?: string;
+  phone?: string;
+};
+
 @Injectable()
 export class AuthTelemetryService {
   constructor(private readonly prisma: PrismaService) {}
@@ -39,6 +46,17 @@ export class AuthTelemetryService {
         metadataJson: input.metadata
           ? JSON.stringify(input.metadata)
           : undefined,
+      },
+    });
+  }
+
+  countRecentEvents(input: CountRecentEventsInput): Promise<number> {
+    return this.prisma.authEvent.count({
+      where: {
+        type: { in: input.types },
+        createdAt: { gte: input.since },
+        ip: input.ip,
+        phone: input.phone,
       },
     });
   }

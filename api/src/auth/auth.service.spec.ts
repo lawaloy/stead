@@ -31,7 +31,7 @@ describe('AuthService', () => {
   };
   let notifications: { enqueueOtpRequested: jest.Mock };
   let jwt: { signAsync: jest.Mock };
-  let telemetry: { recordEvent: jest.Mock };
+  let telemetry: { recordEvent: jest.Mock; countRecentEvents: jest.Mock };
 
   beforeEach(async () => {
     prisma = {
@@ -54,6 +54,7 @@ describe('AuthService', () => {
     };
     telemetry = {
       recordEvent: jest.fn(),
+      countRecentEvents: jest.fn().mockResolvedValue(0),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -125,6 +126,34 @@ describe('AuthService', () => {
         countryIso: 'NG',
       }),
     );
+  });
+
+  it('rate limits otp requests by ip window', async () => {
+    telemetry.countRecentEvents.mockResolvedValueOnce(20);
+
+    await expect(
+      service.requestOtp('08012345678', 'NG', {
+        ip: '127.0.0.1',
+        userAgent: 'jest-agent',
+      }),
+    ).rejects.toMatchObject({
+      message: 'Too many OTP requests from this network. Try again later.',
+      status: HttpStatus.TOO_MANY_REQUESTS,
+    });
+
+    expect(prisma.user.upsert).not.toHaveBeenCalled();
+    expect(telemetry.recordEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'otp_request_rate_limited',
+        phone: '+2348012345678',
+        countryIso: 'NG',
+        ip: '127.0.0.1',
+      }),
+    );
+    const [recordedRateLimitEvent] = telemetry.recordEvent.mock.calls.at(
+      -1,
+    ) as [{ metadata?: { scope?: string } }];
+    expect(recordedRateLimitEvent.metadata?.scope).toBe('ip');
   });
 
   it('rejects otp resend during cooldown window', async () => {
@@ -210,6 +239,31 @@ describe('AuthService', () => {
       }),
     );
     expect(result).toEqual({ token: 'jwt_token' });
+  });
+
+  it('rate limits otp verification failures by ip window', async () => {
+    telemetry.countRecentEvents.mockResolvedValueOnce(10);
+
+    await expect(
+      service.verifyOtp('08012345678', 'NG', '123456', {
+        ip: '127.0.0.1',
+        userAgent: 'jest-agent',
+      }),
+    ).rejects.toMatchObject({
+      message:
+        'Too many invalid OTP attempts from this network. Try again later.',
+      status: HttpStatus.TOO_MANY_REQUESTS,
+    });
+
+    expect(prisma.user.findUnique).not.toHaveBeenCalled();
+    expect(telemetry.recordEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'otp_verify_locked',
+        phone: '+2348012345678',
+        countryIso: 'NG',
+        ip: '127.0.0.1',
+      }),
+    );
   });
 
   it('increments verify attempts for an invalid otp', async () => {

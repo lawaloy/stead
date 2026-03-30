@@ -28,17 +28,18 @@ Move OTP authentication from "implemented in code" to "operationally usable" for
 - Persist auth behavior events for OTP request, resend blocking, verify failure, verify lockout, and verify success.
 - Capture request metadata on OTP verification as well as OTP request.
 - Add a protected auth inspection endpoint for recent auth event visibility and summary counts.
+- Add IP-aware throttling for OTP requests and repeated verification failures.
 
 ## Remaining
 
 ### Auth controls
 
-- Add stronger abuse controls beyond the current verify-attempt throttle.
+- Extend abuse controls beyond the current OTP- and IP-level throttles.
 - Consider whether OTP request and verify should capture more device/request context.
 
 #### Checklist
 
-- Add IP- or device-aware throttling in addition to OTP-level attempt limits.
+- Add device-aware throttling in addition to OTP- and IP-level attempt limits.
 - Decide whether verify-attempt limits should be configurable per environment.
 - Add operator-facing visibility for lockout trends and repeated auth failures by phone or IP.
 
@@ -88,7 +89,7 @@ Move OTP authentication from "implemented in code" to "operationally usable" for
 
 ### Phase 3
 
-- Add verify-attempt throttling and stronger abuse controls.
+- Add verify-attempt throttling and layered abuse controls.
 - Add end-to-end mobile verification in a real environment.
 - Add support tooling for OTP delivery inspection and failure diagnosis.
 
