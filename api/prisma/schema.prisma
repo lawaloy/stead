@@ -30,6 +30,7 @@ model OtpCode {
   user        User     @relation(fields: [userId], references: [id])
 
   codeHash    String
+  verifyAttempts Int   @default(0)
   expiresAt   DateTime
   consumedAt  DateTime?
   createdAt   DateTime @default(now())

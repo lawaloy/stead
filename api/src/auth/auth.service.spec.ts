@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
-import { HttpException } from '@nestjs/common';
+import { BadRequestException, HttpException, HttpStatus } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -12,6 +12,7 @@ describe('AuthService', () => {
   type MockOtpRecord = {
     id: string;
     codeHash?: string;
+    verifyAttempts?: number;
     expiresAt?: Date;
     consumedAt?: Date | null;
   };
@@ -155,6 +156,7 @@ describe('AuthService', () => {
     prisma.otpCode.findFirst.mockResolvedValue({
       id: 'otp_1',
       codeHash: await bcrypt.hash(otp, 1),
+      verifyAttempts: 0,
       expiresAt: new Date(Date.now() + 60_000),
       consumedAt: null,
     } satisfies MockOtpRecord);
@@ -173,5 +175,85 @@ describe('AuthService', () => {
       },
     });
     expect(result).toEqual({ token: 'jwt_token' });
+  });
+
+  it('increments verify attempts for an invalid otp', async () => {
+    prisma.user.findUnique.mockResolvedValue({
+      id: 'user_1',
+      phone: '+2348012345678',
+    } satisfies MockUser);
+    prisma.otpCode.findFirst.mockResolvedValue({
+      id: 'otp_1',
+      codeHash: await bcrypt.hash('123456', 1),
+      verifyAttempts: 1,
+      expiresAt: new Date(Date.now() + 60_000),
+      consumedAt: null,
+    } satisfies MockOtpRecord);
+    prisma.otpCode.update.mockResolvedValue({});
+
+    await expect(
+      service.verifyOtp('08012345678', 'NG', '654321'),
+    ).rejects.toThrow(BadRequestException);
+
+    expect(prisma.otpCode.update).toHaveBeenCalledWith({
+      where: { id: 'otp_1' },
+      data: {
+        verifyAttempts: 2,
+        consumedAt: undefined,
+      },
+    });
+  });
+
+  it('invalidates otp after too many invalid verify attempts', async () => {
+    prisma.user.findUnique.mockResolvedValue({
+      id: 'user_1',
+      phone: '+2348012345678',
+    } satisfies MockUser);
+    prisma.otpCode.findFirst.mockResolvedValue({
+      id: 'otp_1',
+      codeHash: await bcrypt.hash('123456', 1),
+      verifyAttempts: 4,
+      expiresAt: new Date(Date.now() + 60_000),
+      consumedAt: null,
+    } satisfies MockOtpRecord);
+    prisma.otpCode.update.mockResolvedValue({});
+
+    await expect(
+      service.verifyOtp('08012345678', 'NG', '654321'),
+    ).rejects.toMatchObject({
+      message: 'Too many invalid OTP attempts. Request a new code.',
+      status: HttpStatus.TOO_MANY_REQUESTS,
+    });
+
+    expect(prisma.otpCode.update).toHaveBeenCalledWith({
+      where: { id: 'otp_1' },
+      data: {
+        verifyAttempts: 5,
+        consumedAt: expect.any(Date) as unknown as Date,
+      },
+    });
+  });
+
+  it('rejects verification when otp is already maxed out', async () => {
+    prisma.user.findUnique.mockResolvedValue({
+      id: 'user_1',
+      phone: '+2348012345678',
+    } satisfies MockUser);
+    prisma.otpCode.findFirst.mockResolvedValue({
+      id: 'otp_1',
+      codeHash: await bcrypt.hash('123456', 1),
+      verifyAttempts: 5,
+      expiresAt: new Date(Date.now() + 60_000),
+      consumedAt: null,
+    } satisfies MockOtpRecord);
+
+    await expect(
+      service.verifyOtp('08012345678', 'NG', '123456'),
+    ).rejects.toMatchObject({
+      message: 'Too many invalid OTP attempts. Request a new code.',
+      status: HttpStatus.TOO_MANY_REQUESTS,
+    });
+
+    expect(prisma.otpCode.update).not.toHaveBeenCalled();
   });
 });

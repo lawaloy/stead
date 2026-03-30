@@ -12,6 +12,7 @@ import { CountryIso, normalizePhoneNumber } from './phone.util';
 
 const OTP_REQUEST_LIMIT_PER_HOUR = 10;
 const OTP_RESEND_COOLDOWN_MS = 60_000;
+const OTP_MAX_VERIFY_ATTEMPTS = 5;
 
 type OtpRequestContext = {
   ip?: string;
@@ -114,8 +115,34 @@ export class AuthService {
     });
     if (!record) throw new BadRequestException('OTP expired or not found');
 
+    if (record.verifyAttempts >= OTP_MAX_VERIFY_ATTEMPTS) {
+      throw new HttpException(
+        'Too many invalid OTP attempts. Request a new code.',
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
+    }
+
     const ok = await bcrypt.compare(otp, record.codeHash);
-    if (!ok) throw new BadRequestException('Invalid phone or code');
+    if (!ok) {
+      const verifyAttempts = record.verifyAttempts + 1;
+      await this.prisma.otpCode.update({
+        where: { id: record.id },
+        data: {
+          verifyAttempts,
+          consumedAt:
+            verifyAttempts >= OTP_MAX_VERIFY_ATTEMPTS ? new Date() : undefined,
+        },
+      });
+
+      if (verifyAttempts >= OTP_MAX_VERIFY_ATTEMPTS) {
+        throw new HttpException(
+          'Too many invalid OTP attempts. Request a new code.',
+          HttpStatus.TOO_MANY_REQUESTS,
+        );
+      }
+
+      throw new BadRequestException('Invalid phone or code');
+    }
 
     await this.prisma.otpCode.update({
       where: { id: record.id },
