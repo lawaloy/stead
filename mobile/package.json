@@ -37,7 +37,7 @@
     "@typescript-eslint/parser": "^8.57.2",
     "axios-mock-adapter": "^2.1.0",
     "babel-preset-expo": "~55.0.13",
-    "chalk": "4.1.2",
+    "chalk": "5.6.2",
     "eslint": "^9.39.4",
     "eslint-config-expo": "^55.0.0",
     "jest": "^30.3.0",
