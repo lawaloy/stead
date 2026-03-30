@@ -1,8 +1,10 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { JwtService } from '@nestjs/jwt';
+import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
-import { HttpException } from '@nestjs/common';
+import { BadRequestException, HttpException, HttpStatus } from '@nestjs/common';
 import { AuthService } from './auth.service';
+import { AuthTelemetryService } from './auth-telemetry.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 
@@ -12,6 +14,7 @@ describe('AuthService', () => {
   type MockOtpRecord = {
     id: string;
     codeHash?: string;
+    verifyAttempts?: number;
     expiresAt?: Date;
     consumedAt?: Date | null;
   };
@@ -29,6 +32,8 @@ describe('AuthService', () => {
   };
   let notifications: { enqueueOtpRequested: jest.Mock };
   let jwt: { signAsync: jest.Mock };
+  let telemetry: { recordEvent: jest.Mock; countRecentEvents: jest.Mock };
+  let config: { get: jest.Mock };
 
   beforeEach(async () => {
     prisma = {
@@ -49,6 +54,18 @@ describe('AuthService', () => {
     jwt = {
       signAsync: jest.fn(),
     };
+    telemetry = {
+      recordEvent: jest.fn(),
+      countRecentEvents: jest.fn().mockResolvedValue(0),
+    };
+    config = {
+      get: jest.fn((key: string) => {
+        const values: Record<string, number | string | undefined> = {
+          DEV_EXPOSE_OTP: process.env.DEV_EXPOSE_OTP,
+        };
+        return values[key];
+      }),
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -64,6 +81,14 @@ describe('AuthService', () => {
         {
           provide: JwtService,
           useValue: jwt,
+        },
+        {
+          provide: AuthTelemetryService,
+          useValue: telemetry,
+        },
+        {
+          provide: ConfigService,
+          useValue: config,
         },
       ],
     }).compile();
@@ -108,6 +133,41 @@ describe('AuthService', () => {
       '+2348012345678',
       expect.any(String),
     );
+    expect(telemetry.recordEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'otp_requested',
+        phone: '+2348012345678',
+        countryIso: 'NG',
+      }),
+    );
+  });
+
+  it('rate limits otp requests by ip window', async () => {
+    telemetry.countRecentEvents.mockResolvedValueOnce(20);
+
+    await expect(
+      service.requestOtp('08012345678', 'NG', {
+        ip: '127.0.0.1',
+        userAgent: 'jest-agent',
+      }),
+    ).rejects.toMatchObject({
+      message: 'Too many OTP requests from this network. Try again later.',
+      status: HttpStatus.TOO_MANY_REQUESTS,
+    });
+
+    expect(prisma.user.upsert).not.toHaveBeenCalled();
+    expect(telemetry.recordEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'otp_request_rate_limited',
+        phone: '+2348012345678',
+        countryIso: 'NG',
+        ip: '127.0.0.1',
+      }),
+    );
+    const [recordedRateLimitEvent] = telemetry.recordEvent.mock.calls.at(
+      -1,
+    ) as [{ metadata?: { scope?: string } }];
+    expect(recordedRateLimitEvent.metadata?.scope).toBe('ip');
   });
 
   it('rejects otp resend during cooldown window', async () => {
@@ -126,6 +186,47 @@ describe('AuthService', () => {
     ).rejects.toMatchObject({
       message: 'Please wait before requesting another OTP.',
     });
+    expect(telemetry.recordEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'otp_resend_blocked',
+        phone: '+2348012345678',
+        countryIso: 'NG',
+      }),
+    );
+  });
+
+  it('uses configured resend cooldown values', async () => {
+    config.get.mockImplementation((key: string) => {
+      if (key === 'AUTH_OTP_RESEND_COOLDOWN_MS') return 120_000;
+      return undefined;
+    });
+    prisma.otpCode.count.mockResolvedValue(0);
+    prisma.user.upsert.mockResolvedValue({
+      id: 'user_1',
+      phone: '+2348012345678',
+    } satisfies MockUser);
+    prisma.otpCode.findFirst.mockResolvedValue({ id: 'otp_recent' });
+
+    await expect(
+      service.requestOtp('+2348012345678', 'NG'),
+    ).rejects.toMatchObject({
+      message: 'Please wait before requesting another OTP.',
+      status: HttpStatus.TOO_MANY_REQUESTS,
+    });
+
+    expect(prisma.otpCode.findFirst).toHaveBeenCalledWith({
+      where: {
+        userId: 'user_1',
+        createdAt: { gt: expect.any(Date) as unknown as Date },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+    expect(telemetry.recordEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'otp_resend_blocked',
+        metadata: { cooldownMs: 120_000 },
+      }),
+    );
   });
 
   it('normalizes using the selected country', async () => {
@@ -155,13 +256,17 @@ describe('AuthService', () => {
     prisma.otpCode.findFirst.mockResolvedValue({
       id: 'otp_1',
       codeHash: await bcrypt.hash(otp, 1),
+      verifyAttempts: 0,
       expiresAt: new Date(Date.now() + 60_000),
       consumedAt: null,
     } satisfies MockOtpRecord);
     prisma.otpCode.update.mockResolvedValue({});
     jwt.signAsync.mockResolvedValue('jwt_token');
 
-    const result = await service.verifyOtp('08012345678', 'NG', otp);
+    const result = await service.verifyOtp('08012345678', 'NG', otp, {
+      ip: '127.0.0.1',
+      userAgent: 'jest-agent',
+    });
 
     expect(prisma.user.findUnique).toHaveBeenCalledWith({
       where: { phone: '+2348012345678' },
@@ -172,6 +277,144 @@ describe('AuthService', () => {
         consumedAt: expect.any(Date) as unknown as Date,
       },
     });
+    expect(telemetry.recordEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'otp_verify_succeeded',
+        phone: '+2348012345678',
+        countryIso: 'NG',
+        ip: '127.0.0.1',
+        userAgent: 'jest-agent',
+      }),
+    );
     expect(result).toEqual({ token: 'jwt_token' });
+  });
+
+  it('rate limits otp verification failures by ip window', async () => {
+    telemetry.countRecentEvents.mockResolvedValueOnce(10);
+
+    await expect(
+      service.verifyOtp('08012345678', 'NG', '123456', {
+        ip: '127.0.0.1',
+        userAgent: 'jest-agent',
+      }),
+    ).rejects.toMatchObject({
+      message:
+        'Too many invalid OTP attempts from this network. Try again later.',
+      status: HttpStatus.TOO_MANY_REQUESTS,
+    });
+
+    expect(prisma.user.findUnique).not.toHaveBeenCalled();
+    expect(telemetry.recordEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'otp_verify_locked',
+        phone: '+2348012345678',
+        countryIso: 'NG',
+        ip: '127.0.0.1',
+      }),
+    );
+  });
+
+  it('increments verify attempts for an invalid otp', async () => {
+    prisma.user.findUnique.mockResolvedValue({
+      id: 'user_1',
+      phone: '+2348012345678',
+    } satisfies MockUser);
+    prisma.otpCode.findFirst.mockResolvedValue({
+      id: 'otp_1',
+      codeHash: await bcrypt.hash('123456', 1),
+      verifyAttempts: 1,
+      expiresAt: new Date(Date.now() + 60_000),
+      consumedAt: null,
+    } satisfies MockOtpRecord);
+    prisma.otpCode.update.mockResolvedValue({});
+
+    await expect(
+      service.verifyOtp('08012345678', 'NG', '654321'),
+    ).rejects.toThrow(BadRequestException);
+
+    expect(prisma.otpCode.update).toHaveBeenCalledWith({
+      where: { id: 'otp_1' },
+      data: {
+        verifyAttempts: 2,
+        consumedAt: undefined,
+      },
+    });
+    expect(telemetry.recordEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'otp_verify_failed',
+        phone: '+2348012345678',
+        countryIso: 'NG',
+        attemptNumber: 2,
+      }),
+    );
+  });
+
+  it('invalidates otp after too many invalid verify attempts', async () => {
+    prisma.user.findUnique.mockResolvedValue({
+      id: 'user_1',
+      phone: '+2348012345678',
+    } satisfies MockUser);
+    prisma.otpCode.findFirst.mockResolvedValue({
+      id: 'otp_1',
+      codeHash: await bcrypt.hash('123456', 1),
+      verifyAttempts: 4,
+      expiresAt: new Date(Date.now() + 60_000),
+      consumedAt: null,
+    } satisfies MockOtpRecord);
+    prisma.otpCode.update.mockResolvedValue({});
+
+    await expect(
+      service.verifyOtp('08012345678', 'NG', '654321'),
+    ).rejects.toMatchObject({
+      message: 'Too many invalid OTP attempts. Request a new code.',
+      status: HttpStatus.TOO_MANY_REQUESTS,
+    });
+
+    expect(prisma.otpCode.update).toHaveBeenCalledWith({
+      where: { id: 'otp_1' },
+      data: {
+        verifyAttempts: 5,
+        consumedAt: expect.any(Date) as unknown as Date,
+      },
+    });
+    expect(telemetry.recordEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'otp_verify_locked',
+        phone: '+2348012345678',
+        countryIso: 'NG',
+        attemptNumber: 5,
+      }),
+    );
+  });
+
+  it('rejects verification when otp is already maxed out', async () => {
+    prisma.user.findUnique.mockResolvedValue({
+      id: 'user_1',
+      phone: '+2348012345678',
+    } satisfies MockUser);
+    prisma.otpCode.findFirst.mockResolvedValue({
+      id: 'otp_1',
+      codeHash: await bcrypt.hash('123456', 1),
+      verifyAttempts: 5,
+      expiresAt: new Date(Date.now() + 60_000),
+      consumedAt: null,
+    } satisfies MockOtpRecord);
+
+    await expect(
+      service.verifyOtp('08012345678', 'NG', '123456'),
+    ).rejects.toMatchObject({
+      message: 'Too many invalid OTP attempts. Request a new code.',
+      status: HttpStatus.TOO_MANY_REQUESTS,
+    });
+
+    expect(prisma.otpCode.update).not.toHaveBeenCalled();
+    expect(telemetry.recordEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'otp_verify_locked',
+        phone: '+2348012345678',
+        countryIso: 'NG',
+        attemptNumber: 5,
+      }),
+    );
   });
 });

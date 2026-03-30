@@ -2,6 +2,12 @@ import * as Joi from 'joi';
 
 type EnvInput = {
   SMS_PROVIDER?: string;
+  AUTH_OTP_REQUEST_LIMIT_PER_HOUR?: number;
+  AUTH_OTP_REQUEST_LIMIT_PER_IP_PER_HOUR?: number;
+  AUTH_OTP_RESEND_COOLDOWN_MS?: number;
+  AUTH_OTP_MAX_VERIFY_ATTEMPTS?: number;
+  AUTH_OTP_VERIFY_FAILURE_LIMIT_PER_IP_WINDOW?: number;
+  AUTH_OTP_VERIFY_FAILURE_WINDOW_MS?: number;
   TWILIO_ACCOUNT_SID?: string;
   TWILIO_AUTH_TOKEN?: string;
   TWILIO_FROM?: string;
@@ -18,6 +24,24 @@ export const envSchema = Joi.object({
   DATABASE_URL: Joi.string().uri().required(),
   JWT_SECRET: Joi.string().min(16).required(),
   JWT_EXPIRES_IN: Joi.string().default('7d'),
+  AUTH_OTP_REQUEST_LIMIT_PER_HOUR: Joi.number().integer().min(1).default(10),
+  AUTH_OTP_REQUEST_LIMIT_PER_IP_PER_HOUR: Joi.number()
+    .integer()
+    .min(1)
+    .default(20),
+  AUTH_OTP_RESEND_COOLDOWN_MS: Joi.number()
+    .integer()
+    .min(1_000)
+    .default(60_000),
+  AUTH_OTP_MAX_VERIFY_ATTEMPTS: Joi.number().integer().min(1).default(5),
+  AUTH_OTP_VERIFY_FAILURE_LIMIT_PER_IP_WINDOW: Joi.number()
+    .integer()
+    .min(1)
+    .default(10),
+  AUTH_OTP_VERIFY_FAILURE_WINDOW_MS: Joi.number()
+    .integer()
+    .min(1_000)
+    .default(15 * 60 * 1000),
   SMS_PROVIDER: Joi.string().valid('twilio', 'termii').default('twilio'),
   DEV_EXPOSE_OTP: Joi.string().valid('true', 'false').default('false'),
   TWILIO_ACCOUNT_SID: Joi.string().allow('').optional(),
