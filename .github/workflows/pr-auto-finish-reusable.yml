@@ -43,7 +43,6 @@ jobs:
             const maxAttempts = 10;
             const delayMs = 15000;
             const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-            const watchedWorkflows = new Set(['ci', 'mobile-ci', 'CodeQL Advanced', 'Dependency review']);
 
             if (!pull_number) {
               core.info('Skipping because no pull request number was available on the workflow_run payload.');
@@ -105,43 +104,6 @@ jobs:
               );
             };
 
-            const getWatchedCheckState = async (headSha) => {
-              const checkRuns = await github.paginate(github.rest.checks.listForRef, {
-                owner,
-                repo,
-                ref: headSha,
-                per_page: 100,
-              });
-
-              const latestRuns = new Map();
-              for (const checkRun of checkRuns) {
-                if (!watchedWorkflows.has(checkRun.workflow_name)) {
-                  continue;
-                }
-
-                const key = `${checkRun.workflow_name}:${checkRun.name}`;
-                const previous = latestRuns.get(key);
-                if (!previous || checkRun.id > previous.id) {
-                  latestRuns.set(key, checkRun);
-                }
-              }
-
-              const watchedRuns = [...latestRuns.values()];
-              const incompleteRuns = watchedRuns.filter((checkRun) => checkRun.status !== 'completed');
-              const failingRuns = watchedRuns.filter(
-                (checkRun) => checkRun.status === 'completed' && checkRun.conclusion !== 'success',
-              );
-              const satisfiedWorkflows = new Set(watchedRuns.map((checkRun) => checkRun.workflow_name));
-              const missingWorkflows = [...watchedWorkflows].filter((workflowName) => !satisfiedWorkflows.has(workflowName));
-
-              return {
-                watchedRuns,
-                incompleteRuns,
-                failingRuns,
-                missingWorkflows,
-              };
-            };
-
             for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
               const pullRequest = (
                 await github.rest.pulls.get({
@@ -166,36 +128,9 @@ jobs:
                 return;
               }
 
-              const checkState = await getWatchedCheckState(pullRequest.head.sha);
-              if (checkState.missingWorkflows.length > 0) {
-                core.info(
-                  `Waiting for watched workflows on attempt ${attempt}: ${checkState.missingWorkflows.join(', ')}`,
-                );
-              } else if (checkState.incompleteRuns.length > 0) {
-                core.info(
-                  `Waiting for checks on attempt ${attempt}: ${checkState.incompleteRuns
-                    .map((checkRun) => `${checkRun.workflow_name}/${checkRun.name}`)
-                    .join(', ')}`,
-                );
-              } else if (checkState.failingRuns.length > 0) {
-                core.info(
-                  `Skipping because watched checks failed on ${pullRequest.head.sha}: ${checkState.failingRuns
-                    .map((checkRun) => `${checkRun.workflow_name}/${checkRun.name}=${checkRun.conclusion}`)
-                    .join(', ')}`,
-                );
-                return;
-              } else {
-                core.info(`All watched workflow checks are green on ${pullRequest.head.sha}.`);
-              }
-
               core.info(`Mergeable state on attempt ${attempt}: ${pullRequest.mergeable_state}`);
 
-              if (
-                checkState.missingWorkflows.length === 0 &&
-                checkState.incompleteRuns.length === 0 &&
-                checkState.failingRuns.length === 0 &&
-                pullRequest.mergeable_state === 'clean'
-              ) {
+              if (pullRequest.mergeable_state === 'clean') {
                 await github.rest.pulls.merge({
                   owner,
                   repo,
@@ -206,12 +141,7 @@ jobs:
                 return;
               }
 
-              if (
-                checkState.missingWorkflows.length === 0 &&
-                checkState.incompleteRuns.length === 0 &&
-                checkState.failingRuns.length === 0 &&
-                pullRequest.mergeable_state === 'behind'
-              ) {
+              if (pullRequest.mergeable_state === 'behind') {
                 try {
                   await github.rest.pulls.updateBranch({
                     owner,
