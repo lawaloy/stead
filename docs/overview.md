@@ -120,6 +120,3 @@ Internally, the system is goal-agnostic.
 - API (NestJS)
 - Postgres (via Prisma)
 - SMS Provider (OTP only)
-
-No custody.
-No payment movement.
