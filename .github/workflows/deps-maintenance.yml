@@ -3,6 +3,7 @@ name: Dependency Maintenance
 on:
   schedule:
     - cron: '0 10 * * 1'
+    - cron: '0 10 * * 4'
   workflow_dispatch:
 
 permissions:
@@ -16,9 +17,6 @@ concurrency:
 jobs:
   maintain:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: api
     steps:
       - name: Generate GitHub App token
         id: app-token
@@ -37,20 +35,39 @@ jobs:
         with:
           node-version: 24
           cache: npm
-          cache-dependency-path: api/package-lock.json
+          cache-dependency-path: |
+            api/package-lock.json
+            mobile/package-lock.json
 
       - name: Pin npm version
         run: npm install --global npm@11.6.2
 
-      - name: Install dependencies
+      - name: Install API dependencies
+        working-directory: api
         run: npm ci
 
-      - name: Update lockfile and patch vulnerabilities
+      - name: Update API lockfile and patch vulnerabilities
+        working-directory: api
         run: |
           npm update
           npm audit fix || true
 
-      - name: Audit report (non-blocking)
+      - name: API audit report (non-blocking)
+        working-directory: api
+        run: npm audit --audit-level=moderate || true
+
+      - name: Install mobile dependencies
+        working-directory: mobile
+        run: npm ci --legacy-peer-deps
+
+      - name: Update mobile lockfile and patch vulnerabilities
+        working-directory: mobile
+        run: |
+          npm update --legacy-peer-deps
+          npm audit fix --legacy-peer-deps || true
+
+      - name: Mobile audit report (non-blocking)
+        working-directory: mobile
         run: npm audit --audit-level=moderate || true
 
       - name: Create or update maintenance PR
@@ -63,9 +80,8 @@ jobs:
           commit-message: 'chore(deps): automated dependency maintenance'
           body: |
             Automated dependency maintenance run:
-            - `npm update`
-            - `npm audit fix`
-            - `npm audit --audit-level=moderate` (non-blocking report)
+            - `api`: `npm update`, `npm audit fix`, `npm audit --audit-level=moderate` (non-blocking report)
+            - `mobile`: `npm update --legacy-peer-deps`, `npm audit fix --legacy-peer-deps`, `npm audit --audit-level=moderate` (non-blocking report)
 
             This updates the same PR while it is still open. If that PR is merged, the action deletes the branch and the next run will create a new branch/PR named `security/deps-maintenance`.
           labels: |
@@ -74,3 +90,5 @@ jobs:
           add-paths: |
             api/package.json
             api/package-lock.json
+            mobile/package.json
+            mobile/package-lock.json
