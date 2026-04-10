@@ -98,7 +98,7 @@ jobs:
                 pr.head.repo?.full_name === `${owner}/${repo}` &&
                 pr.base?.ref === 'main' &&
                 pr.head?.ref === 'security/deps-maintenance' &&
-                ['app/github-actions', 'github-actions[bot]', 'stead-deps-bot[bot]', 'app/stead-deps-bot'].includes(authorLogin) &&
+                ['app/github-actions', 'github-actions[bot]', 'stead-deps[bot]', 'app/stead-deps'].includes(authorLogin) &&
                 labels.includes('dependencies') &&
                 labels.includes('security')
               );
@@ -167,3 +167,4 @@ jobs:
 
               await sleep(delayMs);
             }
+
