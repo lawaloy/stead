@@ -56,9 +56,9 @@ They do not optimize for:
 
 ### 3.1 Category Definition
 
-Stead defines a new category:
+Stead defines:
 
-Financial Stability Infrastructure
+- Financial Stability Infrastructure
 
 This sits above wallets and banks.
 
