@@ -1,12 +1,12 @@
-# Contributing to Stead API
+# Contributing to Stead
 
 ## Branching
 - Base all work on `main`.
 - Use short-lived branches:
-  - `feature/<service>-<task>`
-  - `fix/<service>-<task>`
-  - `chore/<service>-<task>`
-  - `hotfix/<service>-<task>`
+  - `feature/<area>-<task>`
+  - `fix/<area>-<task>`
+  - `chore/<area>-<task>`
+  - `hotfix/<area>-<task>`
 - Keep one concern per branch.
 
 ## Commit Convention
@@ -18,6 +18,7 @@ Format:
 Examples:
 - `feat(auth): add refresh token rotation`
 - `fix(api): handle null amount in transaction mapper`
+- `feat(mobile): add goal setup screen`
 - `chore(ci): add npm cache to workflow`
 
 Common types:
@@ -30,22 +31,37 @@ Common types:
 - Link related issue(s).
 
 PRs should pass:
-- `npm run lint`
-- `npm run test`
-- `npm run build`
+- API: `npm run lint -- --no-fix`, `npm run test -- --runInBand`, `npm run build`
+- Mobile: `npm run lint`, `npm run typecheck`, `npm test -- --runInBand`, `npm run build`
 
 ## Local Setup
+
+API:
+
 ```bash
-npm install
+cd api
+npm ci
+npx prisma generate
+npx prisma migrate dev
 npm run start:dev
 ```
 
+Mobile:
+
+```bash
+cd mobile
+npm ci
+npm run start
+```
+
 ## Environment
-- Copy `.env.example` to `.env`.
+- Copy `api/.env.example` to `api/.env`.
+- Copy `mobile/.env.example` to `mobile/.env`.
 - Do not commit secrets.
-- Add new required env vars to `.env.example`.
+- Add new required env vars to the matching `.env.example`.
 
 ## Definition of Done
 - Code is linted, tested, and builds.
 - API behavior and contracts are documented when changed.
+- Mobile API schema expectations are updated when API response shapes change.
 - PR approved and merged via squash.

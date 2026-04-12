@@ -14,10 +14,14 @@ Target branch: `main`
 - [ ] Allow only squash merge
 
 ## Required Status Checks
-- [ ] `ci / lint-and-test`
+- [ ] `ci / lint`
+- [ ] `ci / api-test`
 - [ ] `ci / build`
-- [ ] `Dependency Review` (if enabled)
-- [ ] `CodeQL` (if enabled)
+- [ ] `mobile-ci / mobile-test`
+- [ ] `Dependency review / dependency-review`
+- [ ] `CodeQL Advanced / Analyze (javascript-typescript)`
+
+Note: `Dependency review` is currently configured with `continue-on-error: true`; remove that if it should block merges.
 
 ## Merge Queue (Optional)
 - [ ] Enable merge queue for high-traffic repos
