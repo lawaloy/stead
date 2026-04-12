@@ -4,11 +4,30 @@
 
 Move OTP authentication from "implemented in code" to "operationally usable" for early environments.
 
+## Current Status
+
+Implemented:
+
+- Phone numbers are normalized before user lookup and OTP lifecycle operations.
+- OTP request and verify endpoints accept request IP and user-agent metadata.
+- OTP request throttling exists for both phone-level and IP-level limits.
+- OTP resend cooldown is enforced.
+- OTP verify attempts are counted per OTP record and lock after the configured max attempts.
+- OTP verify failures are also rate-limited by IP within a configurable time window.
+- Auth events are persisted for request, rate-limit, resend-blocked, verify-failed, verify-locked, and verify-succeeded outcomes.
+- OTP delivery is queued through persisted notification jobs.
+- Notification jobs support `pending`, `processing`, `sent`, and `dead_letter` states, retry backoff, provider name, and provider message id capture.
+- Twilio and Termii are supported SMS providers.
+- Provider configuration fails fast when required env vars are missing.
+- A dev-only OTP response path exists behind `DEV_EXPOSE_OTP=true`.
+- Authenticated inspection endpoints exist for auth telemetry and notification queue state.
+- Mobile auth has request, verify, resend cooldown, invalid-code, expired-code, lockout messaging, token persistence, and unauthorized-session clearing behavior.
+
 ## Remaining
 
 ### Auth controls
 
-- Extend abuse controls beyond the current OTP- and IP-level throttles.
+- Extend abuse controls beyond the current phone- and IP-level throttles.
 - Consider whether OTP request and verify should capture more device/request context.
 
 #### Checklist
@@ -20,16 +39,15 @@ Move OTP authentication from "implemented in code" to "operationally usable" for
 
 - Configure a real SMS provider in at least one target environment.
 - Validate the full OTP path with a real phone number.
-- Decide whether to add a dev-only OTP inspection path for faster local iteration.
 - Add clearer operator-facing tooling for inspecting OTP delivery and dead-letter jobs.
 
 #### Checklist
 
-- Pick the first live provider and document the required environment variables.
+- Pick the first live provider for the target environment.
 - Configure the target environment with real provider credentials.
 - Run one real-phone OTP request and verify pass end to end.
 - Confirm notification jobs move through `pending` -> `sent` and capture provider metadata.
-- Capture the operator playbook for diagnosing send failures and dead-letter jobs.
+- Capture an operator playbook for diagnosing send failures and dead-letter jobs.
 
 ### Mobile and product flow
 
@@ -46,11 +64,11 @@ Move OTP authentication from "implemented in code" to "operationally usable" for
 
 ## Acceptance Criteria
 
-- Phone numbers are stored and used in a canonical format.
-- OTP requests enforce a short resend cooldown.
-- OTP request records include client metadata when available.
-- Auth tests cover the critical request and verify paths.
-- OTP jobs survive process restarts and persist retry/dead-letter state.
-- Active SMS provider configuration fails fast when required env is missing.
-- Auth events persist resend and verify outcomes for later inspection.
-- Remaining work focuses on real-provider validation, stronger abuse controls, and operator visibility.
+- Phone numbers are stored and used in a canonical format. Done.
+- OTP requests enforce a short resend cooldown. Done.
+- OTP request records include client metadata when available. Done.
+- Auth tests cover the critical request and verify paths. Done.
+- OTP jobs survive process restarts and persist retry/dead-letter state. Done.
+- Active SMS provider configuration fails fast when required env is missing. Done.
+- Auth events persist resend and verify outcomes for later inspection. Done.
+- Remaining work focuses on real-provider validation, stronger device-aware abuse controls, and operator visibility.

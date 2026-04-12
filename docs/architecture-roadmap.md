@@ -1,9 +1,8 @@
-```markdown
 # Architecture Roadmap
 
 ## Context
 - Product: Stead Financial Stability Layer.
-- Current state: one backend API (`api`) and one Expo mobile app (`mobile`) in the same repository.
+- Current state: one backend API (`api`) and one Expo Router mobile app (`mobile`) in the same repository.
 - Constraint: long-term direction is multiple services, without locking into a monorepo as the end state.
 
 ## v2 Goals
@@ -37,7 +36,7 @@ This sequence is intentional. Stead should prioritize user-facing product surfac
   - Auth, goals, transactions, dashboard read APIs.
 - `notification-service`:
   - OTP dispatch, weekly status, risk alerts.
-- `stability-engine` package/service:
+- `stability-engine` package or service:
   - Deterministic scoring logic with versioned inputs/outputs.
 - `mobile-app`:
   - Expo client consuming public API contracts.
@@ -98,6 +97,10 @@ This sequence is intentional. Stead should prioritize user-facing product surfac
 - Lock module boundaries in API (`auth`, `goals`, `transactions`, `dashboard`, `sms`).
 - Enforce contract tests between API responses and mobile schema decoders.
 - Add architecture decision records (ADRs) for key boundary choices.
+- Current status:
+  - Core MVP modules exist in the API.
+  - Mobile Zod schemas parse current API responses.
+  - Notification jobs are already persisted in the database, but the worker still runs in-process.
 - Exit criteria:
   - All boundary contracts versioned.
   - CI green for lint/build/test/contracts.
@@ -106,6 +109,10 @@ This sequence is intentional. Stead should prioritize user-facing product surfac
 - Move SMS/alerts logic behind event consumer.
 - Keep OTP API surface unchanged from mobile perspective.
 - Add queue with dead-letter handling and retry policy.
+- Current status:
+  - OTP delivery is already behind a notification queue abstraction.
+  - Dead-letter handling and retry policy exist in the database-backed queue.
+  - Physical service extraction is not done yet.
 - Exit criteria:
   - Notification pipeline observable and independently deployable.
   - No regression in OTP success rate and alert latency.
@@ -148,5 +155,3 @@ This sequence is intentional. Stead should prioritize user-facing product surfac
 - Contract package distribution method (private npm registry vs git tags).
 - API gateway requirement timing.
 - Multi-region and data residency requirements for Nigerian users.
-
-```
