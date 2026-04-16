@@ -167,6 +167,7 @@ Mobile API responses are parsed with Zod schemas before the UI consumes them.
 
 The codebase has the MVP flow in place, but production readiness still depends on operational validation:
 
+- Next planned work: complete the numbered items in [Next Work Queue](#61-next-work-queue), removing each item from this document as it is completed.
 - Configure a real SMS provider in the target environment.
 - Run an end-to-end OTP request and verify pass with a real phone number.
 - Validate mobile token persistence and session expiry behavior against a real API environment.
@@ -174,3 +175,29 @@ The codebase has the MVP flow in place, but production readiness still depends o
 - Expand operator-facing visibility around repeated auth failures, lockouts, and dead-letter notification jobs.
 - Add broader contract enforcement between the API response shapes and the mobile Zod schemas.
 - Weekly readiness updates and risk warning alerts are still roadmap items; the current notification pipeline is used for OTP delivery.
+
+### 6.1 Next Work Queue
+
+Real-provider OTP validation is intentionally deferred until a paid or verified SMS provider account is ready. These are the next implementation items to unblock local validation and prepare for real-provider debugging.
+
+1. Add a local/dev SMS provider mode.
+   - Support a development provider setting, for example `SMS_PROVIDER=dev`.
+   - Keep OTP request behavior going through the persisted notification job pipeline.
+   - Process OTP jobs without calling Twilio or Termii.
+   - Mark jobs as sent with provider metadata that identifies the dev provider.
+   - Log or expose the OTP only in development-safe paths.
+   - Use this to validate the queue, consumer, and job lifecycle without Twilio spend.
+
+2. Improve operator inspection for OTP jobs.
+   - Make the existing inspection endpoint show enough recent job detail to debug delivery.
+   - Include recent jobs, status, last error, provider, provider message id, timestamps, and masked phone.
+   - Keep sensitive OTP values out of normal operator output.
+   - Use this to prepare for real-provider debugging later.
+
+3. Add contract and integration coverage around auth plus notification queue.
+   - Confirm request OTP creates an OTP record, auth event, and notification job.
+   - Confirm the consumer can process a job through the SMS abstraction.
+   - Confirm failures retry and eventually dead-letter.
+   - Cover the key local/dev provider behavior so future real-provider changes do not break the OTP path.
+
+Once these are done, the next validation target is request OTP -> notification job -> verify OTP -> authenticated mobile session against a real provider-backed environment.
