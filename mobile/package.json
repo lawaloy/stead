@@ -43,7 +43,7 @@
     "eslint-config-expo": "^55.0.0",
     "jest": "^30.3.0",
     "ts-jest": "^29.4.9",
-    "typescript": "~6.0.2"
+    "typescript": "~6.0.3"
   },
   "overrides": {
     "@xmldom/xmldom": "0.8.12",
