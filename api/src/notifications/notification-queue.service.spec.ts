@@ -84,8 +84,8 @@ describe('NotificationQueueService', () => {
       data: {
         attempts: 3,
         status: 'dead_letter',
-        nextRunAt: expect.any(Date) as unknown as Date,
-        failedAt: expect.any(Date) as unknown as Date,
+        nextRunAt: expect.any(Date) as unknown,
+        failedAt: expect.any(Date) as unknown,
         lastError: 'provider down',
         lockedAt: null,
       },
