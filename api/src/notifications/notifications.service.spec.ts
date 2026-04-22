@@ -1,6 +1,4 @@
 import { NotificationsService } from './notifications.service';
-import { NotificationQueueService } from './notification-queue.service';
-import { SmsService } from '../sms/sms.service';
 
 describe('NotificationsService', () => {
   let service: NotificationsService;
@@ -22,10 +20,7 @@ describe('NotificationsService', () => {
     sms = {
       getProviderInspection: jest.fn(),
     };
-    service = new NotificationsService(
-      queue as never as NotificationQueueService,
-      sms as never as SmsService,
-    );
+    service = new NotificationsService(queue, sms);
   });
 
   it('returns inspection summary with masked phones', async () => {

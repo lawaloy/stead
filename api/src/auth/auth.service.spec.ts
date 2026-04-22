@@ -123,8 +123,8 @@ describe('AuthService', () => {
     expect(prisma.otpCode.create).toHaveBeenCalledWith({
       data: {
         userId: 'user_1',
-        codeHash: expect.any(String) as unknown as string,
-        expiresAt: expect.any(Date) as unknown as Date,
+        codeHash: expect.any(String) as unknown,
+        expiresAt: expect.any(Date) as unknown,
         ip: '127.0.0.1',
         userAgent: 'jest-agent',
       },
@@ -217,7 +217,7 @@ describe('AuthService', () => {
     expect(prisma.otpCode.findFirst).toHaveBeenCalledWith({
       where: {
         userId: 'user_1',
-        createdAt: { gt: expect.any(Date) as unknown as Date },
+        createdAt: { gt: expect.any(Date) as unknown },
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -274,7 +274,7 @@ describe('AuthService', () => {
     expect(prisma.otpCode.update).toHaveBeenCalledWith({
       where: { id: 'otp_1' },
       data: {
-        consumedAt: expect.any(Date) as unknown as Date,
+        consumedAt: expect.any(Date) as unknown,
       },
     });
     expect(telemetry.recordEvent).toHaveBeenCalledWith(
@@ -374,7 +374,7 @@ describe('AuthService', () => {
       where: { id: 'otp_1' },
       data: {
         verifyAttempts: 5,
-        consumedAt: expect.any(Date) as unknown as Date,
+        consumedAt: expect.any(Date) as unknown,
       },
     });
     expect(telemetry.recordEvent).toHaveBeenCalledWith(
