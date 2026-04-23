@@ -46,8 +46,8 @@
     "typescript": "~6.0.3"
   },
   "overrides": {
-    "@xmldom/xmldom": "0.8.12",
     "node-forge": "1.4.0",
+    "uuid": "14.0.0",
     "yaml": "2.8.3",
     "handlebars": "4.7.9",
     "anymatch": {
