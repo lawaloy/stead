@@ -24,6 +24,7 @@ describe('AuthService', () => {
       create: jest.Mock;
       findFirst: jest.Mock;
       update: jest.Mock;
+      updateMany: jest.Mock;
     };
     user: {
       upsert: jest.Mock;
@@ -42,6 +43,7 @@ describe('AuthService', () => {
         create: jest.fn(),
         findFirst: jest.fn(),
         update: jest.fn(),
+        updateMany: jest.fn(),
       },
       user: {
         upsert: jest.fn(),
@@ -260,7 +262,7 @@ describe('AuthService', () => {
       expiresAt: new Date(Date.now() + 60_000),
       consumedAt: null,
     } satisfies MockOtpRecord);
-    prisma.otpCode.update.mockResolvedValue({});
+    prisma.otpCode.updateMany.mockResolvedValue({ count: 1 });
     jwt.signAsync.mockResolvedValue('jwt_token');
 
     const result = await service.verifyOtp('08012345678', 'NG', otp, {
@@ -271,11 +273,13 @@ describe('AuthService', () => {
     expect(prisma.user.findUnique).toHaveBeenCalledWith({
       where: { phone: '+2348012345678' },
     });
-    expect(prisma.otpCode.update).toHaveBeenCalledWith({
-      where: { id: 'otp_1' },
-      data: {
-        consumedAt: expect.any(Date) as unknown,
+    expect(prisma.otpCode.updateMany).toHaveBeenCalledWith({
+      where: {
+        id: 'otp_1',
+        consumedAt: null,
+        expiresAt: { gt: expect.any(Date) as unknown },
       },
+      data: { consumedAt: expect.any(Date) as unknown },
     });
     expect(telemetry.recordEvent).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -287,6 +291,31 @@ describe('AuthService', () => {
       }),
     );
     expect(result).toEqual({ token: 'jwt_token' });
+  });
+
+  it('rejects a valid otp if another request already consumed it', async () => {
+    const otp = '123456';
+    prisma.user.findUnique.mockResolvedValue({
+      id: 'user_1',
+      phone: '+2348012345678',
+    } satisfies MockUser);
+    prisma.otpCode.findFirst.mockResolvedValue({
+      id: 'otp_1',
+      codeHash: await bcrypt.hash(otp, 1),
+      verifyAttempts: 0,
+      expiresAt: new Date(Date.now() + 60_000),
+      consumedAt: null,
+    } satisfies MockOtpRecord);
+    prisma.otpCode.updateMany.mockResolvedValue({ count: 0 });
+
+    await expect(
+      service.verifyOtp('08012345678', 'NG', otp),
+    ).rejects.toThrow(BadRequestException);
+
+    expect(jwt.signAsync).not.toHaveBeenCalled();
+    expect(telemetry.recordEvent).not.toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'otp_verify_succeeded' }),
+    );
   });
 
   it('rate limits otp verification failures by ip window', async () => {

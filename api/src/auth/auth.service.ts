@@ -314,10 +314,17 @@ export class AuthService {
       throw new BadRequestException('Invalid phone or code');
     }
 
-    await this.prisma.otpCode.update({
-      where: { id: record.id },
+    const consumed = await this.prisma.otpCode.updateMany({
+      where: {
+        id: record.id,
+        consumedAt: null,
+        expiresAt: { gt: new Date() },
+      },
       data: { consumedAt: new Date() },
     });
+    if (consumed.count === 0) {
+      throw new BadRequestException('OTP expired or not found');
+    }
 
     this.telemetry.recordEvent({
       type: 'otp_verify_succeeded',
