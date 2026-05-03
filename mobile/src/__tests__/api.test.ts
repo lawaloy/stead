@@ -1,5 +1,6 @@
 import MockAdapter from 'axios-mock-adapter';
 import {
+  ApiError,
   apiClient,
   configureApiAuth,
   requestOtp,
@@ -15,6 +16,10 @@ describe('api client', () => {
 
   afterEach(() => {
     mock.reset();
+    configureApiAuth({
+      getToken: async () => null,
+      onUnauthorized: () => undefined,
+    });
   });
 
   it('adds Authorization header when token exists', async () => {
@@ -48,5 +53,39 @@ describe('api client', () => {
       'Unauthorized',
     );
     expect(onUnauthorized).toHaveBeenCalledTimes(1);
+  });
+
+  it('joins array validation messages from api errors', async () => {
+    mock.onPost('/auth/request-otp').reply(400, {
+      message: ['phone must be valid', 'countryIso must be supported'],
+    });
+
+    await expect(requestOtp('not-a-phone', 'NG')).rejects.toMatchObject({
+      name: 'ApiError',
+      status: 400,
+      message: 'phone must be valid, countryIso must be supported',
+    });
+  });
+
+  it('preserves structured error details from api errors', async () => {
+    const details = { retryAfterMs: 60_000, scope: 'ip' };
+
+    mock.onPost('/auth/verify-otp').reply(429, {
+      message: 'Too many invalid OTP attempts from this network. Try again later.',
+      details,
+    });
+
+    try {
+      await verifyOtp('08012345678', 'NG', '000000');
+      throw new Error('Expected verifyOtp to reject');
+    } catch (error) {
+      expect(error).toBeInstanceOf(ApiError);
+      expect(error).toMatchObject({
+        status: 429,
+        message:
+          'Too many invalid OTP attempts from this network. Try again later.',
+        details,
+      });
+    }
   });
 });
