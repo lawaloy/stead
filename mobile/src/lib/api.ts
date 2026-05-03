@@ -42,7 +42,7 @@ apiClient.interceptors.response.use(
 
     const status = error.response?.status;
     const body = error.response?.data as
-      | { message?: string; details?: unknown }
+      | { message?: string | string[]; details?: unknown }
       | string
       | undefined;
 
@@ -52,12 +52,12 @@ apiClient.interceptors.response.use(
     let details: unknown = undefined;
     if (typeof body === 'string') message = body;
     if (body && typeof body === 'object') {
-      message =
-        (body as { message?: string }).message ||
-        (Array.isArray((body as { message?: unknown }).message)
-          ? ((body as { message?: string[] }).message || []).join(', ')
-          : message);
-      details = (body as { details?: unknown }).details;
+      if (Array.isArray(body.message)) {
+        message = body.message.join(', ');
+      } else if (body.message) {
+        message = body.message;
+      }
+      details = body.details;
     }
 
     throw new ApiError({ message, status, details });
