@@ -15,7 +15,7 @@
   "dependencies": {
     "@tanstack/react-query": "^5.100.8",
     "axios": "^1.16.0",
-    "expo": "~55.0.19",
+    "expo": "~55.0.20",
     "expo-constants": "~55.0.7",
     "expo-linking": "~55.0.14",
     "expo-router": "~55.0.13",
@@ -35,7 +35,7 @@
     "@eslint/compat": "^2.0.5",
     "@types/jest": "^30.0.0",
     "@types/react": "~19.2.2",
-    "@typescript-eslint/parser": "^8.59.1",
+    "@typescript-eslint/parser": "^8.59.2",
     "axios-mock-adapter": "^2.1.0",
     "babel-preset-expo": "~55.0.13",
     "chalk": "5.6.2",
