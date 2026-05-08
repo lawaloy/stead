@@ -1,0 +1,118 @@
+import { Logger } from '@nestjs/common';
+import { NotificationConsumerService } from './notification-consumer.service';
+import { NotificationJob } from './notification.types';
+
+describe('NotificationConsumerService', () => {
+  let service: NotificationConsumerService;
+  let queue: {
+    claimReadyJob: jest.Mock;
+    markSucceeded: jest.Mock;
+    markFailed: jest.Mock;
+  };
+  let sms: {
+    sendOtp: jest.Mock;
+  };
+
+  const job: NotificationJob = {
+    id: 'job_1',
+    type: 'otp.requested',
+    payload: { phone: '+2348012345678', otp: '123456' },
+    status: 'processing',
+    attempts: 0,
+    maxAttempts: 3,
+    nextRunAt: new Date('2026-03-29T12:00:00Z'),
+    lockedAt: new Date('2026-03-29T12:00:00Z'),
+    sentAt: null,
+    failedAt: null,
+    lastError: null,
+    provider: null,
+    providerMessageId: null,
+    createdAt: new Date('2026-03-29T12:00:00Z'),
+    updatedAt: new Date('2026-03-29T12:00:00Z'),
+  };
+
+  const tick = () => (service as unknown as { tick(): Promise<void> }).tick();
+
+  beforeEach(() => {
+    jest.spyOn(Logger.prototype, 'log').mockImplementation(() => undefined);
+    jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+
+    queue = {
+      claimReadyJob: jest.fn(),
+      markSucceeded: jest.fn(),
+      markFailed: jest.fn(),
+    };
+    sms = {
+      sendOtp: jest.fn(),
+    };
+    service = new NotificationConsumerService(queue, sms);
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it('sends ready otp jobs and records provider message metadata', async () => {
+    queue.claimReadyJob.mockResolvedValue(job);
+    sms.sendOtp.mockResolvedValue({
+      ok: true,
+      provider: 'twilio',
+      response: { sid: 'SM123' },
+    });
+
+    await tick();
+
+    expect(sms.sendOtp).toHaveBeenCalledWith('+2348012345678', '123456');
+    expect(queue.markSucceeded).toHaveBeenCalledWith('job_1', {
+      provider: 'twilio',
+      providerMessageId: 'SM123',
+    });
+    expect(queue.markFailed).not.toHaveBeenCalled();
+  });
+
+  it('marks jobs failed when the sms provider rejects', async () => {
+    const error = new Error('provider down');
+    queue.claimReadyJob.mockResolvedValue(job);
+    sms.sendOtp.mockRejectedValue(error);
+
+    await tick();
+
+    expect(queue.markSucceeded).not.toHaveBeenCalled();
+    expect(queue.markFailed).toHaveBeenCalledWith(job, error);
+  });
+
+  it('does not claim another job while a send is in flight', async () => {
+    let resolveSend: (value: {
+      ok: boolean;
+      provider: string;
+      response: Record<string, string>;
+    }) => void;
+    const sendPromise = new Promise<{
+      ok: boolean;
+      provider: string;
+      response: Record<string, string>;
+    }>((resolve) => {
+      resolveSend = resolve;
+    });
+    queue.claimReadyJob.mockResolvedValue(job);
+    sms.sendOtp.mockReturnValue(sendPromise);
+
+    const firstTick = tick();
+    await Promise.resolve();
+    await tick();
+
+    expect(queue.claimReadyJob).toHaveBeenCalledTimes(1);
+
+    resolveSend!({
+      ok: true,
+      provider: 'termii',
+      response: { message_id: 'termii-123' },
+    });
+    await firstTick;
+
+    expect(queue.markSucceeded).toHaveBeenCalledWith('job_1', {
+      provider: 'termii',
+      providerMessageId: 'termii-123',
+    });
+  });
+});
