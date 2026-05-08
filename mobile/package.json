@@ -15,16 +15,16 @@
   "dependencies": {
     "@tanstack/react-query": "^5.100.8",
     "axios": "^1.16.0",
-    "expo": "~55.0.19",
+    "expo": "~55.0.23",
     "expo-constants": "~55.0.7",
-    "expo-linking": "~55.0.14",
-    "expo-router": "~55.0.13",
+    "expo-linking": "~55.0.15",
+    "expo-router": "~55.0.14",
     "expo-secure-store": "~55.0.13",
-    "expo-status-bar": "~55.0.5",
+    "expo-status-bar": "~55.0.6",
     "libphonenumber-js": "^1.12.41",
-    "react": "19.2.5",
-    "react-dom": "19.2.5",
-    "react-native": "0.85.2",
+    "react": "19.2.6",
+    "react-dom": "19.2.6",
+    "react-native": "0.85.3",
     "react-native-gesture-handler": "~2.31.1",
     "react-native-safe-area-context": "~5.7.0",
     "react-native-screens": "~4.24.0",
@@ -32,16 +32,16 @@
     "zod": "^4.4.2"
   },
   "devDependencies": {
-    "@eslint/compat": "^2.0.5",
+    "@eslint/compat": "^2.1.0",
     "@types/jest": "^30.0.0",
     "@types/react": "~19.2.2",
-    "@typescript-eslint/parser": "^8.59.1",
+    "@typescript-eslint/parser": "^8.59.2",
     "axios-mock-adapter": "^2.1.0",
     "babel-preset-expo": "~55.0.13",
     "chalk": "5.6.2",
     "eslint": "^10.3.0",
     "eslint-config-expo": "^55.0.0",
-    "jest": "^30.3.0",
+    "jest": "^30.4.1",
     "ts-jest": "^29.4.9",
     "typescript": "~6.0.3"
   },
@@ -79,7 +79,8 @@
     },
     "minimatch@10": {
       "brace-expansion": "5.0.5"
-    }
+    },
+    "postcss": "8.5.10"
   },
   "private": true
 }
