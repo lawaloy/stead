@@ -308,9 +308,9 @@ describe('AuthService', () => {
     } satisfies MockOtpRecord);
     prisma.otpCode.updateMany.mockResolvedValue({ count: 0 });
 
-    await expect(
-      service.verifyOtp('08012345678', 'NG', otp),
-    ).rejects.toThrow(BadRequestException);
+    await expect(service.verifyOtp('08012345678', 'NG', otp)).rejects.toThrow(
+      BadRequestException,
+    );
 
     expect(jwt.signAsync).not.toHaveBeenCalled();
     expect(telemetry.recordEvent).not.toHaveBeenCalledWith(
