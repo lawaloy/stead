@@ -33,8 +33,7 @@ describe('NotificationConsumerService', () => {
     updatedAt: new Date('2026-03-29T12:00:00Z'),
   };
 
-  const tick = () =>
-    (service as unknown as { tick(): Promise<void> }).tick();
+  const tick = () => (service as unknown as { tick(): Promise<void> }).tick();
 
   beforeEach(() => {
     jest.spyOn(Logger.prototype, 'log').mockImplementation(() => undefined);
