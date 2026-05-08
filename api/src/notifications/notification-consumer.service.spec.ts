@@ -1,7 +1,5 @@
 import { Logger } from '@nestjs/common';
-import { SmsService } from '../sms/sms.service';
 import { NotificationConsumerService } from './notification-consumer.service';
-import { NotificationQueueService } from './notification-queue.service';
 import { NotificationJob } from './notification.types';
 
 describe('NotificationConsumerService', () => {
@@ -47,10 +45,7 @@ describe('NotificationConsumerService', () => {
     sms = {
       sendOtp: jest.fn(),
     };
-    service = new NotificationConsumerService(
-      queue as never as NotificationQueueService,
-      sms as never as SmsService,
-    );
+    service = new NotificationConsumerService(queue, sms);
   });
 
   afterEach(() => {
