@@ -15,11 +15,11 @@
   "dependencies": {
     "@tanstack/react-query": "^5.100.10",
     "axios": "^1.16.0",
-    "expo": "~55.0.23",
+    "expo": "~55.0.24",
     "expo-constants": "~55.0.7",
     "expo-linking": "~55.0.15",
     "expo-router": "~55.0.14",
-    "expo-secure-store": "~55.0.13",
+    "expo-secure-store": "~55.0.14",
     "expo-status-bar": "~55.0.6",
     "libphonenumber-js": "^1.13.0",
     "react": "19.2.6",
@@ -40,7 +40,7 @@
     "babel-preset-expo": "~55.0.13",
     "chalk": "5.6.2",
     "eslint": "^10.3.0",
-    "eslint-config-expo": "^55.0.0",
+    "eslint-config-expo": "^55.0.1",
     "jest": "^30.4.2",
     "ts-jest": "^29.4.9",
     "typescript": "~6.0.3"
