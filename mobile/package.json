@@ -13,7 +13,7 @@
     "build": "expo export --platform web --output-dir dist"
   },
   "dependencies": {
-    "@tanstack/react-query": "^5.100.10",
+    "@tanstack/react-query": "^5.100.11",
     "axios": "^1.16.0",
     "expo": "~55.0.24",
     "expo-constants": "~55.0.7",
@@ -26,7 +26,7 @@
     "react-dom": "19.2.6",
     "react-native": "0.85.3",
     "react-native-gesture-handler": "~2.31.1",
-    "react-native-safe-area-context": "~5.7.0",
+    "react-native-safe-area-context": "~5.8.0",
     "react-native-screens": "~4.25.0",
     "react-native-web": "^0.21.0",
     "zod": "^4.4.2"
@@ -35,7 +35,7 @@
     "@eslint/compat": "^2.1.0",
     "@types/jest": "^30.0.0",
     "@types/react": "~19.2.2",
-    "@typescript-eslint/parser": "^8.59.3",
+    "@typescript-eslint/parser": "^8.59.4",
     "axios-mock-adapter": "^2.1.0",
     "babel-preset-expo": "~55.0.13",
     "chalk": "5.6.2",
