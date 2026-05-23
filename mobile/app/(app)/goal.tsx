@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { ApiError, createGoal, getActiveGoal } from '../../src/lib/api';
@@ -10,7 +10,7 @@ const toNaira = (kobo: number) => `₦${(kobo / 100).toLocaleString()}`;
 export default function GoalScreen() {
   const [name, setName] = useState('Rent');
   const [amountKobo, setAmountKobo] = useState('120000000');
-  const [dueDate, setDueDate] = useState(new Date(Date.now() + 120 * 86400000).toISOString());
+  const [dueDate, setDueDate] = useState('');
   const [monthlyIncomeKobo, setMonthlyIncomeKobo] = useState('30000000');
   const [success, setSuccess] = useState('');
 
@@ -44,6 +44,16 @@ export default function GoalScreen() {
       await queryClient.invalidateQueries({ queryKey: ['dashboard', 'stability'] });
     },
   });
+
+  useEffect(() => {
+    if (!dueDate) {
+      // setting initial state once on mount; acceptable here
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setDueDate(new Date(Date.now() + 120 * 86400000).toISOString());
+    }
+    // run only once on mount
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <ScreenShell title="Active Goal">

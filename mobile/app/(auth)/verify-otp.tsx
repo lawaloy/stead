@@ -14,7 +14,7 @@ import {
 
 export default function VerifyOtpScreen() {
   const [otp, setOtp] = useState('');
-  const [now, setNow] = useState(Date.now());
+  const [now, setNow] = useState(0);
   const router = useRouter();
   const {
     pendingPhone,
@@ -28,10 +28,6 @@ export default function VerifyOtpScreen() {
   } = useAuth();
   const country = getAuthCountry(pendingCountryIso);
 
-  useEffect(() => {
-    if (devOtpHint) setOtp(devOtpHint);
-  }, [devOtpHint]);
-
   const validation = useMemo(() => {
     if (!otp) return '';
     if (!/^\d{6}$/.test(otp)) return 'OTP must be 6 digits';
@@ -40,6 +36,9 @@ export default function VerifyOtpScreen() {
 
   useEffect(() => {
     if (!pendingOtpRequestedAt) return;
+    // set initial time immediately, then start interval
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setNow(Date.now());
     const timer = setInterval(() => setNow(Date.now()), 1_000);
     return () => clearInterval(timer);
   }, [pendingOtpRequestedAt]);
@@ -85,7 +84,7 @@ export default function VerifyOtpScreen() {
       <Text style={styles.phone}>{pendingPhone}</Text>
       {devOtpHint ? <Text style={styles.hint}>Dev OTP: {devOtpHint}</Text> : null}
       <TextInput
-        value={otp}
+        value={otp || devOtpHint || ''}
         onChangeText={setOtp}
         placeholder="123456"
         keyboardType="number-pad"
