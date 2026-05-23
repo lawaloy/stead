@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { SmsService } from './sms.service';
 import { TwilioClient } from './twilio.client';
 import { TermiiClient } from './termii.client';
+import { DevClient } from './dev.client';
 
 describe('SmsService', () => {
   let service: SmsService;
@@ -37,6 +38,12 @@ describe('SmsService', () => {
         },
         {
           provide: TermiiClient,
+          useValue: {
+            sendMessage: jest.fn(),
+          },
+        },
+        {
+          provide: DevClient,
           useValue: {
             sendMessage: jest.fn(),
           },

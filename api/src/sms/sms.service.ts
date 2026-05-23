@@ -8,6 +8,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { TwilioClient } from './twilio.client';
 import { TermiiClient } from './termii.client';
+import { DevClient } from './dev.client';
 
 @Injectable()
 export class SmsService implements OnModuleInit {
@@ -17,6 +18,7 @@ export class SmsService implements OnModuleInit {
     private readonly config: ConfigService,
     private readonly twilio: TwilioClient,
     private readonly termii: TermiiClient,
+    private readonly dev: DevClient,
   ) {}
 
   onModuleInit() {
@@ -33,6 +35,15 @@ export class SmsService implements OnModuleInit {
 
     const to = phone;
     const body = `Your Stead OTP is ${otp}. It expires in 10 minutes.`;
+
+    if (provider === 'dev') {
+      // Dev provider: don't call external APIs. Return a simple
+      // response that includes the message body so the consumer
+      // (and dev-safe inspection endpoints) can surface the OTP
+      // when DEV_EXPOSE_OTP is enabled.
+      const response = this.dev.sendMessage({ to, body });
+      return { ok: true, provider: 'dev', response };
+    }
 
     if (provider === 'twilio') {
       const from = process.env.TWILIO_FROM;
@@ -105,6 +116,17 @@ export class SmsService implements OnModuleInit {
   getProviderInspection() {
     const provider = this.getProviderName();
 
+    const exposeOtp = this.config.get<string>('DEV_EXPOSE_OTP') === 'true';
+
+    if (provider === 'dev') {
+      return {
+        provider,
+        ready: true,
+        config: {
+          exposeOtp,
+        },
+      };
+    }
     if (provider === 'twilio') {
       return {
         provider,
@@ -133,6 +155,8 @@ export class SmsService implements OnModuleInit {
 
   private assertProviderConfiguration() {
     const provider = this.getProviderName();
+
+    if (provider === 'dev') return;
 
     if (provider === 'twilio') {
       if (!this.hasValue('TWILIO_ACCOUNT_SID')) {
@@ -164,11 +188,13 @@ export class SmsService implements OnModuleInit {
     }
   }
 
-  private getProviderName(): 'twilio' | 'termii' {
+  private getProviderName(): 'twilio' | 'termii' | 'dev' {
     const provider = (this.config.get<string>('SMS_PROVIDER') || 'twilio')
       .toLowerCase()
       .trim();
-    return provider === 'termii' ? 'termii' : 'twilio';
+    if (provider === 'dev') return 'dev';
+    if (provider === 'termii') return 'termii';
+    return 'twilio';
   }
 
   private hasValue(key: string): boolean {
