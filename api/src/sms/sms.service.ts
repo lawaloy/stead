@@ -41,7 +41,7 @@ export class SmsService implements OnModuleInit {
       // response that includes the message body so the consumer
       // (and dev-safe inspection endpoints) can surface the OTP
       // when DEV_EXPOSE_OTP is enabled.
-      const response = await this.dev.sendMessage({ to, body });
+      const response = this.dev.sendMessage({ to, body });
       return { ok: true, provider: 'dev', response };
     }
 

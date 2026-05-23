@@ -9,7 +9,7 @@ type DevPayload = {
 export class DevClient {
   private readonly logger = new Logger(DevClient.name);
 
-  async sendMessage(payload: DevPayload) {
+  sendMessage(payload: DevPayload) {
     // In dev mode we don't call external APIs. Log the message and
     // return a minimal response that includes the body so callers
     // can surface the OTP in dev-only contexts if allowed.
