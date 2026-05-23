@@ -1,4 +1,4 @@
-import axios, { AxiosHeaders, isAxiosError } from 'axios';
+import * as Axios from 'axios';
 import { z } from 'zod';
 import { appConfig } from './app-config';
 import { resolveApiBaseUrl } from './base-url';
@@ -12,6 +12,9 @@ import {
 } from '../types/api';
 
 export { ApiError } from './api-error';
+
+const axios = Axios as unknown as typeof import('axios');
+const isAxiosError = Axios.isAxiosError;
 
 type AuthConfig = {
   getToken: () => Promise<string | null>;
@@ -28,7 +31,7 @@ export const apiClient = axios.create({
 
 apiClient.interceptors.request.use(async (config) => {
   const token = await getTokenFn();
-  if (!config.headers) config.headers = new AxiosHeaders();
+  if (!config.headers) config.headers = new (Axios as any).AxiosHeaders();
   if (token) config.headers.Authorization = `Bearer ${token}`;
   return config;
 });
