@@ -47,6 +47,8 @@ export default function GoalScreen() {
 
   useEffect(() => {
     if (!dueDate) {
+      // setting initial state once on mount; acceptable here
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setDueDate(new Date(Date.now() + 120 * 86400000).toISOString());
     }
     // run only once on mount

@@ -37,6 +37,7 @@ export default function VerifyOtpScreen() {
   useEffect(() => {
     if (!pendingOtpRequestedAt) return;
     // set initial time immediately, then start interval
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setNow(Date.now());
     const timer = setInterval(() => setNow(Date.now()), 1_000);
     return () => clearInterval(timer);
