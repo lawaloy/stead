@@ -1,6 +1,4 @@
 import * as Axios from 'axios';
-const axios = Axios as unknown as typeof import('axios');
-const isAxiosError = Axios.isAxiosError;
 import { z } from 'zod';
 import { appConfig } from './app-config';
 import { resolveApiBaseUrl } from './base-url';
@@ -14,6 +12,9 @@ import {
 } from '../types/api';
 
 export { ApiError } from './api-error';
+
+const axios = Axios as unknown as typeof import('axios');
+const isAxiosError = Axios.isAxiosError;
 
 type AuthConfig = {
   getToken: () => Promise<string | null>;
