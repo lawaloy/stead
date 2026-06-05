@@ -7,25 +7,25 @@ describe('envSchema', () => {
   };
 
   it('allows the dev SMS provider without external SMS credentials', () => {
-    const { error, value } = envSchema.validate({
+    const result = envSchema.validate({
       ...requiredEnv,
       SMS_PROVIDER: 'dev',
     });
 
-    expect(error).toBeUndefined();
-    expect(value).toMatchObject({
+    expect(result.error).toBeUndefined();
+    expect(result.value as Record<string, unknown>).toMatchObject({
       SMS_PROVIDER: 'dev',
       DEV_EXPOSE_OTP: 'false',
     });
   });
 
   it('still requires Termii credentials when the Termii provider is active', () => {
-    const { error } = envSchema.validate({
+    const result = envSchema.validate({
       ...requiredEnv,
       SMS_PROVIDER: 'termii',
     });
 
-    expect(error?.message).toContain(
+    expect(result.error?.message).toContain(
       'TERMII_API_KEY is required when SMS_PROVIDER=termii',
     );
   });
