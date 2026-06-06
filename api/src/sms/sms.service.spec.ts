@@ -8,8 +8,16 @@ import { DevClient } from './dev.client';
 describe('SmsService', () => {
   let service: SmsService;
   let config: { get: jest.Mock };
+  let devClient: { sendMessage: jest.Mock };
 
   beforeEach(async () => {
+    devClient = {
+      sendMessage: jest.fn(({ body }: { body: string }) => ({
+        dev: true,
+        logged: true,
+        body,
+      })),
+    };
     config = {
       get: jest.fn((key: string) => {
         const env: Record<string, string> = {
@@ -44,9 +52,7 @@ describe('SmsService', () => {
         },
         {
           provide: DevClient,
-          useValue: {
-            sendMessage: jest.fn(),
-          },
+          useValue: devClient,
         },
       ],
     }).compile();
@@ -80,6 +86,49 @@ describe('SmsService', () => {
         apiKeyConfigured: true,
         senderIdConfigured: true,
         channel: 'generic',
+      },
+    });
+  });
+
+  it('routes OTP delivery through the dev provider when configured', async () => {
+    config.get.mockImplementation((key: string) => {
+      const env: Record<string, string> = {
+        SMS_PROVIDER: 'dev',
+        DEV_EXPOSE_OTP: 'true',
+      };
+      return env[key];
+    });
+
+    await expect(service.sendOtp('+15551234567', '123456')).resolves.toEqual({
+      ok: true,
+      provider: 'dev',
+      response: {
+        dev: true,
+        logged: true,
+        body: 'Your Stead OTP is 123456. It expires in 10 minutes.',
+      },
+    });
+    expect(devClient.sendMessage).toHaveBeenCalledWith({
+      to: '+15551234567',
+      body: 'Your Stead OTP is 123456. It expires in 10 minutes.',
+    });
+  });
+
+  it('reports dev provider inspection without requiring SMS secrets', () => {
+    config.get.mockImplementation((key: string) => {
+      const env: Record<string, string> = {
+        SMS_PROVIDER: 'dev',
+        DEV_EXPOSE_OTP: 'true',
+      };
+      return env[key];
+    });
+
+    expect(() => service.onModuleInit()).not.toThrow();
+    expect(service.getProviderInspection()).toEqual({
+      provider: 'dev',
+      ready: true,
+      config: {
+        exposeOtp: true,
       },
     });
   });
