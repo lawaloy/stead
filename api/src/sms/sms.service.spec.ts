@@ -90,6 +90,18 @@ describe('SmsService', () => {
     });
   });
 
+  it('initializes the dev provider without third-party SMS credentials', () => {
+    config.get.mockImplementation((key: string) => {
+      const env: Record<string, string> = {
+        SMS_PROVIDER: 'dev',
+        DEV_EXPOSE_OTP: 'false',
+      };
+      return env[key];
+    });
+
+    expect(() => service.onModuleInit()).not.toThrow();
+  });
+
   it('routes dev provider OTPs through the local client only', async () => {
     config.get.mockImplementation((key: string) => {
       const env: Record<string, string> = {

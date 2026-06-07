@@ -19,6 +19,20 @@ describe('envSchema', () => {
     });
   });
 
+  it('continues to require Twilio credentials for the Twilio provider', () => {
+    const result = envSchema.validate(
+      {
+        ...requiredEnv,
+        SMS_PROVIDER: 'twilio',
+      },
+      { abortEarly: false },
+    );
+
+    expect(result.error?.message).toContain(
+      'TWILIO_ACCOUNT_SID is required when SMS_PROVIDER=twilio',
+    );
+  });
+
   it('preserves explicit dev OTP exposure configuration', () => {
     const result = envSchema.validate({
       ...requiredEnv,
