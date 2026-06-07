@@ -42,7 +42,7 @@ export const envSchema = Joi.object({
     .integer()
     .min(1_000)
     .default(15 * 60 * 1000),
-  SMS_PROVIDER: Joi.string().valid('twilio', 'termii').default('twilio'),
+  SMS_PROVIDER: Joi.string().valid('twilio', 'termii', 'dev').default('twilio'),
   DEV_EXPOSE_OTP: Joi.string().valid('true', 'false').default('false'),
   TWILIO_ACCOUNT_SID: Joi.string().allow('').optional(),
   TWILIO_AUTH_TOKEN: Joi.string().allow('').optional(),
