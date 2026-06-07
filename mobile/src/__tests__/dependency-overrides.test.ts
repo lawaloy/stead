@@ -88,7 +88,7 @@ describe('dependency overrides', () => {
     expect(missingDependencies).toEqual([]);
   });
 
-  it('retains Expo Router optional native peers needed for clean installs', () => {
+  it('retains Expo optional native peer metadata without forcing peer installs', () => {
     const packageLock = readJson<PackageLock>('package-lock.json');
     const packages = packageLock.packages;
 
@@ -103,28 +103,33 @@ describe('dependency overrides', () => {
       },
     });
 
-    expect(packages['node_modules/react-native-reanimated']).toMatchObject({
-      peer: true,
-      dependencies: {
-        'react-native-is-edge-to-edge': '^1.3.1',
-      },
+    expect(packages['node_modules/@expo/ui']).toMatchObject({
       peerDependencies: {
-        'react-native-worklets': '0.9.x',
+        'react-native-reanimated': '*',
+        'react-native-worklets': '*',
+      },
+      peerDependenciesMeta: {
+        'react-native-reanimated': {
+          optional: true,
+        },
+        'react-native-worklets': {
+          optional: true,
+        },
       },
     });
 
-    expect(packages['node_modules/react-native-worklets']).toMatchObject({
-      peer: true,
+    expect(packages['node_modules/expo-modules-core']).toMatchObject({
       peerDependencies: {
-        '@react-native/metro-config': '*',
+        'react-native-worklets': '^0.7.4 || ^0.8.0',
+      },
+      peerDependenciesMeta: {
+        'react-native-worklets': {
+          optional: true,
+        },
       },
     });
 
-    expect(packages['node_modules/@react-native/metro-config']).toMatchObject({
-      peer: true,
-      dependencies: {
-        '@react-native/metro-babel-transformer': '0.85.3',
-      },
-    });
+    expect(packages['node_modules/react-native-reanimated']).toBeUndefined();
+    expect(packages['node_modules/react-native-worklets']).toBeUndefined();
   });
 });
