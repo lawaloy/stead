@@ -1,13 +1,11 @@
 import { readFileSync } from 'node:fs';
 import { join, posix } from 'node:path';
 
-const mobileRoot = join(__dirname, '..', '..');
+const apiRoot = join(__dirname, '..');
 
 type LockfilePackage = {
   dependencies?: Record<string, string>;
-  peer?: boolean;
-  peerDependencies?: Record<string, string>;
-  peerDependenciesMeta?: Record<string, { optional?: boolean }>;
+  optional?: boolean;
   version?: string;
 };
 
@@ -16,7 +14,7 @@ type PackageLock = {
 };
 
 const readJson = <T = Record<string, unknown>>(fileName: string) =>
-  JSON.parse(readFileSync(join(mobileRoot, fileName), 'utf8')) as T;
+  JSON.parse(readFileSync(join(apiRoot, fileName), 'utf8')) as T;
 
 const lockfileDependencyCandidates = (
   packagePath: string,
@@ -47,26 +45,7 @@ const lockfileDependencyCandidates = (
   return Array.from(new Set(candidates));
 };
 
-describe('dependency overrides', () => {
-  it('pins postcss to the patched version in package metadata and lockfile', () => {
-    const packageJson = readJson('package.json');
-    const packageLock = readJson<PackageLock>('package-lock.json');
-
-    expect(packageJson).toMatchObject({
-      overrides: {
-        postcss: '8.5.10',
-      },
-    });
-
-    expect(packageLock).toMatchObject({
-      packages: {
-        'node_modules/postcss': {
-          version: '8.5.10',
-        },
-      },
-    });
-  });
-
+describe('dependency lockfile', () => {
   it('keeps every package dependency resolvable in the lockfile', () => {
     const packageLock = readJson<PackageLock>('package-lock.json');
 
@@ -88,43 +67,31 @@ describe('dependency overrides', () => {
     expect(missingDependencies).toEqual([]);
   });
 
-  it('retains Expo Router optional native peers needed for clean installs', () => {
+  it('retains optional @emnapi packages required by the resolver wasm binding', () => {
     const packageLock = readJson<PackageLock>('package-lock.json');
     const packages = packageLock.packages;
 
-    expect(packages['node_modules/expo-router']).toMatchObject({
-      peerDependencies: {
-        'react-native-reanimated': '*',
-      },
-      peerDependenciesMeta: {
-        'react-native-reanimated': {
-          optional: true,
-        },
-      },
-    });
-
-    expect(packages['node_modules/react-native-reanimated']).toMatchObject({
-      peer: true,
+    expect(
+      packages['node_modules/@unrs/resolver-binding-wasm32-wasi'],
+    ).toMatchObject({
+      optional: true,
       dependencies: {
-        'react-native-is-edge-to-edge': '^1.3.1',
-      },
-      peerDependencies: {
-        'react-native-worklets': '0.9.x',
+        '@emnapi/core': '1.10.0',
+        '@emnapi/runtime': '1.10.0',
       },
     });
 
-    expect(packages['node_modules/react-native-worklets']).toMatchObject({
-      peer: true,
-      peerDependencies: {
-        '@react-native/metro-config': '*',
-      },
-    });
-
-    expect(packages['node_modules/@react-native/metro-config']).toMatchObject({
-      peer: true,
+    expect(packages['node_modules/@emnapi/core']).toMatchObject({
+      optional: true,
+      version: '1.10.0',
       dependencies: {
-        '@react-native/metro-babel-transformer': '0.85.3',
+        '@emnapi/wasi-threads': '1.2.1',
       },
+    });
+
+    expect(packages['node_modules/@emnapi/runtime']).toMatchObject({
+      optional: true,
+      version: '1.10.0',
     });
   });
 });
