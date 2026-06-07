@@ -19,6 +19,20 @@ describe('envSchema', () => {
     });
   });
 
+  it('preserves explicit dev OTP exposure configuration', () => {
+    const result = envSchema.validate({
+      ...requiredEnv,
+      SMS_PROVIDER: 'dev',
+      DEV_EXPOSE_OTP: 'true',
+    });
+
+    expect(result.error).toBeUndefined();
+    expect(result.value as Record<string, unknown>).toMatchObject({
+      SMS_PROVIDER: 'dev',
+      DEV_EXPOSE_OTP: 'true',
+    });
+  });
+
   it('still requires Termii credentials when the Termii provider is active', () => {
     const result = envSchema.validate({
       ...requiredEnv,

@@ -130,6 +130,7 @@ describe('SmsService', () => {
       return env[key];
     });
 
+    expect(() => service.onModuleInit()).not.toThrow();
     expect(service.getProviderInspection()).toEqual({
       provider: 'dev',
       ready: true,
