@@ -102,7 +102,38 @@ describe('SmsService', () => {
     expect(() => service.onModuleInit()).not.toThrow();
   });
 
-  it('returns dev provider inspection with only dev-safe config', () => {
+  it('routes dev provider OTPs through the local client only', async () => {
+    config.get.mockImplementation((key: string) => {
+      const env: Record<string, string> = {
+        SMS_PROVIDER: 'dev',
+        DEV_EXPOSE_OTP: 'true',
+      };
+      return env[key];
+    });
+    dev.sendMessage.mockReturnValue({
+      dev: true,
+      logged: true,
+      body: 'Your Stead OTP is 123456. It expires in 10 minutes.',
+    });
+
+    await expect(service.sendOtp('+2348012345678', '123456')).resolves.toEqual({
+      ok: true,
+      provider: 'dev',
+      response: {
+        dev: true,
+        logged: true,
+        body: 'Your Stead OTP is 123456. It expires in 10 minutes.',
+      },
+    });
+    expect(dev.sendMessage).toHaveBeenCalledWith({
+      to: '+2348012345678',
+      body: 'Your Stead OTP is 123456. It expires in 10 minutes.',
+    });
+    expect(twilio.sendMessage).not.toHaveBeenCalled();
+    expect(termii.sendMessage).not.toHaveBeenCalled();
+  });
+
+  it('reports dev provider inspection with OTP exposure status', () => {
     config.get.mockImplementation((key: string) => {
       const env: Record<string, string> = {
         SMS_PROVIDER: 'dev',
@@ -111,6 +142,7 @@ describe('SmsService', () => {
       return env[key];
     });
 
+    expect(() => service.onModuleInit()).not.toThrow();
     expect(service.getProviderInspection()).toEqual({
       provider: 'dev',
       ready: true,
@@ -118,34 +150,5 @@ describe('SmsService', () => {
         exposeOtp: true,
       },
     });
-  });
-
-  it('sends OTPs through the dev client without calling external providers', async () => {
-    const body = 'Your Stead OTP is 123456. It expires in 10 minutes.';
-    const response = {
-      dev: true,
-      logged: true,
-      body,
-    };
-    config.get.mockImplementation((key: string) => {
-      const env: Record<string, string> = {
-        SMS_PROVIDER: 'dev',
-        DEV_EXPOSE_OTP: 'true',
-      };
-      return env[key];
-    });
-    dev.sendMessage.mockReturnValue(response);
-
-    await expect(service.sendOtp('+2348012345678', '123456')).resolves.toEqual({
-      ok: true,
-      provider: 'dev',
-      response,
-    });
-    expect(dev.sendMessage).toHaveBeenCalledWith({
-      to: '+2348012345678',
-      body,
-    });
-    expect(twilio.sendMessage).not.toHaveBeenCalled();
-    expect(termii.sendMessage).not.toHaveBeenCalled();
   });
 });
