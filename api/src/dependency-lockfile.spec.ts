@@ -89,13 +89,15 @@ describe('dependency lockfile', () => {
       return packages[candidate!];
     };
 
-    expect(resolveDependency('@emnapi/core')).toMatchObject({
+    const emnapiCore = resolveDependency('@emnapi/core');
+
+    expect(emnapiCore).toMatchObject({
       optional: true,
       version: '1.10.0',
-      dependencies: {
-        '@emnapi/wasi-threads': expect.stringMatching(/^1\.2\.\d+$/),
-      },
     });
+    expect(emnapiCore.dependencies?.['@emnapi/wasi-threads']).toMatch(
+      /^1\.2\.\d+$/,
+    );
 
     expect(resolveDependency('@emnapi/runtime')).toMatchObject({
       optional: true,
