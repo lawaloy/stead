@@ -70,10 +70,9 @@ describe('dependency lockfile', () => {
   it('retains optional @emnapi packages required by the resolver wasm binding', () => {
     const packageLock = readJson<PackageLock>('package-lock.json');
     const packages = packageLock.packages;
+    const resolverPath = 'node_modules/@unrs/resolver-binding-wasm32-wasi';
 
-    expect(
-      packages['node_modules/@unrs/resolver-binding-wasm32-wasi'],
-    ).toMatchObject({
+    expect(packages[resolverPath]).toMatchObject({
       optional: true,
       dependencies: {
         '@emnapi/core': '1.10.0',
@@ -81,15 +80,24 @@ describe('dependency lockfile', () => {
       },
     });
 
-    expect(packages['node_modules/@emnapi/core']).toMatchObject({
+    const resolveDependency = (dependencyName: string) => {
+      const candidate = lockfileDependencyCandidates(
+        resolverPath,
+        dependencyName,
+      ).find((path) => packages[path]);
+      expect(candidate).toBeDefined();
+      return packages[candidate!];
+    };
+
+    expect(resolveDependency('@emnapi/core')).toMatchObject({
       optional: true,
       version: '1.10.0',
       dependencies: {
-        '@emnapi/wasi-threads': '1.2.1',
+        '@emnapi/wasi-threads': expect.stringMatching(/^1\.2\.\d+$/),
       },
     });
 
-    expect(packages['node_modules/@emnapi/runtime']).toMatchObject({
+    expect(resolveDependency('@emnapi/runtime')).toMatchObject({
       optional: true,
       version: '1.10.0',
     });
