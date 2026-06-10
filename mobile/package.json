@@ -24,7 +24,7 @@
     "libphonenumber-js": "^1.13.6",
     "react": "19.2.7",
     "react-dom": "19.2.7",
-    "react-native": "0.85.3",
+    "react-native": "0.86.0",
     "react-native-gesture-handler": "~3.0.0",
     "react-native-safe-area-context": "~5.8.0",
     "react-native-screens": "~4.25.2",
