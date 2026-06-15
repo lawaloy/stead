@@ -18,6 +18,22 @@ type PackageLock = {
 const readJson = <T = Record<string, unknown>>(fileName: string) =>
   JSON.parse(readFileSync(join(mobileRoot, fileName), 'utf8')) as T;
 
+const findLockfilePackage = (
+  packages: Record<string, LockfilePackage>,
+  packageName: string,
+): LockfilePackage | undefined => {
+  const directPath = `node_modules/${packageName}`;
+  if (packages[directPath]) {
+    return packages[directPath];
+  }
+
+  const nestedPath = Object.keys(packages).find((path) =>
+    path.endsWith(`/node_modules/${packageName}`),
+  );
+
+  return nestedPath ? packages[nestedPath] : undefined;
+};
+
 const lockfileDependencyCandidates = (
   packagePath: string,
   dependencyName: string,
@@ -118,7 +134,7 @@ describe('dependency overrides', () => {
       },
     });
 
-    expect(packages['node_modules/expo-modules-core']).toMatchObject({
+    expect(findLockfilePackage(packages, 'expo-modules-core')).toMatchObject({
       peerDependencies: {
         'react-native-worklets': '^0.7.4 || ^0.8.0',
       },
