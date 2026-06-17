@@ -2,6 +2,10 @@
 
 - <!-- Fill at least one bullet; the PR Description bot skips sync updates until this section has content. -->
 
+## Checks
+- [ ] `api`: `npm run build`
+- [ ] `api`: `npm run test -- --ci --runInBand`
+
 <!-- AUTO:START -->
 ## Auto
 - Waiting for CI to generate change summary.

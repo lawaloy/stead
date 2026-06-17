@@ -36,6 +36,10 @@ Use the repo template format (see [`.github/pull_request_template.md`](.github/p
 ## What + Why
 - Why this change exists (at least one bullet)
 
+## Checks
+- [ ] `api`: `npm run build`
+- [ ] `api`: `npm run test -- --ci --runInBand`
+
 <!-- AUTO:START -->
 <!-- AUTO:END -->
 ```
@@ -45,7 +49,6 @@ Use the repo template format (see [`.github/pull_request_template.md`](.github/p
 - Use **`## What + Why`**, not `## Summary` — matches the pull request template.
 - Include **`<!-- AUTO:START -->` / `<!-- AUTO:END -->`** markers so the [PR Description workflow](.github/workflows/pr-description.yml) can refresh the file list without overwriting your text.
 - Fill in **at least one What + Why bullet** before pushing again; until then, later syncs skip auto-updates so an empty template is not clobbered.
-- **Required merge checks** (enforced by GitHub, not the template): **lint**, **build**, **api-test**, **mobile-test**, **CodeQL**.
 
 Example with `gh`:
 
