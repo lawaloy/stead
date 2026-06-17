@@ -80,18 +80,7 @@ jobs:
             const START = '<!-- AUTO:START -->';
             const END = '<!-- AUTO:END -->';
 
-            const defaultHumanSection = [
-              '## What + Why',
-              '',
-              '- ',
-              '',
-              '## Checks',
-              '- [ ] `api`: `npm run lint -- --no-fix` (required: **lint**)',
-              '- [ ] `api`: `npm run build` (required: **build**)',
-              '- [ ] `api`: `npm run test -- --ci --runInBand` (required: **api-test**)',
-              '- [ ] `mobile`: `npm test -- --runInBand` (required: **mobile-test**)',
-              '- [ ] CodeQL analysis (required: **CodeQL**)',
-            ].join('\n');
+            const defaultHumanSection = ['## What + Why', '', '- '].join('\n');
 
             const whatWhyHasContent = (humanSection) => {
               const match = humanSection.match(/^## What \+ Why\s*\n([\s\S]*?)(?=\n## |\n<!--|$)/im);

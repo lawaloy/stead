@@ -18,8 +18,9 @@ Standard commands for lint, test, build, and dev are documented in the root `REA
 When creating PRs (including via `gh pr create`), use [`.github/pull_request_template.md`](.github/pull_request_template.md):
 
 - **`## What + Why`** with at least one filled bullet (not `## Summary`)
-- **`## Checks`** checklist aligned with required CI job names
 - **`<!-- AUTO:START -->` … `<!-- AUTO:END -->`** markers so the PR Description workflow can update the file list in place
+
+Merge is gated by CI (ruleset *Stead Rules*); no need to duplicate required checks as template checkboxes.
 
 ```bash
 gh pr create --title "..." --body-file .github/pull_request_template.md
