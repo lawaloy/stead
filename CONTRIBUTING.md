@@ -30,7 +30,34 @@ Common types:
 - Include clear testing notes.
 - Link related issue(s).
 
-PRs should pass:
+Use the repo template format (see [`.github/pull_request_template.md`](.github/pull_request_template.md)):
+
+```markdown
+## What + Why
+- Why this change exists (at least one bullet)
+
+## Checks
+- [ ] `api`: `npm run build`
+- [ ] `api`: `npm run test -- --ci --runInBand`
+
+<!-- AUTO:START -->
+<!-- AUTO:END -->
+```
+
+**Important:**
+
+- Use **`## What + Why`**, not `## Summary` — matches the pull request template.
+- Include **`<!-- AUTO:START -->` / `<!-- AUTO:END -->`** markers so the [PR Description workflow](.github/workflows/pr-description.yml) can refresh the file list without overwriting your text.
+- Fill in **at least one What + Why bullet** before pushing again; until then, later syncs skip auto-updates so an empty template is not clobbered.
+
+Example with `gh`:
+
+```bash
+gh pr create --title "feat: your change" --body-file .github/pull_request_template.md
+```
+
+Local verification (recommended before push):
+
 - API: `npm run lint -- --no-fix`, `npm run test -- --runInBand`, `npm run build`
 - Mobile: `npm run lint`, `npm run typecheck`, `npm test -- --runInBand`, `npm run build`
 

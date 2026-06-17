@@ -11,6 +11,20 @@ Stead is a monorepo with two sub-projects:
 
 Standard commands for lint, test, build, and dev are documented in the root `README.md` and `CONTRIBUTING.md`.
 
+### Opening pull requests
+
+When creating PRs (including via `gh pr create`), use [`.github/pull_request_template.md`](.github/pull_request_template.md):
+
+- **`## What + Why`** with at least one filled bullet (not `## Summary`)
+- **`## Checks`** for local verification before push
+- **`<!-- AUTO:START -->` … `<!-- AUTO:END -->`** markers so the PR Description workflow can update the file list in place
+
+```bash
+gh pr create --title "..." --body-file .github/pull_request_template.md
+```
+
+Fill in **What + Why** before the next push. Details: [CONTRIBUTING.md](CONTRIBUTING.md#pull-requests).
+
 ### Prerequisites
 
 - **Node.js 22+** (required by TypeScript ~6.0)

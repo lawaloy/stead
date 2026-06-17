@@ -1,5 +1,6 @@
 ## What + Why
-- 
+
+- <!-- Fill at least one bullet; the PR Description bot skips sync updates until this section has content. -->
 
 ## Checks
 - [ ] `api`: `npm run build`
