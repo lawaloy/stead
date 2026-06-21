@@ -100,6 +100,7 @@ Implemented API modules:
 
 2. SMS and notification jobs
    - Twilio and Termii provider support
+   - Local development SMS provider support
    - Provider configuration validation at startup
    - Persisted notification jobs for OTP delivery
    - Retry and dead-letter state
@@ -178,26 +179,26 @@ The codebase has the MVP flow in place, but production readiness still depends o
 
 ### 6.1 Next Work Queue
 
-Real-provider OTP validation is intentionally deferred until a paid or verified SMS provider account is ready. These are the next implementation items to unblock local validation and prepare for real-provider debugging.
+Real-provider OTP validation is intentionally deferred until a paid or verified SMS provider account is ready. Local/dev SMS mode and notification job inspection now exist, so the next implementation items are focused on validation depth and production debugging readiness.
 
-1. Add a local/dev SMS provider mode.
-   - Support a development provider setting, for example `SMS_PROVIDER=dev`.
-   - Keep OTP request behavior going through the persisted notification job pipeline.
-   - Process OTP jobs without calling Twilio or Termii.
-   - Mark jobs as sent with provider metadata that identifies the dev provider.
-   - Log or expose the OTP only in development-safe paths.
-   - Use this to validate the queue, consumer, and job lifecycle without Twilio spend.
-
-2. Improve operator inspection for OTP jobs.
-   - Make the existing inspection endpoint show enough recent job detail to debug delivery.
-   - Include recent jobs, status, last error, provider, provider message id, timestamps, and masked phone.
-   - Keep sensitive OTP values out of normal operator output.
-   - Use this to prepare for real-provider debugging later.
-
-3. Add contract and integration coverage around auth plus notification queue.
-   - Confirm request OTP creates an OTP record, auth event, and notification job.
+1. Expand contract and integration coverage around auth plus notification queue.
+   - Confirm request OTP creates an OTP record, auth event, and persisted notification job.
+   - Confirm `DEV_EXPOSE_OTP=true` still exercises the persisted notification job pipeline.
    - Confirm the consumer can process a job through the SMS abstraction.
    - Confirm failures retry and eventually dead-letter.
-   - Cover the key local/dev provider behavior so future real-provider changes do not break the OTP path.
+   - Keep mobile Zod schemas covered by representative API response contract tests.
+
+2. Run the local OTP flow end to end through the dev provider.
+   - Start the API with `SMS_PROVIDER=dev` and `DEV_EXPOSE_OTP=true`.
+   - Keep `SMS_PROVIDER=dev` limited to non-production environments; startup validation rejects it in production.
+   - Request OTP from the mobile app.
+   - Verify the OTP, land in the authenticated app flow, and inspect the notification job as `sent`.
+   - Confirm token persistence survives an app restart.
+
+3. Prepare for real-provider validation.
+   - Pick the first live provider for the target environment.
+   - Configure provider credentials outside source control.
+   - Run request OTP -> notification job -> provider delivery -> verify OTP with a real phone number.
+   - Capture the operator playbook for diagnosing send failures and dead-letter jobs.
 
 Once these are done, the next validation target is request OTP -> notification job -> verify OTP -> authenticated mobile session against a real provider-backed environment.

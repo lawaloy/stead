@@ -192,11 +192,11 @@ export class AuthService {
       userId: user.id,
     });
 
-    if (process.env.DEV_EXPOSE_OTP === 'true') {
+    await this.notifications.enqueueOtpRequested(normalizedPhone, otp);
+
+    if (this.config.get<string>('DEV_EXPOSE_OTP') === 'true') {
       return { ok: true, otp };
     }
-
-    this.notifications.enqueueOtpRequested(normalizedPhone, otp);
 
     return { ok: true };
   }

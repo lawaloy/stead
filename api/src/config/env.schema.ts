@@ -1,6 +1,7 @@
 import * as Joi from 'joi';
 
 type EnvInput = {
+  NODE_ENV?: string;
   SMS_PROVIDER?: string;
   AUTH_OTP_REQUEST_LIMIT_PER_HOUR?: number;
   AUTH_OTP_REQUEST_LIMIT_PER_IP_PER_HOUR?: number;
@@ -55,6 +56,12 @@ export const envSchema = Joi.object({
   .custom((rawValue: unknown, helpers) => {
     const value = rawValue as EnvInput;
     const provider = (value.SMS_PROVIDER || 'twilio').toLowerCase();
+
+    if (value.NODE_ENV === 'production' && provider === 'dev') {
+      return helpers.message({
+        custom: 'SMS_PROVIDER=dev is not allowed when NODE_ENV=production',
+      });
+    }
 
     if (provider === 'twilio') {
       if (!value.TWILIO_ACCOUNT_SID) {
