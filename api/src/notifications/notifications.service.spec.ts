@@ -23,6 +23,27 @@ describe('NotificationsService', () => {
     service = new NotificationsService(queue, sms);
   });
 
+  it('waits for otp notification jobs to be persisted', async () => {
+    queue.enqueueOtpRequested.mockResolvedValue('job_1');
+
+    await expect(
+      service.enqueueOtpRequested('+2348012345678', '123456'),
+    ).resolves.toEqual({ ok: true, jobId: 'job_1' });
+
+    expect(queue.enqueueOtpRequested).toHaveBeenCalledWith({
+      phone: '+2348012345678',
+      otp: '123456',
+    });
+  });
+
+  it('surfaces notification job persistence failures', async () => {
+    queue.enqueueOtpRequested.mockRejectedValue(new Error('database down'));
+
+    await expect(
+      service.enqueueOtpRequested('+2348012345678', '123456'),
+    ).rejects.toThrow('database down');
+  });
+
   it('returns inspection summary with masked phones', async () => {
     sms.getProviderInspection.mockReturnValue({
       provider: 'termii',

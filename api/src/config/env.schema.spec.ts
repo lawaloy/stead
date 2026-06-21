@@ -47,6 +47,18 @@ describe('envSchema', () => {
     });
   });
 
+  it('rejects the dev SMS provider in production', () => {
+    const result = envSchema.validate({
+      ...requiredEnv,
+      NODE_ENV: 'production',
+      SMS_PROVIDER: 'dev',
+    });
+
+    expect(result.error?.message).toContain(
+      'SMS_PROVIDER=dev is not allowed when NODE_ENV=production',
+    );
+  });
+
   it('still requires Termii credentials when the Termii provider is active', () => {
     const result = envSchema.validate({
       ...requiredEnv,

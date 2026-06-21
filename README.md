@@ -27,7 +27,7 @@ npx prisma migrate dev
 npm run start:dev
 ```
 
-Copy `api/.env.example` to `api/.env` first and set at least `DATABASE_URL`, `JWT_SECRET`, and a configured SMS provider. For local Postgres, `api/docker-compose.yml` provides a development database.
+Copy `api/.env.example` to `api/.env` first and set at least `DATABASE_URL` and a `JWT_SECRET` with 16+ characters. The example uses `SMS_PROVIDER=dev` and `DEV_EXPOSE_OTP=true` so local OTP requests still create notification jobs without calling Twilio or Termii. `SMS_PROVIDER=dev` is rejected in production. For local Postgres, `api/docker-compose.yml` provides a development database.
 
 Mobile (from `mobile/`):
 

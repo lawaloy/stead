@@ -9,9 +9,12 @@ export class NotificationsService {
     private readonly sms: SmsService,
   ) {}
 
-  enqueueOtpRequested(phone: string, otp: string): { ok: true } {
-    void this.queue.enqueueOtpRequested({ phone, otp });
-    return { ok: true };
+  async enqueueOtpRequested(
+    phone: string,
+    otp: string,
+  ): Promise<{ ok: true; jobId: string }> {
+    const jobId = await this.queue.enqueueOtpRequested({ phone, otp });
+    return { ok: true, jobId };
   }
 
   async getInspection(limit: number) {

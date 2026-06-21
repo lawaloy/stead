@@ -48,7 +48,8 @@ docker exec stead_db pg_isready -U stead
 
 Copy `.env.example` to `.env` in both `api/` and `mobile/`. Key gotchas:
 
-- `JWT_SECRET` must be at least **16 characters** (the example value `change_me_now` will fail validation).
+- `JWT_SECRET` must be at least **16 characters**.
+- Use `SMS_PROVIDER=dev` locally when testing without Twilio or Termii credentials; this provider is rejected in production.
 - Set `DEV_EXPOSE_OTP=true` in the API environment (or pass it as env var when starting the server) to have the `/auth/request-otp` response include the OTP in plaintext — useful for testing auth flows without an SMS provider.
 
 ### Running the API
@@ -56,7 +57,7 @@ Copy `.env.example` to `.env` in both `api/` and `mobile/`. Key gotchas:
 ```bash
 cd api
 npx prisma migrate dev   # apply pending migrations
-DEV_EXPOSE_OTP=true npm run start:dev   # dev server on port 3000
+SMS_PROVIDER=dev DEV_EXPOSE_OTP=true npm run start:dev   # dev server on port 3000
 ```
 
 The dev server watches source files but **does not restart on `.env` changes**; restart the process manually if you edit `.env`.
