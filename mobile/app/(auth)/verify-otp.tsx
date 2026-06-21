@@ -11,6 +11,7 @@ import {
   getAuthErrorMessage,
   OTP_RESEND_COOLDOWN_MS,
 } from '../../src/lib/auth-feedback';
+import { resolveOtpToSubmit } from '../../src/lib/otp';
 
 export default function VerifyOtpScreen() {
   const [otp, setOtp] = useState('');
@@ -29,10 +30,11 @@ export default function VerifyOtpScreen() {
   const country = getAuthCountry(pendingCountryIso);
 
   const validation = useMemo(() => {
-    if (!otp) return '';
-    if (!/^\d{6}$/.test(otp)) return 'OTP must be 6 digits';
+    const otpToSubmit = resolveOtpToSubmit(otp, devOtpHint);
+    if (!otpToSubmit) return '';
+    if (!/^\d{6}$/.test(otpToSubmit)) return 'OTP must be 6 digits';
     return '';
-  }, [otp]);
+  }, [devOtpHint, otp]);
 
   useEffect(() => {
     if (!pendingOtpRequestedAt) return;
@@ -49,7 +51,12 @@ export default function VerifyOtpScreen() {
   const canResend = resendCooldownMs === 0;
 
   const mutation = useMutation({
-    mutationFn: async () => verifyOtp(pendingPhone, pendingCountryIso, otp),
+    mutationFn: async () =>
+      verifyOtp(
+        pendingPhone,
+        pendingCountryIso,
+        resolveOtpToSubmit(otp, devOtpHint),
+      ),
     retry: false,
     onSuccess: async (data) => {
       await completeAuth(data.token);
