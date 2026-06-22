@@ -1,23 +1,29 @@
-import React, { useMemo, useState } from 'react';
+import React, { useState } from 'react';
 import { useRouter } from 'expo-router';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
-import { requestOtp } from '../../src/lib/api';
+import { fetchAuthCountries, requestOtp } from '../../src/lib/api';
 import { useAuth } from '../../src/lib/auth-state';
 import { ScreenShell } from '../../src/components/screen-shell';
 import {
-  authCountries,
   AuthCountryIso,
   defaultAuthCountryIso,
+  fallbackAuthCountries,
   getAuthCountry,
+  getDefaultAuthCountry,
+  withDisplayPhoneExamples,
 } from '../../src/lib/countries';
-import { isValidPhoneForCountry } from '../../src/lib/phone';
+import {
+  formatPhoneForDisplay,
+  normalizePhoneForCountry,
+} from '../../src/lib/phone';
 import { getAuthErrorMessage } from '../../src/lib/auth-feedback';
 
 export default function RequestOtpScreen() {
   const [phone, setPhone] = useState('');
   const [countryIso, setCountryIso] =
     useState<AuthCountryIso>(defaultAuthCountryIso);
+  const [countryMenuOpen, setCountryMenuOpen] = useState(false);
   const router = useRouter();
   const {
     setPendingPhone,
@@ -25,20 +31,33 @@ export default function RequestOtpScreen() {
     setPendingOtpRequestedAt,
     setDevOtpHint,
   } = useAuth();
-  const selectedCountry = getAuthCountry(countryIso);
+  const countriesQuery = useQuery({
+    queryKey: ['auth-countries'],
+    queryFn: fetchAuthCountries,
+    retry: 1,
+  });
+  const countries = withDisplayPhoneExamples(
+    countriesQuery.data?.countries.length
+      ? countriesQuery.data.countries
+      : fallbackAuthCountries,
+  );
+  const effectiveCountryIso = countries.some((country) => country.iso === countryIso)
+    ? countryIso
+    : getDefaultAuthCountry(countries).iso;
+  const selectedCountry = getAuthCountry(effectiveCountryIso, countries);
+  const normalizedPhone = normalizePhoneForCountry(phone, effectiveCountryIso);
 
-  const validation = useMemo(() => {
-    if (!phone) return '';
-    if (!isValidPhoneForCountry(phone, countryIso))
-      return 'Enter a valid phone number for the selected country';
-    return '';
-  }, [countryIso, phone]);
+  const validation =
+    phone && !normalizedPhone
+      ? 'Enter a valid phone number for the selected country'
+      : '';
 
   const mutation = useMutation({
-    mutationFn: async () => requestOtp(phone, countryIso),
+    mutationFn: async () =>
+      requestOtp(normalizedPhone || phone, effectiveCountryIso),
     onSuccess: (data) => {
-      setPendingPhone(phone);
-      setPendingCountryIso(countryIso);
+      setPendingPhone(normalizedPhone || phone);
+      setPendingCountryIso(effectiveCountryIso);
       setPendingOtpRequestedAt(Date.now());
       setDevOtpHint(data.otp || '');
       router.push('/(auth)/verify-otp');
@@ -48,33 +67,50 @@ export default function RequestOtpScreen() {
   return (
     <ScreenShell title="Stead Login">
       <Text style={styles.label}>Country</Text>
-      <View style={styles.countryRow}>
-        {authCountries.map((country) => {
-          const active = country.iso === countryIso;
-          return (
-            <Pressable
-              key={country.iso}
-              style={[styles.countryChip, active && styles.countryChipActive]}
-              onPress={() => setCountryIso(country.iso)}
-            >
-              <Text
+      <View style={styles.countrySelect}>
+        <Pressable
+          style={styles.countrySelectButton}
+          onPress={() => setCountryMenuOpen((open) => !open)}
+        >
+          <Text style={styles.countrySelectText}>
+            {selectedCountry.label} ({selectedCountry.dialCode})
+          </Text>
+          <Text style={styles.countrySelectIcon}>
+            {countryMenuOpen ? '^' : 'v'}
+          </Text>
+        </Pressable>
+        {countryMenuOpen ? (
+          <View style={styles.countryMenu}>
+            {countries.map((country) => (
+              <Pressable
+                key={country.iso}
                 style={[
-                  styles.countryChipText,
-                  active && styles.countryChipTextActive,
+                  styles.countryOption,
+                  country.iso === effectiveCountryIso &&
+                    styles.countryOptionActive,
                 ]}
+                onPress={() => {
+                  setCountryIso(country.iso);
+                  setCountryMenuOpen(false);
+                }}
               >
-                {country.iso} {country.dialCode}
-              </Text>
-            </Pressable>
-          );
-        })}
+                <Text style={styles.countryOptionText}>
+                  {country.label} {country.dialCode}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+        ) : null}
       </View>
       <Text style={styles.label}>Phone Number</Text>
       <TextInput
         value={phone}
-        onChangeText={setPhone}
-        placeholder={selectedCountry.placeholder}
+        onChangeText={(value) =>
+          setPhone(formatPhoneForDisplay(value, effectiveCountryIso))
+        }
+        placeholder={selectedCountry.phoneExample}
         keyboardType="phone-pad"
+        textContentType="telephoneNumber"
         autoCapitalize="none"
         style={styles.input}
       />
@@ -103,24 +139,34 @@ export default function RequestOtpScreen() {
 const styles = StyleSheet.create({
   label: { fontWeight: '600', color: '#25324a' },
   helper: { color: '#60708a' },
-  countryRow: {
-    flexDirection: 'row',
-    gap: 8,
+  countrySelect: {
+    position: 'relative',
+    zIndex: 2,
   },
-  countryChip: {
+  countrySelectButton: {
     borderWidth: 1,
     borderColor: '#c8d1e1',
-    borderRadius: 999,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 11,
     backgroundColor: '#ffffff',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
-  countryChipActive: {
-    borderColor: '#0f6fff',
-    backgroundColor: '#e9f1ff',
+  countrySelectText: { color: '#25324a', fontWeight: '600' },
+  countrySelectIcon: { color: '#60708a', fontSize: 12 },
+  countryMenu: {
+    marginTop: 6,
+    borderWidth: 1,
+    borderColor: '#c8d1e1',
+    borderRadius: 10,
+    backgroundColor: '#ffffff',
+    overflow: 'hidden',
   },
-  countryChipText: { color: '#25324a', fontWeight: '600' },
-  countryChipTextActive: { color: '#0f4fcc' },
+  countryOption: { paddingHorizontal: 12, paddingVertical: 11 },
+  countryOptionActive: { backgroundColor: '#e9f1ff' },
+  countryOptionText: { color: '#25324a', fontWeight: '600' },
   input: {
     borderWidth: 1,
     borderColor: '#c8d1e1',

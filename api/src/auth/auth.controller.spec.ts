@@ -3,6 +3,7 @@ import { JwtAuthGuard } from './jwt-auth.guard';
 import { AuthTelemetryService } from './auth-telemetry.service';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
+import { CountriesService } from '../countries/countries.service';
 
 describe('AuthController', () => {
   let controller: AuthController;
@@ -12,6 +13,9 @@ describe('AuthController', () => {
   };
   const telemetryService = {
     getInspection: jest.fn(),
+  };
+  const countriesService = {
+    listAuthCountries: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -25,6 +29,10 @@ describe('AuthController', () => {
         {
           provide: AuthTelemetryService,
           useValue: telemetryService,
+        },
+        {
+          provide: CountriesService,
+          useValue: countriesService,
         },
       ],
     })
@@ -91,6 +99,36 @@ describe('AuthController', () => {
     expect(result).toEqual({
       summary: { otp_requested: 1 },
       recent: [],
+    });
+  });
+
+  it('returns auth country options', async () => {
+    countriesService.listAuthCountries.mockResolvedValue([
+      {
+        iso: 'NG',
+        label: 'Nigeria',
+        dialCode: '+234',
+        currencyCode: 'NGN',
+        phoneExample: '08012345678',
+        authEnabled: true,
+        marketEnabled: true,
+        defaultCountry: true,
+      },
+    ]);
+
+    await expect(controller.getCountries()).resolves.toEqual({
+      countries: [
+        {
+          iso: 'NG',
+          label: 'Nigeria',
+          dialCode: '+234',
+          currencyCode: 'NGN',
+          phoneExample: '08012345678',
+          authEnabled: true,
+          marketEnabled: true,
+          defaultCountry: true,
+        },
+      ],
     });
   });
 });

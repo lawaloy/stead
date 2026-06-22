@@ -1,6 +1,6 @@
 import { BadRequestException } from '@nestjs/common';
-import { parsePhoneNumberFromString } from 'libphonenumber-js';
-export type CountryIso = 'NG' | 'US' | 'GB';
+import { CountryCode, parsePhoneNumberFromString } from 'libphonenumber-js';
+export type CountryIso = CountryCode;
 
 export function normalizePhoneNumber(
   phone: string,
@@ -14,6 +14,10 @@ export function normalizePhoneNumber(
 
   if (!parsed || !parsed.isValid()) {
     throw new BadRequestException('phone must look like +2348012345678');
+  }
+
+  if (parsed.country !== countryIso) {
+    throw new BadRequestException('phone must match the selected country');
   }
 
   return parsed.number;

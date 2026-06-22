@@ -7,11 +7,13 @@ import { AuthTelemetryService } from './auth-telemetry.service';
 import { AuthService } from './auth.service';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { PrismaModule } from '../prisma/prisma.module';
+import { CountriesModule } from '../countries/countries.module';
 import { JwtAuthGuard } from './jwt-auth.guard';
 
 @Module({
   imports: [
     PrismaModule,
+    CountriesModule,
     NotificationsModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],

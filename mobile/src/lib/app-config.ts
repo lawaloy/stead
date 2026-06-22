@@ -6,6 +6,7 @@ export const appConfig = {
     timeoutMs: 15_000,
     routes: {
       auth: {
+        countries: '/auth/countries',
         requestOtp: '/auth/request-otp',
         verifyOtp: '/auth/verify-otp',
       },

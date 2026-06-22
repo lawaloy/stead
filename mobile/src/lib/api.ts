@@ -4,6 +4,7 @@ import { appConfig } from './app-config';
 import { resolveApiBaseUrl } from './base-url';
 import { ApiError } from './api-error';
 import {
+  AuthCountriesResponseSchema,
   AuthRequestOtpResponseSchema,
   AuthVerifyOtpResponseSchema,
   DashboardStabilityResponseSchema,
@@ -72,9 +73,14 @@ export const configureApiAuth = (config: AuthConfig) => {
   onUnauthorizedFn = config.onUnauthorized;
 };
 
+export const fetchAuthCountries = async () => {
+  const response = await apiClient.get(appConfig.api.routes.auth.countries);
+  return AuthCountriesResponseSchema.parse(response.data);
+};
+
 export const requestOtp = async (
   phone: string,
-  countryIso: 'NG' | 'US' | 'GB',
+  countryIso: string,
 ) => {
   const response = await apiClient.post(
     appConfig.api.routes.auth.requestOtp,
@@ -85,7 +91,7 @@ export const requestOtp = async (
 
 export const verifyOtp = async (
   phone: string,
-  countryIso: 'NG' | 'US' | 'GB',
+  countryIso: string,
   otp: string,
 ) => {
   const response = await apiClient.post(
