@@ -63,16 +63,18 @@ describe('AuthService', () => {
       countRecentEvents: jest.fn().mockResolvedValue(0),
     };
     countries = {
-      requireAuthCountry: jest.fn(async (iso: string) => ({
-        iso,
-        label: iso,
-        dialCode: '+',
-        currencyCode: 'NGN',
-        phoneExample: '08012345678',
-        authEnabled: true,
-        marketEnabled: iso === 'NG',
-        defaultCountry: iso === 'NG',
-      })),
+      requireAuthCountry: jest.fn((iso: string) =>
+        Promise.resolve({
+          iso,
+          label: iso,
+          dialCode: '+',
+          currencyCode: 'NGN',
+          phoneExample: '08012345678',
+          authEnabled: true,
+          marketEnabled: iso === 'NG',
+          defaultCountry: iso === 'NG',
+        }),
+      ),
     };
     config = {
       get: jest.fn((key: string) => {

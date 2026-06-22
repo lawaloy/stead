@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useState } from 'react';
 import { useRouter } from 'expo-router';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
@@ -41,29 +41,23 @@ export default function RequestOtpScreen() {
       ? countriesQuery.data.countries
       : fallbackAuthCountries,
   );
-  const selectedCountry = getAuthCountry(countryIso, countries);
-  const normalizedPhone = useMemo(
-    () => normalizePhoneForCountry(phone, countryIso),
-    [countryIso, phone],
-  );
+  const effectiveCountryIso = countries.some((country) => country.iso === countryIso)
+    ? countryIso
+    : getDefaultAuthCountry(countries).iso;
+  const selectedCountry = getAuthCountry(effectiveCountryIso, countries);
+  const normalizedPhone = normalizePhoneForCountry(phone, effectiveCountryIso);
 
-  useEffect(() => {
-    if (countries.some((country) => country.iso === countryIso)) return;
-    setCountryIso(getDefaultAuthCountry(countries).iso);
-  }, [countries, countryIso]);
-
-  const validation = useMemo(() => {
-    if (!phone) return '';
-    if (!normalizedPhone)
-      return 'Enter a valid phone number for the selected country';
-    return '';
-  }, [normalizedPhone, phone]);
+  const validation =
+    phone && !normalizedPhone
+      ? 'Enter a valid phone number for the selected country'
+      : '';
 
   const mutation = useMutation({
-    mutationFn: async () => requestOtp(normalizedPhone || phone, countryIso),
+    mutationFn: async () =>
+      requestOtp(normalizedPhone || phone, effectiveCountryIso),
     onSuccess: (data) => {
       setPendingPhone(normalizedPhone || phone);
-      setPendingCountryIso(countryIso);
+      setPendingCountryIso(effectiveCountryIso);
       setPendingOtpRequestedAt(Date.now());
       setDevOtpHint(data.otp || '');
       router.push('/(auth)/verify-otp');
@@ -92,7 +86,8 @@ export default function RequestOtpScreen() {
                 key={country.iso}
                 style={[
                   styles.countryOption,
-                  country.iso === countryIso && styles.countryOptionActive,
+                  country.iso === effectiveCountryIso &&
+                    styles.countryOptionActive,
                 ]}
                 onPress={() => {
                   setCountryIso(country.iso);
@@ -111,7 +106,7 @@ export default function RequestOtpScreen() {
       <TextInput
         value={phone}
         onChangeText={(value) =>
-          setPhone(formatPhoneForDisplay(value, countryIso))
+          setPhone(formatPhoneForDisplay(value, effectiveCountryIso))
         }
         placeholder={selectedCountry.phoneExample}
         keyboardType="phone-pad"

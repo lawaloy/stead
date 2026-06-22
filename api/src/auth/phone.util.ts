@@ -17,9 +17,7 @@ export function normalizePhoneNumber(
   }
 
   if (parsed.country !== countryIso) {
-    throw new BadRequestException(
-      'phone must match the selected country',
-    );
+    throw new BadRequestException('phone must match the selected country');
   }
 
   return parsed.number;
