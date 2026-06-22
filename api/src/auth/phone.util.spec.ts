@@ -11,11 +11,17 @@ describe('normalizePhoneNumber', () => {
   });
 
   it('treats 00-prefixed input as an international number', () => {
-    expect(normalizePhoneNumber('00442071838750', 'NG')).toBe('+442071838750');
+    expect(normalizePhoneNumber('00442071838750', 'GB')).toBe('+442071838750');
   });
 
-  it('keeps explicit international numbers independent of selected country', () => {
-    expect(normalizePhoneNumber('+1 415 555 2671', 'GB')).toBe('+14155552671');
+  it('normalizes explicit international numbers that match the selected country', () => {
+    expect(normalizePhoneNumber('+1 415 555 2671', 'US')).toBe('+14155552671');
+  });
+
+  it('rejects explicit international numbers for a different selected country', () => {
+    expect(() => normalizePhoneNumber('+1 415 555 2671', 'GB')).toThrow(
+      BadRequestException,
+    );
   });
 
   it('rejects numbers that cannot be parsed as valid for the country', () => {

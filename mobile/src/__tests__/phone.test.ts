@@ -1,4 +1,8 @@
-import { isValidPhoneForCountry } from '../lib/phone';
+import {
+  formatPhoneForDisplay,
+  isValidPhoneForCountry,
+  normalizePhoneForCountry,
+} from '../lib/phone';
 
 describe('isValidPhoneForCountry', () => {
   it('accepts a valid Nigerian local number', () => {
@@ -11,5 +15,33 @@ describe('isValidPhoneForCountry', () => {
 
   it('rejects a number that is invalid for the selected country', () => {
     expect(isValidPhoneForCountry('08012345678', 'US')).toBe(false);
+  });
+
+  it('rejects an international number for a different selected country', () => {
+    expect(isValidPhoneForCountry('+14155552671', 'GB')).toBe(false);
+  });
+
+  it('normalizes valid input to E.164', () => {
+    expect(normalizePhoneForCountry('(415) 555-2671', 'US')).toBe(
+      '+14155552671',
+    );
+  });
+
+  it('formats Nigerian local input for display', () => {
+    expect(formatPhoneForDisplay('08012345678', 'NG')).toBe('0801 234 5678');
+  });
+
+  it('formats US local input for display with parentheses and dash', () => {
+    expect(formatPhoneForDisplay('4155552671', 'US')).toBe('(415) 555-2671');
+  });
+
+  it('formats UK local input for display', () => {
+    expect(formatPhoneForDisplay('07911123456', 'GB')).toBe('07911 123456');
+  });
+
+  it('normalizes formatted display input', () => {
+    expect(normalizePhoneForCountry('(415) 555-2671', 'US')).toBe(
+      '+14155552671',
+    );
   });
 });

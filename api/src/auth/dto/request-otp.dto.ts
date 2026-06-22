@@ -1,9 +1,11 @@
-import { IsIn, IsString, Matches } from 'class-validator';
+import { IsString, Matches } from 'class-validator';
 
 export class RequestOtpDto {
   @IsString()
-  @IsIn(['NG', 'US', 'GB'])
-  countryIso!: 'NG' | 'US' | 'GB';
+  @Matches(/^[A-Z]{2}$/, {
+    message: 'countryIso must be a two-letter country code',
+  })
+  countryIso!: string;
 
   @IsString()
   @Matches(/^(?:\+?\d{6,15}|0\d{6,14}|00\d{6,15})$/, {

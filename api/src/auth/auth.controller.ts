@@ -15,13 +15,20 @@ import { AuthTelemetryService } from './auth-telemetry.service';
 import { AuthService } from './auth.service';
 import { RequestOtpDto } from './dto/request-otp.dto';
 import { VerifyOtpDto } from './dto/verify-otp.dto';
+import { CountriesService } from '../countries/countries.service';
 
 @Controller('auth')
 export class AuthController {
   constructor(
     private auth: AuthService,
     private telemetry: AuthTelemetryService,
+    private countries: CountriesService,
   ) {}
+
+  @Get('countries')
+  async getCountries() {
+    return { countries: await this.countries.listAuthCountries() };
+  }
 
   @Post('request-otp')
   requestOtp(@Body() dto: RequestOtpDto, @Req() req: Request) {

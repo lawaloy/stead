@@ -3,6 +3,7 @@ import {
   ApiError,
   apiClient,
   configureApiAuth,
+  fetchAuthCountries,
   requestOtp,
   verifyOtp,
 } from '../lib/api';
@@ -64,6 +65,38 @@ describe('api client', () => {
       name: 'ApiError',
       status: 400,
       message: 'phone must be valid, countryIso must be supported',
+    });
+  });
+
+  it('fetches auth countries for the country selector', async () => {
+    mock.onGet('/auth/countries').reply(200, {
+      countries: [
+        {
+          iso: 'NG',
+          label: 'Nigeria',
+          dialCode: '+234',
+          currencyCode: 'NGN',
+          phoneExample: '08012345678',
+          authEnabled: true,
+          marketEnabled: true,
+          defaultCountry: true,
+        },
+      ],
+    });
+
+    await expect(fetchAuthCountries()).resolves.toEqual({
+      countries: [
+        {
+          iso: 'NG',
+          label: 'Nigeria',
+          dialCode: '+234',
+          currencyCode: 'NGN',
+          phoneExample: '08012345678',
+          authEnabled: true,
+          marketEnabled: true,
+          defaultCountry: true,
+        },
+      ],
     });
   });
 

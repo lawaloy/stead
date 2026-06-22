@@ -7,6 +7,7 @@ import { AuthService } from './auth.service';
 import { AuthTelemetryService } from './auth-telemetry.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { CountriesService } from '../countries/countries.service';
 
 describe('AuthService', () => {
   let service: AuthService;
@@ -35,6 +36,7 @@ describe('AuthService', () => {
   let jwt: { signAsync: jest.Mock };
   let telemetry: { recordEvent: jest.Mock; countRecentEvents: jest.Mock };
   let config: { get: jest.Mock };
+  let countries: { requireAuthCountry: jest.Mock };
 
   beforeEach(async () => {
     prisma = {
@@ -59,6 +61,18 @@ describe('AuthService', () => {
     telemetry = {
       recordEvent: jest.fn(),
       countRecentEvents: jest.fn().mockResolvedValue(0),
+    };
+    countries = {
+      requireAuthCountry: jest.fn(async (iso: string) => ({
+        iso,
+        label: iso,
+        dialCode: '+',
+        currencyCode: 'NGN',
+        phoneExample: '08012345678',
+        authEnabled: true,
+        marketEnabled: iso === 'NG',
+        defaultCountry: iso === 'NG',
+      })),
     };
     config = {
       get: jest.fn((key: string) => {
@@ -92,6 +106,10 @@ describe('AuthService', () => {
           provide: ConfigService,
           useValue: config,
         },
+        {
+          provide: CountriesService,
+          useValue: countries,
+        },
       ],
     }).compile();
 
@@ -101,6 +119,17 @@ describe('AuthService', () => {
 
   it('should be defined', () => {
     expect(service).toBeDefined();
+  });
+
+  it('rejects otp requests for unsupported auth countries', async () => {
+    countries.requireAuthCountry.mockRejectedValue(
+      new BadRequestException('countryIso must be supported'),
+    );
+
+    await expect(service.requestOtp('08012345678', 'ZZ')).rejects.toThrow(
+      'countryIso must be supported',
+    );
+    expect(prisma.user.upsert).not.toHaveBeenCalled();
   });
 
   it('normalizes phone numbers, stores metadata, and enqueues otp', async () => {

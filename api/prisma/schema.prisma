@@ -71,6 +71,23 @@ model AuthEvent {
   @@index([type, createdAt])
 }
 
+model Country {
+  id             String   @id @default(uuid())
+  isoCode        String   @unique
+  name           String
+  dialCode       String
+  currencyCode   String
+  phoneExample   String
+  authEnabled    Boolean  @default(false)
+  marketEnabled  Boolean  @default(false)
+  defaultCountry Boolean  @default(false)
+  sortOrder      Int      @default(100)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([authEnabled, sortOrder])
+}
+
 model Goal {
   id              String        @id @default(uuid())
   userId          String

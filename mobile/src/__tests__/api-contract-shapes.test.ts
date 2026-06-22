@@ -1,4 +1,5 @@
 import {
+  AuthCountriesResponseSchema,
   AuthRequestOtpResponseSchema,
   AuthVerifyOtpResponseSchema,
   DashboardStabilityResponseSchema,
@@ -16,6 +17,38 @@ describe('api response contract shapes', () => {
     ).toEqual({ ok: true, otp: '123456' });
     expect(AuthVerifyOtpResponseSchema.parse({ token: 'jwt-token' })).toEqual({
       token: 'jwt-token',
+    });
+  });
+
+  it('accepts auth countries with Nigeria marked as default market', () => {
+    expect(
+      AuthCountriesResponseSchema.parse({
+        countries: [
+          {
+            iso: 'NG',
+            label: 'Nigeria',
+            dialCode: '+234',
+            currencyCode: 'NGN',
+            phoneExample: '08012345678',
+            authEnabled: true,
+            marketEnabled: true,
+            defaultCountry: true,
+          },
+        ],
+      }),
+    ).toEqual({
+      countries: [
+        {
+          iso: 'NG',
+          label: 'Nigeria',
+          dialCode: '+234',
+          currencyCode: 'NGN',
+          phoneExample: '08012345678',
+          authEnabled: true,
+          marketEnabled: true,
+          defaultCountry: true,
+        },
+      ],
     });
   });
 

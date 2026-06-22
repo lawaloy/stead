@@ -11,6 +11,25 @@ export const AuthVerifyOtpResponseSchema = z.object({
 });
 export type AuthVerifyOtpResponse = z.infer<typeof AuthVerifyOtpResponseSchema>;
 
+export const AuthCountrySchema = z.object({
+  iso: z.string().length(2),
+  label: z.string(),
+  dialCode: z.string(),
+  currencyCode: z.string().length(3),
+  phoneExample: z.string(),
+  authEnabled: z.boolean(),
+  marketEnabled: z.boolean(),
+  defaultCountry: z.boolean(),
+});
+export type AuthCountry = z.infer<typeof AuthCountrySchema>;
+
+export const AuthCountriesResponseSchema = z.object({
+  countries: z.array(AuthCountrySchema).min(1),
+});
+export type AuthCountriesResponse = z.infer<
+  typeof AuthCountriesResponseSchema
+>;
+
 export const GoalSchema = z.object({
   id: z.string(),
   userId: z.string(),

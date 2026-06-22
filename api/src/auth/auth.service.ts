@@ -11,6 +11,7 @@ import * as bcrypt from 'bcrypt';
 import { JwtService } from '@nestjs/jwt';
 import { AuthTelemetryService } from './auth-telemetry.service';
 import { CountryIso, normalizePhoneNumber } from './phone.util';
+import { CountriesService } from '../countries/countries.service';
 
 const DEFAULT_OTP_REQUEST_LIMIT_PER_HOUR = 10;
 const DEFAULT_OTP_RESEND_COOLDOWN_MS = 60_000;
@@ -40,6 +41,7 @@ export class AuthService {
     private jwt: JwtService,
     private telemetry: AuthTelemetryService,
     private readonly config: ConfigService,
+    private readonly countries: CountriesService,
   ) {}
 
   private get otpRequestLimitPerHour() {
@@ -86,10 +88,14 @@ export class AuthService {
 
   async requestOtp(
     phone: string,
-    countryIso: CountryIso,
+    countryIso: string,
     context: OtpRequestContext = {},
   ) {
-    const normalizedPhone = normalizePhoneNumber(phone, countryIso);
+    const country = await this.countries.requireAuthCountry(countryIso);
+    const normalizedPhone = normalizePhoneNumber(
+      phone,
+      country.iso as CountryIso,
+    );
     const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
 
     if (context.ip) {
@@ -102,7 +108,7 @@ export class AuthService {
         this.telemetry.recordEvent({
           type: 'otp_request_rate_limited',
           phone: normalizedPhone,
-          countryIso,
+          countryIso: country.iso,
           ip: context.ip,
           userAgent: context.userAgent,
           metadata: {
@@ -128,7 +134,7 @@ export class AuthService {
       this.telemetry.recordEvent({
         type: 'otp_request_rate_limited',
         phone: normalizedPhone,
-        countryIso,
+        countryIso: country.iso,
         ip: context.ip,
         userAgent: context.userAgent,
         metadata: { limit: this.otpRequestLimitPerHour, window: '1h' },
@@ -156,7 +162,7 @@ export class AuthService {
       this.telemetry.recordEvent({
         type: 'otp_resend_blocked',
         phone: normalizedPhone,
-        countryIso,
+        countryIso: country.iso,
         ip: context.ip,
         userAgent: context.userAgent,
         userId: user.id,
@@ -186,7 +192,7 @@ export class AuthService {
     this.telemetry.recordEvent({
       type: 'otp_requested',
       phone: normalizedPhone,
-      countryIso,
+      countryIso: country.iso,
       ip: context.ip,
       userAgent: context.userAgent,
       userId: user.id,
@@ -203,11 +209,15 @@ export class AuthService {
 
   async verifyOtp(
     phone: string,
-    countryIso: CountryIso,
+    countryIso: string,
     otp: string,
     context: OtpRequestContext = {},
   ) {
-    const normalizedPhone = normalizePhoneNumber(phone, countryIso);
+    const country = await this.countries.requireAuthCountry(countryIso);
+    const normalizedPhone = normalizePhoneNumber(
+      phone,
+      country.iso as CountryIso,
+    );
     if (context.ip) {
       const recentVerifyFailuresByIp = await this.telemetry.countRecentEvents({
         types: ['otp_verify_failed', 'otp_verify_locked'],
@@ -219,7 +229,7 @@ export class AuthService {
         this.telemetry.recordEvent({
           type: 'otp_verify_locked',
           phone: normalizedPhone,
-          countryIso,
+          countryIso: country.iso,
           ip: context.ip,
           userAgent: context.userAgent,
           attemptNumber: recentVerifyFailuresByIp,
@@ -255,7 +265,7 @@ export class AuthService {
       this.telemetry.recordEvent({
         type: 'otp_verify_locked',
         phone: normalizedPhone,
-        countryIso,
+        countryIso: country.iso,
         ip: context.ip,
         userAgent: context.userAgent,
         userId: user.id,
@@ -287,7 +297,7 @@ export class AuthService {
         this.telemetry.recordEvent({
           type: 'otp_verify_locked',
           phone: normalizedPhone,
-          countryIso,
+          countryIso: country.iso,
           ip: context.ip,
           userAgent: context.userAgent,
           userId: user.id,
@@ -304,7 +314,7 @@ export class AuthService {
       this.telemetry.recordEvent({
         type: 'otp_verify_failed',
         phone: normalizedPhone,
-        countryIso,
+        countryIso: country.iso,
         ip: context.ip,
         userAgent: context.userAgent,
         userId: user.id,
@@ -329,7 +339,7 @@ export class AuthService {
     this.telemetry.recordEvent({
       type: 'otp_verify_succeeded',
       phone: normalizedPhone,
-      countryIso,
+      countryIso: country.iso,
       ip: context.ip,
       userAgent: context.userAgent,
       userId: user.id,
