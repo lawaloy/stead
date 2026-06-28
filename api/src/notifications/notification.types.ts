@@ -1,10 +1,6 @@
 export type NotificationEventType = 'otp.requested';
 export type NotificationJobStatus =
-  | 'pending'
-  | 'processing'
-  | 'sent'
-  | 'failed'
-  | 'dead_letter';
+  'pending' | 'processing' | 'sent' | 'failed' | 'dead_letter';
 
 export interface OtpRequestedPayload {
   phone: string;
