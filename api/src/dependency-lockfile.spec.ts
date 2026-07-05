@@ -13,6 +13,10 @@ type PackageLock = {
   packages: Record<string, LockfilePackage>;
 };
 
+type PackageJson = {
+  overrides?: Record<string, unknown>;
+};
+
 const readJson = <T = Record<string, unknown>>(fileName: string) =>
   JSON.parse(readFileSync(join(apiRoot, fileName), 'utf8')) as T;
 
@@ -103,5 +107,23 @@ describe('dependency lockfile', () => {
       optional: true,
       version: '1.10.0',
     });
+  });
+
+  it('retains audit override pins in package metadata and lockfile', () => {
+    const packageJson = readJson<PackageJson>('package.json');
+    const packageLock = readJson<PackageLock>('package-lock.json');
+    const auditOverridePins = {
+      'js-yaml': '4.2.0',
+      multer: '2.2.0',
+    };
+
+    for (const [packageName, version] of Object.entries(auditOverridePins)) {
+      expect(packageJson.overrides?.[packageName]).toBe(version);
+      expect(packageLock.packages[`node_modules/${packageName}`]).toMatchObject(
+        {
+          version,
+        },
+      );
+    }
   });
 });
