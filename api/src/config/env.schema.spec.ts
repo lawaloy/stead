@@ -59,6 +59,22 @@ describe('envSchema', () => {
     );
   });
 
+  it('rejects dev OTP exposure in production', () => {
+    const result = envSchema.validate({
+      ...requiredEnv,
+      NODE_ENV: 'production',
+      SMS_PROVIDER: 'twilio',
+      DEV_EXPOSE_OTP: 'true',
+      TWILIO_ACCOUNT_SID: 'ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
+      TWILIO_AUTH_TOKEN: 'twilio_auth_token',
+      TWILIO_FROM: '+15551234567',
+    });
+
+    expect(result.error?.message).toContain(
+      'DEV_EXPOSE_OTP=true is not allowed when NODE_ENV=production',
+    );
+  });
+
   it('still requires Termii credentials when the Termii provider is active', () => {
     const result = envSchema.validate({
       ...requiredEnv,
