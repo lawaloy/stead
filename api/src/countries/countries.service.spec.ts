@@ -63,4 +63,31 @@ describe('CountriesService', () => {
       where: { isoCode: 'ZZ', authEnabled: true },
     });
   });
+
+  it('normalizes selected country codes to uppercase before lookup', async () => {
+    prisma.country.findFirst.mockResolvedValue({
+      isoCode: 'NG',
+      name: 'Nigeria',
+      dialCode: '+234',
+      currencyCode: 'NGN',
+      phoneExample: '08012345678',
+      authEnabled: true,
+      marketEnabled: true,
+      defaultCountry: true,
+    });
+
+    await expect(service.requireAuthCountry('ng')).resolves.toEqual({
+      iso: 'NG',
+      label: 'Nigeria',
+      dialCode: '+234',
+      currencyCode: 'NGN',
+      phoneExample: '08012345678',
+      authEnabled: true,
+      marketEnabled: true,
+      defaultCountry: true,
+    });
+    expect(prisma.country.findFirst).toHaveBeenCalledWith({
+      where: { isoCode: 'NG', authEnabled: true },
+    });
+  });
 });
