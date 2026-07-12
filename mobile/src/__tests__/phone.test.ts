@@ -21,6 +21,16 @@ describe('isValidPhoneForCountry', () => {
     expect(isValidPhoneForCountry('+14155552671', 'GB')).toBe(false);
   });
 
+  it('normalizes 00-prefixed international input for the selected country', () => {
+    expect(normalizePhoneForCountry('00442071838750', 'GB')).toBe(
+      '+442071838750',
+    );
+  });
+
+  it('rejects 00-prefixed international input for a different selected country', () => {
+    expect(normalizePhoneForCountry('00442071838750', 'US')).toBeNull();
+  });
+
   it('normalizes valid input to E.164', () => {
     expect(normalizePhoneForCountry('(415) 555-2671', 'US')).toBe(
       '+14155552671',
