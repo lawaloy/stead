@@ -44,4 +44,10 @@ describe('isValidPhoneForCountry', () => {
       '+14155552671',
     );
   });
+
+  it('normalizes international 00 prefixes for the selected country', () => {
+    expect(normalizePhoneForCountry('00442071838750', 'GB')).toBe(
+      '+442071838750',
+    );
+  });
 });
