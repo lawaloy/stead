@@ -136,7 +136,7 @@ describe('dependency overrides', () => {
 
     expect(findLockfilePackage(packages, 'expo-modules-core')).toMatchObject({
       peerDependencies: {
-        'react-native-worklets': '^0.7.4 || ^0.8.0',
+        'react-native-worklets': '^0.7.4 || ^0.8.0 || ^0.9.0 || ^0.10.0',
       },
       peerDependenciesMeta: {
         'react-native-worklets': {
