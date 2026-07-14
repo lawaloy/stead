@@ -15,6 +15,17 @@ describe('auth countries', () => {
     });
   });
 
+  it('keeps every seeded auth country available when the API is unavailable', () => {
+    expect(fallbackAuthCountries.map((country) => country.iso)).toEqual([
+      'NG',
+      'US',
+      'GB',
+    ]);
+    expect(fallbackAuthCountries.every((country) => country.authEnabled)).toBe(
+      true,
+    );
+  });
+
   it('uses the default country when a selected country is missing', () => {
     expect(getAuthCountry('ZZ', fallbackAuthCountries).iso).toBe('NG');
   });
@@ -34,5 +45,22 @@ describe('auth countries', () => {
         },
       ])[0].phoneExample,
     ).toBe('(415) 555-2671');
+  });
+
+  it('formats UK display phone examples for the country selector', () => {
+    expect(
+      withDisplayPhoneExamples([
+        {
+          iso: 'GB',
+          label: 'United Kingdom',
+          dialCode: '+44',
+          currencyCode: 'GBP',
+          phoneExample: '07911123456',
+          authEnabled: true,
+          marketEnabled: false,
+          defaultCountry: false,
+        },
+      ])[0].phoneExample,
+    ).toBe('07911 123456');
   });
 });

@@ -134,6 +134,16 @@ describe('AuthService', () => {
     expect(prisma.user.upsert).not.toHaveBeenCalled();
   });
 
+  it('rejects otp requests when phone does not match the selected country', async () => {
+    await expect(service.requestOtp('+1 415 555 2671', 'NG')).rejects.toThrow(
+      BadRequestException,
+    );
+
+    expect(prisma.otpCode.count).not.toHaveBeenCalled();
+    expect(prisma.user.upsert).not.toHaveBeenCalled();
+    expect(notifications.enqueueOtpRequested).not.toHaveBeenCalled();
+  });
+
   it('normalizes phone numbers, stores metadata, and enqueues otp', async () => {
     prisma.otpCode.count.mockResolvedValue(0);
     prisma.user.upsert.mockResolvedValue({
@@ -228,6 +238,77 @@ describe('AuthService', () => {
     expect(recordedRateLimitEvent.metadata?.scope).toBe('ip');
   });
 
+  it('rate limits otp requests per phone within the hourly window', async () => {
+    prisma.otpCode.count.mockResolvedValue(10);
+
+    await expect(
+      service.requestOtp('08012345678', 'NG', {
+        ip: '127.0.0.1',
+        userAgent: 'jest-agent',
+      }),
+    ).rejects.toMatchObject({
+      message: 'Too many OTP requests. Try again later.',
+      status: HttpStatus.TOO_MANY_REQUESTS,
+    });
+
+    expect(prisma.otpCode.count).toHaveBeenCalledWith({
+      where: {
+        user: { phone: '+2348012345678' },
+        createdAt: { gte: expect.any(Date) as unknown },
+      },
+    });
+    expect(prisma.user.upsert).not.toHaveBeenCalled();
+    expect(prisma.otpCode.create).not.toHaveBeenCalled();
+    expect(notifications.enqueueOtpRequested).not.toHaveBeenCalled();
+    expect(telemetry.recordEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'otp_request_rate_limited',
+        phone: '+2348012345678',
+        countryIso: 'NG',
+        ip: '127.0.0.1',
+        userAgent: 'jest-agent',
+        metadata: { limit: 10, window: '1h' },
+      }),
+    );
+  });
+
+  it('surfaces notification enqueue failures after storing the otp', async () => {
+    prisma.otpCode.count.mockResolvedValue(0);
+    prisma.user.upsert.mockResolvedValue({
+      id: 'user_1',
+      phone: '+2348012345678',
+    } satisfies MockUser);
+    prisma.otpCode.findFirst.mockResolvedValue(null);
+    prisma.otpCode.create.mockResolvedValue({ id: 'otp_1' });
+    notifications.enqueueOtpRequested.mockRejectedValue(
+      new Error('queue unavailable'),
+    );
+
+    await expect(
+      service.requestOtp('08012345678', 'NG', {
+        ip: '127.0.0.1',
+        userAgent: 'jest-agent',
+      }),
+    ).rejects.toThrow('queue unavailable');
+
+    expect(prisma.otpCode.create).toHaveBeenCalledWith({
+      data: {
+        userId: 'user_1',
+        codeHash: expect.any(String) as unknown,
+        expiresAt: expect.any(Date) as unknown,
+        ip: '127.0.0.1',
+        userAgent: 'jest-agent',
+      },
+    });
+    expect(telemetry.recordEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'otp_requested',
+        phone: '+2348012345678',
+        countryIso: 'NG',
+      }),
+    );
+  });
+
   it('rejects otp resend during cooldown window', async () => {
     prisma.otpCode.count.mockResolvedValue(0);
     prisma.user.upsert.mockResolvedValue({
@@ -303,6 +384,15 @@ describe('AuthService', () => {
       update: {},
       create: { phone: '+14155552671' },
     });
+  });
+
+  it('rejects otp verification when phone does not match the selected country', async () => {
+    await expect(
+      service.verifyOtp('+1 415 555 2671', 'NG', '123456'),
+    ).rejects.toThrow(BadRequestException);
+
+    expect(prisma.user.findUnique).not.toHaveBeenCalled();
+    expect(prisma.otpCode.findFirst).not.toHaveBeenCalled();
   });
 
   it('verifies otp against normalized phone and returns token', async () => {
