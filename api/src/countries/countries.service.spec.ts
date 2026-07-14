@@ -63,4 +63,31 @@ describe('CountriesService', () => {
       where: { isoCode: 'ZZ', authEnabled: true },
     });
   });
+
+  it('normalizes selected country codes before requiring auth support', async () => {
+    prisma.country.findFirst.mockResolvedValue({
+      isoCode: 'US',
+      name: 'United States',
+      dialCode: '+1',
+      currencyCode: 'USD',
+      phoneExample: '4155552671',
+      authEnabled: true,
+      marketEnabled: false,
+      defaultCountry: false,
+    });
+
+    await expect(service.requireAuthCountry('us')).resolves.toEqual({
+      iso: 'US',
+      label: 'United States',
+      dialCode: '+1',
+      currencyCode: 'USD',
+      phoneExample: '4155552671',
+      authEnabled: true,
+      marketEnabled: false,
+      defaultCountry: false,
+    });
+    expect(prisma.country.findFirst).toHaveBeenCalledWith({
+      where: { isoCode: 'US', authEnabled: true },
+    });
+  });
 });

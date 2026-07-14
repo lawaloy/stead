@@ -46,4 +46,21 @@ describe('auth countries', () => {
       ])[0].phoneExample,
     ).toBe('(415) 555-2671');
   });
+
+  it('formats UK display phone examples for the country selector', () => {
+    expect(
+      withDisplayPhoneExamples([
+        {
+          iso: 'GB',
+          label: 'United Kingdom',
+          dialCode: '+44',
+          currencyCode: 'GBP',
+          phoneExample: '07911123456',
+          authEnabled: true,
+          marketEnabled: false,
+          defaultCountry: false,
+        },
+      ])[0].phoneExample,
+    ).toBe('07911 123456');
+  });
 });

@@ -104,7 +104,11 @@ describe('dependency overrides', () => {
     expect(missingDependencies).toEqual([]);
   });
 
-  it('retains Expo optional native peer metadata without adding root app dependencies', () => {
+  it('retains Expo optional native peer metadata and peer lockfile entries', () => {
+    const packageJson = readJson<{
+      dependencies?: Record<string, string>;
+      devDependencies?: Record<string, string>;
+    }>('package.json');
     const packageLock = readJson<PackageLock>('package-lock.json');
     const packages = packageLock.packages;
 
@@ -145,18 +149,23 @@ describe('dependency overrides', () => {
       },
     });
 
+    expect(packageJson.dependencies?.['react-native-reanimated']).toBeUndefined();
+    expect(packageJson.dependencies?.['react-native-worklets']).toBeUndefined();
     expect(
-      packages[''].dependencies?.['react-native-reanimated'],
+      packageJson.devDependencies?.['react-native-reanimated'],
     ).toBeUndefined();
-    expect(packages[''].dependencies?.['react-native-worklets']).toBeUndefined();
+    expect(packageJson.devDependencies?.['react-native-worklets']).toBeUndefined();
+
     expect(packages['node_modules/react-native-reanimated']).toMatchObject({
       peer: true,
+      version: '4.5.1',
       peerDependencies: {
         'react-native-worklets': '0.10.x',
       },
     });
     expect(packages['node_modules/react-native-worklets']).toMatchObject({
       peer: true,
+      version: '0.10.2',
     });
   });
 });
