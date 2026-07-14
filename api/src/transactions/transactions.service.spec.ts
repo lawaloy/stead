@@ -18,15 +18,16 @@ describe('TransactionsService', () => {
     };
   };
 
+  const occurredAt = new Date('2026-01-02T03:04:05.000Z');
   const transactionRecord = {
     id: 'tx_1',
     userId: 'user_1',
     goalId: 'goal_1',
-    amountKobo: 5_000n,
-    direction: 'in',
-    occurredAt: new Date('2026-01-02T00:00:00.000Z'),
-    note: 'Saved',
-    createdAt: new Date('2026-01-02T00:00:00.000Z'),
+    amountKobo: 12_500n,
+    direction: 'out',
+    occurredAt,
+    note: 'Groceries',
+    createdAt: new Date('2026-01-02T03:05:06.000Z'),
   };
 
   beforeEach(async () => {
@@ -60,17 +61,50 @@ describe('TransactionsService', () => {
     expect(service).toBeDefined();
   });
 
+  it('creates transactions scoped to the authenticated user and owned goal', async () => {
+    prisma.goal.findFirst.mockResolvedValue({ id: 'goal_1' });
+    prisma.transaction.create.mockResolvedValue(transactionRecord);
+
+    await expect(
+      service.create('user_1', {
+        direction: 'out',
+        amountKobo: 12_500,
+        occurredAt: occurredAt.toISOString(),
+        goalId: 'goal_1',
+        note: 'Groceries',
+      }),
+    ).resolves.toEqual({
+      ...transactionRecord,
+      amountKobo: 12_500,
+    });
+
+    expect(prisma.goal.findFirst).toHaveBeenCalledWith({
+      where: { id: 'goal_1', userId: 'user_1' },
+      select: { id: true },
+    });
+    expect(prisma.transaction.create).toHaveBeenCalledWith({
+      data: {
+        userId: 'user_1',
+        goalId: 'goal_1',
+        direction: 'out',
+        amountKobo: 12_500n,
+        occurredAt,
+        note: 'Groceries',
+      },
+    });
+  });
+
   it('rejects creating a transaction for another user goal', async () => {
     prisma.goal.findFirst.mockResolvedValue(null);
 
     await expect(
       service.create('user_1', {
         direction: 'in',
-        amountKobo: 5_000,
-        occurredAt: '2026-01-02T00:00:00.000Z',
+        amountKobo: 50_000,
+        occurredAt: occurredAt.toISOString(),
         goalId: 'goal_2',
       }),
-    ).rejects.toThrow(NotFoundException);
+    ).rejects.toThrow(new NotFoundException('Goal not found'));
 
     expect(prisma.goal.findFirst).toHaveBeenCalledWith({
       where: { id: 'goal_2', userId: 'user_1' },
@@ -79,57 +113,76 @@ describe('TransactionsService', () => {
     expect(prisma.transaction.create).not.toHaveBeenCalled();
   });
 
-  it('creates and serializes a transaction after goal ownership is verified', async () => {
-    prisma.goal.findFirst.mockResolvedValue({ id: 'goal_1' });
-    prisma.transaction.create.mockResolvedValue(transactionRecord);
+  it('lists only transactions belonging to the authenticated user within date filters', async () => {
+    prisma.transaction.findMany.mockResolvedValue([transactionRecord]);
 
     await expect(
-      service.create('user_1', {
-        direction: 'in',
-        amountKobo: 5_000,
-        occurredAt: '2026-01-02T00:00:00.000Z',
-        goalId: 'goal_1',
-        note: 'Saved',
+      service.list('user_1', {
+        from: '2026-01-01T00:00:00.000Z',
+        to: '2026-01-31T23:59:59.000Z',
       }),
-    ).resolves.toEqual({
-      ...transactionRecord,
-      amountKobo: 5_000,
-    });
+    ).resolves.toEqual([{ ...transactionRecord, amountKobo: 12_500 }]);
 
-    expect(prisma.transaction.create).toHaveBeenCalledWith({
-      data: {
+    expect(prisma.transaction.findMany).toHaveBeenCalledWith({
+      where: {
         userId: 'user_1',
-        goalId: 'goal_1',
-        direction: 'in',
-        amountKobo: 5_000n,
-        occurredAt: new Date('2026-01-02T00:00:00.000Z'),
-        note: 'Saved',
+        occurredAt: {
+          gte: new Date('2026-01-01T00:00:00.000Z'),
+          lte: new Date('2026-01-31T23:59:59.000Z'),
+        },
       },
+      orderBy: { occurredAt: 'desc' },
     });
   });
 
-  it('rejects updating transactions outside the user boundary', async () => {
+  it('rejects updating another user transaction before writing changes', async () => {
     prisma.transaction.findFirst.mockResolvedValue(null);
 
     await expect(
-      service.update('user_1', 'tx_2', { note: 'Not mine' }),
-    ).rejects.toThrow(NotFoundException);
+      service.update('user_1', 'tx_2', {
+        amountKobo: 9_000,
+      }),
+    ).rejects.toThrow(new NotFoundException('Transaction not found'));
 
     expect(prisma.transaction.findFirst).toHaveBeenCalledWith({
       where: { id: 'tx_2', userId: 'user_1' },
       select: { id: true },
     });
-    expect(prisma.goal.findFirst).not.toHaveBeenCalled();
     expect(prisma.transaction.update).not.toHaveBeenCalled();
   });
 
-  it('rejects deleting transactions outside the user boundary', async () => {
+  it('rejects moving a transaction onto another user goal', async () => {
+    prisma.transaction.findFirst.mockResolvedValue({ id: 'tx_1' });
+    prisma.goal.findFirst.mockResolvedValue(null);
+
+    await expect(
+      service.update('user_1', 'tx_1', {
+        goalId: 'goal_2',
+      }),
+    ).rejects.toThrow(new NotFoundException('Goal not found'));
+
+    expect(prisma.transaction.findFirst).toHaveBeenCalledWith({
+      where: { id: 'tx_1', userId: 'user_1' },
+      select: { id: true },
+    });
+    expect(prisma.goal.findFirst).toHaveBeenCalledWith({
+      where: { id: 'goal_2', userId: 'user_1' },
+      select: { id: true },
+    });
+    expect(prisma.transaction.update).not.toHaveBeenCalled();
+  });
+
+  it('rejects deleting another user transaction before deleting', async () => {
     prisma.transaction.findFirst.mockResolvedValue(null);
 
     await expect(service.remove('user_1', 'tx_2')).rejects.toThrow(
-      NotFoundException,
+      new NotFoundException('Transaction not found'),
     );
 
+    expect(prisma.transaction.findFirst).toHaveBeenCalledWith({
+      where: { id: 'tx_2', userId: 'user_1' },
+      select: { id: true },
+    });
     expect(prisma.transaction.delete).not.toHaveBeenCalled();
   });
 });
