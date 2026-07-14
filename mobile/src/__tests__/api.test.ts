@@ -39,6 +39,38 @@ describe('api client', () => {
     expect(response.otp).toBe('123456');
   });
 
+  it('posts country-aware payloads for otp requests', async () => {
+    mock.onPost('/auth/request-otp').reply((config) => {
+      expect(JSON.parse(config.data as string)).toEqual({
+        phone: '+14155552671',
+        countryIso: 'US',
+      });
+      return [200, { ok: true, otp: '123456' }];
+    });
+
+    await expect(requestOtp('+14155552671', 'US')).resolves.toEqual({
+      ok: true,
+      otp: '123456',
+    });
+  });
+
+  it('posts country-aware payloads for otp verification', async () => {
+    mock.onPost('/auth/verify-otp').reply((config) => {
+      expect(JSON.parse(config.data as string)).toEqual({
+        phone: '+442071838750',
+        countryIso: 'GB',
+        otp: '654321',
+      });
+      return [200, { token: 'jwt-token' }];
+    });
+
+    await expect(
+      verifyOtp('+442071838750', 'GB', '654321'),
+    ).resolves.toEqual({
+      token: 'jwt-token',
+    });
+  });
+
   it('calls unauthorized handler on 401', async () => {
     const onUnauthorized = jest.fn();
     configureApiAuth({
