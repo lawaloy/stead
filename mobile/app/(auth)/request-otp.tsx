@@ -10,14 +10,14 @@ import {
   defaultAuthCountryIso,
   fallbackAuthCountries,
   getAuthCountry,
-  getDefaultAuthCountry,
   withDisplayPhoneExamples,
 } from '../../src/lib/countries';
-import {
-  formatPhoneForDisplay,
-  normalizePhoneForCountry,
-} from '../../src/lib/phone';
+import { formatPhoneForDisplay } from '../../src/lib/phone';
 import { getAuthErrorMessage } from '../../src/lib/auth-feedback';
+import {
+  buildOtpRequestInput,
+  resolveEffectiveCountryIso,
+} from '../../src/lib/otp-request';
 
 export default function RequestOtpScreen() {
   const [phone, setPhone] = useState('');
@@ -41,20 +41,15 @@ export default function RequestOtpScreen() {
       ? countriesQuery.data.countries
       : fallbackAuthCountries,
   );
-  const effectiveCountryIso = countries.some((country) => country.iso === countryIso)
-    ? countryIso
-    : getDefaultAuthCountry(countries).iso;
+  const effectiveCountryIso = resolveEffectiveCountryIso(countryIso, countries);
   const selectedCountry = getAuthCountry(effectiveCountryIso, countries);
-  const normalizedPhone = normalizePhoneForCountry(phone, effectiveCountryIso);
+  const requestInput = buildOtpRequestInput(phone, countryIso, countries);
+  const normalizedPhone = requestInput?.phone ?? null;
 
   const validation =
     phone && !normalizedPhone
       ? 'Enter a valid phone number for the selected country'
       : '';
-  const requestInput =
-    normalizedPhone === null
-      ? null
-      : { phone: normalizedPhone, countryIso: effectiveCountryIso };
 
   const mutation = useMutation({
     mutationFn: async (input: { phone: string; countryIso: AuthCountryIso }) =>
