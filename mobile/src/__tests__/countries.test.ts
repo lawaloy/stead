@@ -15,6 +15,17 @@ describe('auth countries', () => {
     });
   });
 
+  it('keeps every seeded auth country available when the API is unavailable', () => {
+    expect(fallbackAuthCountries.map((country) => country.iso)).toEqual([
+      'NG',
+      'US',
+      'GB',
+    ]);
+    expect(fallbackAuthCountries.every((country) => country.authEnabled)).toBe(
+      true,
+    );
+  });
+
   it('uses the default country when a selected country is missing', () => {
     expect(getAuthCountry('ZZ', fallbackAuthCountries).iso).toBe('NG');
   });
