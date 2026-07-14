@@ -51,13 +51,17 @@ export default function RequestOtpScreen() {
     phone && !normalizedPhone
       ? 'Enter a valid phone number for the selected country'
       : '';
+  const requestInput =
+    normalizedPhone === null
+      ? null
+      : { phone: normalizedPhone, countryIso: effectiveCountryIso };
 
   const mutation = useMutation({
-    mutationFn: async () =>
-      requestOtp(normalizedPhone || phone, effectiveCountryIso),
-    onSuccess: (data) => {
-      setPendingPhone(normalizedPhone || phone);
-      setPendingCountryIso(effectiveCountryIso);
+    mutationFn: async (input: { phone: string; countryIso: AuthCountryIso }) =>
+      requestOtp(input.phone, input.countryIso),
+    onSuccess: (data, input) => {
+      setPendingPhone(input.phone);
+      setPendingCountryIso(input.countryIso);
       setPendingOtpRequestedAt(Date.now());
       setDevOtpHint(data.otp || '');
       router.push('/(auth)/verify-otp');
@@ -70,6 +74,7 @@ export default function RequestOtpScreen() {
       <View style={styles.countrySelect}>
         <Pressable
           style={styles.countrySelectButton}
+          disabled={mutation.isPending}
           onPress={() => setCountryMenuOpen((open) => !open)}
         >
           <Text style={styles.countrySelectText}>
@@ -89,6 +94,7 @@ export default function RequestOtpScreen() {
                   country.iso === effectiveCountryIso &&
                     styles.countryOptionActive,
                 ]}
+                disabled={mutation.isPending}
                 onPress={() => {
                   setCountryIso(country.iso);
                   setCountryMenuOpen(false);
@@ -112,6 +118,7 @@ export default function RequestOtpScreen() {
         keyboardType="phone-pad"
         textContentType="telephoneNumber"
         autoCapitalize="none"
+        editable={!mutation.isPending}
         style={styles.input}
       />
       <Text style={styles.helper}>
@@ -124,9 +131,15 @@ export default function RequestOtpScreen() {
         </Text>
       ) : null}
       <Pressable
-        style={[styles.button, (!!validation || mutation.isPending) && styles.buttonDisabled]}
-        disabled={!!validation || mutation.isPending}
-        onPress={() => mutation.mutate()}
+        style={[
+          styles.button,
+          (!requestInput || mutation.isPending) && styles.buttonDisabled,
+        ]}
+        disabled={!requestInput || mutation.isPending}
+        onPress={() => {
+          if (!requestInput) return;
+          mutation.mutate(requestInput);
+        }}
       >
         <Text style={styles.buttonText}>
           {mutation.isPending ? 'Requesting...' : 'Request OTP'}
