@@ -11,6 +11,26 @@ export const fallbackAuthCountries: AuthCountry[] = [
     marketEnabled: true,
     defaultCountry: true,
   },
+  {
+    iso: 'US',
+    label: 'United States',
+    dialCode: '+1',
+    currencyCode: 'USD',
+    phoneExample: '4155552671',
+    authEnabled: true,
+    marketEnabled: false,
+    defaultCountry: false,
+  },
+  {
+    iso: 'GB',
+    label: 'United Kingdom',
+    dialCode: '+44',
+    currencyCode: 'GBP',
+    phoneExample: '07911123456',
+    authEnabled: true,
+    marketEnabled: false,
+    defaultCountry: false,
+  },
 ];
 
 export type AuthCountryIso = string;
