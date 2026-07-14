@@ -7,7 +7,7 @@
   "license": "UNLICENSED",
   "scripts": {
     "postinstall": "prisma generate",
-    "build": "nest build",
+    "build": "tsc -p tsconfig.build.json",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "start": "nest start",
     "start:dev": "nest start --watch",
@@ -20,6 +20,7 @@
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
+    "typecheck": "tsc --noEmit -p tsconfig.build.json",
     "mobile:test": "npm --prefix ../mobile test -- --runInBand",
     "mobile:typecheck": "npm --prefix ../mobile run typecheck"
   },
@@ -69,6 +70,7 @@
     "ts-loader": "^9.6.2",
     "ts-node": "^10.9.2",
     "tsconfig-paths": "^4.2.0",
+    "@typescript/native": "npm:typescript@~7.0.2",
     "typescript": "~6.0.3",
     "typescript-eslint": "^8.63.0"
   },
