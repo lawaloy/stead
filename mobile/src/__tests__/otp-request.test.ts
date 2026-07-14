@@ -50,9 +50,9 @@ describe('OTP request input', () => {
 
   it('builds a valid request from the offline fallback countries', () => {
     expect(
-      buildOtpRequestInput('07911123456', 'GB', fallbackAuthCountries),
+      buildOtpRequestInput('02071838750', 'GB', fallbackAuthCountries),
     ).toEqual({
-      phone: '+447911123456',
+      phone: '+442071838750',
       countryIso: 'GB',
     });
   });
