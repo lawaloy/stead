@@ -146,6 +146,9 @@ describe('dependency overrides', () => {
     });
 
     for (const packageName of [
+      '@emnapi/core',
+      '@emnapi/runtime',
+      '@emnapi/wasi-threads',
       '@react-native/metro-config',
       '@testing-library/dom',
       'react-native-reanimated',
