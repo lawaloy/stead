@@ -117,7 +117,14 @@ jobs:
         run: |
           node -e "const workspaces = JSON.parse(process.env.CHANGED_WORKSPACES); if (!Array.isArray(workspaces) || workspaces.length === 0) process.exit(0);"
           for workspace in $(node -pe "JSON.parse(process.env.CHANGED_WORKSPACES).join(' ')"); do
-            (cd "$workspace" && npm install --package-lock-only --ignore-scripts)
+            case "$workspace" in
+              mobile)
+                (cd "$workspace" && npx --yes npm@10.9.7 install --package-lock-only --ignore-scripts)
+                ;;
+              *)
+                (cd "$workspace" && npm install --package-lock-only --ignore-scripts)
+                ;;
+            esac
           done
 
       - name: Commit normalized lockfiles

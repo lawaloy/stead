@@ -56,6 +56,9 @@ jobs:
         working-directory: api
         run: npm audit --audit-level=moderate || true
 
+      - name: Pin mobile npm version
+        run: npm install --global npm@10.9.7
+
       - name: Install mobile dependencies
         working-directory: mobile
         run: npm ci
