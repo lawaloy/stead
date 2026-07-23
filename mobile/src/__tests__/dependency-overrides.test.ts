@@ -145,6 +145,18 @@ describe('dependency overrides', () => {
       },
     });
 
+    for (const packageName of [
+      '@emnapi/core',
+      '@emnapi/runtime',
+      '@emnapi/wasi-threads',
+      '@react-native/metro-config',
+      '@testing-library/dom',
+      'react-native-reanimated',
+      'react-native-worklets',
+    ]) {
+      expect(findLockfilePackage(packages, packageName)).toBeDefined();
+    }
+
     expect(packageJson.dependencies?.['react-native-reanimated']).toBeUndefined();
     expect(packageJson.dependencies?.['react-native-worklets']).toBeUndefined();
     expect(
