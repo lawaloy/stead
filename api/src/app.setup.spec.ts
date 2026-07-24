@@ -40,6 +40,21 @@ describe('configureApp', () => {
     expect(use).toHaveBeenCalledTimes(1);
   });
 
+  it('configures ValidationPipe with whitelist, transform, and implicit conversion', () => {
+    type ConfiguredPipe = ValidationPipe & {
+      isTransformEnabled: boolean;
+      validatorOptions: { whitelist?: boolean };
+      transformOptions: { enableImplicitConversion?: boolean };
+    };
+    const calls = useGlobalPipes.mock.calls as unknown as ConfiguredPipe[][];
+    const pipe = calls[0]?.[0];
+
+    expect(pipe).toBeInstanceOf(ValidationPipe);
+    expect(pipe?.isTransformEnabled).toBe(true);
+    expect(pipe?.validatorOptions.whitelist).toBe(true);
+    expect(pipe?.transformOptions.enableImplicitConversion).toBe(true);
+  });
+
   it('preserves a non-empty x-request-id header on the response', () => {
     const { res, setHeader } = createResponse(200);
     const next = jest.fn();

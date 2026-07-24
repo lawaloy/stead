@@ -233,4 +233,31 @@ describe('TransactionsService', () => {
       },
     });
   });
+
+  it('persists empty notes and goal ids as null on create', async () => {
+    const cleared = { ...transactionRecord, goalId: null, note: null };
+    prisma.transaction.create.mockResolvedValue(cleared);
+
+    await expect(
+      service.create('user_1', {
+        direction: 'out',
+        amountKobo: 12_500,
+        occurredAt: occurredAt.toISOString(),
+        goalId: '',
+        note: '',
+      }),
+    ).resolves.toEqual({ ...cleared, amountKobo: 12_500 });
+
+    expect(prisma.goal.findFirst).not.toHaveBeenCalled();
+    expect(prisma.transaction.create).toHaveBeenCalledWith({
+      data: {
+        userId: 'user_1',
+        goalId: null,
+        direction: 'out',
+        amountKobo: 12_500n,
+        occurredAt,
+        note: null,
+      },
+    });
+  });
 });

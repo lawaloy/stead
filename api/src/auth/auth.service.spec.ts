@@ -185,6 +185,28 @@ describe('AuthService', () => {
     );
   });
 
+  it('omits otp from the response when DEV_EXPOSE_OTP is not enabled', async () => {
+    prisma.otpCode.count.mockResolvedValue(0);
+    prisma.user.upsert.mockResolvedValue({
+      id: 'user_1',
+      phone: '+2348012345678',
+    } satisfies MockUser);
+    prisma.otpCode.findFirst.mockResolvedValue(null);
+    prisma.otpCode.create.mockResolvedValue({ id: 'otp_1' });
+
+    const response = await service.requestOtp('08012345678', 'NG', {
+      ip: '127.0.0.1',
+      userAgent: 'jest-agent',
+    });
+
+    expect(response).toEqual({ ok: true });
+    expect(response).not.toHaveProperty('otp');
+    expect(notifications.enqueueOtpRequested).toHaveBeenCalledWith(
+      '+2348012345678',
+      expect.any(String),
+    );
+  });
+
   it('still enqueues otp notification jobs when exposing dev otps', async () => {
     process.env.DEV_EXPOSE_OTP = 'true';
     prisma.otpCode.count.mockResolvedValue(0);

@@ -159,4 +159,40 @@ describe('computeStability', () => {
     expect(result.paceRequiredMonthlyKobo).toBe(0);
     expect(result.safeToSpendKobo).toBe(5_000);
   });
+
+  it('treats a zero goal total as zero readiness without dividing by zero', () => {
+    const result = computeStability({
+      goalTotalKobo: 0,
+      goalSavedKobo: 5_000,
+      dueDate: dueInThirtyDays,
+      today,
+      estimatedBalanceKobo: 10_000,
+      monthlyIncomeKobo: 2_000,
+    });
+
+    expect(result.remainingObligationKobo).toBe(0);
+    expect(result.readinessPct).toBe(0);
+    expect(result.paceRequiredMonthlyKobo).toBe(0);
+    expect(result.safeToSpendKobo).toBe(10_000);
+    expect(Number.isFinite(result.stabilityScore)).toBe(true);
+    expect(result.stabilityScore).toBe(40);
+    expect(result.status).toBe('warning');
+  });
+
+  it('never reports negative safe-to-spend when estimated balance is negative', () => {
+    const result = computeStability({
+      goalTotalKobo: 100_000,
+      goalSavedKobo: 20_000,
+      dueDate: dueInThirtyDays,
+      today,
+      estimatedBalanceKobo: -15_000,
+      monthlyIncomeKobo: null,
+    });
+
+    expect(result.remainingObligationKobo).toBe(80_000);
+    expect(result.readinessPct).toBe(20);
+    expect(result.safeToSpendKobo).toBe(0);
+    expect(result.stabilityScore).toBe(8);
+    expect(result.status).toBe('critical');
+  });
 });
