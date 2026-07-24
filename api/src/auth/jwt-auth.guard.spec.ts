@@ -65,6 +65,14 @@ describe('JwtAuthGuard', () => {
 
   it('rejects tokens that include phone but omit the subject claim', () => {
     const token = jwt.sign({ phone: '+2348012345678' }, secret);
+
+    const { context } = contextFor(`Bearer ${token}`);
+
+    expect(() => guard.canActivate(context)).toThrow(UnauthorizedException);
+  });
+
+  it('rejects tokens with an empty subject claim', () => {
+    const token = jwt.sign({ sub: '', phone: '+2348012345678' }, secret);
     const { context } = contextFor(`Bearer ${token}`);
 
     expect(() => guard.canActivate(context)).toThrow(UnauthorizedException);
