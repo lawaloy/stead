@@ -95,7 +95,7 @@ describe('NotificationConsumerService', () => {
     queue.claimReadyJob.mockResolvedValue({
       ...job,
       type: 'unknown.event',
-    } as NotificationJob);
+    });
 
     await tick();
 
