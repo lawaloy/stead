@@ -144,6 +144,25 @@ describe('NotificationConsumerService', () => {
     },
   );
 
+  it.each([{ sid: 123 }, { message_id: true }, { sid: null, message_id: 99 }])(
+    'records a null provider message id when sid/message_id are non-strings (%p)',
+    async (response) => {
+      queue.claimReadyJob.mockResolvedValue(job);
+      sms.sendOtp.mockResolvedValue({
+        ok: true,
+        provider: 'twilio',
+        response,
+      });
+
+      await tick();
+
+      expect(queue.markSucceeded).toHaveBeenCalledWith('job_1', {
+        provider: 'twilio',
+        providerMessageId: null,
+      });
+    },
+  );
+
   it('logs short phones unmasked and longer phones masked on success and failure', async () => {
     const logSpy = jest.spyOn(Logger.prototype, 'log');
     const warnSpy = jest.spyOn(Logger.prototype, 'warn');
