@@ -16,7 +16,7 @@ export class PrismaService
     });
 
     super({
-      adapter: adapter as never,
+      adapter,
     });
   }
 
