@@ -36,7 +36,7 @@ const auditRemediationPins = [
   },
   {
     packageName: 'js-yaml',
-    version: '4.2.0',
+    version: '4.3.0',
     lockfilePath: 'node_modules/js-yaml',
   },
   {
@@ -53,6 +53,16 @@ const auditRemediationPins = [
     packageName: 'handlebars',
     version: '4.7.9',
     lockfilePath: 'node_modules/handlebars',
+  },
+  {
+    packageName: '@hono/node-server',
+    version: '2.0.11',
+    lockfilePath: 'node_modules/@hono/node-server',
+  },
+  {
+    packageName: 'valibot',
+    version: '1.4.2',
+    lockfilePath: 'node_modules/valibot',
   },
 ] as const;
 
