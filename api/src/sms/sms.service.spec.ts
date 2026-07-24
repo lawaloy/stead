@@ -210,12 +210,12 @@ describe('SmsService', () => {
     await expect(service.sendOtp('+14155552671', '654321')).rejects.toThrow(
       HttpException,
     );
-    await expect(service.sendOtp('+14155552671', '654321')).rejects.toMatchObject(
-      {
-        message: 'Set TWILIO_FROM or TWILIO_MESSAGING_SERVICE_SID',
-        status: HttpStatus.BAD_REQUEST,
-      },
-    );
+    await expect(
+      service.sendOtp('+14155552671', '654321'),
+    ).rejects.toMatchObject({
+      message: 'Set TWILIO_FROM or TWILIO_MESSAGING_SERVICE_SID',
+      status: HttpStatus.BAD_REQUEST,
+    });
     expect(twilio.sendMessage).not.toHaveBeenCalled();
   });
 
@@ -236,15 +236,15 @@ describe('SmsService', () => {
     await expect(service.sendOtp('+14155552671', '654321')).rejects.toThrow(
       HttpException,
     );
-    await expect(service.sendOtp('+14155552671', '654321')).rejects.toMatchObject(
-      {
-        response: {
-          message: 'Failed to send OTP via Twilio',
-          details: { code: 21211, message: 'Invalid To phone number' },
-        },
-        status: HttpStatus.BAD_GATEWAY,
+    await expect(
+      service.sendOtp('+14155552671', '654321'),
+    ).rejects.toMatchObject({
+      response: {
+        message: 'Failed to send OTP via Twilio',
+        details: { code: 21211, message: 'Invalid To phone number' },
       },
-    );
+      status: HttpStatus.BAD_GATEWAY,
+    });
   });
 
   it('sends OTP via Termii with the configured sender and default channel', async () => {
