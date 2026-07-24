@@ -125,4 +125,18 @@ describe('NotificationsService', () => {
 
     expect(queue.listRecentJobs).toHaveBeenCalledWith(50);
   });
+
+  it('raises a zero inspection limit to the minimum of one', async () => {
+    sms.getProviderInspection.mockReturnValue({
+      provider: 'twilio',
+      ready: true,
+      config: {},
+    });
+    queue.getStatusSummary.mockResolvedValue({});
+    queue.listRecentJobs.mockResolvedValue([]);
+
+    await service.getInspection(0);
+
+    expect(queue.listRecentJobs).toHaveBeenCalledWith(1);
+  });
 });
