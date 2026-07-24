@@ -132,4 +132,52 @@ describe('envSchema', () => {
 
     expect(result.error?.message).toContain('JWT_SECRET');
   });
+
+  it('rejects otp abuse-control env values below their minimums', () => {
+    const result = envSchema.validate(
+      {
+        ...requiredEnv,
+        SMS_PROVIDER: 'dev',
+        AUTH_OTP_REQUEST_LIMIT_PER_HOUR: 0,
+        AUTH_OTP_REQUEST_LIMIT_PER_IP_PER_HOUR: 0,
+        AUTH_OTP_MAX_VERIFY_ATTEMPTS: 0,
+        AUTH_OTP_VERIFY_FAILURE_LIMIT_PER_IP_WINDOW: 0,
+        AUTH_OTP_RESEND_COOLDOWN_MS: 500,
+        AUTH_OTP_VERIFY_FAILURE_WINDOW_MS: 500,
+      },
+      { abortEarly: false },
+    );
+
+    const details = result.error?.details.map((detail) => detail.message) ?? [];
+    expect(
+      details.some((message) =>
+        message.includes('AUTH_OTP_REQUEST_LIMIT_PER_HOUR'),
+      ),
+    ).toBe(true);
+    expect(
+      details.some((message) =>
+        message.includes('AUTH_OTP_REQUEST_LIMIT_PER_IP_PER_HOUR'),
+      ),
+    ).toBe(true);
+    expect(
+      details.some((message) =>
+        message.includes('AUTH_OTP_MAX_VERIFY_ATTEMPTS'),
+      ),
+    ).toBe(true);
+    expect(
+      details.some((message) =>
+        message.includes('AUTH_OTP_VERIFY_FAILURE_LIMIT_PER_IP_WINDOW'),
+      ),
+    ).toBe(true);
+    expect(
+      details.some((message) =>
+        message.includes('AUTH_OTP_RESEND_COOLDOWN_MS'),
+      ),
+    ).toBe(true);
+    expect(
+      details.some((message) =>
+        message.includes('AUTH_OTP_VERIFY_FAILURE_WINDOW_MS'),
+      ),
+    ).toBe(true);
+  });
 });
