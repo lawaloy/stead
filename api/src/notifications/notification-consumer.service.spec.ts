@@ -231,4 +231,20 @@ describe('NotificationConsumerService', () => {
       providerMessageId: 'termii-123',
     });
   });
+
+  it('starts and clears the polling interval on module lifecycle hooks', async () => {
+    jest.useFakeTimers();
+    queue.claimReadyJob.mockResolvedValue(null);
+
+    service.onModuleInit();
+    await jest.advanceTimersByTimeAsync(300);
+
+    expect(queue.claimReadyJob).toHaveBeenCalledTimes(1);
+
+    service.onModuleDestroy();
+    await jest.advanceTimersByTimeAsync(600);
+
+    expect(queue.claimReadyJob).toHaveBeenCalledTimes(1);
+    jest.useRealTimers();
+  });
 });
