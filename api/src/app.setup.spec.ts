@@ -10,6 +10,15 @@ describe('configureApp', () => {
   let middleware: (req: Request, res: Response, next: NextFunction) => void;
   let app: INestApplication;
 
+  const createResponse = (statusCode: number) => {
+    const setHeader = jest.fn();
+    const res = Object.assign(new EventEmitter(), {
+      setHeader,
+      statusCode,
+    }) as unknown as Response & EventEmitter;
+    return { res, setHeader };
+  };
+
   beforeEach(() => {
     enableCors = jest.fn();
     useGlobalPipes = jest.fn();
@@ -32,10 +41,7 @@ describe('configureApp', () => {
   });
 
   it('preserves a non-empty x-request-id header on the response', () => {
-    const res = Object.assign(new EventEmitter(), {
-      setHeader: jest.fn(),
-      statusCode: 200,
-    }) as unknown as Response & EventEmitter;
+    const { res, setHeader } = createResponse(200);
     const next = jest.fn();
 
     middleware(
@@ -48,18 +54,12 @@ describe('configureApp', () => {
       next,
     );
 
-    expect(res.setHeader).toHaveBeenCalledWith(
-      'x-request-id',
-      'client-trace-1',
-    );
+    expect(setHeader).toHaveBeenCalledWith('x-request-id', 'client-trace-1');
     expect(next).toHaveBeenCalledTimes(1);
   });
 
   it('generates a request id when the header is missing or empty', () => {
-    const res = Object.assign(new EventEmitter(), {
-      setHeader: jest.fn(),
-      statusCode: 204,
-    }) as unknown as Response & EventEmitter;
+    const { res, setHeader } = createResponse(204);
     const next = jest.fn();
 
     middleware(
@@ -72,7 +72,7 @@ describe('configureApp', () => {
       next,
     );
 
-    expect(res.setHeader).toHaveBeenCalledWith(
+    expect(setHeader).toHaveBeenCalledWith(
       'x-request-id',
       expect.stringMatching(
         /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
@@ -82,10 +82,7 @@ describe('configureApp', () => {
   });
 
   it('generates a request id when x-request-id is a multi-value array', () => {
-    const res = Object.assign(new EventEmitter(), {
-      setHeader: jest.fn(),
-      statusCode: 200,
-    }) as unknown as Response & EventEmitter;
+    const { res, setHeader } = createResponse(200);
 
     middleware(
       {
@@ -97,10 +94,13 @@ describe('configureApp', () => {
       jest.fn(),
     );
 
-    const assigned = (res.setHeader as jest.Mock).mock.calls[0][1] as string;
-    expect(assigned).not.toBe('a');
-    expect(assigned).toMatch(
-      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
+    expect(setHeader).not.toHaveBeenCalledWith('x-request-id', 'a');
+    expect(setHeader).not.toHaveBeenCalledWith('x-request-id', 'b');
+    expect(setHeader).toHaveBeenCalledWith(
+      'x-request-id',
+      expect.stringMatching(
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
+      ),
     );
   });
 
@@ -108,10 +108,7 @@ describe('configureApp', () => {
     const logSpy = jest
       .spyOn(Logger.prototype, 'log')
       .mockImplementation(() => undefined);
-    const res = Object.assign(new EventEmitter(), {
-      setHeader: jest.fn(),
-      statusCode: 201,
-    }) as unknown as Response & EventEmitter;
+    const { res } = createResponse(201);
 
     middleware(
       {
