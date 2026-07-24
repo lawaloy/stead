@@ -144,11 +144,7 @@ describe('NotificationConsumerService', () => {
     },
   );
 
-  it.each([
-    { sid: 123 },
-    { message_id: true },
-    { sid: null, message_id: 99 },
-  ])(
+  it.each([{ sid: 123 }, { message_id: true }, { sid: null, message_id: 99 }])(
     'records a null provider message id when sid/message_id are non-strings (%p)',
     async (response) => {
       queue.claimReadyJob.mockResolvedValue(job);
