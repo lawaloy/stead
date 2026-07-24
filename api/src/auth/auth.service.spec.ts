@@ -592,4 +592,46 @@ describe('AuthService', () => {
       }),
     );
   });
+
+  it('uses configured max verify attempts for lockout', async () => {
+    config.get.mockImplementation((key: string) => {
+      if (key === 'AUTH_OTP_MAX_VERIFY_ATTEMPTS') return 2;
+      return undefined;
+    });
+    prisma.user.findUnique.mockResolvedValue({
+      id: 'user_1',
+      phone: '+2348012345678',
+    } satisfies MockUser);
+    prisma.otpCode.findFirst.mockResolvedValue({
+      id: 'otp_1',
+      codeHash: await bcrypt.hash('123456', 1),
+      verifyAttempts: 1,
+      expiresAt: new Date(Date.now() + 60_000),
+      consumedAt: null,
+    } satisfies MockOtpRecord);
+    prisma.otpCode.update.mockResolvedValue({});
+
+    await expect(
+      service.verifyOtp('08012345678', 'NG', '654321'),
+    ).rejects.toMatchObject({
+      message: 'Too many invalid OTP attempts. Request a new code.',
+      status: HttpStatus.TOO_MANY_REQUESTS,
+    });
+
+    expect(prisma.otpCode.update).toHaveBeenCalledWith({
+      where: { id: 'otp_1' },
+      data: {
+        verifyAttempts: 2,
+        consumedAt: expect.any(Date) as unknown,
+      },
+    });
+    expect(telemetry.recordEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'otp_verify_locked',
+        phone: '+2348012345678',
+        countryIso: 'NG',
+        attemptNumber: 2,
+      }),
+    );
+  });
 });

@@ -109,4 +109,53 @@ describe('AuthTelemetryService', () => {
       take: 50,
     });
   });
+
+  it('clamps inspection limit to a minimum of 1', async () => {
+    prisma.authEvent.groupBy.mockResolvedValue([]);
+    prisma.authEvent.findMany.mockResolvedValue([]);
+
+    await service.getInspection(0);
+
+    expect(prisma.authEvent.findMany).toHaveBeenCalledWith({
+      orderBy: { createdAt: 'desc' },
+      take: 1,
+    });
+  });
+
+  it('leaves short phones unmasked and null metadata untouched', async () => {
+    prisma.authEvent.groupBy.mockResolvedValue([]);
+    prisma.authEvent.findMany.mockResolvedValue([
+      {
+        id: 'event_short',
+        type: 'otp_requested',
+        phone: '1234',
+        countryIso: 'NG',
+        ip: null,
+        userAgent: null,
+        attemptNumber: null,
+        userId: null,
+        otpCodeId: null,
+        metadataJson: null,
+        createdAt: new Date('2026-03-30T00:00:00Z'),
+      },
+    ]);
+
+    const result = await service.getInspection(5);
+
+    expect(result.recent).toEqual([
+      {
+        id: 'event_short',
+        type: 'otp_requested',
+        phone: '1234',
+        countryIso: 'NG',
+        ip: null,
+        userAgent: null,
+        attemptNumber: null,
+        userId: null,
+        otpCodeId: null,
+        metadata: null,
+        createdAt: new Date('2026-03-30T00:00:00Z'),
+      },
+    ]);
+  });
 });
