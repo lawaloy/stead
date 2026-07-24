@@ -14,10 +14,11 @@ export class PrismaService
     const adapter = new PrismaPg({
       connectionString,
     });
+    const prismaOptions: { adapter: never } = {
+      adapter: adapter as never,
+    };
 
-    super({
-      adapter,
-    });
+    super(prismaOptions);
   }
 
   async onModuleInit() {

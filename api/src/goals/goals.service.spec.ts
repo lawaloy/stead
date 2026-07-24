@@ -182,6 +182,40 @@ describe('GoalsService', () => {
     expect(prisma.goal.update).not.toHaveBeenCalled();
   });
 
+  it('persists zero monthly income as 0n when update supplies monthlyIncomeKobo: 0', async () => {
+    prisma.goal.findFirst.mockResolvedValue({
+      id: 'goal_1',
+      userId: 'user_1',
+    });
+    prisma.goal.update.mockResolvedValue({
+      id: 'goal_1',
+      userId: 'user_1',
+      name: 'Rent buffer',
+      amountTotalKobo: 500_000n,
+      dueDate,
+      monthlyIncomeKobo: 0n,
+      isActive: true,
+      createdAt,
+    });
+
+    const result = await service.update('user_1', 'goal_1', {
+      monthlyIncomeKobo: 0,
+    });
+
+    expect(prisma.goal.updateMany).not.toHaveBeenCalled();
+    expect(prisma.goal.update).toHaveBeenCalledWith({
+      where: { id: 'goal_1' },
+      data: {
+        name: undefined,
+        amountTotalKobo: undefined,
+        dueDate: undefined,
+        monthlyIncomeKobo: 0n,
+        isActive: undefined,
+      },
+    });
+    expect(result.monthlyIncomeKobo).toBe(0);
+  });
+
   it('deactivates sibling goals when an existing goal becomes active', async () => {
     const updatedDueDate = new Date('2026-04-01T00:00:00.000Z');
     prisma.goal.findFirst.mockResolvedValue({
