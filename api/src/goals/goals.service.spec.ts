@@ -267,4 +267,48 @@ describe('GoalsService', () => {
       createdAt,
     });
   });
+
+  it('does not deactivate sibling goals when the update is not activating', async () => {
+    prisma.goal.findFirst.mockResolvedValue({
+      id: 'goal_1',
+      userId: 'user_1',
+    });
+    prisma.goal.update.mockResolvedValue({
+      id: 'goal_1',
+      userId: 'user_1',
+      name: 'Renamed inactive goal',
+      amountTotalKobo: 500_000n,
+      dueDate,
+      monthlyIncomeKobo: null,
+      isActive: false,
+      createdAt,
+    });
+
+    const result = await service.update('user_1', 'goal_1', {
+      name: 'Renamed inactive goal',
+      isActive: false,
+    });
+
+    expect(prisma.goal.updateMany).not.toHaveBeenCalled();
+    expect(prisma.goal.update).toHaveBeenCalledWith({
+      where: { id: 'goal_1' },
+      data: {
+        name: 'Renamed inactive goal',
+        amountTotalKobo: undefined,
+        dueDate: undefined,
+        monthlyIncomeKobo: undefined,
+        isActive: false,
+      },
+    });
+    expect(result).toEqual({
+      id: 'goal_1',
+      userId: 'user_1',
+      name: 'Renamed inactive goal',
+      amountTotalKobo: 500_000,
+      dueDate,
+      monthlyIncomeKobo: null,
+      isActive: false,
+      createdAt,
+    });
+  });
 });
