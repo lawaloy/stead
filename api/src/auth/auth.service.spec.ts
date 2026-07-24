@@ -436,7 +436,36 @@ describe('AuthService', () => {
         userAgent: 'jest-agent',
       }),
     );
+    expect(jwt.signAsync).toHaveBeenCalledWith({
+      sub: 'user_1',
+      phone: '+2348012345678',
+    });
     expect(result).toEqual({ token: 'jwt_token' });
+  });
+
+  it('rejects verification when no user exists for the phone', async () => {
+    prisma.user.findUnique.mockResolvedValue(null);
+
+    await expect(
+      service.verifyOtp('08012345678', 'NG', '123456'),
+    ).rejects.toThrow('Invalid phone or code');
+
+    expect(prisma.otpCode.findFirst).not.toHaveBeenCalled();
+    expect(jwt.signAsync).not.toHaveBeenCalled();
+  });
+
+  it('rejects verification when no unconsumed otp remains', async () => {
+    prisma.user.findUnique.mockResolvedValue({
+      id: 'user_1',
+      phone: '+2348012345678',
+    } satisfies MockUser);
+    prisma.otpCode.findFirst.mockResolvedValue(null);
+
+    await expect(
+      service.verifyOtp('08012345678', 'NG', '123456'),
+    ).rejects.toThrow('OTP expired or not found');
+
+    expect(jwt.signAsync).not.toHaveBeenCalled();
   });
 
   it('rejects a valid otp if another request already consumed it', async () => {
