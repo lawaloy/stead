@@ -1,9 +1,11 @@
 import MockAdapter from 'axios-mock-adapter';
+import { z } from 'zod';
 import {
   ApiError,
   apiClient,
   configureApiAuth,
   fetchAuthCountries,
+  parseApiValidationErrors,
   requestOtp,
   verifyOtp,
 } from '../lib/api';
@@ -152,5 +154,55 @@ describe('api client', () => {
         details,
       });
     }
+  });
+
+  it('uses plain string response bodies as the ApiError message', async () => {
+    mock.onPost('/auth/request-otp').reply(502, 'upstream unavailable');
+
+    await expect(requestOtp('08012345678', 'NG')).rejects.toMatchObject({
+      name: 'ApiError',
+      status: 502,
+      message: 'upstream unavailable',
+    });
+  });
+
+  it('maps non-Axios rejections to Unexpected network error', async () => {
+    const responseInterceptor = (
+      apiClient.interceptors.response as unknown as {
+        handlers: Array<{
+          rejected?: (error: unknown) => Promise<never>;
+        }>;
+      }
+    ).handlers.find((handler) => typeof handler?.rejected === 'function');
+
+    expect(responseInterceptor?.rejected).toBeDefined();
+
+    await expect(
+      responseInterceptor!.rejected!(new Error('socket hung up')),
+    ).rejects.toMatchObject({
+      name: 'ApiError',
+      message: 'Unexpected network error',
+    });
+  });
+
+  it('joins Zod validation issues and ignores non-Zod values', () => {
+    const zodError = new z.ZodError([
+      {
+        code: 'custom',
+        path: ['phone'],
+        message: 'phone must be valid',
+      },
+      {
+        code: 'custom',
+        path: ['countryIso'],
+        message: 'countryIso must be supported',
+      },
+    ]);
+
+    expect(parseApiValidationErrors(zodError)).toBe(
+      'phone must be valid, countryIso must be supported',
+    );
+    expect(parseApiValidationErrors(new Error('nope'))).toBeNull();
+    expect(parseApiValidationErrors({ message: 'plain' })).toBeNull();
   });
 });

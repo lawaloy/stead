@@ -390,6 +390,49 @@ describe('AuthService', () => {
     );
   });
 
+  it('uses configured otp request limits for ip and phone windows', async () => {
+    config.get.mockImplementation((key: string) => {
+      if (key === 'AUTH_OTP_REQUEST_LIMIT_PER_IP_PER_HOUR') return 3;
+      if (key === 'AUTH_OTP_REQUEST_LIMIT_PER_HOUR') return 4;
+      return undefined;
+    });
+
+    telemetry.countRecentEvents.mockResolvedValueOnce(3);
+    await expect(
+      service.requestOtp('08012345678', 'NG', {
+        ip: '203.0.113.10',
+        userAgent: 'jest-agent',
+      }),
+    ).rejects.toMatchObject({
+      message: 'Too many OTP requests from this network. Try again later.',
+      status: HttpStatus.TOO_MANY_REQUESTS,
+    });
+    expect(telemetry.recordEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'otp_request_rate_limited',
+        metadata: { limit: 3, window: '1h', scope: 'ip' },
+      }),
+    );
+
+    telemetry.countRecentEvents.mockResolvedValueOnce(0);
+    prisma.otpCode.count.mockResolvedValueOnce(4);
+    await expect(
+      service.requestOtp('08012345678', 'NG', {
+        ip: '203.0.113.10',
+        userAgent: 'jest-agent',
+      }),
+    ).rejects.toMatchObject({
+      message: 'Too many OTP requests. Try again later.',
+      status: HttpStatus.TOO_MANY_REQUESTS,
+    });
+    expect(telemetry.recordEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'otp_request_rate_limited',
+        metadata: { limit: 4, window: '1h' },
+      }),
+    );
+  });
+
   it('normalizes using the selected country', async () => {
     prisma.otpCode.count.mockResolvedValue(0);
     prisma.user.upsert.mockResolvedValue({
@@ -538,6 +581,48 @@ describe('AuthService', () => {
         ip: '127.0.0.1',
       }),
     );
+  });
+
+  it('uses configured verify failure ip window limits', async () => {
+    jest.useFakeTimers();
+    jest.setSystemTime(new Date('2026-07-24T12:00:00.000Z'));
+
+    config.get.mockImplementation((key: string) => {
+      if (key === 'AUTH_OTP_VERIFY_FAILURE_LIMIT_PER_IP_WINDOW') return 2;
+      if (key === 'AUTH_OTP_VERIFY_FAILURE_WINDOW_MS') return 5 * 60 * 1000;
+      return undefined;
+    });
+    telemetry.countRecentEvents.mockResolvedValueOnce(2);
+
+    await expect(
+      service.verifyOtp('08012345678', 'NG', '123456', {
+        ip: '198.51.100.7',
+        userAgent: 'jest-agent',
+      }),
+    ).rejects.toMatchObject({
+      message:
+        'Too many invalid OTP attempts from this network. Try again later.',
+      status: HttpStatus.TOO_MANY_REQUESTS,
+    });
+
+    expect(telemetry.countRecentEvents).toHaveBeenCalledWith({
+      types: ['otp_verify_failed', 'otp_verify_locked'],
+      since: new Date('2026-07-24T11:55:00.000Z'),
+      ip: '198.51.100.7',
+    });
+    expect(telemetry.recordEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'otp_verify_locked',
+        attemptNumber: 2,
+        metadata: {
+          reason: 'ip_window_limit_reached',
+          limit: 2,
+          windowMs: 5 * 60 * 1000,
+        },
+      }),
+    );
+
+    jest.useRealTimers();
   });
 
   it('increments verify attempts for an invalid otp', async () => {
