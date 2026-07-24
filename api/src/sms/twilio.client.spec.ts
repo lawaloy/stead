@@ -4,6 +4,9 @@ import { TwilioClient } from './twilio.client';
 
 jest.mock('https');
 
+type MockResponse = EventEmitter & { statusCode: number };
+type MockRequestCallback = (response: MockResponse) => void;
+
 describe('TwilioClient transport edges', () => {
   const client = new TwilioClient();
   const originalEnv = {
@@ -17,15 +20,17 @@ describe('TwilioClient transport edges', () => {
       end: jest.fn(),
     });
 
-    (https.request as jest.Mock).mockImplementation((_options, callback) => {
-      const res = Object.assign(new EventEmitter(), { statusCode });
-      callback(res);
-      queueMicrotask(() => {
-        res.emit('data', body);
-        res.emit('end');
-      });
-      return req;
-    });
+    (https.request as jest.Mock).mockImplementation(
+      (_options: unknown, callback: MockRequestCallback) => {
+        const res = Object.assign(new EventEmitter(), { statusCode });
+        callback(res);
+        queueMicrotask(() => {
+          res.emit('data', body);
+          res.emit('end');
+        });
+        return req;
+      },
+    );
 
     return req;
   };
