@@ -90,6 +90,47 @@ describe('GoalsService', () => {
     });
   });
 
+  it('stores null monthly income when create omits monthlyIncomeKobo', async () => {
+    prisma.goal.updateMany.mockResolvedValue({ count: 0 });
+    prisma.goal.create.mockResolvedValue({
+      id: 'goal_2',
+      userId: 'user_1',
+      name: 'Emergency fund',
+      amountTotalKobo: 250_000n,
+      dueDate,
+      monthlyIncomeKobo: null,
+      isActive: true,
+      createdAt,
+    });
+
+    const result = await service.create('user_1', {
+      name: 'Emergency fund',
+      amountTotalKobo: 250_000,
+      dueDate: dueDate.toISOString(),
+    });
+
+    expect(prisma.goal.create).toHaveBeenCalledWith({
+      data: {
+        userId: 'user_1',
+        name: 'Emergency fund',
+        amountTotalKobo: 250_000n,
+        dueDate,
+        monthlyIncomeKobo: null,
+        isActive: true,
+      },
+    });
+    expect(result).toEqual({
+      id: 'goal_2',
+      userId: 'user_1',
+      name: 'Emergency fund',
+      amountTotalKobo: 250_000,
+      dueDate,
+      monthlyIncomeKobo: null,
+      isActive: true,
+      createdAt,
+    });
+  });
+
   it('returns the newest active goal for the user', async () => {
     prisma.goal.findFirst.mockResolvedValue({
       id: 'goal_1',
