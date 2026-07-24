@@ -70,14 +70,14 @@ describe('dependency overrides', () => {
 
     expect(packageJson).toMatchObject({
       overrides: {
-        postcss: '8.5.10',
+        postcss: '8.5.23',
       },
     });
 
     expect(packageLock).toMatchObject({
       packages: {
         'node_modules/postcss': {
-          version: '8.5.10',
+          version: '8.5.23',
         },
       },
     });
@@ -157,11 +157,15 @@ describe('dependency overrides', () => {
       expect(findLockfilePackage(packages, packageName)).toBeDefined();
     }
 
-    expect(packageJson.dependencies?.['react-native-reanimated']).toBeUndefined();
+    expect(
+      packageJson.dependencies?.['react-native-reanimated'],
+    ).toBeUndefined();
     expect(packageJson.dependencies?.['react-native-worklets']).toBeUndefined();
     expect(
       packageJson.devDependencies?.['react-native-reanimated'],
     ).toBeUndefined();
-    expect(packageJson.devDependencies?.['react-native-worklets']).toBeUndefined();
+    expect(
+      packageJson.devDependencies?.['react-native-worklets'],
+    ).toBeUndefined();
   });
 });
