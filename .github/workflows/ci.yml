@@ -45,11 +45,11 @@ jobs:
           cache-dependency-path: mobile/package-lock.json
 
       - name: Pin npm version for mobile lint
-        run: npm install --global npm@11.6.2
+        run: npm install --global npm@10.9.7
 
       - name: Install mobile dependencies
         working-directory: mobile
-        run: npm ci --legacy-peer-deps
+        run: npm ci
 
       - name: Lint mobile
         working-directory: mobile
@@ -125,11 +125,11 @@ jobs:
           cache-dependency-path: mobile/package-lock.json
 
       - name: Pin npm version for mobile build
-        run: npm install --global npm@11.6.2
+        run: npm install --global npm@10.9.7
 
       - name: Install mobile dependencies
         working-directory: mobile
-        run: npm ci --legacy-peer-deps
+        run: npm ci
 
       - name: Build mobile
         working-directory: mobile

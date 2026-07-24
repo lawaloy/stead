@@ -49,6 +49,12 @@ describe('isValidPhoneForCountry', () => {
     expect(formatPhoneForDisplay('07911123456', 'GB')).toBe('07911 123456');
   });
 
+  it('keeps international input as a compact plus-prefixed display value', () => {
+    expect(formatPhoneForDisplay('+1 (415) 555-2671', 'US')).toBe(
+      '+14155552671',
+    );
+  });
+
   it('normalizes formatted display input', () => {
     expect(normalizePhoneForCountry('(415) 555-2671', 'US')).toBe(
       '+14155552671',

@@ -81,6 +81,122 @@ describe('NotificationConsumerService', () => {
     expect(queue.markFailed).toHaveBeenCalledWith(job, error);
   });
 
+  it('skips work when no ready job is claimed', async () => {
+    queue.claimReadyJob.mockResolvedValue(null);
+
+    await tick();
+
+    expect(sms.sendOtp).not.toHaveBeenCalled();
+    expect(queue.markSucceeded).not.toHaveBeenCalled();
+    expect(queue.markFailed).not.toHaveBeenCalled();
+  });
+
+  it('marks unsupported job types as failed', async () => {
+    queue.claimReadyJob.mockResolvedValue({
+      ...job,
+      type: 'unknown.event',
+    });
+
+    await tick();
+
+    expect(sms.sendOtp).not.toHaveBeenCalled();
+    expect(queue.markSucceeded).not.toHaveBeenCalled();
+    expect(queue.markFailed).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'job_1' }),
+      expect.objectContaining({
+        message: 'Unsupported notification job type',
+      }),
+    );
+  });
+
+  it('records a null provider message id when the sms response has no id', async () => {
+    queue.claimReadyJob.mockResolvedValue(job);
+    sms.sendOtp.mockResolvedValue({
+      ok: true,
+      provider: 'dev',
+      response: { logged: true },
+    });
+
+    await tick();
+
+    expect(queue.markSucceeded).toHaveBeenCalledWith('job_1', {
+      provider: 'dev',
+      providerMessageId: null,
+    });
+  });
+
+  it.each([null, 'SM123', 42] as const)(
+    'records a null provider message id for non-object sms responses (%p)',
+    async (response) => {
+      queue.claimReadyJob.mockResolvedValue(job);
+      sms.sendOtp.mockResolvedValue({
+        ok: true,
+        provider: 'dev',
+        response,
+      });
+
+      await tick();
+
+      expect(queue.markSucceeded).toHaveBeenCalledWith('job_1', {
+        provider: 'dev',
+        providerMessageId: null,
+      });
+    },
+  );
+
+  it.each([{ sid: 123 }, { message_id: true }, { sid: null, message_id: 99 }])(
+    'records a null provider message id when sid/message_id are non-strings (%p)',
+    async (response) => {
+      queue.claimReadyJob.mockResolvedValue(job);
+      sms.sendOtp.mockResolvedValue({
+        ok: true,
+        provider: 'twilio',
+        response,
+      });
+
+      await tick();
+
+      expect(queue.markSucceeded).toHaveBeenCalledWith('job_1', {
+        provider: 'twilio',
+        providerMessageId: null,
+      });
+    },
+  );
+
+  it('logs short phones unmasked and longer phones masked on success and failure', async () => {
+    const logSpy = jest.spyOn(Logger.prototype, 'log');
+    const warnSpy = jest.spyOn(Logger.prototype, 'warn');
+
+    queue.claimReadyJob.mockResolvedValue({
+      ...job,
+      payload: { phone: '1234', otp: '123456' },
+    });
+    sms.sendOtp.mockResolvedValue({
+      ok: true,
+      provider: 'dev',
+      response: { logged: true },
+    });
+
+    await tick();
+
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('phone=1234'));
+    expect(logSpy).not.toHaveBeenCalledWith(
+      expect.stringContaining('phone=1234***'),
+    );
+
+    queue.claimReadyJob.mockResolvedValue({
+      ...job,
+      payload: { phone: '+2348012345678', otp: '123456' },
+    });
+    sms.sendOtp.mockRejectedValue(new Error('provider down'));
+
+    await tick();
+
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('phone=+234***78'),
+    );
+  });
+
   it('does not claim another job while a send is in flight', async () => {
     let resolveSend: (value: {
       ok: boolean;
@@ -114,5 +230,21 @@ describe('NotificationConsumerService', () => {
       provider: 'termii',
       providerMessageId: 'termii-123',
     });
+  });
+
+  it('starts and clears the polling interval on module lifecycle hooks', async () => {
+    jest.useFakeTimers();
+    queue.claimReadyJob.mockResolvedValue(null);
+
+    service.onModuleInit();
+    await jest.advanceTimersByTimeAsync(300);
+
+    expect(queue.claimReadyJob).toHaveBeenCalledTimes(1);
+
+    service.onModuleDestroy();
+    await jest.advanceTimersByTimeAsync(600);
+
+    expect(queue.claimReadyJob).toHaveBeenCalledTimes(1);
+    jest.useRealTimers();
   });
 });

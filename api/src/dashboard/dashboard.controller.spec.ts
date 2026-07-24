@@ -5,6 +5,9 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
 describe('DashboardController', () => {
   let controller: DashboardController;
+  const dashboard = {
+    getStability: jest.fn(),
+  };
 
   beforeEach(async () => {
     const moduleBuilder = Test.createTestingModule({
@@ -12,7 +15,7 @@ describe('DashboardController', () => {
       providers: [
         {
           provide: DashboardService,
-          useValue: {},
+          useValue: dashboard,
         },
       ],
     });
@@ -23,9 +26,18 @@ describe('DashboardController', () => {
       .compile();
 
     controller = module.get<DashboardController>(DashboardController);
+    jest.clearAllMocks();
   });
 
   it('should be defined', () => {
     expect(controller).toBeDefined();
+  });
+
+  it('scopes stability reads to the authenticated user id', () => {
+    const req = { user: { userId: 'user_1' } };
+
+    void controller.getStability(req as never);
+
+    expect(dashboard.getStability).toHaveBeenCalledWith('user_1');
   });
 });

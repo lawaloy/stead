@@ -85,4 +85,51 @@ describe('envSchema', () => {
       'TERMII_API_KEY is required when SMS_PROVIDER=termii',
     );
   });
+
+  it('allows Twilio when MessagingServiceSid is set without From', () => {
+    const result = envSchema.validate({
+      ...requiredEnv,
+      SMS_PROVIDER: 'twilio',
+      TWILIO_ACCOUNT_SID: 'ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
+      TWILIO_AUTH_TOKEN: 'twilio_auth_token',
+      TWILIO_MESSAGING_SERVICE_SID: 'MGxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
+    });
+
+    expect(result.error).toBeUndefined();
+  });
+
+  it('rejects Twilio when neither From nor MessagingServiceSid is configured', () => {
+    const result = envSchema.validate({
+      ...requiredEnv,
+      SMS_PROVIDER: 'twilio',
+      TWILIO_ACCOUNT_SID: 'ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
+      TWILIO_AUTH_TOKEN: 'twilio_auth_token',
+    });
+
+    expect(result.error?.message).toContain(
+      'Set TWILIO_FROM or TWILIO_MESSAGING_SERVICE_SID when SMS_PROVIDER=twilio',
+    );
+  });
+
+  it('requires Termii sender id when the Termii provider is active', () => {
+    const result = envSchema.validate({
+      ...requiredEnv,
+      SMS_PROVIDER: 'termii',
+      TERMII_API_KEY: 'termii_api_key',
+    });
+
+    expect(result.error?.message).toContain(
+      'TERMII_SENDER_ID is required when SMS_PROVIDER=termii',
+    );
+  });
+
+  it('rejects JWT secrets shorter than 16 characters', () => {
+    const result = envSchema.validate({
+      DATABASE_URL: requiredEnv.DATABASE_URL,
+      JWT_SECRET: 'too-short',
+      SMS_PROVIDER: 'dev',
+    });
+
+    expect(result.error?.message).toContain('JWT_SECRET');
+  });
 });
