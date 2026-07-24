@@ -6,6 +6,7 @@ describe('AuthTelemetryService', () => {
   let prisma: {
     authEvent: {
       create: jest.Mock;
+      count: jest.Mock;
       groupBy: jest.Mock;
       findMany: jest.Mock;
     };
@@ -15,6 +16,7 @@ describe('AuthTelemetryService', () => {
     prisma = {
       authEvent: {
         create: jest.fn(),
+        count: jest.fn(),
         groupBy: jest.fn(),
         findMany: jest.fn(),
       },
@@ -44,6 +46,50 @@ describe('AuthTelemetryService', () => {
         userId: undefined,
         otpCodeId: undefined,
         metadataJson: JSON.stringify({ source: 'test' }),
+      },
+    });
+  });
+
+  it('counts recent OTP requests for the caller IP and time window', async () => {
+    const since = new Date('2026-07-01T12:00:00.000Z');
+    prisma.authEvent.count.mockResolvedValue(19);
+
+    await expect(
+      service.countRecentEvents({
+        types: ['otp_requested'],
+        since,
+        ip: '203.0.113.10',
+      }),
+    ).resolves.toBe(19);
+
+    expect(prisma.authEvent.count).toHaveBeenCalledWith({
+      where: {
+        type: { in: ['otp_requested'] },
+        createdAt: { gte: since },
+        ip: '203.0.113.10',
+        phone: undefined,
+      },
+    });
+  });
+
+  it('counts all verify failure events for IP lockout checks', async () => {
+    const since = new Date('2026-07-01T12:00:00.000Z');
+    prisma.authEvent.count.mockResolvedValue(9);
+
+    await expect(
+      service.countRecentEvents({
+        types: ['otp_verify_failed', 'otp_verify_locked'],
+        since,
+        ip: '198.51.100.4',
+      }),
+    ).resolves.toBe(9);
+
+    expect(prisma.authEvent.count).toHaveBeenCalledWith({
+      where: {
+        type: { in: ['otp_verify_failed', 'otp_verify_locked'] },
+        createdAt: { gte: since },
+        ip: '198.51.100.4',
+        phone: undefined,
       },
     });
   });

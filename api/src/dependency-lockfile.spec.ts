@@ -30,11 +30,6 @@ const auditRemediationPins = [
     lockfilePath: 'node_modules/@angular-devkit/schematics-cli',
   },
   {
-    packageName: '@hono/node-server',
-    version: '1.19.14',
-    lockfilePath: 'node_modules/@hono/node-server',
-  },
-  {
     packageName: 'file-type',
     version: '21.3.2',
     lockfilePath: 'node_modules/file-type',

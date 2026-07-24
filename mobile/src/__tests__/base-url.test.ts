@@ -25,4 +25,26 @@ describe('resolveApiBaseUrl', () => {
     const { resolveApiBaseUrl } = await import('../lib/base-url');
     expect(resolveApiBaseUrl()).toBe('http://10.0.0.45:3000');
   });
+
+  it('uses the Android emulator loopback host when env and expo host are absent', async () => {
+    jest.doMock('react-native', () => ({
+      Platform: { OS: 'android' },
+    }));
+    jest.doMock('expo-constants', () => ({
+      expoConfig: { hostUri: undefined },
+    }));
+    const { resolveApiBaseUrl } = await import('../lib/base-url');
+    expect(resolveApiBaseUrl()).toBe('http://10.0.2.2:3000');
+  });
+
+  it('falls back to localhost on non-Android platforms without env or expo host', async () => {
+    jest.doMock('react-native', () => ({
+      Platform: { OS: 'ios' },
+    }));
+    jest.doMock('expo-constants', () => ({
+      expoConfig: { hostUri: undefined },
+    }));
+    const { resolveApiBaseUrl } = await import('../lib/base-url');
+    expect(resolveApiBaseUrl()).toBe('http://localhost:3000');
+  });
 });

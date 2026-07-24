@@ -133,6 +133,35 @@ describe('SmsService', () => {
     );
   });
 
+  it('fails fast when Twilio is missing account credentials or sender identity', () => {
+    useConfig({
+      SMS_PROVIDER: 'twilio',
+      DEV_EXPOSE_OTP: 'false',
+    });
+    expect(() => service.onModuleInit()).toThrow(
+      'TWILIO_ACCOUNT_SID is required when SMS_PROVIDER=twilio',
+    );
+
+    useConfig({
+      SMS_PROVIDER: 'twilio',
+      TWILIO_ACCOUNT_SID: 'ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
+      DEV_EXPOSE_OTP: 'false',
+    });
+    expect(() => service.onModuleInit()).toThrow(
+      'TWILIO_AUTH_TOKEN is required when SMS_PROVIDER=twilio',
+    );
+
+    useConfig({
+      SMS_PROVIDER: 'twilio',
+      TWILIO_ACCOUNT_SID: 'ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
+      TWILIO_AUTH_TOKEN: 'twilio-token',
+      DEV_EXPOSE_OTP: 'false',
+    });
+    expect(() => service.onModuleInit()).toThrow(
+      'Set TWILIO_FROM or TWILIO_MESSAGING_SERVICE_SID when SMS_PROVIDER=twilio',
+    );
+  });
+
   it('returns provider inspection without exposing secrets', () => {
     expect(service.getProviderInspection()).toEqual({
       provider: 'termii',
@@ -141,6 +170,27 @@ describe('SmsService', () => {
         apiKeyConfigured: true,
         senderIdConfigured: true,
         channel: 'generic',
+      },
+    });
+  });
+
+  it('reports Twilio inspection flags without leaking secret values', () => {
+    useConfig({
+      SMS_PROVIDER: 'twilio',
+      TWILIO_ACCOUNT_SID: 'ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
+      TWILIO_AUTH_TOKEN: '   ',
+      TWILIO_FROM: '+14155550100',
+      DEV_EXPOSE_OTP: 'false',
+    });
+
+    expect(service.getProviderInspection()).toEqual({
+      provider: 'twilio',
+      ready: true,
+      config: {
+        accountSidConfigured: true,
+        authTokenConfigured: false,
+        fromConfigured: true,
+        messagingServiceSidConfigured: false,
       },
     });
   });
@@ -350,5 +400,134 @@ describe('SmsService', () => {
       sms: 'Your Stead OTP is 123456. It expires in 10 minutes.',
       channel: 'dnd',
     });
+  });
+
+  it('falls back to the Error message when Twilio failures omit response bodies', async () => {
+    useConfig({
+      SMS_PROVIDER: 'twilio',
+      TWILIO_ACCOUNT_SID: 'ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
+      TWILIO_AUTH_TOKEN: 'twilio-token',
+      TWILIO_FROM: '+14155550100',
+      DEV_EXPOSE_OTP: 'false',
+    });
+    process.env.TWILIO_FROM = '+14155550100';
+    twilio.sendMessage.mockRejectedValue(new Error('socket hang up'));
+
+    await expect(
+      service.sendOtp('+14155552671', '654321'),
+    ).rejects.toMatchObject({
+      response: {
+        message: 'Failed to send OTP via Twilio',
+        details: 'socket hang up',
+      },
+      status: HttpStatus.BAD_GATEWAY,
+    });
+  });
+
+  it('maps non-object Twilio failures to Unknown error details', async () => {
+    useConfig({
+      SMS_PROVIDER: 'twilio',
+      TWILIO_ACCOUNT_SID: 'ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
+      TWILIO_AUTH_TOKEN: 'twilio-token',
+      TWILIO_FROM: '+14155550100',
+      DEV_EXPOSE_OTP: 'false',
+    });
+    process.env.TWILIO_FROM = '+14155550100';
+    twilio.sendMessage.mockRejectedValue('transport failed');
+
+    await expect(
+      service.sendOtp('+14155552671', '654321'),
+    ).rejects.toMatchObject({
+      response: {
+        message: 'Failed to send OTP via Twilio',
+        details: 'Unknown error',
+      },
+      status: HttpStatus.BAD_GATEWAY,
+    });
+  });
+
+  it('maps empty-object Twilio failures to Unknown error details', async () => {
+    useConfig({
+      SMS_PROVIDER: 'twilio',
+      TWILIO_ACCOUNT_SID: 'ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
+      TWILIO_AUTH_TOKEN: 'twilio-token',
+      TWILIO_FROM: '+14155550100',
+      DEV_EXPOSE_OTP: 'false',
+    });
+    process.env.TWILIO_FROM = '+14155550100';
+    twilio.sendMessage.mockRejectedValue({});
+
+    await expect(
+      service.sendOtp('+14155552671', '654321'),
+    ).rejects.toMatchObject({
+      response: {
+        message: 'Failed to send OTP via Twilio',
+        details: 'Unknown error',
+      },
+      status: HttpStatus.BAD_GATEWAY,
+    });
+  });
+
+  it('falls back unknown or blank SMS_PROVIDER values to Twilio', async () => {
+    useConfig({
+      SMS_PROVIDER: 'not-a-provider',
+      TWILIO_ACCOUNT_SID: 'ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
+      TWILIO_AUTH_TOKEN: 'twilio-token',
+      TWILIO_FROM: '+14155550100',
+      DEV_EXPOSE_OTP: 'false',
+    });
+    process.env.TWILIO_FROM = '+14155550100';
+    twilio.sendMessage.mockResolvedValue({ sid: 'SM999' });
+
+    expect(() => service.onModuleInit()).not.toThrow();
+    expect(service.getProviderInspection()).toMatchObject({
+      provider: 'twilio',
+    });
+    await expect(service.sendOtp('+14155552671', '111111')).resolves.toEqual({
+      ok: true,
+      provider: 'twilio',
+      response: { sid: 'SM999' },
+    });
+    expect(termii.sendMessage).not.toHaveBeenCalled();
+
+    useConfig({
+      SMS_PROVIDER: '',
+      TWILIO_ACCOUNT_SID: 'ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
+      TWILIO_AUTH_TOKEN: 'twilio-token',
+      TWILIO_FROM: '+14155550100',
+      DEV_EXPOSE_OTP: 'false',
+    });
+    twilio.sendMessage.mockResolvedValue({ sid: 'SM998' });
+
+    expect(service.getProviderInspection()).toMatchObject({
+      provider: 'twilio',
+    });
+    await expect(service.sendOtp('+14155552671', '222222')).resolves.toEqual({
+      ok: true,
+      provider: 'twilio',
+      response: { sid: 'SM998' },
+    });
+  });
+
+  it('normalizes SMS_PROVIDER casing and surrounding whitespace', async () => {
+    useConfig({
+      SMS_PROVIDER: '  TeRmIi  ',
+      TERMII_API_KEY: 'termii-key',
+      TERMII_SENDER_ID: 'STEAD',
+      DEV_EXPOSE_OTP: 'false',
+    });
+    process.env.TERMII_SENDER_ID = 'STEAD';
+    termii.sendMessage.mockResolvedValue({ message_id: 'termii-case' });
+
+    expect(() => service.onModuleInit()).not.toThrow();
+    expect(service.getProviderInspection()).toMatchObject({
+      provider: 'termii',
+    });
+    await expect(service.sendOtp('+2348012345678', '333333')).resolves.toEqual({
+      ok: true,
+      provider: 'termii',
+      response: { message_id: 'termii-case' },
+    });
+    expect(twilio.sendMessage).not.toHaveBeenCalled();
   });
 });

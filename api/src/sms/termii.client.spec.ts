@@ -4,25 +4,34 @@ import { TermiiClient } from './termii.client';
 
 jest.mock('https');
 
+type MockResponse = EventEmitter & { statusCode: number };
+type MockRequest = EventEmitter & {
+  write: jest.MockedFunction<(chunk: string) => void>;
+  end: jest.MockedFunction<() => void>;
+};
+type MockRequestCallback = (response: MockResponse) => void;
+
 describe('TermiiClient', () => {
   const client = new TermiiClient();
   const originalApiKey = process.env.TERMII_API_KEY;
 
   const mockRequest = (statusCode: number, body: string) => {
-    const req = Object.assign(new EventEmitter(), {
-      write: jest.fn(),
-      end: jest.fn(),
+    const req: MockRequest = Object.assign(new EventEmitter(), {
+      write: jest.fn<(chunk: string) => void>(),
+      end: jest.fn<() => void>(),
     });
 
-    (https.request as jest.Mock).mockImplementation((_options, callback) => {
-      const res = Object.assign(new EventEmitter(), { statusCode });
-      callback(res);
-      queueMicrotask(() => {
-        res.emit('data', body);
-        res.emit('end');
-      });
-      return req;
-    });
+    (https.request as jest.Mock).mockImplementation(
+      (_options: unknown, callback: MockRequestCallback) => {
+        const res = Object.assign(new EventEmitter(), { statusCode });
+        callback(res);
+        queueMicrotask(() => {
+          res.emit('data', body);
+          res.emit('end');
+        });
+        return req;
+      },
+    );
 
     return req;
   };
@@ -53,6 +62,30 @@ describe('TermiiClient', () => {
     expect(https.request).not.toHaveBeenCalled();
   });
 
+  it('resolves an empty success body as an empty object', async () => {
+    mockRequest(200, '');
+
+    await expect(
+      client.sendMessage({
+        to: '2348012345678',
+        from: 'STEAD',
+        sms: 'OTP 123456',
+      }),
+    ).resolves.toEqual({});
+  });
+
+  it('keeps non-JSON success bodies as the raw string', async () => {
+    mockRequest(200, 'ok');
+
+    await expect(
+      client.sendMessage({
+        to: '2348012345678',
+        from: 'STEAD',
+        sms: 'OTP 123456',
+      }),
+    ).resolves.toBe('ok');
+  });
+
   it('posts plain SMS with the default generic channel', async () => {
     const req = mockRequest(200, JSON.stringify({ message_id: 'tm_1' }));
 
@@ -72,7 +105,9 @@ describe('TermiiClient', () => {
       }),
       expect.any(Function),
     );
-    expect(JSON.parse(req.write.mock.calls[0][0] as string)).toEqual({
+    const [[requestBody]] = req.write.mock.calls;
+
+    expect(JSON.parse(requestBody)).toEqual({
       to: '2348012345678',
       from: 'STEAD',
       sms: 'OTP 123456',
@@ -96,5 +131,39 @@ describe('TermiiClient', () => {
       message: 'Termii API error 401',
       response: { message: 'Invalid API key' },
     });
+  });
+
+  it('attaches non-JSON error bodies as the raw response string', async () => {
+    mockRequest(503, 'upstream unavailable');
+
+    await expect(
+      client.sendMessage({
+        to: '2348012345678',
+        from: 'STEAD',
+        sms: 'OTP 123456',
+      }),
+    ).rejects.toMatchObject({
+      message: 'Termii API error 503',
+      response: 'upstream unavailable',
+    });
+  });
+
+  it('rejects when the underlying request emits an error', async () => {
+    const req = Object.assign(new EventEmitter(), {
+      write: jest.fn(),
+      end: jest.fn(),
+    });
+    (https.request as jest.Mock).mockImplementation(() => req);
+
+    const pending = client.sendMessage({
+      to: '2348012345678',
+      from: 'STEAD',
+      sms: 'OTP 123456',
+    });
+    queueMicrotask(() => {
+      req.emit('error', new Error('ENOTFOUND'));
+    });
+
+    await expect(pending).rejects.toThrow('ENOTFOUND');
   });
 });
