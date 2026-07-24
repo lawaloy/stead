@@ -114,4 +114,38 @@ describe('tokenStore', () => {
       mockSecureStore.deleteItemAsync = originalDelete;
     }
   });
+
+  it('falls back to in-memory storage when localStorage throws', async () => {
+    Object.defineProperty(globalThis, 'localStorage', {
+      configurable: true,
+      value: {
+        getItem: jest.fn(() => {
+          throw new Error('localStorage blocked');
+        }),
+        setItem: jest.fn(() => {
+          throw new Error('localStorage blocked');
+        }),
+        removeItem: jest.fn(() => {
+          throw new Error('localStorage blocked');
+        }),
+      },
+    });
+    const originalGet = mockSecureStore.getItemAsync;
+    const originalSet = mockSecureStore.setItemAsync;
+    const originalDelete = mockSecureStore.deleteItemAsync;
+    mockSecureStore.getItemAsync = undefined;
+    mockSecureStore.setItemAsync = undefined;
+    mockSecureStore.deleteItemAsync = undefined;
+
+    try {
+      await tokenStore.setToken('memory-token');
+      await expect(tokenStore.getToken()).resolves.toBe('memory-token');
+      await tokenStore.clearToken();
+      await expect(tokenStore.getToken()).resolves.toBeNull();
+    } finally {
+      mockSecureStore.getItemAsync = originalGet;
+      mockSecureStore.setItemAsync = originalSet;
+      mockSecureStore.deleteItemAsync = originalDelete;
+    }
+  });
 });

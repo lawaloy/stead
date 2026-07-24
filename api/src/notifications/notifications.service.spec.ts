@@ -125,4 +125,39 @@ describe('NotificationsService', () => {
 
     expect(queue.listRecentJobs).toHaveBeenCalledWith(50);
   });
+
+  it('leaves short phone numbers unmasked in inspection payloads', async () => {
+    sms.getProviderInspection.mockReturnValue({
+      provider: 'dev',
+      ready: true,
+      config: { exposeOtp: false },
+    });
+    queue.getStatusSummary.mockResolvedValue({});
+    queue.listRecentJobs.mockResolvedValue([
+      {
+        id: 'job_short',
+        type: 'otp.requested',
+        status: 'pending',
+        attempts: 0,
+        maxAttempts: 3,
+        nextRunAt: new Date('2026-03-29T12:00:00Z'),
+        lockedAt: null,
+        sentAt: null,
+        failedAt: null,
+        lastError: null,
+        provider: null,
+        providerMessageId: null,
+        createdAt: new Date('2026-03-29T12:00:00Z'),
+        updatedAt: new Date('2026-03-29T12:00:00Z'),
+        payload: {
+          phone: '1234',
+          otp: '123456',
+        },
+      },
+    ]);
+
+    const result = await service.getInspection(5);
+
+    expect(result.jobs.recent[0].payload).toEqual({ phone: '1234' });
+  });
 });
