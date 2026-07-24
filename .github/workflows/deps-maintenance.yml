@@ -56,15 +56,18 @@ jobs:
         working-directory: api
         run: npm audit --audit-level=moderate || true
 
+      - name: Pin mobile npm version
+        run: npm install --global npm@10.9.7
+
       - name: Install mobile dependencies
         working-directory: mobile
-        run: npm ci --legacy-peer-deps
+        run: npm ci
 
       - name: Update mobile lockfile and patch vulnerabilities
         working-directory: mobile
         run: |
-          npm update --legacy-peer-deps
-          npm audit fix --legacy-peer-deps || true
+          npm update
+          npm audit fix || true
 
       - name: Mobile audit report (non-blocking)
         working-directory: mobile
@@ -83,7 +86,7 @@ jobs:
           body: |
             Automated dependency maintenance run:
             - `api`: `npm update`, `npm audit fix`, `npm audit --audit-level=moderate` (non-blocking report)
-            - `mobile`: `npm update --legacy-peer-deps`, `npm audit fix --legacy-peer-deps`, `npm audit --audit-level=moderate` (non-blocking report)
+            - `mobile`: `npm update`, `npm audit fix`, `npm audit --audit-level=moderate` (non-blocking report)
 
             This updates the same PR while it is still open. If that PR is merged, the action deletes the branch and the next run will create a new branch/PR named `security/deps-maintenance`.
           labels: |
