@@ -57,6 +57,19 @@ describe('Goals DTOs', () => {
       expect(income.some((e) => e.property === 'monthlyIncomeKobo')).toBe(true);
       expect(name.some((e) => e.property === 'name')).toBe(true);
     });
+
+    it('rejects missing required fields and non-ISO due dates', async () => {
+      const missing = await validationErrors(CreateGoalDto, {});
+      const badDueDate = await validationErrors(CreateGoalDto, {
+        name: 'School fees',
+        amountTotalKobo: 1000,
+        dueDate: 'not-a-date',
+      });
+      expect(missing.some((e) => e.property === 'name')).toBe(true);
+      expect(missing.some((e) => e.property === 'amountTotalKobo')).toBe(true);
+      expect(missing.some((e) => e.property === 'dueDate')).toBe(true);
+      expect(badDueDate.some((e) => e.property === 'dueDate')).toBe(true);
+    });
   });
 
   describe('UpdateGoalDto', () => {
@@ -74,6 +87,13 @@ describe('Goals DTOs', () => {
         amountTotalKobo: 0,
       });
       expect(errors.some((e) => e.property === 'amountTotalKobo')).toBe(true);
+    });
+
+    it('rejects non-ISO dueDate on update', async () => {
+      const errors = await validationErrors(UpdateGoalDto, {
+        dueDate: '12/01/2026',
+      });
+      expect(errors.some((e) => e.property === 'dueDate')).toBe(true);
     });
   });
 });
