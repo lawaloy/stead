@@ -22,11 +22,17 @@ describe('normalizePhoneNumber', () => {
     expect(() => normalizePhoneNumber('+1 415 555 2671', 'GB')).toThrow(
       BadRequestException,
     );
+    expect(() => normalizePhoneNumber('+1 415 555 2671', 'GB')).toThrow(
+      'phone must match the selected country',
+    );
   });
 
   it('rejects numbers that cannot be parsed as valid for the country', () => {
     expect(() => normalizePhoneNumber('123456', 'NG')).toThrow(
       BadRequestException,
+    );
+    expect(() => normalizePhoneNumber('123456', 'NG')).toThrow(
+      'phone must look like +2348012345678',
     );
   });
 });
