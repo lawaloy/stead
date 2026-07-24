@@ -130,4 +130,30 @@ describe('DashboardService', () => {
       },
     });
   });
+
+  it('returns zero balance and saved totals when the ledger is empty', async () => {
+    prisma.goal.findFirst.mockResolvedValue({
+      id: 'goal_1',
+      userId: 'user_1',
+      name: 'School fees',
+      amountTotalKobo: 500_000n,
+      dueDate,
+      monthlyIncomeKobo: 400_000n,
+      isActive: true,
+      createdAt,
+    });
+    prisma.transaction.findMany.mockResolvedValue([]);
+
+    const result = await service.getStability('user_1');
+
+    expect(result).toMatchObject({
+      ok: true,
+      metrics: {
+        goalSavedKobo: 0,
+        estimatedBalanceKobo: 0,
+        remainingObligationKobo: 500_000,
+        readinessPct: 0,
+      },
+    });
+  });
 });

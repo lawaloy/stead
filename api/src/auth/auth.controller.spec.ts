@@ -87,6 +87,37 @@ describe('AuthController', () => {
     );
   });
 
+  it('forwards undefined ip and user-agent when request metadata is absent', () => {
+    const req = {
+      ip: undefined,
+      get: jest.fn().mockReturnValue(undefined),
+    };
+
+    void controller.requestOtp(
+      { phone: '08012345678', countryIso: 'NG' },
+      req as never,
+    );
+    void controller.verifyOtp(
+      { phone: '08012345678', countryIso: 'NG', otp: '123456' },
+      req as never,
+    );
+
+    expect(authService.requestOtp).toHaveBeenCalledWith('08012345678', 'NG', {
+      ip: undefined,
+      userAgent: undefined,
+    });
+    expect(authService.verifyOtp).toHaveBeenCalledWith(
+      '08012345678',
+      'NG',
+      '123456',
+      {
+        ip: undefined,
+        userAgent: undefined,
+      },
+    );
+    expect(req.get).toHaveBeenCalledWith('user-agent');
+  });
+
   it('returns auth telemetry inspection', async () => {
     telemetryService.getInspection.mockResolvedValue({
       summary: { otp_requested: 1 },
