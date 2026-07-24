@@ -86,6 +86,15 @@ describe('NotificationQueueService', () => {
     expect(prisma.notificationJob.findUniqueOrThrow).not.toHaveBeenCalled();
   });
 
+  it('returns null without claiming when the queue has no ready jobs', async () => {
+    prisma.notificationJob.findFirst.mockResolvedValue(null);
+
+    await expect(queue.claimReadyJob()).resolves.toBeNull();
+
+    expect(prisma.notificationJob.updateMany).not.toHaveBeenCalled();
+    expect(prisma.notificationJob.findUniqueOrThrow).not.toHaveBeenCalled();
+  });
+
   it('reschedules non-terminal failures with retry backoff', async () => {
     const now = new Date('2026-01-01T00:00:00.000Z');
     jest.useFakeTimers().setSystemTime(now);

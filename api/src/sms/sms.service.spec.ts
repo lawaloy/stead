@@ -107,6 +107,32 @@ describe('SmsService', () => {
     );
   });
 
+  it('fails fast when Termii API key is set but sender id is missing', () => {
+    useConfig({
+      SMS_PROVIDER: 'termii',
+      TERMII_API_KEY: 'termii-key',
+      DEV_EXPOSE_OTP: 'false',
+    });
+
+    expect(() => service.onModuleInit()).toThrow(
+      'TERMII_SENDER_ID is required when SMS_PROVIDER=termii',
+    );
+  });
+
+  it('treats whitespace-only Twilio credentials as missing at boot', () => {
+    useConfig({
+      SMS_PROVIDER: 'twilio',
+      TWILIO_ACCOUNT_SID: '   ',
+      TWILIO_AUTH_TOKEN: 'twilio-token',
+      TWILIO_FROM: '+15551234567',
+      DEV_EXPOSE_OTP: 'false',
+    });
+
+    expect(() => service.onModuleInit()).toThrow(
+      'TWILIO_ACCOUNT_SID is required when SMS_PROVIDER=twilio',
+    );
+  });
+
   it('fails fast when Twilio is missing account credentials or sender identity', () => {
     useConfig({
       SMS_PROVIDER: 'twilio',

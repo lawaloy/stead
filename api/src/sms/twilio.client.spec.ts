@@ -7,7 +7,7 @@ jest.mock('https');
 type MockResponse = EventEmitter & { statusCode: number };
 type MockRequestCallback = (response: MockResponse) => void;
 
-describe('TwilioClient transport edges', () => {
+describe('TwilioClient', () => {
   const client = new TwilioClient();
   const originalEnv = {
     TWILIO_ACCOUNT_SID: process.env.TWILIO_ACCOUNT_SID,
@@ -51,6 +51,19 @@ describe('TwilioClient transport edges', () => {
     }
   });
 
+  it('rejects sends when account credentials are missing', async () => {
+    delete process.env.TWILIO_ACCOUNT_SID;
+
+    await expect(
+      client.sendMessage({
+        to: '+15551234567',
+        body: 'OTP 123456',
+        from: '+15557654321',
+      }),
+    ).rejects.toThrow('TWILIO_ACCOUNT_SID is not set');
+    expect(https.request).not.toHaveBeenCalled();
+  });
+
   it('rejects sends when the auth token is missing', async () => {
     delete process.env.TWILIO_AUTH_TOKEN;
 
@@ -86,6 +99,51 @@ describe('TwilioClient transport edges', () => {
         from: '+15557654321',
       }),
     ).resolves.toBe('not-json');
+  });
+
+  it('posts MessagingServiceSid when From is omitted', async () => {
+    const req = mockRequest(201, JSON.stringify({ sid: 'SM123' }));
+
+    await expect(
+      client.sendMessage({
+        to: '+15551234567',
+        body: 'OTP 123456',
+        messagingServiceSid: 'MGxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
+      }),
+    ).resolves.toEqual({ sid: 'SM123' });
+
+    expect(https.request).toHaveBeenCalledWith(
+      expect.objectContaining({
+        method: 'POST',
+        hostname: 'api.twilio.com',
+        path: '/2010-04-01/Accounts/ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx/Messages.json',
+        auth: 'ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx:twilio-token',
+      }),
+      expect.any(Function),
+    );
+    expect(req.write).toHaveBeenCalledWith(
+      expect.stringContaining(
+        'MessagingServiceSid=MGxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
+      ),
+    );
+    expect(req.write).toHaveBeenCalledWith(
+      expect.not.stringContaining('From='),
+    );
+  });
+
+  it('rejects HTTP error responses with the parsed body attached', async () => {
+    mockRequest(400, JSON.stringify({ message: 'invalid to' }));
+
+    await expect(
+      client.sendMessage({
+        to: '+15551234567',
+        body: 'OTP 123456',
+        from: '+15557654321',
+      }),
+    ).rejects.toMatchObject({
+      message: 'Twilio API error 400',
+      response: { message: 'invalid to' },
+    });
   });
 
   it('attaches non-JSON error bodies as the raw response string', async () => {
