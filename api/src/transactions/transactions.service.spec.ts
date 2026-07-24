@@ -230,6 +230,30 @@ describe('TransactionsService', () => {
     expect(prisma.transaction.delete).not.toHaveBeenCalled();
   });
 
+  it('persists empty-string notes on update (unlike create which nulls them)', async () => {
+    prisma.transaction.findFirst.mockResolvedValue({ id: 'tx_1' });
+    prisma.transaction.update.mockResolvedValue({
+      ...transactionRecord,
+      note: '',
+    });
+
+    await expect(
+      service.update('user_1', 'tx_1', { note: '' }),
+    ).resolves.toMatchObject({ note: '' });
+
+    expect(prisma.goal.findFirst).not.toHaveBeenCalled();
+    expect(prisma.transaction.update).toHaveBeenCalledWith({
+      where: { id: 'tx_1' },
+      data: {
+        direction: undefined,
+        amountKobo: undefined,
+        occurredAt: undefined,
+        goalId: undefined,
+        note: '',
+      },
+    });
+  });
+
   it('updates an owned transaction after ownership checks pass', async () => {
     prisma.transaction.findFirst.mockResolvedValue({ id: 'tx_1' });
     prisma.goal.findFirst.mockResolvedValue({ id: 'goal_1' });
@@ -259,6 +283,30 @@ describe('TransactionsService', () => {
         occurredAt: undefined,
         goalId: 'goal_1',
         note: 'corrected note',
+      },
+    });
+  });
+
+  it('unlinks a transaction from its goal when update sets goalId to null', async () => {
+    prisma.transaction.findFirst.mockResolvedValue({ id: 'tx_1' });
+    prisma.transaction.update.mockResolvedValue({
+      ...transactionRecord,
+      goalId: null,
+    });
+
+    await expect(
+      service.update('user_1', 'tx_1', { goalId: null }),
+    ).resolves.toMatchObject({ goalId: null });
+
+    expect(prisma.goal.findFirst).not.toHaveBeenCalled();
+    expect(prisma.transaction.update).toHaveBeenCalledWith({
+      where: { id: 'tx_1' },
+      data: {
+        direction: undefined,
+        amountKobo: undefined,
+        occurredAt: undefined,
+        goalId: null,
+        note: undefined,
       },
     });
   });
