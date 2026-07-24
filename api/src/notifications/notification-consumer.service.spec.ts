@@ -160,9 +160,7 @@ describe('NotificationConsumerService', () => {
 
     await tick();
 
-    expect(logSpy).toHaveBeenCalledWith(
-      expect.stringContaining('phone=1234'),
-    );
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('phone=1234'));
     expect(logSpy).not.toHaveBeenCalledWith(
       expect.stringContaining('phone=1234***'),
     );
