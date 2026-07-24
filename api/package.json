@@ -57,7 +57,7 @@
     "@types/express": "^5.0.0",
     "@types/jest": "^30.0.0",
     "@types/node": "^26.1.1",
-    "@types/supertest": "^7.2.0",
+    "@types/supertest": "^7.2.1",
     "eslint": "^10.6.0",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-prettier": "^5.5.6",
@@ -72,7 +72,7 @@
     "tsconfig-paths": "^4.2.0",
     "@typescript/native": "npm:typescript@~7.0.2",
     "typescript": "~6.0.3",
-    "typescript-eslint": "^8.63.0"
+    "typescript-eslint": "^8.64.0"
   },
   "overrides": {
     "@angular-devkit/core": "21.2.14",
