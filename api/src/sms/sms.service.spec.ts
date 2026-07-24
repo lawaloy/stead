@@ -375,4 +375,70 @@ describe('SmsService', () => {
       channel: 'dnd',
     });
   });
+
+  it('falls back to the Error message when Twilio failures omit response bodies', async () => {
+    useConfig({
+      SMS_PROVIDER: 'twilio',
+      TWILIO_ACCOUNT_SID: 'ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
+      TWILIO_AUTH_TOKEN: 'twilio-token',
+      TWILIO_FROM: '+14155550100',
+      DEV_EXPOSE_OTP: 'false',
+    });
+    process.env.TWILIO_FROM = '+14155550100';
+    twilio.sendMessage.mockRejectedValue(new Error('socket hang up'));
+
+    await expect(
+      service.sendOtp('+14155552671', '654321'),
+    ).rejects.toMatchObject({
+      response: {
+        message: 'Failed to send OTP via Twilio',
+        details: 'socket hang up',
+      },
+      status: HttpStatus.BAD_GATEWAY,
+    });
+  });
+
+  it('maps non-object Twilio failures to Unknown error details', async () => {
+    useConfig({
+      SMS_PROVIDER: 'twilio',
+      TWILIO_ACCOUNT_SID: 'ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
+      TWILIO_AUTH_TOKEN: 'twilio-token',
+      TWILIO_FROM: '+14155550100',
+      DEV_EXPOSE_OTP: 'false',
+    });
+    process.env.TWILIO_FROM = '+14155550100';
+    twilio.sendMessage.mockRejectedValue('transport failed');
+
+    await expect(
+      service.sendOtp('+14155552671', '654321'),
+    ).rejects.toMatchObject({
+      response: {
+        message: 'Failed to send OTP via Twilio',
+        details: 'Unknown error',
+      },
+      status: HttpStatus.BAD_GATEWAY,
+    });
+  });
+
+  it('maps empty-object Twilio failures to Unknown error details', async () => {
+    useConfig({
+      SMS_PROVIDER: 'twilio',
+      TWILIO_ACCOUNT_SID: 'ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
+      TWILIO_AUTH_TOKEN: 'twilio-token',
+      TWILIO_FROM: '+14155550100',
+      DEV_EXPOSE_OTP: 'false',
+    });
+    process.env.TWILIO_FROM = '+14155550100';
+    twilio.sendMessage.mockRejectedValue({});
+
+    await expect(
+      service.sendOtp('+14155552671', '654321'),
+    ).rejects.toMatchObject({
+      response: {
+        message: 'Failed to send OTP via Twilio',
+        details: 'Unknown error',
+      },
+      status: HttpStatus.BAD_GATEWAY,
+    });
+  });
 });
