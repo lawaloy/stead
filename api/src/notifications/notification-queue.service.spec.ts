@@ -292,4 +292,61 @@ describe('NotificationQueueService', () => {
       }),
     ]);
   });
+
+  it('coerces persisted non-otp job types to otp.requested when mapping', async () => {
+    const updatedAt = new Date('2026-01-02T00:00:00.000Z');
+    prisma.notificationJob.findMany.mockResolvedValue([
+      {
+        id: 'job_3',
+        type: 'other.event',
+        payloadJson: JSON.stringify({ phone: '+2348000000002', otp: '111222' }),
+        status: 'pending',
+        attempts: 0,
+        maxAttempts: 3,
+        nextRunAt: updatedAt,
+        lockedAt: null,
+        sentAt: null,
+        failedAt: null,
+        lastError: null,
+        provider: null,
+        providerMessageId: null,
+        createdAt: updatedAt,
+        updatedAt,
+      },
+    ]);
+
+    const jobs = await queue.listRecentJobs();
+
+    expect(prisma.notificationJob.findMany).toHaveBeenCalledWith({
+      orderBy: { updatedAt: 'desc' },
+      take: 20,
+    });
+    expect(jobs).toEqual([
+      expect.objectContaining({
+        id: 'job_3',
+        type: 'otp.requested',
+        payload: { phone: '+2348000000002', otp: '111222' },
+      }),
+    ]);
+  });
+
+  it('omits empty provider metadata when marking a job succeeded', async () => {
+    await queue.markSucceeded('job_1', {
+      provider: '',
+      providerMessageId: '',
+    });
+
+    expect(prisma.notificationJob.update).toHaveBeenCalledWith({
+      where: { id: 'job_1' },
+      data: {
+        status: 'sent',
+        sentAt: expect.any(Date) as unknown,
+        provider: undefined,
+        providerMessageId: undefined,
+        lastError: null,
+        failedAt: null,
+        lockedAt: null,
+      },
+    });
+  });
 });

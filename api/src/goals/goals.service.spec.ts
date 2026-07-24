@@ -90,6 +90,47 @@ describe('GoalsService', () => {
     });
   });
 
+  it('stores null monthly income when create omits monthlyIncomeKobo', async () => {
+    prisma.goal.updateMany.mockResolvedValue({ count: 0 });
+    prisma.goal.create.mockResolvedValue({
+      id: 'goal_2',
+      userId: 'user_1',
+      name: 'Emergency fund',
+      amountTotalKobo: 250_000n,
+      dueDate,
+      monthlyIncomeKobo: null,
+      isActive: true,
+      createdAt,
+    });
+
+    const result = await service.create('user_1', {
+      name: 'Emergency fund',
+      amountTotalKobo: 250_000,
+      dueDate: dueDate.toISOString(),
+    });
+
+    expect(prisma.goal.create).toHaveBeenCalledWith({
+      data: {
+        userId: 'user_1',
+        name: 'Emergency fund',
+        amountTotalKobo: 250_000n,
+        dueDate,
+        monthlyIncomeKobo: null,
+        isActive: true,
+      },
+    });
+    expect(result).toEqual({
+      id: 'goal_2',
+      userId: 'user_1',
+      name: 'Emergency fund',
+      amountTotalKobo: 250_000,
+      dueDate,
+      monthlyIncomeKobo: null,
+      isActive: true,
+      createdAt,
+    });
+  });
+
   it('returns the newest active goal for the user', async () => {
     prisma.goal.findFirst.mockResolvedValue({
       id: 'goal_1',
@@ -139,6 +180,40 @@ describe('GoalsService', () => {
       where: { id: 'goal_2', userId: 'user_1' },
     });
     expect(prisma.goal.update).not.toHaveBeenCalled();
+  });
+
+  it('persists zero monthly income as 0n when update supplies monthlyIncomeKobo: 0', async () => {
+    prisma.goal.findFirst.mockResolvedValue({
+      id: 'goal_1',
+      userId: 'user_1',
+    });
+    prisma.goal.update.mockResolvedValue({
+      id: 'goal_1',
+      userId: 'user_1',
+      name: 'Rent buffer',
+      amountTotalKobo: 500_000n,
+      dueDate,
+      monthlyIncomeKobo: 0n,
+      isActive: true,
+      createdAt,
+    });
+
+    const result = await service.update('user_1', 'goal_1', {
+      monthlyIncomeKobo: 0,
+    });
+
+    expect(prisma.goal.updateMany).not.toHaveBeenCalled();
+    expect(prisma.goal.update).toHaveBeenCalledWith({
+      where: { id: 'goal_1' },
+      data: {
+        name: undefined,
+        amountTotalKobo: undefined,
+        dueDate: undefined,
+        monthlyIncomeKobo: 0n,
+        isActive: undefined,
+      },
+    });
+    expect(result.monthlyIncomeKobo).toBe(0);
   });
 
   it('deactivates sibling goals when an existing goal becomes active', async () => {
