@@ -113,6 +113,31 @@ describe('TransactionsService', () => {
     expect(prisma.transaction.create).not.toHaveBeenCalled();
   });
 
+  it('creates transactions without checking goal ownership when no goal is linked', async () => {
+    const unlinked = { ...transactionRecord, goalId: null, note: null };
+    prisma.transaction.create.mockResolvedValue(unlinked);
+
+    await expect(
+      service.create('user_1', {
+        direction: 'in',
+        amountKobo: 12_500,
+        occurredAt: occurredAt.toISOString(),
+      }),
+    ).resolves.toEqual({ ...unlinked, amountKobo: 12_500 });
+
+    expect(prisma.goal.findFirst).not.toHaveBeenCalled();
+    expect(prisma.transaction.create).toHaveBeenCalledWith({
+      data: {
+        userId: 'user_1',
+        goalId: null,
+        direction: 'in',
+        amountKobo: 12_500n,
+        occurredAt,
+        note: null,
+      },
+    });
+  });
+
   it('lists only transactions belonging to the authenticated user within date filters', async () => {
     prisma.transaction.findMany.mockResolvedValue([transactionRecord]);
 
@@ -129,6 +154,25 @@ describe('TransactionsService', () => {
         occurredAt: {
           gte: new Date('2026-01-01T00:00:00.000Z'),
           lte: new Date('2026-01-31T23:59:59.000Z'),
+        },
+      },
+      orderBy: { occurredAt: 'desc' },
+    });
+  });
+
+  it('lists user transactions without date bounds when filters are omitted', async () => {
+    prisma.transaction.findMany.mockResolvedValue([transactionRecord]);
+
+    await expect(service.list('user_1', {})).resolves.toEqual([
+      { ...transactionRecord, amountKobo: 12_500 },
+    ]);
+
+    expect(prisma.transaction.findMany).toHaveBeenCalledWith({
+      where: {
+        userId: 'user_1',
+        occurredAt: {
+          gte: undefined,
+          lte: undefined,
         },
       },
       orderBy: { occurredAt: 'desc' },
@@ -184,6 +228,52 @@ describe('TransactionsService', () => {
       select: { id: true },
     });
     expect(prisma.transaction.delete).not.toHaveBeenCalled();
+  });
+
+  it('updates an owned transaction after ownership checks pass', async () => {
+    prisma.transaction.findFirst.mockResolvedValue({ id: 'tx_1' });
+    prisma.goal.findFirst.mockResolvedValue({ id: 'goal_1' });
+    prisma.transaction.update.mockResolvedValue({
+      ...transactionRecord,
+      note: 'corrected note',
+      amountKobo: 9_000n,
+    });
+
+    await expect(
+      service.update('user_1', 'tx_1', {
+        amountKobo: 9_000,
+        goalId: 'goal_1',
+        note: 'corrected note',
+      }),
+    ).resolves.toEqual({
+      ...transactionRecord,
+      note: 'corrected note',
+      amountKobo: 9_000,
+    });
+
+    expect(prisma.transaction.update).toHaveBeenCalledWith({
+      where: { id: 'tx_1' },
+      data: {
+        direction: undefined,
+        amountKobo: 9_000n,
+        occurredAt: undefined,
+        goalId: 'goal_1',
+        note: 'corrected note',
+      },
+    });
+  });
+
+  it('deletes an owned transaction after ownership checks pass', async () => {
+    prisma.transaction.findFirst.mockResolvedValue({ id: 'tx_1' });
+    prisma.transaction.delete.mockResolvedValue(transactionRecord);
+
+    await expect(service.remove('user_1', 'tx_1')).resolves.toEqual({
+      ok: true,
+    });
+
+    expect(prisma.transaction.delete).toHaveBeenCalledWith({
+      where: { id: 'tx_1' },
+    });
   });
 
   it('persists empty notes and goal ids as null on create', async () => {
