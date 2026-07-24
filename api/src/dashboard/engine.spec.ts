@@ -106,6 +106,23 @@ describe('computeStability', () => {
     expect(result.status).toBe('critical');
   });
 
+  it('annualizes pace with the 1/30 floor when only one day remains', () => {
+    const result = computeStability({
+      goalTotalKobo: 100_000,
+      goalSavedKobo: 40_000,
+      dueDate: new Date('2026-01-02T00:00:00.000Z'),
+      today,
+      estimatedBalanceKobo: 10_000,
+      monthlyIncomeKobo: 50_000,
+    });
+
+    // daysRemaining=1 → divisor max(1/30, 1/30)=1/30 → ceil(60_000 / (1/30)) = 1_800_000
+    expect(result.daysRemaining).toBe(1);
+    expect(result.remainingObligationKobo).toBe(60_000);
+    expect(result.paceRequiredMonthlyKobo).toBe(1_800_000);
+    expect(result.safeToSpendKobo).toBe(0);
+  });
+
   it('clamps overdue and over-saved goals without creating negative obligations', () => {
     const result = computeStability({
       goalTotalKobo: 10_000,

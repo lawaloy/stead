@@ -249,6 +249,32 @@ describe('SmsService', () => {
     expect(dev.sendMessage).not.toHaveBeenCalled();
   });
 
+  it('sends OTP via Twilio using From when MessagingServiceSid is unset', async () => {
+    useConfig({
+      SMS_PROVIDER: 'twilio',
+      TWILIO_ACCOUNT_SID: 'ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
+      TWILIO_AUTH_TOKEN: 'twilio-token',
+      TWILIO_FROM: '+14155550100',
+      DEV_EXPOSE_OTP: 'false',
+    });
+    process.env.TWILIO_FROM = '+14155550100';
+    twilio.sendMessage.mockResolvedValue({ sid: 'SM456' });
+
+    await expect(service.sendOtp('+14155552671', '654321')).resolves.toEqual({
+      ok: true,
+      provider: 'twilio',
+      response: { sid: 'SM456' },
+    });
+    expect(twilio.sendMessage).toHaveBeenCalledWith({
+      to: '+14155552671',
+      body: 'Your Stead OTP is 654321. It expires in 10 minutes.',
+      from: '+14155550100',
+      messagingServiceSid: undefined,
+    });
+    expect(termii.sendMessage).not.toHaveBeenCalled();
+    expect(dev.sendMessage).not.toHaveBeenCalled();
+  });
+
   it('rejects Twilio OTP sends when neither From nor MessagingServiceSid is set', async () => {
     useConfig({
       SMS_PROVIDER: 'twilio',
