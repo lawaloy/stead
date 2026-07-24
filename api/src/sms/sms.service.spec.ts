@@ -107,6 +107,35 @@ describe('SmsService', () => {
     );
   });
 
+  it('fails fast when Twilio is missing account credentials or sender identity', () => {
+    useConfig({
+      SMS_PROVIDER: 'twilio',
+      DEV_EXPOSE_OTP: 'false',
+    });
+    expect(() => service.onModuleInit()).toThrow(
+      'TWILIO_ACCOUNT_SID is required when SMS_PROVIDER=twilio',
+    );
+
+    useConfig({
+      SMS_PROVIDER: 'twilio',
+      TWILIO_ACCOUNT_SID: 'ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
+      DEV_EXPOSE_OTP: 'false',
+    });
+    expect(() => service.onModuleInit()).toThrow(
+      'TWILIO_AUTH_TOKEN is required when SMS_PROVIDER=twilio',
+    );
+
+    useConfig({
+      SMS_PROVIDER: 'twilio',
+      TWILIO_ACCOUNT_SID: 'ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
+      TWILIO_AUTH_TOKEN: 'twilio-token',
+      DEV_EXPOSE_OTP: 'false',
+    });
+    expect(() => service.onModuleInit()).toThrow(
+      'Set TWILIO_FROM or TWILIO_MESSAGING_SERVICE_SID when SMS_PROVIDER=twilio',
+    );
+  });
+
   it('returns provider inspection without exposing secrets', () => {
     expect(service.getProviderInspection()).toEqual({
       provider: 'termii',
@@ -115,6 +144,27 @@ describe('SmsService', () => {
         apiKeyConfigured: true,
         senderIdConfigured: true,
         channel: 'generic',
+      },
+    });
+  });
+
+  it('reports Twilio inspection flags without leaking secret values', () => {
+    useConfig({
+      SMS_PROVIDER: 'twilio',
+      TWILIO_ACCOUNT_SID: 'ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
+      TWILIO_AUTH_TOKEN: '   ',
+      TWILIO_FROM: '+14155550100',
+      DEV_EXPOSE_OTP: 'false',
+    });
+
+    expect(service.getProviderInspection()).toEqual({
+      provider: 'twilio',
+      ready: true,
+      config: {
+        accountSidConfigured: true,
+        authTokenConfigured: false,
+        fromConfigured: true,
+        messagingServiceSidConfigured: false,
       },
     });
   });

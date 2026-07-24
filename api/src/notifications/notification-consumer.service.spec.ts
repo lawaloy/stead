@@ -81,6 +81,50 @@ describe('NotificationConsumerService', () => {
     expect(queue.markFailed).toHaveBeenCalledWith(job, error);
   });
 
+  it('skips work when no ready job is claimed', async () => {
+    queue.claimReadyJob.mockResolvedValue(null);
+
+    await tick();
+
+    expect(sms.sendOtp).not.toHaveBeenCalled();
+    expect(queue.markSucceeded).not.toHaveBeenCalled();
+    expect(queue.markFailed).not.toHaveBeenCalled();
+  });
+
+  it('marks unsupported job types as failed', async () => {
+    queue.claimReadyJob.mockResolvedValue({
+      ...job,
+      type: 'unknown.event',
+    } as NotificationJob);
+
+    await tick();
+
+    expect(sms.sendOtp).not.toHaveBeenCalled();
+    expect(queue.markSucceeded).not.toHaveBeenCalled();
+    expect(queue.markFailed).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'job_1' }),
+      expect.objectContaining({
+        message: 'Unsupported notification job type',
+      }),
+    );
+  });
+
+  it('records a null provider message id when the sms response has no id', async () => {
+    queue.claimReadyJob.mockResolvedValue(job);
+    sms.sendOtp.mockResolvedValue({
+      ok: true,
+      provider: 'dev',
+      response: { logged: true },
+    });
+
+    await tick();
+
+    expect(queue.markSucceeded).toHaveBeenCalledWith('job_1', {
+      provider: 'dev',
+      providerMessageId: null,
+    });
+  });
+
   it('does not claim another job while a send is in flight', async () => {
     let resolveSend: (value: {
       ok: boolean;
