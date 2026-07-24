@@ -42,6 +42,13 @@ describe('JwtAuthGuard', () => {
     expect(() => guard.canActivate(context)).toThrow(UnauthorizedException);
   });
 
+  it('rejects non-bearer authorization schemes', () => {
+    const token = jwt.sign({ sub: 'user_1', phone: '+2348012345678' }, secret);
+    const { context } = contextFor(`Basic ${token}`);
+
+    expect(() => guard.canActivate(context)).toThrow(UnauthorizedException);
+  });
+
   it('rejects malformed or incorrectly signed tokens', () => {
     const token = jwt.sign({ sub: 'user_1', phone: '+2348012345678' }, 'wrong');
     const { context } = contextFor(`Bearer ${token}`);
@@ -58,6 +65,14 @@ describe('JwtAuthGuard', () => {
 
   it('rejects tokens with an empty phone claim', () => {
     const token = jwt.sign({ sub: 'user_1', phone: '' }, secret);
+
+    const { context } = contextFor(`Bearer ${token}`);
+
+    expect(() => guard.canActivate(context)).toThrow(UnauthorizedException);
+  });
+
+  it('rejects tokens that include phone but omit the subject claim', () => {
+    const token = jwt.sign({ phone: '+2348012345678' }, secret);
 
     const { context } = contextFor(`Bearer ${token}`);
 
