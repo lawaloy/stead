@@ -131,6 +131,83 @@ describe('DashboardService', () => {
     });
   });
 
+  it('passes null monthly income through to goal and stability metrics', async () => {
+    prisma.goal.findFirst.mockResolvedValue({
+      id: 'goal_1',
+      userId: 'user_1',
+      name: 'School fees',
+      amountTotalKobo: 500_000n,
+      dueDate,
+      monthlyIncomeKobo: null,
+      isActive: true,
+      createdAt,
+    });
+    prisma.transaction.findMany.mockResolvedValue([
+      {
+        amountKobo: 150_000n,
+        direction: 'in',
+        goalId: 'goal_1',
+      },
+    ]);
+
+    const result = await service.getStability('user_1');
+
+    expect(result).toMatchObject({
+      ok: true,
+      goal: {
+        id: 'goal_1',
+        monthlyIncomeKobo: null,
+      },
+      metrics: {
+        goalSavedKobo: 150_000,
+        estimatedBalanceKobo: 150_000,
+        status: 'critical',
+      },
+    });
+    if (result.ok) {
+      expect(result.goal.monthlyIncomeKobo).toBeNull();
+    }
+  });
+
+  it('coerces zero monthly income bigint to null for stability scoring', async () => {
+    prisma.goal.findFirst.mockResolvedValue({
+      id: 'goal_1',
+      userId: 'user_1',
+      name: 'School fees',
+      amountTotalKobo: 500_000n,
+      dueDate,
+      monthlyIncomeKobo: 0n,
+      isActive: true,
+      createdAt,
+    });
+    prisma.transaction.findMany.mockResolvedValue([
+      {
+        amountKobo: 150_000n,
+        direction: 'in',
+        goalId: 'goal_1',
+      },
+    ]);
+
+    const withZero = await service.getStability('user_1');
+
+    prisma.goal.findFirst.mockResolvedValue({
+      id: 'goal_1',
+      userId: 'user_1',
+      name: 'School fees',
+      amountTotalKobo: 500_000n,
+      dueDate,
+      monthlyIncomeKobo: null,
+      isActive: true,
+      createdAt,
+    });
+    const withNull = await service.getStability('user_1');
+
+    expect(withZero).toEqual(withNull);
+    if (withZero.ok) {
+      expect(withZero.goal.monthlyIncomeKobo).toBeNull();
+    }
+  });
+
   it('returns zero balance and saved totals when the ledger is empty', async () => {
     prisma.goal.findFirst.mockResolvedValue({
       id: 'goal_1',
