@@ -35,6 +35,11 @@ const auditRemediationPins = [
     lockfilePath: 'node_modules/file-type',
   },
   {
+    packageName: 'find-my-way',
+    version: '9.7.0',
+    lockfilePath: 'node_modules/find-my-way',
+  },
+  {
     packageName: 'js-yaml',
     version: '4.3.0',
     lockfilePath: 'node_modules/js-yaml',
