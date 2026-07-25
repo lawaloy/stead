@@ -55,11 +55,6 @@ const auditRemediationPins = [
     lockfilePath: 'node_modules/handlebars',
   },
   {
-    packageName: '@hono/node-server',
-    version: '2.0.11',
-    lockfilePath: 'node_modules/@hono/node-server',
-  },
-  {
     packageName: 'valibot',
     version: '1.4.2',
     lockfilePath: 'node_modules/valibot',
