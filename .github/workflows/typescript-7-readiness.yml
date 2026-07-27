@@ -1,0 +1,31 @@
+name: TypeScript 7 Readiness
+
+on:
+  schedule:
+    - cron: "0 15 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  api-toolchain:
+    name: API toolchain readiness
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install readiness checker dependency
+        run: npm --prefix "$RUNNER_TEMP/typescript-7-readiness" install semver@latest
+
+      - name: Check TypeScript 7 support
+        env:
+          NODE_PATH: ${{ runner.temp }}/typescript-7-readiness/node_modules
+        run: node .github/scripts/check-typescript-7-readiness.cjs
