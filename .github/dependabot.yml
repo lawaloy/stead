@@ -10,6 +10,13 @@ updates:
     schedule:
       interval: "cron"
       cronjob: "0 13 * * *"
+    # TypeScript 7 is blocked until the API lint/test toolchain supports it.
+    # The typescript-7-readiness workflow checks this weekly so the ignore
+    # can be removed when upstream packages are ready.
+    ignore:
+      - dependency-name: "typescript"
+        update-types:
+          - "version-update:semver-major"
     groups:
       npm-safe:
         patterns:
