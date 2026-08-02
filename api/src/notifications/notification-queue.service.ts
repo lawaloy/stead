@@ -1,16 +1,40 @@
 import { Injectable } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import {
+  createCipheriv,
+  createDecipheriv,
+  createHash,
+  randomBytes,
+} from 'node:crypto';
 import { PrismaService } from '../prisma/prisma.service';
-import { NotificationJob, OtpRequestedPayload } from './notification.types';
+import {
+  NotificationJob,
+  OtpRequestedPayload,
+  RedactedOtpRequestedPayload,
+} from './notification.types';
+
+const JOB_LOCK_TIMEOUT_MS = 5 * 60 * 1000;
+const REDACTED_PAYLOAD_JSON = JSON.stringify({ redacted: true });
+
+type EncryptedPayloadEnvelope = {
+  v: 1;
+  iv: string;
+  authTag: string;
+  ciphertext: string;
+};
 
 @Injectable()
 export class NotificationQueueService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly config: ConfigService,
+  ) {}
 
   async enqueueOtpRequested(payload: OtpRequestedPayload): Promise<string> {
     const job = await this.prisma.notificationJob.create({
       data: {
         type: 'otp.requested',
-        payloadJson: JSON.stringify(payload),
+        payloadJson: this.encryptPayload(payload),
         status: 'pending',
         attempts: 0,
         maxAttempts: 3,
@@ -23,11 +47,21 @@ export class NotificationQueueService {
 
   async claimReadyJob(): Promise<NotificationJob | null> {
     const now = new Date();
+    const staleLockBefore = new Date(now.getTime() - JOB_LOCK_TIMEOUT_MS);
+    const readyWhere = {
+      OR: [
+        {
+          status: 'pending' as const,
+          nextRunAt: { lte: now },
+        },
+        {
+          status: 'processing' as const,
+          OR: [{ lockedAt: null }, { lockedAt: { lte: staleLockBefore } }],
+        },
+      ],
+    };
     const candidate = await this.prisma.notificationJob.findFirst({
-      where: {
-        status: 'pending',
-        nextRunAt: { lte: now },
-      },
+      where: readyWhere,
       orderBy: { createdAt: 'asc' },
     });
 
@@ -36,7 +70,7 @@ export class NotificationQueueService {
     const claimed = await this.prisma.notificationJob.updateMany({
       where: {
         id: candidate.id,
-        status: 'pending',
+        ...readyWhere,
       },
       data: {
         status: 'processing',
@@ -54,12 +88,13 @@ export class NotificationQueueService {
   }
 
   async markSucceeded(
-    jobId: string,
+    job: NotificationJob,
     input?: { provider?: string | null; providerMessageId?: string | null },
   ): Promise<void> {
     await this.prisma.notificationJob.update({
-      where: { id: jobId },
+      where: { id: job.id },
       data: {
+        payloadJson: REDACTED_PAYLOAD_JSON,
         status: 'sent',
         sentAt: new Date(),
         provider: input?.provider || undefined,
@@ -81,6 +116,7 @@ export class NotificationQueueService {
     await this.prisma.notificationJob.update({
       where: { id: job.id },
       data: {
+        payloadJson: terminal ? REDACTED_PAYLOAD_JSON : undefined,
         attempts,
         status: terminal ? 'dead_letter' : 'pending',
         nextRunAt: terminal
@@ -96,6 +132,16 @@ export class NotificationQueueService {
   async getQueueDepth(): Promise<number> {
     return this.prisma.notificationJob.count({
       where: { status: { in: ['pending', 'processing'] } },
+    });
+  }
+
+  async redactTerminalPayloads(): Promise<void> {
+    await this.prisma.notificationJob.updateMany({
+      where: {
+        status: { in: ['sent', 'dead_letter'] },
+        NOT: { payloadJson: REDACTED_PAYLOAD_JSON },
+      },
+      data: { payloadJson: REDACTED_PAYLOAD_JSON },
     });
   }
 
@@ -146,7 +192,7 @@ export class NotificationQueueService {
     return {
       id: job.id,
       type: 'otp.requested',
-      payload: JSON.parse(job.payloadJson) as OtpRequestedPayload,
+      payload: this.decryptPayload(job.payloadJson),
       status: job.status,
       attempts: job.attempts,
       maxAttempts: job.maxAttempts,
@@ -164,5 +210,86 @@ export class NotificationQueueService {
 
   private backoffMs(attempt: number): number {
     return Math.min(30_000, 1_000 * 2 ** attempt);
+  }
+
+  private encryptPayload(payload: OtpRequestedPayload): string {
+    const iv = randomBytes(12);
+    const cipher = createCipheriv('aes-256-gcm', this.encryptionKey(), iv);
+    const ciphertext = Buffer.concat([
+      cipher.update(JSON.stringify(payload), 'utf8'),
+      cipher.final(),
+    ]);
+    const envelope: EncryptedPayloadEnvelope = {
+      v: 1,
+      iv: iv.toString('base64'),
+      authTag: cipher.getAuthTag().toString('base64'),
+      ciphertext: ciphertext.toString('base64'),
+    };
+
+    return JSON.stringify(envelope);
+  }
+
+  private decryptPayload(
+    payloadJson: string,
+  ): OtpRequestedPayload | RedactedOtpRequestedPayload {
+    const stored = JSON.parse(payloadJson) as Record<string, unknown>;
+    if (stored.redacted === true) {
+      return { phone: '<redacted>', redacted: true };
+    }
+
+    if (this.isOtpPayload(stored)) {
+      return stored;
+    }
+
+    if (!this.isEncryptedEnvelope(stored)) {
+      throw new Error('Invalid notification payload');
+    }
+
+    try {
+      const decipher = createDecipheriv(
+        'aes-256-gcm',
+        this.encryptionKey(),
+        Buffer.from(stored.iv, 'base64'),
+      );
+      decipher.setAuthTag(Buffer.from(stored.authTag, 'base64'));
+      const plaintext = Buffer.concat([
+        decipher.update(Buffer.from(stored.ciphertext, 'base64')),
+        decipher.final(),
+      ]).toString('utf8');
+      const payload = JSON.parse(plaintext) as Record<string, unknown>;
+      if (!this.isOtpPayload(payload)) {
+        throw new Error('Invalid decrypted notification payload');
+      }
+      return payload;
+    } catch {
+      throw new Error('Unable to decrypt notification payload');
+    }
+  }
+
+  private encryptionKey(): Buffer {
+    const secret = this.config.get<string>(
+      'NOTIFICATION_PAYLOAD_ENCRYPTION_KEY',
+    );
+    if (!secret) {
+      throw new Error('Notification payload encryption key is not configured');
+    }
+    return createHash('sha256').update(secret, 'utf8').digest();
+  }
+
+  private isOtpPayload(
+    value: Record<string, unknown>,
+  ): value is Record<string, unknown> & OtpRequestedPayload {
+    return typeof value.phone === 'string' && typeof value.otp === 'string';
+  }
+
+  private isEncryptedEnvelope(
+    value: Record<string, unknown>,
+  ): value is Record<string, unknown> & EncryptedPayloadEnvelope {
+    return (
+      value.v === 1 &&
+      typeof value.iv === 'string' &&
+      typeof value.authTag === 'string' &&
+      typeof value.ciphertext === 'string'
+    );
   }
 }

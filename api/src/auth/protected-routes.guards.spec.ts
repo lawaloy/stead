@@ -1,6 +1,7 @@
 import { GUARDS_METADATA } from '@nestjs/common/constants';
 import { AuthController } from './auth.controller';
 import { JwtAuthGuard } from './jwt-auth.guard';
+import { OperatorGuard } from './operator.guard';
 import { DashboardController } from '../dashboard/dashboard.controller';
 import { GoalsController } from '../goals/goals.controller';
 import { NotificationsController } from '../notifications/notifications.controller';
@@ -23,7 +24,10 @@ describe('protected route JwtAuthGuard wiring', () => {
     expect(guardsFor(GoalsController)).toEqual([JwtAuthGuard]);
     expect(guardsFor(TransactionsController)).toEqual([JwtAuthGuard]);
     expect(guardsFor(DashboardController)).toEqual([JwtAuthGuard]);
-    expect(guardsFor(NotificationsController)).toEqual([JwtAuthGuard]);
+    expect(guardsFor(NotificationsController)).toEqual([
+      JwtAuthGuard,
+      OperatorGuard,
+    ]);
   });
 
   it('guards auth inspection while leaving OTP and countries public', () => {
@@ -33,6 +37,7 @@ describe('protected route JwtAuthGuard wiring', () => {
     expect(methodGuards(AuthController.prototype, 'getCountries')).toEqual([]);
     expect(methodGuards(AuthController.prototype, 'getInspection')).toEqual([
       JwtAuthGuard,
+      OperatorGuard,
     ]);
   });
 });

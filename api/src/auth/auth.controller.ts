@@ -11,6 +11,7 @@ import {
 } from '@nestjs/common';
 import type { Request } from 'express';
 import { JwtAuthGuard } from './jwt-auth.guard';
+import { OperatorGuard } from './operator.guard';
 import { AuthTelemetryService } from './auth-telemetry.service';
 import { AuthService } from './auth.service';
 import { RequestOtpDto } from './dto/request-otp.dto';
@@ -46,7 +47,7 @@ export class AuthController {
     });
   }
 
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, OperatorGuard)
   @Get('inspection')
   getInspection(
     @Query('limit', new DefaultValuePipe(10), ParseIntPipe) limit: number,

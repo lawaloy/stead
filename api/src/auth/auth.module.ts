@@ -9,6 +9,7 @@ import { NotificationsModule } from '../notifications/notifications.module';
 import { PrismaModule } from '../prisma/prisma.module';
 import { CountriesModule } from '../countries/countries.module';
 import { JwtAuthGuard } from './jwt-auth.guard';
+import { OperatorGuard } from './operator.guard';
 
 @Module({
   imports: [
@@ -28,7 +29,7 @@ import { JwtAuthGuard } from './jwt-auth.guard';
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, AuthTelemetryService, JwtAuthGuard],
-  exports: [JwtAuthGuard],
+  providers: [AuthService, AuthTelemetryService, JwtAuthGuard, OperatorGuard],
+  exports: [JwtAuthGuard, OperatorGuard],
 })
 export class AuthModule {}

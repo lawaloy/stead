@@ -169,9 +169,9 @@ describe('api client', () => {
   it('maps non-Axios rejections to Unexpected network error', async () => {
     const responseInterceptor = (
       apiClient.interceptors.response as unknown as {
-        handlers: Array<{
+        handlers: {
           rejected?: (error: unknown) => Promise<never>;
-        }>;
+        }[];
       }
     ).handlers.find((handler) => typeof handler?.rejected === 'function');
 

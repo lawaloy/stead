@@ -1,3 +1,4 @@
+import { randomInt } from 'node:crypto';
 import {
   BadRequestException,
   HttpException,
@@ -19,18 +20,16 @@ const DEFAULT_OTP_MAX_VERIFY_ATTEMPTS = 5;
 const DEFAULT_OTP_REQUEST_LIMIT_PER_IP_PER_HOUR = 20;
 const DEFAULT_OTP_VERIFY_FAILURE_LIMIT_PER_IP_WINDOW = 10;
 const DEFAULT_OTP_VERIFY_FAILURE_WINDOW_MS = 15 * 60 * 1000;
+const OTP_LENGTH = 6;
+const OTP_UPPER_BOUND = 10 ** OTP_LENGTH;
 
 type OtpRequestContext = {
   ip?: string;
   userAgent?: string;
 };
 
-function randomOtp(len = 6) {
-  const digits = '0123456789';
-  let out = '';
-  for (let i = 0; i < len; i++)
-    out += digits[Math.floor(Math.random() * digits.length)];
-  return out;
+function generateOtp() {
+  return randomInt(0, OTP_UPPER_BOUND).toString().padStart(OTP_LENGTH, '0');
 }
 
 @Injectable()
@@ -175,7 +174,7 @@ export class AuthService {
       );
     }
 
-    const otp = randomOtp(6);
+    const otp = generateOtp();
     const codeHash = await bcrypt.hash(otp, 10);
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
 

@@ -8,23 +8,25 @@ export class GoalsService {
   constructor(private readonly prisma: PrismaService) {}
 
   async create(userId: string, dto: CreateGoalDto) {
-    await this.prisma.goal.updateMany({
-      where: { userId, isActive: true },
-      data: { isActive: false },
-    });
+    const goal = await this.prisma.$transaction(async (transaction) => {
+      await transaction.goal.updateMany({
+        where: { userId, isActive: true },
+        data: { isActive: false },
+      });
 
-    const goal = await this.prisma.goal.create({
-      data: {
-        userId,
-        name: dto.name,
-        amountTotalKobo: BigInt(dto.amountTotalKobo),
-        dueDate: new Date(dto.dueDate),
-        monthlyIncomeKobo:
-          dto.monthlyIncomeKobo === undefined
-            ? null
-            : BigInt(dto.monthlyIncomeKobo),
-        isActive: true,
-      },
+      return transaction.goal.create({
+        data: {
+          userId,
+          name: dto.name,
+          amountTotalKobo: BigInt(dto.amountTotalKobo),
+          dueDate: new Date(dto.dueDate),
+          monthlyIncomeKobo:
+            dto.monthlyIncomeKobo === undefined
+              ? null
+              : BigInt(dto.monthlyIncomeKobo),
+          isActive: true,
+        },
+      });
     });
 
     return this.serializeGoal(goal);
@@ -41,33 +43,36 @@ export class GoalsService {
   }
 
   async update(userId: string, goalId: string, dto: UpdateGoalDto) {
-    const existing = await this.prisma.goal.findFirst({
-      where: { id: goalId, userId },
-    });
-    if (!existing) throw new NotFoundException('Goal not found');
-
-    if (dto.isActive === true) {
-      await this.prisma.goal.updateMany({
-        where: { userId, isActive: true, id: { not: goalId } },
-        data: { isActive: false },
+    const goal = await this.prisma.$transaction(async (transaction) => {
+      const existing = await transaction.goal.findFirst({
+        where: { id: goalId, userId },
       });
-    }
+      if (!existing) throw new NotFoundException('Goal not found');
 
-    const goal = await this.prisma.goal.update({
-      where: { id: goalId },
-      data: {
-        name: dto.name,
-        amountTotalKobo:
-          dto.amountTotalKobo === undefined
-            ? undefined
-            : BigInt(dto.amountTotalKobo),
-        dueDate: dto.dueDate === undefined ? undefined : new Date(dto.dueDate),
-        monthlyIncomeKobo:
-          dto.monthlyIncomeKobo === undefined
-            ? undefined
-            : BigInt(dto.monthlyIncomeKobo),
-        isActive: dto.isActive,
-      },
+      if (dto.isActive === true) {
+        await transaction.goal.updateMany({
+          where: { userId, isActive: true, id: { not: goalId } },
+          data: { isActive: false },
+        });
+      }
+
+      return transaction.goal.update({
+        where: { id: goalId },
+        data: {
+          name: dto.name,
+          amountTotalKobo:
+            dto.amountTotalKobo === undefined
+              ? undefined
+              : BigInt(dto.amountTotalKobo),
+          dueDate:
+            dto.dueDate === undefined ? undefined : new Date(dto.dueDate),
+          monthlyIncomeKobo:
+            dto.monthlyIncomeKobo === undefined
+              ? undefined
+              : BigInt(dto.monthlyIncomeKobo),
+          isActive: dto.isActive,
+        },
+      });
     });
 
     return this.serializeGoal(goal);

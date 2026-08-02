@@ -11,7 +11,7 @@ import {
   getAuthErrorMessage,
   OTP_RESEND_COOLDOWN_MS,
 } from '../../src/lib/auth-feedback';
-import { resolveOtpToSubmit } from '../../src/lib/otp';
+import { isValidOtp, resolveOtpToSubmit } from '../../src/lib/otp';
 
 export default function VerifyOtpScreen() {
   const [otp, setOtp] = useState('');
@@ -29,12 +29,16 @@ export default function VerifyOtpScreen() {
   } = useAuth();
   const country = getAuthCountry(pendingCountryIso);
 
+  const otpToSubmit = useMemo(
+    () => resolveOtpToSubmit(otp, devOtpHint),
+    [devOtpHint, otp],
+  );
   const validation = useMemo(() => {
-    const otpToSubmit = resolveOtpToSubmit(otp, devOtpHint);
     if (!otpToSubmit) return '';
-    if (!/^\d{6}$/.test(otpToSubmit)) return 'OTP must be 6 digits';
+    if (!isValidOtp(otpToSubmit)) return 'OTP must be 6 digits';
     return '';
-  }, [devOtpHint, otp]);
+  }, [otpToSubmit]);
+  const canVerify = isValidOtp(otpToSubmit);
 
   useEffect(() => {
     if (!pendingOtpRequestedAt) return;
@@ -52,11 +56,7 @@ export default function VerifyOtpScreen() {
 
   const mutation = useMutation({
     mutationFn: async () =>
-      verifyOtp(
-        pendingPhone,
-        pendingCountryIso,
-        resolveOtpToSubmit(otp, devOtpHint),
-      ),
+      verifyOtp(pendingPhone, pendingCountryIso, otpToSubmit),
     retry: false,
     onSuccess: async (data) => {
       await completeAuth(data.token);
@@ -77,8 +77,13 @@ export default function VerifyOtpScreen() {
   if (!pendingPhone) {
     return (
       <ScreenShell title="Verify OTP">
-        <Text style={styles.error}>No phone found. Start from Request OTP.</Text>
-        <Pressable style={styles.button} onPress={() => router.replace('/(auth)/request-otp')}>
+        <Text style={styles.error}>
+          No phone found. Start from Request OTP.
+        </Text>
+        <Pressable
+          style={styles.button}
+          onPress={() => router.replace('/(auth)/request-otp')}
+        >
           <Text style={styles.buttonText}>Go to Request OTP</Text>
         </Pressable>
       </ScreenShell>
@@ -89,7 +94,9 @@ export default function VerifyOtpScreen() {
     <ScreenShell title="Verify OTP">
       <Text style={styles.label}>Code sent to your {country.label} number</Text>
       <Text style={styles.phone}>{pendingPhone}</Text>
-      {devOtpHint ? <Text style={styles.hint}>Dev OTP: {devOtpHint}</Text> : null}
+      {devOtpHint ? (
+        <Text style={styles.hint}>Dev OTP: {devOtpHint}</Text>
+      ) : null}
       <TextInput
         value={otp || devOtpHint || ''}
         onChangeText={setOtp}
@@ -113,8 +120,11 @@ export default function VerifyOtpScreen() {
         <Text style={styles.success}>A fresh code is on the way.</Text>
       ) : null}
       <Pressable
-        style={[styles.button, (!!validation || mutation.isPending) && styles.buttonDisabled]}
-        disabled={!!validation || mutation.isPending}
+        style={[
+          styles.button,
+          (!canVerify || mutation.isPending) && styles.buttonDisabled,
+        ]}
+        disabled={!canVerify || mutation.isPending}
         onPress={() => mutation.mutate()}
       >
         <Text style={styles.buttonText}>
@@ -128,7 +138,9 @@ export default function VerifyOtpScreen() {
             (!canResend || resendMutation.isPending || mutation.isPending) &&
               styles.secondaryButtonDisabled,
           ]}
-          disabled={!canResend || resendMutation.isPending || mutation.isPending}
+          disabled={
+            !canResend || resendMutation.isPending || mutation.isPending
+          }
           onPress={() => resendMutation.mutate()}
         >
           <Text style={styles.secondaryButtonText}>

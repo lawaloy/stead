@@ -17,8 +17,8 @@ describe('TermiiClient', () => {
 
   const mockRequest = (statusCode: number, body: string) => {
     const req: MockRequest = Object.assign(new EventEmitter(), {
-      write: jest.fn<(chunk: string) => void>(),
-      end: jest.fn<() => void>(),
+      write: jest.fn<void, [string]>(),
+      end: jest.fn<void, []>(),
     });
 
     (https.request as jest.Mock).mockImplementation(

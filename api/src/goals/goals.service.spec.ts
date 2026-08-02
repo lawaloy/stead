@@ -6,6 +6,7 @@ import { PrismaService } from '../prisma/prisma.service';
 describe('GoalsService', () => {
   let service: GoalsService;
   let prisma: {
+    $transaction: jest.Mock;
     goal: {
       updateMany: jest.Mock;
       create: jest.Mock;
@@ -19,6 +20,7 @@ describe('GoalsService', () => {
 
   beforeEach(async () => {
     prisma = {
+      $transaction: jest.fn(),
       goal: {
         updateMany: jest.fn(),
         create: jest.fn(),
@@ -26,6 +28,9 @@ describe('GoalsService', () => {
         update: jest.fn(),
       },
     };
+    prisma.$transaction.mockImplementation(
+      (callback: (transaction: typeof prisma) => unknown) => callback(prisma),
+    );
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -68,6 +73,7 @@ describe('GoalsService', () => {
       where: { userId: 'user_1', isActive: true },
       data: { isActive: false },
     });
+    expect(prisma.$transaction).toHaveBeenCalledTimes(1);
     expect(prisma.goal.create).toHaveBeenCalledWith({
       data: {
         userId: 'user_1',
@@ -213,6 +219,7 @@ describe('GoalsService', () => {
       where: { id: 'goal_2', userId: 'user_1' },
     });
     expect(prisma.goal.update).not.toHaveBeenCalled();
+    expect(prisma.$transaction).toHaveBeenCalledTimes(1);
   });
 
   it('persists zero monthly income as 0n when update supplies monthlyIncomeKobo: 0', async () => {
@@ -299,6 +306,7 @@ describe('GoalsService', () => {
       isActive: true,
       createdAt,
     });
+    expect(prisma.$transaction).toHaveBeenCalledTimes(1);
   });
 
   it('does not deactivate sibling goals when the update is not activating', async () => {

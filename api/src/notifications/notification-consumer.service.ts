@@ -21,7 +21,8 @@ export class NotificationConsumerService
     private readonly sms: SmsService,
   ) {}
 
-  onModuleInit() {
+  async onModuleInit() {
+    await this.queue.redactTerminalPayloads();
     this.timer = setInterval(() => {
       void this.tick();
     }, 300);
@@ -43,7 +44,7 @@ export class NotificationConsumerService
     this.isProcessing = true;
     try {
       const result = await this.processJob(job);
-      await this.queue.markSucceeded(job.id, result);
+      await this.queue.markSucceeded(job, result);
       this.logger.log(
         `Notification job sent id=${job.id} type=${job.type} provider=${result.provider ?? 'unknown'} phone=${this.maskPhone(job.payload.phone)}`,
       );
@@ -60,6 +61,9 @@ export class NotificationConsumerService
   private async processJob(job: NotificationJob) {
     switch (job.type) {
       case 'otp.requested': {
+        if ('redacted' in job.payload) {
+          throw new Error('OTP notification payload has been redacted');
+        }
         const result = await this.sms.sendOtp(
           job.payload.phone,
           job.payload.otp,

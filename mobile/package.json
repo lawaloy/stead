@@ -8,7 +8,7 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "lint": "eslint . --ext .js,.jsx,.ts,.tsx",
-    "test": "jest",
+    "test": "node --require ../tools/jest-resolver-fallback.cjs node_modules/jest/bin/jest.js",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "build": "expo export --platform web --output-dir dist"
   },

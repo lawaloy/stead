@@ -85,6 +85,8 @@ npm run start
 - Copy `api/.env.example` to `api/.env`.
 - Copy `mobile/.env.example` to `mobile/.env`.
 - Do not commit secrets.
+- Generate independent random values for `JWT_SECRET` and `NOTIFICATION_PAYLOAD_ENCRYPTION_KEY`; do not use the example placeholders.
+- Leave `AUTH_INSPECTION_OPERATOR_USER_IDS` empty unless specific authenticated user IDs need operator access.
 - Add new required env vars to the matching `.env.example`.
 
 ## Definition of Done

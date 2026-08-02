@@ -7,6 +7,11 @@ export interface OtpRequestedPayload {
   otp: string;
 }
 
+export interface RedactedOtpRequestedPayload {
+  phone: '<redacted>';
+  redacted: true;
+}
+
 export interface NotificationJobBase<TPayload> {
   id: string;
   type: NotificationEventType;
@@ -25,7 +30,9 @@ export interface NotificationJobBase<TPayload> {
   updatedAt: Date;
 }
 
-export type OtpRequestedJob = NotificationJobBase<OtpRequestedPayload> & {
+export type OtpRequestedJob = NotificationJobBase<
+  OtpRequestedPayload | RedactedOtpRequestedPayload
+> & {
   type: 'otp.requested';
 };
 

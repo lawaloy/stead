@@ -10,14 +10,15 @@ export class DevClient {
   private readonly logger = new Logger(DevClient.name);
 
   sendMessage(payload: DevPayload) {
-    // In dev mode we don't call external APIs. Log the message and
-    // return a minimal response that includes the body so callers
-    // can surface the OTP in dev-only contexts if allowed.
-    this.logger.log(`DEV SMS to=${payload.to} body=${payload.body}`);
+    this.logger.log(`DEV SMS accepted to=${this.maskPhone(payload.to)}`);
     return {
       dev: true,
-      logged: true,
-      body: payload.body,
+      accepted: true,
     };
+  }
+
+  private maskPhone(phone: string): string {
+    if (phone.length <= 4) return phone;
+    return `${phone.slice(0, 4)}***${phone.slice(-2)}`;
   }
 }

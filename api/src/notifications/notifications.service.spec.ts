@@ -20,7 +20,7 @@ describe('NotificationsService', () => {
     sms = {
       getProviderInspection: jest.fn(),
     };
-    service = new NotificationsService(queue, sms);
+    service = new NotificationsService(queue as never, sms as never);
   });
 
   it('waits for otp notification jobs to be persisted', async () => {
@@ -44,7 +44,7 @@ describe('NotificationsService', () => {
     ).rejects.toThrow('database down');
   });
 
-  it('returns inspection summary with masked phones', async () => {
+  it('returns inspection summary without sensitive terminal payload data', async () => {
     sms.getProviderInspection.mockReturnValue({
       provider: 'termii',
       ready: true,
@@ -75,8 +75,8 @@ describe('NotificationsService', () => {
         createdAt: new Date('2026-03-29T12:00:00Z'),
         updatedAt: new Date('2026-03-29T12:01:00Z'),
         payload: {
-          phone: '+2348012345678',
-          otp: '123456',
+          phone: '<redacted>',
+          redacted: true,
         },
       },
     ]);
@@ -104,7 +104,7 @@ describe('NotificationsService', () => {
         recent: [
           expect.objectContaining({
             id: 'job_1',
-            payload: { phone: '+234***78' },
+            payload: { phone: '<redacted>' },
           }),
         ],
       },

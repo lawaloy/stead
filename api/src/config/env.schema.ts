@@ -4,6 +4,8 @@ type EnvInput = {
   NODE_ENV?: string;
   SMS_PROVIDER?: string;
   DEV_EXPOSE_OTP?: string;
+  AUTH_INSPECTION_OPERATOR_USER_IDS?: string;
+  NOTIFICATION_PAYLOAD_ENCRYPTION_KEY?: string;
   AUTH_OTP_REQUEST_LIMIT_PER_HOUR?: number;
   AUTH_OTP_REQUEST_LIMIT_PER_IP_PER_HOUR?: number;
   AUTH_OTP_RESEND_COOLDOWN_MS?: number;
@@ -26,6 +28,8 @@ export const envSchema = Joi.object({
   DATABASE_URL: Joi.string().uri().required(),
   JWT_SECRET: Joi.string().min(16).required(),
   JWT_EXPIRES_IN: Joi.string().default('7d'),
+  AUTH_INSPECTION_OPERATOR_USER_IDS: Joi.string().allow('').default(''),
+  NOTIFICATION_PAYLOAD_ENCRYPTION_KEY: Joi.string().min(32).required(),
   AUTH_OTP_REQUEST_LIMIT_PER_HOUR: Joi.number().integer().min(1).default(10),
   AUTH_OTP_REQUEST_LIMIT_PER_IP_PER_HOUR: Joi.number()
     .integer()

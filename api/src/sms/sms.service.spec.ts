@@ -211,8 +211,7 @@ describe('SmsService', () => {
     });
     dev.sendMessage.mockReturnValue({
       dev: true,
-      logged: true,
-      body: 'Your Stead OTP is 123456. It expires in 10 minutes.',
+      accepted: true,
     });
 
     await expect(service.sendOtp('+2348012345678', '123456')).resolves.toEqual({
@@ -220,8 +219,7 @@ describe('SmsService', () => {
       provider: 'dev',
       response: {
         dev: true,
-        logged: true,
-        body: 'Your Stead OTP is 123456. It expires in 10 minutes.',
+        accepted: true,
       },
     });
     expect(dev.sendMessage).toHaveBeenCalledWith({
