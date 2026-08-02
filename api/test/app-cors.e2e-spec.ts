@@ -9,6 +9,9 @@ process.env.DATABASE_URL =
   process.env.DATABASE_URL ||
   'postgresql://stead:stead@localhost:5432/stead?schema=public';
 process.env.JWT_SECRET = process.env.JWT_SECRET || 'stead-test-secret-12345';
+process.env.NOTIFICATION_PAYLOAD_ENCRYPTION_KEY =
+  process.env.NOTIFICATION_PAYLOAD_ENCRYPTION_KEY ||
+  'stead-test-notification-key-1234567890';
 process.env.SMS_PROVIDER = process.env.SMS_PROVIDER || 'dev';
 
 describe('App CORS (e2e)', () => {

@@ -4,6 +4,7 @@ import {
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import type { Request } from 'express';
 import * as jwt from 'jsonwebtoken';
 import type { JwtPayload } from 'jsonwebtoken';
@@ -11,6 +12,8 @@ import type { JwtUser } from './jwt-user.interface';
 
 @Injectable()
 export class JwtAuthGuard implements CanActivate {
+  constructor(private readonly config: ConfigService) {}
+
   canActivate(context: ExecutionContext): boolean {
     const req = context
       .switchToHttp()
@@ -21,7 +24,10 @@ export class JwtAuthGuard implements CanActivate {
     }
 
     const token = authHeader.slice('Bearer '.length);
-    const secret = process.env.JWT_SECRET || 'change_me_now';
+    const secret = this.config.get<string>('JWT_SECRET');
+    if (!secret) {
+      throw new UnauthorizedException('Invalid token');
+    }
 
     try {
       const decoded = jwt.verify(token, secret);

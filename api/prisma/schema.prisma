@@ -1,5 +1,6 @@
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
+  previewFeatures = ["partialIndexes"]
 }
 
 datasource db {
@@ -101,6 +102,8 @@ model Goal {
   createdAt       DateTime      @default(now())
 
   transactions    Transaction[]
+
+  @@unique([userId], map: "Goal_one_active_per_user_idx", where: { isActive: true })
 }
 
 model Transaction {

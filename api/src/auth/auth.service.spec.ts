@@ -119,6 +119,10 @@ describe('AuthService', () => {
     process.env.DEV_EXPOSE_OTP = 'false';
   });
 
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
   it('should be defined', () => {
     expect(service).toBeDefined();
   });
@@ -207,7 +211,10 @@ describe('AuthService', () => {
     );
   });
 
-  it('still enqueues otp notification jobs when exposing dev otps', async () => {
+  it('securely generates and enqueues otp notification jobs', async () => {
+    const insecureRandom = jest.spyOn(Math, 'random').mockImplementation(() => {
+      throw new Error('Math.random must not be used for OTP generation');
+    });
     process.env.DEV_EXPOSE_OTP = 'true';
     prisma.otpCode.count.mockResolvedValue(0);
     prisma.user.upsert.mockResolvedValue({
@@ -230,6 +237,7 @@ describe('AuthService', () => {
       '+2348012345678',
       response.otp,
     );
+    expect(insecureRandom).not.toHaveBeenCalled();
   });
 
   it('rate limits otp requests by ip window', async () => {

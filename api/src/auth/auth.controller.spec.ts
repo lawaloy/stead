@@ -1,5 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { JwtAuthGuard } from './jwt-auth.guard';
+import { OperatorGuard } from './operator.guard';
 import { AuthTelemetryService } from './auth-telemetry.service';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
@@ -37,6 +38,8 @@ describe('AuthController', () => {
       ],
     })
       .overrideGuard(JwtAuthGuard)
+      .useValue({ canActivate: () => true })
+      .overrideGuard(OperatorGuard)
       .useValue({ canActivate: () => true })
       .compile();
 

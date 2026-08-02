@@ -8,6 +8,7 @@ describe('NotificationConsumerService', () => {
     claimReadyJob: jest.Mock;
     markSucceeded: jest.Mock;
     markFailed: jest.Mock;
+    redactTerminalPayloads: jest.Mock;
   };
   let sms: {
     sendOtp: jest.Mock;
@@ -41,11 +42,12 @@ describe('NotificationConsumerService', () => {
       claimReadyJob: jest.fn(),
       markSucceeded: jest.fn(),
       markFailed: jest.fn(),
+      redactTerminalPayloads: jest.fn().mockResolvedValue(undefined),
     };
     sms = {
       sendOtp: jest.fn(),
     };
-    service = new NotificationConsumerService(queue, sms);
+    service = new NotificationConsumerService(queue as never, sms as never);
   });
 
   afterEach(() => {
@@ -63,7 +65,7 @@ describe('NotificationConsumerService', () => {
     await tick();
 
     expect(sms.sendOtp).toHaveBeenCalledWith('+2348012345678', '123456');
-    expect(queue.markSucceeded).toHaveBeenCalledWith('job_1', {
+    expect(queue.markSucceeded).toHaveBeenCalledWith(job, {
       provider: 'twilio',
       providerMessageId: 'SM123',
     });
@@ -114,12 +116,12 @@ describe('NotificationConsumerService', () => {
     sms.sendOtp.mockResolvedValue({
       ok: true,
       provider: 'dev',
-      response: { logged: true },
+      response: { accepted: true },
     });
 
     await tick();
 
-    expect(queue.markSucceeded).toHaveBeenCalledWith('job_1', {
+    expect(queue.markSucceeded).toHaveBeenCalledWith(job, {
       provider: 'dev',
       providerMessageId: null,
     });
@@ -137,7 +139,7 @@ describe('NotificationConsumerService', () => {
 
       await tick();
 
-      expect(queue.markSucceeded).toHaveBeenCalledWith('job_1', {
+      expect(queue.markSucceeded).toHaveBeenCalledWith(job, {
         provider: 'dev',
         providerMessageId: null,
       });
@@ -156,7 +158,7 @@ describe('NotificationConsumerService', () => {
 
       await tick();
 
-      expect(queue.markSucceeded).toHaveBeenCalledWith('job_1', {
+      expect(queue.markSucceeded).toHaveBeenCalledWith(job, {
         provider: 'twilio',
         providerMessageId: null,
       });
@@ -174,7 +176,7 @@ describe('NotificationConsumerService', () => {
     sms.sendOtp.mockResolvedValue({
       ok: true,
       provider: 'dev',
-      response: { logged: true },
+      response: { accepted: true },
     });
 
     await tick();
@@ -226,7 +228,7 @@ describe('NotificationConsumerService', () => {
     });
     await firstTick;
 
-    expect(queue.markSucceeded).toHaveBeenCalledWith('job_1', {
+    expect(queue.markSucceeded).toHaveBeenCalledWith(job, {
       provider: 'termii',
       providerMessageId: 'termii-123',
     });
@@ -236,7 +238,8 @@ describe('NotificationConsumerService', () => {
     jest.useFakeTimers();
     queue.claimReadyJob.mockResolvedValue(null);
 
-    service.onModuleInit();
+    await service.onModuleInit();
+    expect(queue.redactTerminalPayloads).toHaveBeenCalledTimes(1);
     await jest.advanceTimersByTimeAsync(300);
 
     expect(queue.claimReadyJob).toHaveBeenCalledTimes(1);
@@ -246,5 +249,24 @@ describe('NotificationConsumerService', () => {
 
     expect(queue.claimReadyJob).toHaveBeenCalledTimes(1);
     jest.useRealTimers();
+  });
+
+  it('fails closed when a claimed OTP payload was already redacted', async () => {
+    const redactedJob = {
+      ...job,
+      payload: { phone: '<redacted>', redacted: true } as const,
+    };
+    queue.claimReadyJob.mockResolvedValue(redactedJob);
+
+    await tick();
+
+    expect(sms.sendOtp).not.toHaveBeenCalled();
+    expect(queue.markSucceeded).not.toHaveBeenCalled();
+    expect(queue.markFailed).toHaveBeenCalledWith(
+      redactedJob,
+      expect.objectContaining({
+        message: 'OTP notification payload has been redacted',
+      }),
+    );
   });
 });

@@ -1,5 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { OperatorGuard } from '../auth/operator.guard';
 import { NotificationsController } from './notifications.controller';
 import { NotificationsService } from './notifications.service';
 
@@ -20,6 +21,8 @@ describe('NotificationsController', () => {
       ],
     })
       .overrideGuard(JwtAuthGuard)
+      .useValue({ canActivate: jest.fn().mockReturnValue(true) })
+      .overrideGuard(OperatorGuard)
       .useValue({ canActivate: jest.fn().mockReturnValue(true) })
       .compile();
 

@@ -50,7 +50,10 @@ export class NotificationsService {
           createdAt: job.createdAt,
           updatedAt: job.updatedAt,
           payload: {
-            phone: this.maskPhone(job.payload.phone),
+            phone:
+              'redacted' in job.payload
+                ? job.payload.phone
+                : this.maskPhone(job.payload.phone),
           },
         })),
       },

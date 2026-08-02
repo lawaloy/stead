@@ -37,10 +37,6 @@ export class SmsService implements OnModuleInit {
     const body = `Your Stead OTP is ${otp}. It expires in 10 minutes.`;
 
     if (provider === 'dev') {
-      // Dev provider: don't call external APIs. Return a simple
-      // response that includes the message body so the consumer
-      // (and dev-safe inspection endpoints) can surface the OTP
-      // when DEV_EXPOSE_OTP is enabled.
       const response = this.dev.sendMessage({ to, body });
       return { ok: true, provider: 'dev', response };
     }

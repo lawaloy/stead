@@ -12,7 +12,7 @@ export class DashboardService {
       orderBy: { createdAt: 'desc' },
     });
 
-    if (!goal) return { ok: false, message: 'No active goal found' };
+    if (!goal) return { ok: false as const, message: 'No active goal found' };
 
     const transactions = await this.prisma.transaction.findMany({
       where: { userId },
@@ -46,7 +46,7 @@ export class DashboardService {
     });
 
     return {
-      ok: true,
+      ok: true as const,
       goal: {
         id: goal.id,
         name: goal.name,

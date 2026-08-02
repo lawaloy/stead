@@ -5,7 +5,6 @@ import { JwtAuthGuard } from './jwt-auth.guard';
 describe('JwtAuthGuard', () => {
   const secret = 'test_jwt_secret_123';
   let guard: JwtAuthGuard;
-  let previousSecret: string | undefined;
 
   const contextFor = (authorization?: string) => {
     const req: { headers: { authorization?: string }; user?: unknown } = {
@@ -23,17 +22,9 @@ describe('JwtAuthGuard', () => {
   };
 
   beforeEach(() => {
-    previousSecret = process.env.JWT_SECRET;
-    process.env.JWT_SECRET = secret;
-    guard = new JwtAuthGuard();
-  });
-
-  afterEach(() => {
-    if (previousSecret === undefined) {
-      delete process.env.JWT_SECRET;
-    } else {
-      process.env.JWT_SECRET = previousSecret;
-    }
+    guard = new JwtAuthGuard({
+      get: jest.fn().mockReturnValue(secret),
+    } as never);
   });
 
   it('rejects requests without a bearer token', () => {

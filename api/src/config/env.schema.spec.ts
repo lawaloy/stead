@@ -4,6 +4,8 @@ describe('envSchema', () => {
   const requiredEnv = {
     DATABASE_URL: 'postgresql://stead:stead@localhost:5432/stead',
     JWT_SECRET: 'a-secret-with-16-chars',
+    NOTIFICATION_PAYLOAD_ENCRYPTION_KEY:
+      'a-notification-encryption-key-with-32-chars',
   };
 
   it('allows the dev SMS provider without external SMS credentials', () => {
@@ -127,10 +129,24 @@ describe('envSchema', () => {
     const result = envSchema.validate({
       DATABASE_URL: requiredEnv.DATABASE_URL,
       JWT_SECRET: 'too-short',
+      NOTIFICATION_PAYLOAD_ENCRYPTION_KEY:
+        requiredEnv.NOTIFICATION_PAYLOAD_ENCRYPTION_KEY,
       SMS_PROVIDER: 'dev',
     });
 
     expect(result.error?.message).toContain('JWT_SECRET');
+  });
+
+  it('rejects notification encryption keys shorter than 32 characters', () => {
+    const result = envSchema.validate({
+      ...requiredEnv,
+      NOTIFICATION_PAYLOAD_ENCRYPTION_KEY: 'too-short',
+      SMS_PROVIDER: 'dev',
+    });
+
+    expect(result.error?.message).toContain(
+      'NOTIFICATION_PAYLOAD_ENCRYPTION_KEY',
+    );
   });
 
   it('rejects otp abuse-control env values below their minimums', () => {

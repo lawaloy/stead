@@ -49,6 +49,8 @@ docker exec stead_db pg_isready -U stead
 Copy `.env.example` to `.env` in both `api/` and `mobile/`. Key gotchas:
 
 - `JWT_SECRET` must be at least **16 characters**.
+- `NOTIFICATION_PAYLOAD_ENCRYPTION_KEY` must be at least **32 characters** and must not reuse the JWT secret.
+- `AUTH_INSPECTION_OPERATOR_USER_IDS` is a comma-separated allowlist; leaving it empty denies inspection access to everyone.
 - Use `SMS_PROVIDER=dev` locally when testing without Twilio or Termii credentials; this provider is rejected in production.
 - Set `DEV_EXPOSE_OTP=true` in the API environment (or pass it as env var when starting the server) to have the `/auth/request-otp` response include the OTP in plaintext — useful for testing auth flows without an SMS provider.
 

@@ -3,7 +3,6 @@ import * as jwt from 'jsonwebtoken';
 import { JwtAuthGuard } from './jwt-auth.guard';
 
 describe('JwtAuthGuard default secret fallback', () => {
-  let previousSecret: string | undefined;
   let guard: JwtAuthGuard;
 
   const contextFor = (authorization?: string) => {
@@ -22,34 +21,22 @@ describe('JwtAuthGuard default secret fallback', () => {
   };
 
   beforeEach(() => {
-    previousSecret = process.env.JWT_SECRET;
-    delete process.env.JWT_SECRET;
-    guard = new JwtAuthGuard();
+    guard = new JwtAuthGuard({
+      get: jest.fn().mockReturnValue(undefined),
+    } as never);
   });
 
-  afterEach(() => {
-    if (previousSecret === undefined) {
-      delete process.env.JWT_SECRET;
-    } else {
-      process.env.JWT_SECRET = previousSecret;
-    }
-  });
-
-  it('accepts tokens signed with the hard-coded fallback when JWT_SECRET is unset', () => {
+  it('rejects the former hard-coded fallback when JWT_SECRET is unset', () => {
     const token = jwt.sign(
       { sub: 'user_1', phone: '+2348012345678' },
       'change_me_now',
     );
-    const { context, req } = contextFor(`Bearer ${token}`);
+    const { context } = contextFor(`Bearer ${token}`);
 
-    expect(guard.canActivate(context)).toBe(true);
-    expect(req.user).toEqual({
-      userId: 'user_1',
-      phone: '+2348012345678',
-    });
+    expect(() => guard.canActivate(context)).toThrow(UnauthorizedException);
   });
 
-  it('rejects tokens signed with a different secret when JWT_SECRET is unset', () => {
+  it('rejects all signed tokens when JWT_SECRET is unset', () => {
     const token = jwt.sign(
       { sub: 'user_1', phone: '+2348012345678' },
       'some_other_secret',

@@ -2,6 +2,8 @@ import { PrismaService } from '../prisma/prisma.service';
 import { NotificationQueueService } from './notification-queue.service';
 
 describe('NotificationQueueService', () => {
+  const encryptionKey = 'test-notification-encryption-key-1234567890';
+  const redactedPayloadJson = JSON.stringify({ redacted: true });
   let queue: NotificationQueueService;
   let prisma: {
     notificationJob: {
@@ -29,7 +31,12 @@ describe('NotificationQueueService', () => {
         findMany: jest.fn(),
       },
     };
-    queue = new NotificationQueueService(prisma as never as PrismaService);
+    queue = new NotificationQueueService(
+      prisma as never as PrismaService,
+      {
+        get: jest.fn().mockReturnValue(encryptionKey),
+      } as never,
+    );
   });
 
   afterEach(() => {
@@ -37,13 +44,26 @@ describe('NotificationQueueService', () => {
   });
 
   it('enqueues and claims otp job', async () => {
-    prisma.notificationJob.create.mockResolvedValue({ id: 'job_1' });
+    let encryptedPayloadJson = '';
+    prisma.notificationJob.create.mockImplementation(
+      (input: { data: { payloadJson: string } }) => {
+        encryptedPayloadJson = input.data.payloadJson;
+        return Promise.resolve({ id: 'job_1' });
+      },
+    );
     prisma.notificationJob.findFirst.mockResolvedValue({ id: 'job_1' });
     prisma.notificationJob.updateMany.mockResolvedValue({ count: 1 });
+    await queue.enqueueOtpRequested({
+      phone: '+2348000000000',
+      otp: '123456',
+    });
+    expect(encryptedPayloadJson).not.toContain('+2348000000000');
+    expect(encryptedPayloadJson).not.toContain('123456');
+
     prisma.notificationJob.findUniqueOrThrow.mockResolvedValue({
       id: 'job_1',
       type: 'otp.requested',
-      payloadJson: JSON.stringify({ phone: '+2348000000000', otp: '123456' }),
+      payloadJson: encryptedPayloadJson,
       status: 'processing',
       attempts: 0,
       maxAttempts: 3,
@@ -58,12 +78,15 @@ describe('NotificationQueueService', () => {
       updatedAt: new Date(),
     });
 
-    await queue.enqueueOtpRequested({ phone: '+2348000000000', otp: '123456' });
     const job = await queue.claimReadyJob();
 
     expect(job).not.toBeNull();
     expect(job?.type).toBe('otp.requested');
     expect(job?.attempts).toBe(0);
+    expect(job?.payload).toEqual({
+      phone: '+2348000000000',
+      otp: '123456',
+    });
     expect(prisma.notificationJob.create).toHaveBeenCalled();
   });
 
@@ -76,7 +99,19 @@ describe('NotificationQueueService', () => {
     expect(prisma.notificationJob.updateMany).toHaveBeenCalledWith({
       where: {
         id: 'job_1',
-        status: 'pending',
+        OR: [
+          {
+            status: 'pending',
+            nextRunAt: { lte: expect.any(Date) as unknown },
+          },
+          {
+            status: 'processing',
+            OR: [
+              { lockedAt: null },
+              { lockedAt: { lte: expect.any(Date) as unknown } },
+            ],
+          },
+        ],
       },
       data: {
         status: 'processing',
@@ -84,6 +119,53 @@ describe('NotificationQueueService', () => {
       },
     });
     expect(prisma.notificationJob.findUniqueOrThrow).not.toHaveBeenCalled();
+  });
+
+  it('reclaims processing jobs after the lock lease expires', async () => {
+    const now = new Date('2026-01-01T00:10:00.000Z');
+    jest.useFakeTimers().setSystemTime(now);
+    prisma.notificationJob.findFirst.mockResolvedValue({ id: 'job_stale' });
+    prisma.notificationJob.updateMany.mockResolvedValue({ count: 1 });
+    prisma.notificationJob.findUniqueOrThrow.mockResolvedValue({
+      id: 'job_stale',
+      type: 'otp.requested',
+      payloadJson: JSON.stringify({ phone: '+2348000000000', otp: '123456' }),
+      status: 'processing',
+      attempts: 0,
+      maxAttempts: 3,
+      nextRunAt: now,
+      lockedAt: now,
+      sentAt: null,
+      failedAt: null,
+      lastError: null,
+      provider: null,
+      providerMessageId: null,
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    await expect(queue.claimReadyJob()).resolves.toEqual(
+      expect.objectContaining({ id: 'job_stale' }),
+    );
+    expect(prisma.notificationJob.findFirst).toHaveBeenCalledWith({
+      where: {
+        OR: [
+          { status: 'pending', nextRunAt: { lte: now } },
+          {
+            status: 'processing',
+            OR: [
+              { lockedAt: null },
+              {
+                lockedAt: {
+                  lte: new Date('2026-01-01T00:05:00.000Z'),
+                },
+              },
+            ],
+          },
+        ],
+      },
+      orderBy: { createdAt: 'asc' },
+    });
   });
 
   it('returns null without claiming when the queue has no ready jobs', async () => {
@@ -117,6 +199,7 @@ describe('NotificationQueueService', () => {
     expect(prisma.notificationJob.update).toHaveBeenCalledWith({
       where: { id: 'job_1' },
       data: {
+        payloadJson: undefined,
         attempts: 1,
         status: 'pending',
         nextRunAt: new Date('2026-01-01T00:00:02.000Z'),
@@ -146,6 +229,7 @@ describe('NotificationQueueService', () => {
     expect(prisma.notificationJob.update).toHaveBeenCalledWith({
       where: { id: 'job_1' },
       data: {
+        payloadJson: redactedPayloadJson,
         attempts: 3,
         status: 'dead_letter',
         nextRunAt: expect.any(Date) as unknown,
@@ -157,7 +241,7 @@ describe('NotificationQueueService', () => {
   });
 
   it('marks succeeded jobs as sent and clears failure fields', async () => {
-    await queue.markSucceeded('job_1', {
+    await queue.markSucceeded({ id: 'job_1' } as never, {
       provider: 'twilio',
       providerMessageId: 'SM123',
     });
@@ -165,6 +249,7 @@ describe('NotificationQueueService', () => {
     expect(prisma.notificationJob.update).toHaveBeenCalledWith({
       where: { id: 'job_1' },
       data: {
+        payloadJson: redactedPayloadJson,
         status: 'sent',
         sentAt: expect.any(Date) as unknown,
         provider: 'twilio',
@@ -268,7 +353,7 @@ describe('NotificationQueueService', () => {
       {
         id: 'job_2',
         type: 'otp.requested',
-        payloadJson: JSON.stringify({ phone: '+2348000000001', otp: '654321' }),
+        payloadJson: redactedPayloadJson,
         status: 'sent',
         attempts: 1,
         maxAttempts: 3,
@@ -294,7 +379,7 @@ describe('NotificationQueueService', () => {
       expect.objectContaining({
         id: 'job_2',
         type: 'otp.requested',
-        payload: { phone: '+2348000000001', otp: '654321' },
+        payload: { phone: '<redacted>', redacted: true },
         status: 'sent',
         provider: 'termii',
         providerMessageId: 'termii-1',
@@ -340,7 +425,7 @@ describe('NotificationQueueService', () => {
   });
 
   it('omits empty provider metadata when marking a job succeeded', async () => {
-    await queue.markSucceeded('job_1', {
+    await queue.markSucceeded({ id: 'job_1' } as never, {
       provider: '',
       providerMessageId: '',
     });
@@ -348,6 +433,7 @@ describe('NotificationQueueService', () => {
     expect(prisma.notificationJob.update).toHaveBeenCalledWith({
       where: { id: 'job_1' },
       data: {
+        payloadJson: redactedPayloadJson,
         status: 'sent',
         sentAt: expect.any(Date) as unknown,
         provider: undefined,
@@ -356,6 +442,20 @@ describe('NotificationQueueService', () => {
         failedAt: null,
         lockedAt: null,
       },
+    });
+  });
+
+  it('redacts legacy payloads from terminal jobs', async () => {
+    prisma.notificationJob.updateMany.mockResolvedValue({ count: 2 });
+
+    await queue.redactTerminalPayloads();
+
+    expect(prisma.notificationJob.updateMany).toHaveBeenCalledWith({
+      where: {
+        status: { in: ['sent', 'dead_letter'] },
+        NOT: { payloadJson: redactedPayloadJson },
+      },
+      data: { payloadJson: redactedPayloadJson },
     });
   });
 });
