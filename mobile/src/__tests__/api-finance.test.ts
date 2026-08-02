@@ -1,4 +1,4 @@
-import MockAdapter from 'axios-mock-adapter';
+import { createAxiosMock } from './axios-mock';
 import {
   apiClient,
   configureApiAuth,
@@ -13,7 +13,7 @@ jest.mock('../lib/base-url', () => ({
 }));
 
 describe('api finance client', () => {
-  const mock = new MockAdapter(apiClient);
+  const mock = createAxiosMock(apiClient);
 
   const goalResponse = {
     id: 'goal_1',
