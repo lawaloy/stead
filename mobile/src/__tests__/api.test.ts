@@ -1,5 +1,5 @@
-import MockAdapter from 'axios-mock-adapter';
 import { z } from 'zod';
+import { createAxiosMock } from './axios-mock';
 import {
   ApiError,
   apiClient,
@@ -15,7 +15,7 @@ jest.mock('../lib/base-url', () => ({
 }));
 
 describe('api client', () => {
-  const mock = new MockAdapter(apiClient);
+  const mock = createAxiosMock(apiClient);
 
   afterEach(() => {
     mock.reset();
