@@ -44,6 +44,16 @@ Wait for Postgres to accept connections before running migrations:
 docker exec stead_db pg_isready -U stead
 ```
 
+API e2e tests delete their fixtures and must use a dedicated schema. Never run
+them against the development `public` schema. Prepare and run them with:
+
+```powershell
+cd api
+$env:DATABASE_URL = 'postgresql://stead:stead@localhost:5432/stead?schema=e2e'
+npx prisma migrate deploy
+npm run test:e2e -- --runInBand
+```
+
 ### Environment files
 
 Copy `.env.example` to `.env` in both `api/` and `mobile/`. Key gotchas:

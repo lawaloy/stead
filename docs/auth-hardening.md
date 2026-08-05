@@ -15,21 +15,14 @@ Rationale:
 - Operator inspection exists for provider status and recent masked notification jobs.
 - Focused coverage should keep the local OTP path and future live-provider changes from drifting apart.
 
-1. Expand contract and integration coverage around auth plus notification queue.
-   - Confirm request OTP creates an OTP record, auth event, and persisted notification job.
-   - Confirm `DEV_EXPOSE_OTP=true` still exercises the persisted notification job pipeline.
-   - Confirm the consumer can process a job through the SMS abstraction.
-   - Confirm failures retry and eventually dead-letter.
-   - Add focused tests for provider selection, job processing, mobile schema contracts, and non-production guardrails.
-
-2. Run the local OTP flow end to end through the dev provider.
+1. Run the local OTP flow end to end through the dev provider.
    - Start the API with `SMS_PROVIDER=dev` and `DEV_EXPOSE_OTP=true`.
    - Keep `SMS_PROVIDER=dev` limited to non-production environments; startup validation rejects it in production.
    - Request OTP from the mobile app.
    - Verify the OTP, land in the authenticated app flow, and inspect the notification job as `sent`.
    - Confirm token persistence survives an app restart.
 
-3. Prepare for real-provider validation.
+2. Prepare for real-provider validation.
    - Pick the first live provider for the target environment.
    - Configure provider credentials outside source control.
    - Run request OTP -> notification job -> provider delivery -> verify OTP with a real phone number.
@@ -83,4 +76,5 @@ Rationale:
 - Auth events persist resend and verify outcomes for later inspection. Done.
 - Local/dev SMS provider mode exists for queue-backed OTP testing without third-party SMS spend. Done.
 - Notification inspection exposes recent masked jobs, status, provider metadata, and failures. Done.
+- PostgreSQL-backed e2e coverage verifies OTP persistence, dev-provider delivery, verification, retries, and dead-lettering in CI. Done.
 - Remaining work focuses on real-provider validation, stronger device-aware abuse controls, and operator visibility.

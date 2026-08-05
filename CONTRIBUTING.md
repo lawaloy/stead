@@ -58,8 +58,12 @@ gh pr create --title "feat: your change" --body-file .github/pull_request_templa
 
 Local verification (recommended before push):
 
-- API: `npm run lint -- --no-fix`, `npm run test -- --runInBand`, `npm run build`
+- API: `npm run lint -- --no-fix`, `npm run test -- --runInBand`, `npm run test:e2e -- --runInBand`, `npm run build`
 - Mobile: `npm run lint`, `npm run typecheck`, `npm test -- --runInBand`, `npm run build`
+
+API e2e tests require PostgreSQL and a dedicated `e2e` or test schema. The
+test harness refuses to clean the development `public` schema. See the root
+README for the local migration command.
 
 ## Local Setup
 

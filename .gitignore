@@ -62,6 +62,9 @@ pids
 *.seed
 *.pid.lock
 
+# Local database recovery artifacts (may contain sensitive data)
+/recovery/
+
 # Diagnostic reports (https://nodejs.org/api/report.html)
 report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 

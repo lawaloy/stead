@@ -58,11 +58,30 @@ jobs:
   test:
     name: api-test
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: stead
+          POSTGRES_PASSWORD: stead
+          POSTGRES_DB: stead
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U stead -d stead"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     defaults:
       run:
         working-directory: api
     env:
-      DATABASE_URL: postgresql://stead:stead@localhost:5432/stead?schema=public
+      DATABASE_URL: postgresql://stead:stead@localhost:5432/stead?schema=e2e
+      NODE_ENV: test
+      JWT_SECRET: stead-ci-jwt-secret
+      NOTIFICATION_PAYLOAD_ENCRYPTION_KEY: stead-ci-notification-key-1234567890
+      SMS_PROVIDER: dev
+      DEV_EXPOSE_OTP: 'true'
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -83,8 +102,14 @@ jobs:
       - name: Generate Prisma client
         run: npx prisma generate
 
+      - name: Apply database migrations
+        run: npx prisma migrate deploy
+
       - name: Unit tests
         run: npm run test -- --ci --runInBand
+
+      - name: End-to-end tests
+        run: npm run test:e2e -- --ci --runInBand
 
   build:
     runs-on: ubuntu-latest

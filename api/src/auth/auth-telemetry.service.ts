@@ -32,8 +32,8 @@ type CountRecentEventsInput = {
 export class AuthTelemetryService {
   constructor(private readonly prisma: PrismaService) {}
 
-  recordEvent(input: RecordAuthEventInput): void {
-    void this.prisma.authEvent.create({
+  async recordEvent(input: RecordAuthEventInput): Promise<void> {
+    await this.prisma.authEvent.create({
       data: {
         type: input.type,
         phone: input.phone,

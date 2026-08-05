@@ -25,10 +25,10 @@ describe('AuthTelemetryService', () => {
     service = new AuthTelemetryService(prisma as never as PrismaService);
   });
 
-  it('records auth events asynchronously', () => {
+  it('waits for auth events to be persisted', async () => {
     prisma.authEvent.create.mockResolvedValue({ id: 'event_1' });
 
-    service.recordEvent({
+    await service.recordEvent({
       type: 'otp_requested',
       phone: '+2348012345678',
       countryIso: 'NG',
