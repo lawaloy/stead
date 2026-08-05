@@ -1,4 +1,4 @@
-import { IsString, Length, Matches } from 'class-validator';
+import { IsString, Matches } from 'class-validator';
 
 export class VerifyOtpDto {
   @IsString()
@@ -14,6 +14,8 @@ export class VerifyOtpDto {
   phone!: string;
 
   @IsString()
-  @Length(4, 8)
+  @Matches(/^\d{6}$/, {
+    message: 'otp must be a 6-digit code',
+  })
   otp!: string;
 }

@@ -53,24 +53,17 @@ describe('Auth DTOs', () => {
   });
 
   describe('VerifyOtpDto', () => {
-    it('accepts OTP codes between 4 and 8 characters', async () => {
+    it('accepts a 6-digit OTP code', async () => {
       await expect(
         validationErrors(VerifyOtpDto, {
           countryIso: 'NG',
           phone: '+2348012345678',
-          otp: '1234',
-        }),
-      ).resolves.toHaveLength(0);
-      await expect(
-        validationErrors(VerifyOtpDto, {
-          countryIso: 'NG',
-          phone: '+2348012345678',
-          otp: '12345678',
+          otp: '123456',
         }),
       ).resolves.toHaveLength(0);
     });
 
-    it('rejects OTP codes outside the 4–8 length window', async () => {
+    it('rejects OTP codes that are not exactly 6 digits', async () => {
       const tooShort = await validationErrors(VerifyOtpDto, {
         countryIso: 'NG',
         phone: '+2348012345678',

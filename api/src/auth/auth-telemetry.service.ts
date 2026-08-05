@@ -89,12 +89,23 @@ export class AuthTelemetryService {
         attemptNumber: event.attemptNumber ?? null,
         userId: event.userId ?? null,
         otpCodeId: event.otpCodeId ?? null,
-        metadata: event.metadataJson
-          ? (JSON.parse(event.metadataJson) as Record<string, unknown>)
-          : null,
+        metadata: this.parseMetadataJson(event.metadataJson),
         createdAt: event.createdAt,
       })),
     };
+  }
+
+  private parseMetadataJson(
+    metadataJson: string | null,
+  ): Record<string, unknown> | null {
+    if (!metadataJson) {
+      return null;
+    }
+    try {
+      return JSON.parse(metadataJson) as Record<string, unknown>;
+    } catch {
+      return null;
+    }
   }
 
   private maskPhone(phone: string): string {
