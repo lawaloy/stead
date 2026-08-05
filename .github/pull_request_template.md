@@ -5,6 +5,7 @@
 ## Checks
 - [ ] `api`: `npm run build`
 - [ ] `api`: `npm run test -- --ci --runInBand`
+- [ ] `api`: `npm run test:e2e -- --ci --runInBand`
 
 <!-- AUTO:START -->
 ## Auto

@@ -104,7 +104,7 @@ export class AuthService {
         ip: context.ip,
       });
       if (recentByIp >= this.otpRequestLimitPerIpPerHour) {
-        this.telemetry.recordEvent({
+        await this.telemetry.recordEvent({
           type: 'otp_request_rate_limited',
           phone: normalizedPhone,
           countryIso: country.iso,
@@ -130,7 +130,7 @@ export class AuthService {
       },
     });
     if (recent >= this.otpRequestLimitPerHour) {
-      this.telemetry.recordEvent({
+      await this.telemetry.recordEvent({
         type: 'otp_request_rate_limited',
         phone: normalizedPhone,
         countryIso: country.iso,
@@ -158,7 +158,7 @@ export class AuthService {
       orderBy: { createdAt: 'desc' },
     });
     if (latestOtp) {
-      this.telemetry.recordEvent({
+      await this.telemetry.recordEvent({
         type: 'otp_resend_blocked',
         phone: normalizedPhone,
         countryIso: country.iso,
@@ -188,7 +188,7 @@ export class AuthService {
       },
     });
 
-    this.telemetry.recordEvent({
+    await this.telemetry.recordEvent({
       type: 'otp_requested',
       phone: normalizedPhone,
       countryIso: country.iso,
@@ -225,7 +225,7 @@ export class AuthService {
       });
 
       if (recentVerifyFailuresByIp >= this.otpVerifyFailureLimitPerIpWindow) {
-        this.telemetry.recordEvent({
+        await this.telemetry.recordEvent({
           type: 'otp_verify_locked',
           phone: normalizedPhone,
           countryIso: country.iso,
@@ -261,7 +261,7 @@ export class AuthService {
     if (!record) throw new BadRequestException('OTP expired or not found');
 
     if (record.verifyAttempts >= this.otpMaxVerifyAttempts) {
-      this.telemetry.recordEvent({
+      await this.telemetry.recordEvent({
         type: 'otp_verify_locked',
         phone: normalizedPhone,
         countryIso: country.iso,
@@ -293,7 +293,7 @@ export class AuthService {
       });
 
       if (verifyAttempts >= this.otpMaxVerifyAttempts) {
-        this.telemetry.recordEvent({
+        await this.telemetry.recordEvent({
           type: 'otp_verify_locked',
           phone: normalizedPhone,
           countryIso: country.iso,
@@ -310,7 +310,7 @@ export class AuthService {
         );
       }
 
-      this.telemetry.recordEvent({
+      await this.telemetry.recordEvent({
         type: 'otp_verify_failed',
         phone: normalizedPhone,
         countryIso: country.iso,
@@ -335,7 +335,7 @@ export class AuthService {
       throw new BadRequestException('OTP expired or not found');
     }
 
-    this.telemetry.recordEvent({
+    await this.telemetry.recordEvent({
       type: 'otp_verify_succeeded',
       phone: normalizedPhone,
       countryIso: country.iso,

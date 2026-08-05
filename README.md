@@ -54,4 +54,15 @@ npm test -- --runInBand
 npm run build
 ```
 
+The API e2e suite uses PostgreSQL and deletes its own fixtures. It refuses to
+run against the development `public` schema. Before the first local e2e run,
+apply migrations to a dedicated schema and keep that URL set for the test:
+
+```powershell
+cd api
+$env:DATABASE_URL = 'postgresql://stead:stead@localhost:5432/stead?schema=e2e'
+npx prisma migrate deploy
+npm run test:e2e -- --runInBand
+```
+
 For the full vision, product strategy, current implementation, remaining gaps, and architecture see [docs/overview.md](docs/overview.md).
