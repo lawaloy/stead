@@ -1,5 +1,4 @@
 import { createCipheriv, createHash, randomBytes } from 'node:crypto';
-import { PrismaService } from '../prisma/prisma.service';
 import { NotificationQueueService } from './notification-queue.service';
 
 describe('NotificationQueueService decrypt without encryption key', () => {
@@ -72,9 +71,12 @@ describe('NotificationQueueService decrypt without encryption key', () => {
       },
     };
     configGet = jest.fn().mockReturnValue(encryptionKey);
-    queue = new NotificationQueueService(prisma as never, {
-      get: configGet,
-    } as never);
+    queue = new NotificationQueueService(
+      prisma as never,
+      {
+        get: configGet,
+      } as never,
+    );
   });
 
   it('fails closed when claiming an encrypted job after the encryption key is unset', async () => {

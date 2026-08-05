@@ -1,4 +1,3 @@
-import { PrismaService } from '../prisma/prisma.service';
 import { NotificationQueueService } from './notification-queue.service';
 
 describe('NotificationQueueService OTP payload shape edges', () => {
@@ -56,9 +55,12 @@ describe('NotificationQueueService OTP payload shape edges', () => {
     configGet = jest
       .fn()
       .mockReturnValue('test-notification-encryption-key-1234567890');
-    queue = new NotificationQueueService(prisma as never, {
-      get: configGet,
-    } as never);
+    queue = new NotificationQueueService(
+      prisma as never,
+      {
+        get: configGet,
+      } as never,
+    );
   });
 
   it('maps legacy plaintext OTP payloads without requiring an encryption key', async () => {
