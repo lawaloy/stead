@@ -11,9 +11,14 @@ export class PrismaService
     const connectionString =
       process.env.DATABASE_URL ||
       'postgresql://stead:stead@localhost:5432/stead?schema=public';
-    const adapter = new PrismaPg({
-      connectionString,
-    });
+    const schema =
+      new URL(connectionString).searchParams.get('schema') || 'public';
+    const adapter = new PrismaPg(
+      {
+        connectionString,
+      },
+      { schema },
+    );
     const prismaOptions: { adapter: never } = {
       adapter: adapter as never,
     };
