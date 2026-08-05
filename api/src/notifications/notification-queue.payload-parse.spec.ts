@@ -1,4 +1,3 @@
-import { PrismaService } from '../prisma/prisma.service';
 import { NotificationQueueService } from './notification-queue.service';
 
 describe('NotificationQueueService corrupt payloadJson parsing', () => {
@@ -31,7 +30,7 @@ describe('NotificationQueueService corrupt payloadJson parsing', () => {
       },
     };
     queue = new NotificationQueueService(
-      prisma as never as PrismaService,
+      prisma as never,
       {
         get: jest.fn().mockReturnValue(encryptionKey),
       } as never,

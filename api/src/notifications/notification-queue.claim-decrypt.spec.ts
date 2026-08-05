@@ -1,4 +1,3 @@
-import { PrismaService } from '../prisma/prisma.service';
 import { NotificationQueueService } from './notification-queue.service';
 
 describe('NotificationQueueService claim-before-decrypt ordering', () => {
@@ -31,7 +30,7 @@ describe('NotificationQueueService claim-before-decrypt ordering', () => {
       },
     };
     queue = new NotificationQueueService(
-      prisma as never as PrismaService,
+      prisma as never,
       {
         get: jest.fn().mockReturnValue(encryptionKey),
       } as never,
