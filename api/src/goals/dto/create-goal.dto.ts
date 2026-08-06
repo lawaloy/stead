@@ -6,8 +6,9 @@ import {
   MaxLength,
   Min,
 } from 'class-validator';
+import type { CreateGoalRequest } from '../../contracts/generated/types.gen';
 
-export class CreateGoalDto {
+export class CreateGoalDto implements CreateGoalRequest {
   @IsString()
   @MaxLength(100)
   name!: string;

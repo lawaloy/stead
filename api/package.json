@@ -5,9 +5,14 @@
   "author": "",
   "private": true,
   "license": "UNLICENSED",
+  "engines": {
+    "node": "^22.18.0 || ^24.0.0"
+  },
   "scripts": {
     "postinstall": "prisma generate",
     "build": "tsc -p tsconfig.build.json",
+    "contracts:generate": "node scripts/generate-contracts.mjs",
+    "contracts:check": "npm run contracts:generate && git diff --exit-code -- src/contracts/generated ../mobile/src/contracts/generated",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "start": "nest start",
     "start:dev": "nest start --watch",
@@ -50,6 +55,7 @@
   "devDependencies": {
     "@eslint/eslintrc": "^3.3.5",
     "@eslint/js": "^10.0.1",
+    "@hey-api/openapi-ts": "0.99.0",
     "@nestjs/cli": "^11.0.23",
     "@nestjs/schematics": "^11.1.0",
     "@nestjs/testing": "^11.1.28",

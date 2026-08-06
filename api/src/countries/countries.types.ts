@@ -1,10 +1,3 @@
-export type AuthCountryDto = {
-  iso: string;
-  label: string;
-  dialCode: string;
-  currencyCode: string;
-  phoneExample: string;
-  authEnabled: boolean;
-  marketEnabled: boolean;
-  defaultCountry: boolean;
-};
+import type { AuthCountry } from '../contracts/generated/types.gen';
+
+export type AuthCountryDto = AuthCountry;

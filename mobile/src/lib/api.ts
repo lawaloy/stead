@@ -11,6 +11,12 @@ import {
   GoalSchema,
   TransactionSchema,
 } from '../types/api';
+import type {
+  CreateGoalRequest,
+  CreateTransactionRequest,
+  RequestOtpRequest,
+  VerifyOtpRequest,
+} from '../contracts/generated/types.gen';
 
 export { ApiError } from './api-error';
 
@@ -46,9 +52,7 @@ apiClient.interceptors.response.use(
 
     const status = error.response?.status;
     const body = error.response?.data as
-      | { message?: string | string[]; details?: unknown }
-      | string
-      | undefined;
+      { message?: string | string[]; details?: unknown } | string | undefined;
 
     if (status === 401) await onUnauthorizedFn();
 
@@ -78,13 +82,11 @@ export const fetchAuthCountries = async () => {
   return AuthCountriesResponseSchema.parse(response.data);
 };
 
-export const requestOtp = async (
-  phone: string,
-  countryIso: string,
-) => {
+export const requestOtp = async (phone: string, countryIso: string) => {
+  const payload: RequestOtpRequest = { phone, countryIso };
   const response = await apiClient.post(
     appConfig.api.routes.auth.requestOtp,
-    { phone, countryIso },
+    payload,
   );
   return AuthRequestOtpResponseSchema.parse(response.data);
 };
@@ -94,9 +96,10 @@ export const verifyOtp = async (
   countryIso: string,
   otp: string,
 ) => {
+  const payload: VerifyOtpRequest = { phone, countryIso, otp };
   const response = await apiClient.post(
     appConfig.api.routes.auth.verifyOtp,
-    { phone, countryIso, otp },
+    payload,
   );
   return AuthVerifyOtpResponseSchema.parse(response.data);
 };
@@ -106,23 +109,15 @@ export const getActiveGoal = async () => {
   return GoalSchema.parse(response.data);
 };
 
-export const createGoal = async (payload: {
-  name: string;
-  amountTotalKobo: number;
-  dueDate: string;
-  monthlyIncomeKobo?: number;
-}) => {
-  const response = await apiClient.post(appConfig.api.routes.goals.create, payload);
+export const createGoal = async (payload: CreateGoalRequest) => {
+  const response = await apiClient.post(
+    appConfig.api.routes.goals.create,
+    payload,
+  );
   return GoalSchema.parse(response.data);
 };
 
-export const createTransaction = async (payload: {
-  direction: 'in' | 'out';
-  amountKobo: number;
-  occurredAt: string;
-  note?: string;
-  goalId?: string;
-}) => {
+export const createTransaction = async (payload: CreateTransactionRequest) => {
   const response = await apiClient.post(
     appConfig.api.routes.transactions.create,
     payload,
@@ -131,7 +126,9 @@ export const createTransaction = async (payload: {
 };
 
 export const getDashboardStability = async () => {
-  const response = await apiClient.get(appConfig.api.routes.dashboard.stability);
+  const response = await apiClient.get(
+    appConfig.api.routes.dashboard.stability,
+  );
   return DashboardStabilityResponseSchema.parse(response.data);
 };
 

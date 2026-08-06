@@ -8,8 +8,9 @@ import {
   MaxLength,
   Min,
 } from 'class-validator';
+import type { CreateTransactionRequest } from '../../contracts/generated/types.gen';
 
-export class CreateTransactionDto {
+export class CreateTransactionDto implements CreateTransactionRequest {
   @IsIn(['in', 'out'])
   direction!: 'in' | 'out';
 

@@ -3,12 +3,20 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CreateTransactionDto } from './dto/create-transaction.dto';
 import { ListTransactionsQueryDto } from './dto/list-transactions.dto';
 import { UpdateTransactionDto } from './dto/update-transaction.dto';
+import type {
+  OkResponse,
+  Transaction,
+  TransactionDirection,
+} from '../contracts/generated/types.gen';
 
 @Injectable()
 export class TransactionsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async create(userId: string, dto: CreateTransactionDto) {
+  async create(
+    userId: string,
+    dto: CreateTransactionDto,
+  ): Promise<Transaction> {
     if (dto.goalId) await this.ensureGoalBelongsToUser(dto.goalId, userId);
 
     const transaction = await this.prisma.transaction.create({
@@ -25,7 +33,10 @@ export class TransactionsService {
     return this.serializeTransaction(transaction);
   }
 
-  async list(userId: string, query: ListTransactionsQueryDto) {
+  async list(
+    userId: string,
+    query: ListTransactionsQueryDto,
+  ): Promise<Transaction[]> {
     const from = query.from ? new Date(query.from) : undefined;
     const to = query.to ? new Date(query.to) : undefined;
 
@@ -45,7 +56,11 @@ export class TransactionsService {
     );
   }
 
-  async update(userId: string, id: string, dto: UpdateTransactionDto) {
+  async update(
+    userId: string,
+    id: string,
+    dto: UpdateTransactionDto,
+  ): Promise<Transaction> {
     await this.ensureTransactionBelongsToUser(id, userId);
     if (dto.goalId) await this.ensureGoalBelongsToUser(dto.goalId, userId);
 
@@ -65,7 +80,7 @@ export class TransactionsService {
     return this.serializeTransaction(transaction);
   }
 
-  async remove(userId: string, id: string) {
+  async remove(userId: string, id: string): Promise<OkResponse> {
     await this.ensureTransactionBelongsToUser(id, userId);
     await this.prisma.transaction.delete({ where: { id } });
     return { ok: true };
@@ -96,16 +111,24 @@ export class TransactionsService {
     occurredAt: Date;
     note: string | null;
     createdAt: Date;
-  }) {
+  }): Transaction {
+    if (transaction.direction !== 'in' && transaction.direction !== 'out') {
+      throw new Error(
+        `Unsupported transaction direction: ${transaction.direction}`,
+      );
+    }
+
+    const direction: TransactionDirection = transaction.direction;
+
     return {
       id: transaction.id,
       userId: transaction.userId,
       goalId: transaction.goalId,
       amountKobo: Number(transaction.amountKobo),
-      direction: transaction.direction,
-      occurredAt: transaction.occurredAt,
+      direction,
+      occurredAt: transaction.occurredAt.toISOString(),
       note: transaction.note,
-      createdAt: transaction.createdAt,
+      createdAt: transaction.createdAt.toISOString(),
     };
   }
 }

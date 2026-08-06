@@ -56,7 +56,7 @@ describe('api finance client', () => {
       expect(JSON.parse(config.data as string)).toEqual({
         name: 'Rent',
         amountTotalKobo: 120_000_000,
-        dueDate: '2026-12-31',
+        dueDate: '2026-12-31T00:00:00.000Z',
         monthlyIncomeKobo: 30_000_000,
       });
       return [200, goalResponse];
@@ -66,7 +66,7 @@ describe('api finance client', () => {
       createGoal({
         name: 'Rent',
         amountTotalKobo: 120_000_000,
-        dueDate: '2026-12-31',
+        dueDate: '2026-12-31T00:00:00.000Z',
         monthlyIncomeKobo: 30_000_000,
       }),
     ).resolves.toEqual(goalResponse);
