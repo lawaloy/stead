@@ -125,6 +125,13 @@ export class NotificationQueueService {
         failedAt: now,
         lastError: errorMessage,
         lockedAt: null,
+        failureAttempts: {
+          create: {
+            attemptNumber: attempts,
+            terminal,
+            failedAt: now,
+          },
+        },
       },
     });
   }
@@ -172,7 +179,7 @@ export class NotificationQueueService {
       attemptFailuresLast24Hours,
       deadLettersLast24Hours,
       oldestPending,
-      lastFailure,
+      lastFailureAttempt,
     ] = await Promise.all([
       this.prisma.notificationJob.count({
         where: { status: 'pending', attempts: { gt: 0 } },
@@ -183,13 +190,13 @@ export class NotificationQueueService {
           OR: [{ lockedAt: null }, { lockedAt: { lte: staleLockBefore } }],
         },
       }),
-      this.prisma.notificationJob.count({
+      this.prisma.notificationFailureAttempt.count({
         where: { failedAt: { gte: last24Hours } },
       }),
       this.prisma.notificationJob.count({
         where: {
           status: 'dead_letter',
-          updatedAt: { gte: last24Hours },
+          failedAt: { gte: last24Hours },
         },
       }),
       this.prisma.notificationJob.findFirst({
@@ -197,14 +204,12 @@ export class NotificationQueueService {
         orderBy: { nextRunAt: 'asc' },
         select: { id: true, nextRunAt: true, attempts: true },
       }),
-      this.prisma.notificationJob.findFirst({
-        where: { failedAt: { not: null } },
+      this.prisma.notificationFailureAttempt.findFirst({
         orderBy: { failedAt: 'desc' },
         select: {
-          id: true,
-          status: true,
+          notificationJobId: true,
           failedAt: true,
-          lastError: true,
+          notificationJob: { select: { status: true, lastError: true } },
         },
       }),
     ]);
@@ -216,7 +221,14 @@ export class NotificationQueueService {
       attemptFailuresLast24Hours,
       deadLettersLast24Hours,
       oldestPending: oldestPending ?? null,
-      lastFailure: lastFailure ?? null,
+      lastFailure: lastFailureAttempt
+        ? {
+            id: lastFailureAttempt.notificationJobId,
+            status: lastFailureAttempt.notificationJob.status,
+            failedAt: lastFailureAttempt.failedAt,
+            lastError: lastFailureAttempt.notificationJob.lastError,
+          }
+        : null,
     };
   }
 
