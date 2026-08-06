@@ -188,9 +188,12 @@ Completed P0 work:
 P1 delivery status:
 
 1. Authoritative API/mobile contract generation and CI drift enforcement are
-   implemented and under review.
+   implemented and enforced on `main`.
 2. Device-aware OTP controls and stronger auth/notification operator diagnostics
-   are implemented and covered by unit and PostgreSQL-backed e2e tests.
+   are implemented on `main` and covered by unit and PostgreSQL-backed e2e tests.
+3. Identity now publishes OTP delivery through a narrow notification port.
+   [ADR 0002](adr/0002-notification-service-extraction-boundary.md) records the
+   extraction boundary while the durable worker remains in-process.
 
 Real-provider OTP validation remains externally blocked until a paid or
 verified sender account is available. When available, configure credentials

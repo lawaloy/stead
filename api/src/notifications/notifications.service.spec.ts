@@ -3,7 +3,6 @@ import { NotificationsService } from './notifications.service';
 describe('NotificationsService', () => {
   let service: NotificationsService;
   let queue: {
-    enqueueOtpRequested: jest.Mock;
     getStatusSummary: jest.Mock;
     getOperationalHealth: jest.Mock;
     listRecentJobs: jest.Mock;
@@ -14,7 +13,6 @@ describe('NotificationsService', () => {
 
   beforeEach(() => {
     queue = {
-      enqueueOtpRequested: jest.fn(),
       getStatusSummary: jest.fn(),
       getOperationalHealth: jest.fn().mockResolvedValue({
         generatedAt: new Date('2026-08-05T12:00:00Z'),
@@ -31,27 +29,6 @@ describe('NotificationsService', () => {
       getProviderInspection: jest.fn(),
     };
     service = new NotificationsService(queue as never, sms as never);
-  });
-
-  it('waits for otp notification jobs to be persisted', async () => {
-    queue.enqueueOtpRequested.mockResolvedValue('job_1');
-
-    await expect(
-      service.enqueueOtpRequested('+2348012345678', '123456'),
-    ).resolves.toEqual({ ok: true, jobId: 'job_1' });
-
-    expect(queue.enqueueOtpRequested).toHaveBeenCalledWith({
-      phone: '+2348012345678',
-      otp: '123456',
-    });
-  });
-
-  it('surfaces notification job persistence failures', async () => {
-    queue.enqueueOtpRequested.mockRejectedValue(new Error('database down'));
-
-    await expect(
-      service.enqueueOtpRequested('+2348012345678', '123456'),
-    ).rejects.toThrow('database down');
   });
 
   it('returns inspection summary without sensitive terminal payload data', async () => {

@@ -3,7 +3,6 @@ import { NotificationsService } from './notifications.service';
 describe('NotificationsService inspection phone masking', () => {
   let service: NotificationsService;
   let queue: {
-    enqueueOtpRequested: jest.Mock;
     getStatusSummary: jest.Mock;
     getOperationalHealth: jest.Mock;
     listRecentJobs: jest.Mock;
@@ -14,7 +13,6 @@ describe('NotificationsService inspection phone masking', () => {
 
   beforeEach(() => {
     queue = {
-      enqueueOtpRequested: jest.fn(),
       getStatusSummary: jest.fn().mockResolvedValue({}),
       getOperationalHealth: jest.fn().mockResolvedValue({}),
       listRecentJobs: jest.fn(),

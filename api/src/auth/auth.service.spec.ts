@@ -7,7 +7,7 @@ import { BadRequestException, HttpException, HttpStatus } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { AuthTelemetryService } from './auth-telemetry.service';
 import { PrismaService } from '../prisma/prisma.service';
-import { NotificationsService } from '../notifications/notifications.service';
+import { NOTIFICATION_PUBLISHER } from '../notifications/notification-publisher';
 import { CountriesService } from '../countries/countries.service';
 
 describe('AuthService', () => {
@@ -33,7 +33,7 @@ describe('AuthService', () => {
       findUnique: jest.Mock;
     };
   };
-  let notifications: { enqueueOtpRequested: jest.Mock };
+  let notificationPublisher: { publishOtpRequested: jest.Mock };
   let jwt: { signAsync: jest.Mock };
   let telemetry: { recordEvent: jest.Mock; countRecentEvents: jest.Mock };
   let config: { get: jest.Mock };
@@ -53,8 +53,8 @@ describe('AuthService', () => {
         findUnique: jest.fn(),
       },
     };
-    notifications = {
-      enqueueOtpRequested: jest.fn(),
+    notificationPublisher = {
+      publishOtpRequested: jest.fn(),
     };
     jwt = {
       signAsync: jest.fn(),
@@ -94,8 +94,8 @@ describe('AuthService', () => {
           useValue: prisma,
         },
         {
-          provide: NotificationsService,
-          useValue: notifications,
+          provide: NOTIFICATION_PUBLISHER,
+          useValue: notificationPublisher,
         },
         {
           provide: JwtService,
@@ -146,7 +146,7 @@ describe('AuthService', () => {
 
     expect(prisma.otpCode.count).not.toHaveBeenCalled();
     expect(prisma.user.upsert).not.toHaveBeenCalled();
-    expect(notifications.enqueueOtpRequested).not.toHaveBeenCalled();
+    expect(notificationPublisher.publishOtpRequested).not.toHaveBeenCalled();
   });
 
   it('normalizes phone numbers, stores metadata, and enqueues otp', async () => {
@@ -177,10 +177,10 @@ describe('AuthService', () => {
         userAgent: 'jest-agent',
       },
     });
-    expect(notifications.enqueueOtpRequested).toHaveBeenCalledWith(
-      '+2348012345678',
-      expect.any(String),
-    );
+    expect(notificationPublisher.publishOtpRequested).toHaveBeenCalledWith({
+      phone: '+2348012345678',
+      otp: expect.any(String) as unknown,
+    });
     expect(telemetry.recordEvent).toHaveBeenCalledWith(
       expect.objectContaining({
         type: 'otp_requested',
@@ -206,10 +206,10 @@ describe('AuthService', () => {
 
     expect(response).toEqual({ ok: true });
     expect(response).not.toHaveProperty('otp');
-    expect(notifications.enqueueOtpRequested).toHaveBeenCalledWith(
-      '+2348012345678',
-      expect.any(String),
-    );
+    expect(notificationPublisher.publishOtpRequested).toHaveBeenCalledWith({
+      phone: '+2348012345678',
+      otp: expect.any(String) as unknown,
+    });
   });
 
   it('securely generates and enqueues otp notification jobs', async () => {
@@ -234,10 +234,10 @@ describe('AuthService', () => {
       ok: true,
       otp: expect.stringMatching(/^\d{6}$/) as unknown,
     });
-    expect(notifications.enqueueOtpRequested).toHaveBeenCalledWith(
-      '+2348012345678',
-      response.otp,
-    );
+    expect(notificationPublisher.publishOtpRequested).toHaveBeenCalledWith({
+      phone: '+2348012345678',
+      otp: response.otp,
+    });
     expect(insecureRandom).not.toHaveBeenCalled();
   });
 
@@ -331,7 +331,7 @@ describe('AuthService', () => {
     });
     expect(prisma.user.upsert).not.toHaveBeenCalled();
     expect(prisma.otpCode.create).not.toHaveBeenCalled();
-    expect(notifications.enqueueOtpRequested).not.toHaveBeenCalled();
+    expect(notificationPublisher.publishOtpRequested).not.toHaveBeenCalled();
     expect(telemetry.recordEvent).toHaveBeenCalledWith(
       expect.objectContaining({
         type: 'otp_request_rate_limited',
@@ -352,7 +352,7 @@ describe('AuthService', () => {
     } satisfies MockUser);
     prisma.otpCode.findFirst.mockResolvedValue(null);
     prisma.otpCode.create.mockResolvedValue({ id: 'otp_1' });
-    notifications.enqueueOtpRequested.mockRejectedValue(
+    notificationPublisher.publishOtpRequested.mockRejectedValue(
       new Error('queue unavailable'),
     );
 

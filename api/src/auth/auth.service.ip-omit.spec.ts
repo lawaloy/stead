@@ -5,7 +5,7 @@ import * as bcrypt from 'bcrypt';
 import { AuthService } from './auth.service';
 import { AuthTelemetryService } from './auth-telemetry.service';
 import { PrismaService } from '../prisma/prisma.service';
-import { NotificationsService } from '../notifications/notifications.service';
+import { NOTIFICATION_PUBLISHER } from '../notifications/notification-publisher';
 import { CountriesService } from '../countries/countries.service';
 
 describe('AuthService IP omit branches', () => {
@@ -23,7 +23,7 @@ describe('AuthService IP omit branches', () => {
       findUnique: jest.Mock;
     };
   };
-  let notifications: { enqueueOtpRequested: jest.Mock };
+  let notificationPublisher: { publishOtpRequested: jest.Mock };
   let jwt: { signAsync: jest.Mock };
   let telemetry: { recordEvent: jest.Mock; countRecentEvents: jest.Mock };
   let config: { get: jest.Mock };
@@ -43,8 +43,8 @@ describe('AuthService IP omit branches', () => {
         findUnique: jest.fn(),
       },
     };
-    notifications = {
-      enqueueOtpRequested: jest.fn(),
+    notificationPublisher = {
+      publishOtpRequested: jest.fn(),
     };
     jwt = {
       signAsync: jest.fn(),
@@ -80,7 +80,7 @@ describe('AuthService IP omit branches', () => {
       providers: [
         AuthService,
         { provide: PrismaService, useValue: prisma },
-        { provide: NotificationsService, useValue: notifications },
+        { provide: NOTIFICATION_PUBLISHER, useValue: notificationPublisher },
         { provide: JwtService, useValue: jwt },
         { provide: AuthTelemetryService, useValue: telemetry },
         { provide: ConfigService, useValue: config },
@@ -104,10 +104,10 @@ describe('AuthService IP omit branches', () => {
 
     expect(telemetry.countRecentEvents).not.toHaveBeenCalled();
     expect(prisma.otpCode.count).toHaveBeenCalled();
-    expect(notifications.enqueueOtpRequested).toHaveBeenCalledWith(
-      '+2348012345678',
-      expect.any(String),
-    );
+    expect(notificationPublisher.publishOtpRequested).toHaveBeenCalledWith({
+      phone: '+2348012345678',
+      otp: expect.any(String) as unknown,
+    });
     expect(prisma.otpCode.create).toHaveBeenCalledWith({
       data: {
         userId: 'user_1',

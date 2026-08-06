@@ -117,13 +117,23 @@ This sequence is intentional. Stead should prioritize user-facing product surfac
   - Core MVP modules exist in the API.
   - The authoritative OpenAPI contract generates API serializer/DTO types and
     mobile Zod response decoders; CI rejects stale generated output.
+  - Identity publishes OTP delivery through a narrow notification port; the
+    current adapter durably persists encrypted jobs without exposing queue or
+    provider details to the auth module.
   - Notification jobs are already persisted in the database, but the worker still runs in-process.
   - PostgreSQL-backed e2e tests cover OTP persistence, dev delivery, verification, retries, and dead-lettering in CI.
 - Immediate priorities:
-  - P0: complete the local mobile auth acceptance pass and close the blocking Dependency Review gap documented in the overview.
+  - Completed P0: the local mobile auth acceptance pass is recorded and
+    Dependency Review is blocking in the active `main` ruleset.
+  - Completed P1: authoritative API/mobile contract generation and device-aware
+    OTP abuse controls with stronger operator diagnostics.
   - P1: extend contract enforcement to any new mobile-consumed endpoints as
     they are introduced.
-  - P1: record ADRs for contract ownership and the notification-service extraction boundary.
+  - P1: validate real-provider OTP delivery and the operator response playbook
+    when a paid or verified sender account is available.
+  - Next extraction step: define the cross-process command envelope,
+    correlation/idempotency strategy, and queue selection criteria before
+    moving the worker out of the API deployment.
 - Exit criteria:
   - All boundary contracts versioned.
   - CI green for lint/build/test/contracts.
@@ -135,6 +145,9 @@ This sequence is intentional. Stead should prioritize user-facing product surfac
 - Preserve the existing retry/dead-letter semantics while replacing the in-process worker boundary with an independently deployable consumer.
 - Current status:
   - OTP delivery is already behind a notification queue abstraction.
+  - API Core reaches Messaging through the `NotificationPublisher` port;
+    [ADR 0002](adr/0002-notification-service-extraction-boundary.md) defines
+    the logical and future physical extraction boundary.
   - Dead-letter handling and retry policy exist in the database-backed queue.
   - Physical service extraction is not done yet.
 - Exit criteria:

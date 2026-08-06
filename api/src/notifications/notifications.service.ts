@@ -9,14 +9,6 @@ export class NotificationsService {
     private readonly sms: SmsService,
   ) {}
 
-  async enqueueOtpRequested(
-    phone: string,
-    otp: string,
-  ): Promise<{ ok: true; jobId: string }> {
-    const jobId = await this.queue.enqueueOtpRequested({ phone, otp });
-    return { ok: true, jobId };
-  }
-
   async getInspection(limit: number) {
     const boundedLimit = Math.min(Math.max(limit, 1), 50);
     const [summary, health, recentJobs] = await Promise.all([
