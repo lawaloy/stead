@@ -141,6 +141,11 @@ export type ErrorResponse = {
   error?: string;
 };
 
+/**
+ * Optional mobile installation UUID used as an additive abuse-control signal. The API persists only a keyed hash.
+ */
+export type SteadDeviceId = string;
+
 export type ResourceId = string;
 
 export type GetAuthCountriesData = {
@@ -162,6 +167,12 @@ export type GetAuthCountriesResponse =
 
 export type RequestOtpData = {
   body: RequestOtpRequest;
+  headers?: {
+    /**
+     * Optional mobile installation UUID used as an additive abuse-control signal. The API persists only a keyed hash.
+     */
+    'X-Stead-Device-Id'?: string;
+  };
   path?: never;
   query?: never;
   url: '/auth/request-otp';
@@ -192,6 +203,12 @@ export type RequestOtpResponse2 =
 
 export type VerifyOtpData = {
   body: VerifyOtpRequest;
+  headers?: {
+    /**
+     * Optional mobile installation UUID used as an additive abuse-control signal. The API persists only a keyed hash.
+     */
+    'X-Stead-Device-Id'?: string;
+  };
   path?: never;
   query?: never;
   url: '/auth/verify-otp';

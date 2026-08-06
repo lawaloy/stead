@@ -141,6 +141,15 @@ export const zErrorResponse = z.object({
   error: z.string().optional(),
 });
 
+/**
+ * Optional mobile installation UUID used as an additive abuse-control signal. The API persists only a keyed hash.
+ */
+export const zSteadDeviceId = z
+  .uuid()
+  .regex(
+    /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$/,
+  );
+
 export const zResourceId = z.string().min(1);
 
 /**
@@ -150,12 +159,30 @@ export const zGetAuthCountriesResponse = zAuthCountriesResponse;
 
 export const zRequestOtpBody = zRequestOtpRequest;
 
+export const zRequestOtpHeaders = z.object({
+  'X-Stead-Device-Id': z
+    .uuid()
+    .regex(
+      /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$/,
+    )
+    .optional(),
+});
+
 /**
  * OTP accepted for queue-backed delivery.
  */
 export const zRequestOtpResponse2 = zRequestOtpResponse;
 
 export const zVerifyOtpBody = zVerifyOtpRequest;
+
+export const zVerifyOtpHeaders = z.object({
+  'X-Stead-Device-Id': z
+    .uuid()
+    .regex(
+      /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$/,
+    )
+    .optional(),
+});
 
 /**
  * OTP verified and JWT issued.

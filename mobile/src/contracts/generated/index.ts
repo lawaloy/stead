@@ -55,6 +55,7 @@ export type {
   RequestOtpResponse2,
   RequestOtpResponses,
   ResourceId,
+  SteadDeviceId,
   Transaction,
   TransactionDirection,
   UpdateGoalData,

@@ -19,6 +19,8 @@ paths:
   /auth/request-otp:
     post:
       operationId: requestOtp
+      parameters:
+        - $ref: '#/components/parameters/SteadDeviceId'
       requestBody:
         required: true
         content:
@@ -39,6 +41,8 @@ paths:
   /auth/verify-otp:
     post:
       operationId: verifyOtp
+      parameters:
+        - $ref: '#/components/parameters/SteadDeviceId'
       requestBody:
         required: true
         content:
@@ -236,6 +240,15 @@ components:
       scheme: bearer
       bearerFormat: JWT
   parameters:
+    SteadDeviceId:
+      name: X-Stead-Device-Id
+      in: header
+      required: false
+      description: Optional mobile installation UUID used as an additive abuse-control signal. The API persists only a keyed hash.
+      schema:
+        type: string
+        format: uuid
+        pattern: '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$'
     ResourceId:
       name: id
       in: path
