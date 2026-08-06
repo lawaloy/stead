@@ -18,6 +18,10 @@ Quick links
 - API: [api/](api/)
 - Mobile: [mobile/](mobile/)
 
+Prerequisites: Node.js 22.18+ on the 22.x line or Node.js 24.x, plus Docker
+for the local PostgreSQL database. Both npm projects enforce the supported
+Node.js range during dependency installation.
+
 Get started
 
 API (from `api/`):

@@ -29,7 +29,7 @@ Fill in **What + Why** before the next push. Details: [CONTRIBUTING.md](CONTRIBU
 
 ### Prerequisites
 
-- **Node.js 22+** (required by TypeScript ~6.0)
+- **Node.js 22.18+ (22.x) or 24.x** (required by the contract generator and TypeScript ~6.0)
 - **Docker** (required for PostgreSQL via `api/docker-compose.yml`)
 
 ### Starting the database
