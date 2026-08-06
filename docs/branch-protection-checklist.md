@@ -2,30 +2,61 @@
 
 Target branch: `main`
 
-## Required Settings
-- [ ] Require a pull request before merging
-- [ ] Require at least 1 approving review
+Last verified: 2026-08-05 through the GitHub repository ruleset API.
+
+`main` is governed by the active `Stead Rules` repository ruleset. GitHub's
+classic branch-protection endpoint reports no classic protection, so the
+ruleset—not the classic protection page—is the source of truth for this
+checklist.
+
+## Current Ruleset
+
+- [x] Require a pull request before merging
+- [ ] Require at least 1 approving review — currently `0`
 - [ ] Dismiss stale approvals when new commits are pushed
-- [ ] Require status checks to pass before merging
-- [ ] Require branches to be up to date before merging
+- [x] Require status checks to pass before merging
+- [x] Require branches to be up to date before merging
 - [ ] Require conversation resolution before merging
-- [ ] Restrict who can push directly to `main`
-- [ ] Include administrators (recommended)
-- [ ] Allow only squash merge
+- [x] Restrict direct pushes to `main` — bypass actors can bypass only through a pull request, not by pushing directly
+- [ ] Apply the pull-request requirement without an administrator bypass
+- [ ] Allow only squash merge — merge, squash, and rebase are currently allowed
+
+The ruleset also blocks branch deletion and non-fast-forward updates, requires
+CodeQL findings to stay below the configured threshold, and enables Copilot
+code review on pushes.
 
 ## Required Status Checks
-- [ ] `ci / lint`
-- [ ] `ci / api-test`
-- [ ] `ci / build`
-- [ ] `mobile-ci / mobile-test`
-- [ ] `Dependency review / dependency-review`
-- [ ] `CodeQL Advanced / Analyze (javascript-typescript)`
 
-Note: `Dependency review` is currently configured with `continue-on-error: true`; remove that if it should block merges.
+These are the exact contexts stored in the active ruleset:
+
+- [x] `lint`
+- [x] `api-test` — includes API unit and PostgreSQL-backed e2e tests
+- [x] `build`
+- [x] `mobile-test` — includes mobile typecheck and unit tests
+- [x] `CodeQL`
+- [ ] `dependency-review`
+
+The Dependency Review workflow is not required and its scan step currently has
+`continue-on-error: true`, so a critical runtime dependency finding cannot
+block a merge.
+
+## Urgent Follow-up
+
+1. Remove `continue-on-error: true` from Dependency Review and add its actual
+   successful check context to the ruleset.
+2. If more than one reviewer is available, require one approval, dismiss stale
+   approvals, and require conversation resolution.
+3. Decide whether squash is the only supported merge strategy and configure
+   the ruleset to match `CONTRIBUTING.md`.
+4. Review the repository-role bypass actors and retain only intentional
+   emergency access.
+5. Re-run this audit after each ruleset change and update the verification date.
 
 ## Merge Queue (Optional)
-- [ ] Enable merge queue for high-traffic repos
+
+- [ ] Enable merge queue if repository traffic makes serialized merging useful
 
 ## Release Hygiene
-- [ ] Protect tags pattern `v*`
-- [ ] Use semantic versioning per release
+
+- [ ] Protect tags matching `v*`
+- [ ] Use semantic versioning for releases

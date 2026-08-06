@@ -37,8 +37,14 @@ Use the repo template format (see [`.github/pull_request_template.md`](.github/p
 - Why this change exists (at least one bullet)
 
 ## Checks
+- [ ] `api`: `npm run lint -- --no-fix`
 - [ ] `api`: `npm run build`
 - [ ] `api`: `npm run test -- --ci --runInBand`
+- [ ] `api`: `npm run test:e2e -- --ci --runInBand`
+- [ ] `mobile`: `npm run lint`
+- [ ] `mobile`: `npm run typecheck`
+- [ ] `mobile`: `npm test -- --runInBand`
+- [ ] `mobile`: `npm run build`
 
 <!-- AUTO:START -->
 <!-- AUTO:END -->

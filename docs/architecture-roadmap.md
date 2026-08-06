@@ -94,13 +94,18 @@ This sequence is intentional. Stead should prioritize user-facing product surfac
 
 ## Delivery Roadmap
 ### Stage 1: Harden Modular Monolith (now -> short term)
-- Lock module boundaries in API (`auth`, `goals`, `transactions`, `dashboard`, `sms`).
+- Lock module boundaries in API (`auth`, `countries`, `goals`, `transactions`, `dashboard`, `notifications`, and provider-specific `sms`).
 - Enforce contract tests between API responses and mobile schema decoders.
 - Add architecture decision records (ADRs) for key boundary choices.
 - Current status:
   - Core MVP modules exist in the API.
-  - Mobile Zod schemas parse current API responses.
+  - Mobile Zod schemas parse current API responses, but their shape tests use hand-authored fixtures and do not detect independent API serializer drift.
   - Notification jobs are already persisted in the database, but the worker still runs in-process.
+  - PostgreSQL-backed e2e tests cover OTP persistence, dev delivery, verification, retries, and dead-lettering in CI.
+- Immediate priorities:
+  - P0: complete the local mobile auth acceptance pass and close the blocking Dependency Review gap documented in the overview.
+  - P1: establish one authoritative API/mobile contract and enforce compatibility in CI.
+  - P1: record ADRs for contract ownership and the notification-service extraction boundary.
 - Exit criteria:
   - All boundary contracts versioned.
   - CI green for lint/build/test/contracts.
@@ -108,7 +113,7 @@ This sequence is intentional. Stead should prioritize user-facing product surfac
 ### Stage 2: Extract Notification Service (short -> mid term)
 - Move SMS/alerts logic behind event consumer.
 - Keep OTP API surface unchanged from mobile perspective.
-- Add queue with dead-letter handling and retry policy.
+- Preserve the existing retry/dead-letter semantics while replacing the in-process worker boundary with an independently deployable consumer.
 - Current status:
   - OTP delivery is already behind a notification queue abstraction.
   - Dead-letter handling and retry policy exist in the database-backed queue.
