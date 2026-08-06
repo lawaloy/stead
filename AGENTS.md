@@ -47,7 +47,9 @@ docker exec stead_db pg_isready -U stead
 ```
 
 API e2e tests delete their fixtures and must use a dedicated schema. Never run
-them against the development `public` schema. Prepare and run them with:
+them against the development `public` schema. The test harness defaults to the
+local `e2e` schema. Prepare it before the first run and whenever migrations
+change:
 
 ```powershell
 cd api
@@ -55,6 +57,9 @@ $env:DATABASE_URL = 'postgresql://stead:stead@localhost:5432/stead?schema=e2e'
 npx prisma migrate deploy
 npm run test:e2e -- --runInBand
 ```
+
+The schema persists in the Docker volume, so unchanged test runs do not need a
+fresh migration.
 
 ### Environment files
 

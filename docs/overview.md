@@ -166,32 +166,37 @@ Mobile API responses are parsed with Zod schemas before the UI consumes them.
 
 ## 6. Remaining Gaps
 
-The codebase has the MVP flow in place, but production readiness still depends on operational validation:
+The MVP flow is implemented, and the server-side OTP notification pipeline now
+has PostgreSQL-backed e2e coverage in CI. Production readiness still depends on
+work at the client, repository-policy, and external-provider boundaries.
 
-- Next planned work: complete the numbered items in [Next Work Queue](#61-next-work-queue), removing each item from this document as it is completed.
-- Configure a real SMS provider in the target environment.
-- Run an end-to-end OTP request and verify pass with a real phone number.
-- Validate mobile token persistence and session expiry behavior against a real API environment.
-- Add stronger device-aware abuse controls beyond the current phone and IP limits.
-- Expand operator-facing visibility around repeated auth failures, lockouts, and dead-letter notification jobs.
-- Add broader contract enforcement between the API response shapes and the mobile Zod schemas.
-- Weekly readiness updates and risk warning alerts are still roadmap items; the current notification pipeline is used for OTP delivery.
+### 6.1 Active Milestone: Production-readiness validation
 
-### 6.1 Next Work Queue
+P0 work, in order:
 
-Real-provider OTP validation is intentionally deferred until a paid or verified SMS provider account is ready. Local/dev SMS mode and notification job inspection now exist, so the next implementation items are focused on validation depth and production debugging readiness.
+1. Complete the local mobile auth acceptance pass documented in
+   [Auth Hardening](auth-hardening.md#p0-local-mobile-auth-acceptance-pass).
+   This is the next engineering task because the API pipeline is automated, but
+   the mobile request, verification, authenticated routing, and restart behavior
+   have not been validated together.
+2. Make Dependency Review a blocking check and add it to the active `main`
+   ruleset. The workflow currently uses `continue-on-error: true`; see the
+   [Branch Protection Checklist](branch-protection-checklist.md).
 
-1. Run the local OTP flow end to end through the dev provider.
-   - Start the API with `SMS_PROVIDER=dev` and `DEV_EXPOSE_OTP=true`.
-   - Keep `SMS_PROVIDER=dev` limited to non-production environments; startup validation rejects it in production.
-   - Request OTP from the mobile app.
-   - Verify the OTP, land in the authenticated app flow, and inspect the notification job as `sent`.
-   - Confirm token persistence survives an app restart.
+P1 work:
 
-2. Prepare for real-provider validation.
-   - Pick the first live provider for the target environment.
-   - Configure provider credentials outside source control.
-   - Run request OTP -> notification job -> provider delivery -> verify OTP with a real phone number.
-   - Capture the operator playbook for diagnosing send failures and dead-letter jobs.
+1. Enforce API/mobile response contracts from one authoritative source. The
+   current mobile schema tests use hand-authored fixtures and cannot detect an
+   API serializer drifting independently.
+2. Add stronger device-aware abuse controls beyond the current phone and IP
+   limits.
+3. Expand operator-facing visibility around repeated auth failures, lockouts,
+   and dead-letter notification jobs.
 
-Once these are done, the next validation target is request OTP -> notification job -> verify OTP -> authenticated mobile session against a real provider-backed environment.
+Real-provider OTP validation remains externally blocked until a paid or
+verified sender account is available. When available, configure credentials
+outside source control, run a real-phone request and verify pass, and capture
+the operator failure-response playbook.
+
+Weekly readiness updates and risk warning alerts remain later roadmap items;
+the current notification pipeline is used for OTP delivery.

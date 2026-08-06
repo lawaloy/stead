@@ -6,11 +6,14 @@ Current repo status:
 
 - API: NestJS, Prisma, Postgres, JWT auth, OTP over SMS, goals, manual transactions, stability dashboard, and persisted notification jobs.
 - Mobile: Expo Router app with OTP login, token persistence, active goal setup, manual transaction entry, and stability dashboard screens.
-- CI: API/mobile lint, API tests, API/mobile builds, mobile typecheck/tests, Dependency Review, and CodeQL workflows are present.
+- CI: API/mobile lint, API unit and PostgreSQL-backed e2e tests, API/mobile builds, mobile typecheck/tests, an advisory Dependency Review workflow, and CodeQL are present.
 
 Quick links
 
 - Overview: [docs/overview.md](docs/overview.md)
+- Active architecture milestone: [docs/architecture-roadmap.md](docs/architecture-roadmap.md#delivery-roadmap)
+- Auth readiness work: [docs/auth-hardening.md](docs/auth-hardening.md)
+- Repository rules audit: [docs/branch-protection-checklist.md](docs/branch-protection-checklist.md)
 - Contributing: [CONTRIBUTING.md](CONTRIBUTING.md)
 - API: [api/](api/)
 - Mobile: [mobile/](mobile/)
@@ -55,8 +58,10 @@ npm run build
 ```
 
 The API e2e suite uses PostgreSQL and deletes its own fixtures. It refuses to
-run against the development `public` schema. Before the first local e2e run,
-apply migrations to a dedicated schema and keep that URL set for the test:
+run against the development `public` schema. The test harness defaults to the
+local `e2e` schema and also accepts an `E2E_DATABASE_URL` override. Before the
+first local e2e run, and whenever migrations change, apply migrations to the
+dedicated schema:
 
 ```powershell
 cd api
@@ -64,5 +69,8 @@ $env:DATABASE_URL = 'postgresql://stead:stead@localhost:5432/stead?schema=e2e'
 npx prisma migrate deploy
 npm run test:e2e -- --runInBand
 ```
+
+The database and schema persist in the Docker volume, so this migration step
+does not need to be repeated before every unchanged test run.
 
 For the full vision, product strategy, current implementation, remaining gaps, and architecture see [docs/overview.md](docs/overview.md).
