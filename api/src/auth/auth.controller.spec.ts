@@ -54,7 +54,11 @@ describe('AuthController', () => {
   it('passes request metadata when requesting otp', () => {
     const req = {
       ip: '127.0.0.1',
-      get: jest.fn().mockReturnValue('jest-agent'),
+      get: jest.fn((header: string) =>
+        header === 'user-agent'
+          ? 'jest-agent'
+          : '0f81c2a7-1e6d-4f05-9a1c-03de8a5f6b77',
+      ),
     };
 
     void controller.requestOtp(
@@ -65,13 +69,18 @@ describe('AuthController', () => {
     expect(authService.requestOtp).toHaveBeenCalledWith('08012345678', 'NG', {
       ip: '127.0.0.1',
       userAgent: 'jest-agent',
+      deviceId: '0f81c2a7-1e6d-4f05-9a1c-03de8a5f6b77',
     });
   });
 
   it('passes request metadata when verifying otp', () => {
     const req = {
       ip: '127.0.0.1',
-      get: jest.fn().mockReturnValue('jest-agent'),
+      get: jest.fn((header: string) =>
+        header === 'user-agent'
+          ? 'jest-agent'
+          : '0f81c2a7-1e6d-4f05-9a1c-03de8a5f6b77',
+      ),
     };
 
     void controller.verifyOtp(
@@ -86,6 +95,7 @@ describe('AuthController', () => {
       {
         ip: '127.0.0.1',
         userAgent: 'jest-agent',
+        deviceId: '0f81c2a7-1e6d-4f05-9a1c-03de8a5f6b77',
       },
     );
   });
@@ -108,6 +118,7 @@ describe('AuthController', () => {
     expect(authService.requestOtp).toHaveBeenCalledWith('08012345678', 'NG', {
       ip: undefined,
       userAgent: undefined,
+      deviceId: undefined,
     });
     expect(authService.verifyOtp).toHaveBeenCalledWith(
       '08012345678',
@@ -116,9 +127,11 @@ describe('AuthController', () => {
       {
         ip: undefined,
         userAgent: undefined,
+        deviceId: undefined,
       },
     );
     expect(req.get).toHaveBeenCalledWith('user-agent');
+    expect(req.get).toHaveBeenCalledWith('x-stead-device-id');
   });
 
   it('returns auth telemetry inspection', async () => {

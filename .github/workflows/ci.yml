@@ -83,6 +83,7 @@ jobs:
       NODE_ENV: test
       JWT_SECRET: stead-ci-jwt-secret
       NOTIFICATION_PAYLOAD_ENCRYPTION_KEY: stead-ci-notification-key-1234567890
+      AUTH_DEVICE_IDENTIFIER_SECRET: stead-ci-device-identifier-key-1234567890
       SMS_PROVIDER: dev
       DEV_EXPOSE_OTP: 'true'
     steps:

@@ -125,6 +125,13 @@ export class NotificationQueueService {
         failedAt: now,
         lastError: errorMessage,
         lockedAt: null,
+        failureAttempts: {
+          create: {
+            attemptNumber: attempts,
+            terminal,
+            failedAt: now,
+          },
+        },
       },
     });
   }
@@ -161,6 +168,68 @@ export class NotificationQueueService {
       summary[row.status] = row._count._all;
       return summary;
     }, {});
+  }
+
+  async getOperationalHealth(now = new Date()) {
+    const last24Hours = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+    const staleLockBefore = new Date(now.getTime() - JOB_LOCK_TIMEOUT_MS);
+    const [
+      retrying,
+      staleProcessing,
+      attemptFailuresLast24Hours,
+      deadLettersLast24Hours,
+      oldestPending,
+      lastFailureAttempt,
+    ] = await Promise.all([
+      this.prisma.notificationJob.count({
+        where: { status: 'pending', attempts: { gt: 0 } },
+      }),
+      this.prisma.notificationJob.count({
+        where: {
+          status: 'processing',
+          OR: [{ lockedAt: null }, { lockedAt: { lte: staleLockBefore } }],
+        },
+      }),
+      this.prisma.notificationFailureAttempt.count({
+        where: { failedAt: { gte: last24Hours } },
+      }),
+      this.prisma.notificationJob.count({
+        where: {
+          status: 'dead_letter',
+          failedAt: { gte: last24Hours },
+        },
+      }),
+      this.prisma.notificationJob.findFirst({
+        where: { status: 'pending' },
+        orderBy: { nextRunAt: 'asc' },
+        select: { id: true, nextRunAt: true, attempts: true },
+      }),
+      this.prisma.notificationFailureAttempt.findFirst({
+        orderBy: { failedAt: 'desc' },
+        select: {
+          notificationJobId: true,
+          failedAt: true,
+          notificationJob: { select: { status: true, lastError: true } },
+        },
+      }),
+    ]);
+
+    return {
+      generatedAt: now,
+      retrying,
+      staleProcessing,
+      attemptFailuresLast24Hours,
+      deadLettersLast24Hours,
+      oldestPending: oldestPending ?? null,
+      lastFailure: lastFailureAttempt
+        ? {
+            id: lastFailureAttempt.notificationJobId,
+            status: lastFailureAttempt.notificationJob.status,
+            failedAt: lastFailureAttempt.failedAt,
+            lastError: lastFailureAttempt.notificationJob.lastError,
+          }
+        : null,
+    };
   }
 
   async listRecentJobs(limit = 20): Promise<NotificationJob[]> {

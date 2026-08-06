@@ -16,5 +16,14 @@ process.env.JWT_SECRET = process.env.JWT_SECRET || 'stead-test-secret-12345';
 process.env.NOTIFICATION_PAYLOAD_ENCRYPTION_KEY =
   process.env.NOTIFICATION_PAYLOAD_ENCRYPTION_KEY ||
   'stead-test-notification-key-1234567890';
+process.env.AUTH_DEVICE_IDENTIFIER_SECRET =
+  process.env.AUTH_DEVICE_IDENTIFIER_SECRET ||
+  'stead-test-device-identifier-key-1234567890';
+process.env.AUTH_OTP_REQUEST_LIMIT_PER_DEVICE_PER_HOUR =
+  process.env.AUTH_OTP_REQUEST_LIMIT_PER_DEVICE_PER_HOUR || '2';
+process.env.AUTH_OTP_VERIFY_FAILURE_LIMIT_PER_DEVICE_WINDOW =
+  process.env.AUTH_OTP_VERIFY_FAILURE_LIMIT_PER_DEVICE_WINDOW || '2';
+process.env.AUTH_INSPECTION_OPERATOR_USER_IDS =
+  process.env.AUTH_INSPECTION_OPERATOR_USER_IDS || 'operator-e2e';
 process.env.SMS_PROVIDER = process.env.SMS_PROVIDER || 'dev';
 process.env.DEV_EXPOSE_OTP = process.env.DEV_EXPOSE_OTP || 'true';

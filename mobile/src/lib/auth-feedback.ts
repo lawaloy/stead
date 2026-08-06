@@ -23,6 +23,8 @@ export const getAuthErrorMessage = (
       return 'A code was just sent. Wait a moment, then request a new one.';
     case 'Too many OTP requests from this network. Try again later.':
       return 'Too many code requests came from this network. Try again later.';
+    case 'Too many OTP requests from this device. Try again later.':
+      return 'Too many code requests came from this device. Try again later.';
     case 'Too many OTP requests. Try again later.':
       return 'Too many code requests were made for this number. Try again later.';
     case 'OTP expired or not found':
@@ -33,6 +35,8 @@ export const getAuthErrorMessage = (
       return 'Too many incorrect codes were entered. Request a new code to continue.';
     case 'Too many invalid OTP attempts from this network. Try again later.':
       return 'Too many incorrect codes came from this network. Try again later.';
+    case 'Too many invalid OTP attempts from this device. Try again later.':
+      return 'Too many incorrect codes came from this device. Try again later.';
     case 'Unexpected network error':
       return 'We could not reach Stead right now. Check your connection and try again.';
     default:

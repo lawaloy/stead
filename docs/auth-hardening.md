@@ -15,7 +15,8 @@ remains part of real-provider validation.
 
 ## P0: Local Mobile Auth Acceptance Pass
 
-This is the next engineering task and does not depend on a paid SMS provider.
+This acceptance pass is complete for Expo web and did not require a paid SMS
+provider.
 
 - Start Postgres and apply current migrations to the development schema.
 - Start the API with `SMS_PROVIDER=dev` and `DEV_EXPOSE_OTP=true`.
@@ -56,13 +57,44 @@ installed), so this record does not claim a native Android/iOS lifecycle pass.
 
 ## P1: Abuse Controls and Operator Diagnostics
 
-- Add device-aware throttling beyond the current phone- and IP-level limits.
-- Decide which additional device/request context OTP request and verify events
-  should retain.
-- Add operator visibility for lockout trends and repeated failures by phone or
-  IP.
-- Improve operator workflows for investigating failed and dead-letter
-  notification jobs.
+The mobile app now creates a random installation UUID and persists it with the
+same platform-aware SecureStore/browser fallback strategy used for sessions. It
+sends that value in `X-Stead-Device-Id`. The API validates the UUID, converts it
+immediately to an HMAC using `AUTH_DEVICE_IDENTIFIER_SECRET`, and persists only
+the keyed hash on auth events. Raw device IDs are neither stored nor returned.
+
+The device signal is intentionally additive, not trusted identity: clients can
+omit or rotate it, so phone and IP controls remain authoritative independent
+limits. Device request and verify-failure windows make abuse from one honest
+installation visible even when networks or target phone numbers change.
+
+The allowlisted auth inspection endpoint now includes:
+
+- event counts for the last 15 minutes, hour, and 24 hours;
+- top repeated abuse dimensions for masked phones, IPs, and short device
+  references;
+- device-signal coverage for OTP requests; and
+- the short device reference on recent events.
+
+The notification inspection endpoint now reports retrying work, stale processing
+locks, attempt failures and dead letters in the last 24 hours, the oldest pending
+job, and the most recent failure. Inspection payloads continue to omit OTPs and
+raw device IDs.
+
+Operator workflow:
+
+1. Compare the auth inspection windows to distinguish a current spike from a
+   longer-running pattern, then identify whether a masked phone, network, or
+   device reference is recurring.
+2. Check notification queue health to distinguish abuse controls from delivery
+   trouble. Start with stale processing, the oldest pending job, and the latest
+   failure.
+3. Correlate timestamps and pseudonymous references. OTP payloads and raw device
+   identifiers are intentionally unavailable through inspection.
+
+If self-declared installation IDs become insufficient against a stronger abuse
+threat, platform attestation or a dedicated edge risk service is the next
+control; expanding the authority of this header is not.
 
 ## Deferred: Real-provider Validation
 
@@ -90,19 +122,19 @@ Completed:
 - [x] Auth tests cover the critical request and verify paths.
 - [x] OTP jobs survive process restarts and persist retry/dead-letter state.
 - [x] Active SMS provider configuration fails fast when required environment
-  variables are missing.
+      variables are missing.
 - [x] Auth events persist resend and verify outcomes for later inspection.
 - [x] Local/dev SMS mode exercises queue-backed OTP delivery without third-party
-  SMS spend.
+      SMS spend.
 - [x] Notification inspection exposes recent masked jobs, status, provider
-  metadata, and failures.
+      metadata, and failures.
 - [x] PostgreSQL-backed CI coverage verifies OTP persistence, dev-provider
-  delivery, verification, retries, and dead-lettering.
+      delivery, verification, retries, and dead-lettering.
+- [x] Complete the P0 local mobile auth acceptance pass on Expo web.
+- [x] Add stronger device-aware abuse controls.
+- [x] Expand operator diagnostics for abuse and delivery failures.
 
 Remaining:
 
-- [x] Complete the P0 local mobile auth acceptance pass on Expo web.
-- [ ] Add stronger device-aware abuse controls.
-- [ ] Expand operator diagnostics for abuse and delivery failures.
 - [ ] Complete a real-provider, real-device OTP pass when sender access is
-  available.
+      available.

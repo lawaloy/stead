@@ -16,6 +16,10 @@ describe('NotificationQueueService', () => {
       groupBy: jest.Mock;
       findMany: jest.Mock;
     };
+    notificationFailureAttempt: {
+      count: jest.Mock;
+      findFirst: jest.Mock;
+    };
   };
 
   beforeEach(() => {
@@ -29,6 +33,10 @@ describe('NotificationQueueService', () => {
         count: jest.fn(),
         groupBy: jest.fn(),
         findMany: jest.fn(),
+      },
+      notificationFailureAttempt: {
+        count: jest.fn(),
+        findFirst: jest.fn(),
       },
     };
     queue = new NotificationQueueService(
@@ -206,6 +214,13 @@ describe('NotificationQueueService', () => {
         failedAt: now,
         lastError: 'provider down',
         lockedAt: null,
+        failureAttempts: {
+          create: {
+            attemptNumber: 1,
+            terminal: false,
+            failedAt: now,
+          },
+        },
       },
     });
   });
@@ -236,6 +251,13 @@ describe('NotificationQueueService', () => {
         failedAt: expect.any(Date) as unknown,
         lastError: 'provider down',
         lockedAt: null,
+        failureAttempts: {
+          create: {
+            attemptNumber: 3,
+            terminal: true,
+            failedAt: expect.any(Date) as unknown,
+          },
+        },
       },
     });
   });
@@ -344,6 +366,82 @@ describe('NotificationQueueService', () => {
     await expect(queue.getStatusSummary()).resolves.toEqual({
       pending: 3,
       dead_letter: 1,
+    });
+  });
+
+  it('reports retry, stale-lock, and recent failure diagnostics', async () => {
+    const now = new Date('2026-08-05T12:00:00.000Z');
+    prisma.notificationJob.count
+      .mockResolvedValueOnce(2)
+      .mockResolvedValueOnce(1)
+      .mockResolvedValueOnce(1);
+    prisma.notificationFailureAttempt.count.mockResolvedValue(4);
+    prisma.notificationJob.findFirst.mockResolvedValue({
+      id: 'job_pending',
+      nextRunAt: new Date('2026-08-05T11:55:00.000Z'),
+      attempts: 1,
+    });
+    prisma.notificationFailureAttempt.findFirst.mockResolvedValue({
+      notificationJobId: 'job_failed',
+      failedAt: new Date('2026-08-05T11:59:00.000Z'),
+      notificationJob: {
+        status: 'sent',
+        lastError: null,
+      },
+    });
+
+    await expect(queue.getOperationalHealth(now)).resolves.toEqual({
+      generatedAt: now,
+      retrying: 2,
+      staleProcessing: 1,
+      attemptFailuresLast24Hours: 4,
+      deadLettersLast24Hours: 1,
+      oldestPending: {
+        id: 'job_pending',
+        nextRunAt: new Date('2026-08-05T11:55:00.000Z'),
+        attempts: 1,
+      },
+      lastFailure: {
+        id: 'job_failed',
+        status: 'sent',
+        failedAt: new Date('2026-08-05T11:59:00.000Z'),
+        lastError: null,
+      },
+    });
+    expect(prisma.notificationJob.count.mock.calls).toEqual([
+      [{ where: { status: 'pending', attempts: { gt: 0 } } }],
+      [
+        {
+          where: {
+            status: 'processing',
+            OR: [
+              { lockedAt: null },
+              { lockedAt: { lte: new Date('2026-08-05T11:55:00.000Z') } },
+            ],
+          },
+        },
+      ],
+      [
+        {
+          where: {
+            status: 'dead_letter',
+            failedAt: { gte: new Date('2026-08-04T12:00:00.000Z') },
+          },
+        },
+      ],
+    ]);
+    expect(prisma.notificationFailureAttempt.count).toHaveBeenCalledWith({
+      where: {
+        failedAt: { gte: new Date('2026-08-04T12:00:00.000Z') },
+      },
+    });
+    expect(prisma.notificationFailureAttempt.findFirst).toHaveBeenCalledWith({
+      orderBy: { failedAt: 'desc' },
+      select: {
+        notificationJobId: true,
+        failedAt: true,
+        notificationJob: { select: { status: true, lastError: true } },
+      },
     });
   });
 

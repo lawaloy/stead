@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { appConfig } from './app-config';
 import { resolveApiBaseUrl } from './base-url';
 import { ApiError } from './api-error';
+import { installationIdStore } from './installation-id-store';
 import {
   AuthCountriesResponseSchema,
   AuthRequestOtpResponseSchema,
@@ -37,9 +38,13 @@ export const apiClient = axios.create({
 });
 
 apiClient.interceptors.request.use(async (config) => {
-  const token = await getTokenFn();
+  const [token, installationId] = await Promise.all([
+    getTokenFn(),
+    installationIdStore.getOrCreateId(),
+  ]);
   if (!config.headers) config.headers = new (Axios as any).AxiosHeaders();
   if (token) config.headers.Authorization = `Bearer ${token}`;
+  config.headers['X-Stead-Device-Id'] = installationId;
   return config;
 });
 

@@ -58,6 +58,7 @@ model AuthEvent {
   phone         String
   countryIso    String
   ip            String?
+  deviceHash    String?
   userAgent     String?
   attemptNumber Int?
   metadataJson  String?
@@ -69,6 +70,8 @@ model AuthEvent {
   otpCode       OtpCode?      @relation(fields: [otpCodeId], references: [id])
 
   @@index([phone, createdAt])
+  @@index([ip, createdAt])
+  @@index([deviceHash, createdAt])
   @@index([type, createdAt])
 }
 
@@ -138,5 +141,22 @@ model NotificationJob {
   createdAt          DateTime              @default(now())
   updatedAt          DateTime              @updatedAt
 
+  failureAttempts    NotificationFailureAttempt[]
+
   @@index([status, nextRunAt])
+  @@index([status, updatedAt])
+  @@index([status, failedAt])
+  @@index([failedAt])
+}
+
+model NotificationFailureAttempt {
+  id                String          @id @default(uuid())
+  notificationJobId String
+  notificationJob   NotificationJob @relation(fields: [notificationJobId], references: [id], onDelete: Cascade)
+  attemptNumber     Int
+  terminal          Boolean
+  failedAt          DateTime        @default(now())
+
+  @@index([failedAt])
+  @@index([notificationJobId, failedAt])
 }

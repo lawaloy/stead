@@ -5,6 +5,7 @@ describe('NotificationsService', () => {
   let queue: {
     enqueueOtpRequested: jest.Mock;
     getStatusSummary: jest.Mock;
+    getOperationalHealth: jest.Mock;
     listRecentJobs: jest.Mock;
   };
   let sms: {
@@ -15,6 +16,15 @@ describe('NotificationsService', () => {
     queue = {
       enqueueOtpRequested: jest.fn(),
       getStatusSummary: jest.fn(),
+      getOperationalHealth: jest.fn().mockResolvedValue({
+        generatedAt: new Date('2026-08-05T12:00:00Z'),
+        retrying: 1,
+        staleProcessing: 0,
+        attemptFailuresLast24Hours: 2,
+        deadLettersLast24Hours: 1,
+        oldestPending: null,
+        lastFailure: null,
+      }),
       listRecentJobs: jest.fn(),
     };
     sms = {
@@ -100,6 +110,15 @@ describe('NotificationsService', () => {
           sent: 0,
           failed: 0,
           deadLetter: 1,
+        },
+        health: {
+          generatedAt: new Date('2026-08-05T12:00:00Z'),
+          retrying: 1,
+          staleProcessing: 0,
+          attemptFailuresLast24Hours: 2,
+          deadLettersLast24Hours: 1,
+          oldestPending: null,
+          lastFailure: null,
         },
         recent: [
           expect.objectContaining({

@@ -36,6 +36,7 @@ export class AuthController {
     return this.auth.requestOtp(dto.phone, dto.countryIso, {
       ip: req.ip,
       userAgent: req.get('user-agent'),
+      deviceId: req.get('x-stead-device-id'),
     });
   }
 
@@ -44,6 +45,7 @@ export class AuthController {
     return this.auth.verifyOtp(dto.phone, dto.countryIso, dto.otp, {
       ip: req.ip,
       userAgent: req.get('user-agent'),
+      deviceId: req.get('x-stead-device-id'),
     });
   }
 
