@@ -34,23 +34,20 @@ These are the exact contexts stored in the active ruleset:
 - [x] `build`
 - [x] `mobile-test` — includes mobile typecheck and unit tests
 - [x] `CodeQL`
-- [ ] `dependency-review`
+- [x] `dependency-review` — blocks critical runtime dependency findings
 
-The Dependency Review workflow is not required and its scan step currently has
-`continue-on-error: true`, so a critical runtime dependency finding cannot
-block a merge.
+The Dependency Review workflow is required and its scan step propagates
+failures, so a critical runtime dependency finding blocks a merge.
 
 ## Urgent Follow-up
 
-1. Remove `continue-on-error: true` from Dependency Review and add its actual
-   successful check context to the ruleset.
-2. If more than one reviewer is available, require one approval, dismiss stale
+1. If more than one reviewer is available, require one approval, dismiss stale
    approvals, and require conversation resolution.
-3. Decide whether squash is the only supported merge strategy and configure
+2. Decide whether squash is the only supported merge strategy and configure
    the ruleset to match `CONTRIBUTING.md`.
-4. Review the repository-role bypass actors and retain only intentional
+3. Review the repository-role bypass actors and retain only intentional
    emergency access.
-5. Re-run this audit after each ruleset change and update the verification date.
+4. Re-run this audit after each ruleset change and update the verification date.
 
 ## Merge Queue (Optional)
 
