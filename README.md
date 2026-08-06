@@ -6,7 +6,7 @@ Current repo status:
 
 - API: NestJS, Prisma, Postgres, JWT auth, OTP over SMS, goals, manual transactions, stability dashboard, and persisted notification jobs.
 - Mobile: Expo Router app with OTP login, token persistence, active goal setup, manual transaction entry, and stability dashboard screens.
-- CI: API/mobile lint, API unit and PostgreSQL-backed e2e tests, API/mobile builds, mobile typecheck/tests, an advisory Dependency Review workflow, and CodeQL are present.
+- CI: API/mobile lint, API unit and PostgreSQL-backed e2e tests, API/mobile builds, mobile typecheck/tests, blocking Dependency Review, and CodeQL are present.
 
 Quick links
 

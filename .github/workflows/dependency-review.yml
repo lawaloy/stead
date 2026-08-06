@@ -30,7 +30,6 @@ jobs:
       - name: 'Checkout repository'
         uses: actions/checkout@v4
       - name: 'Dependency Review'
-        continue-on-error: true
         uses: actions/dependency-review-action@v4
         # Commonly enabled options, see https://github.com/actions/dependency-review-action#configuration-options for all available options.
         with:
