@@ -9,8 +9,9 @@ for early environments.
 
 The API path is automated: PostgreSQL-backed e2e tests cover OTP persistence,
 dev-provider delivery, verification, retry, and dead-letter behavior. Mobile
-schemas and token storage have unit coverage. What remains unproven is the
-integrated mobile/device experience against a running local API.
+schemas and token storage have unit coverage. The integrated Expo web path has
+also passed against a running local API. A native Android/iOS device pass
+remains part of real-provider validation.
 
 ## P0: Local Mobile Auth Acceptance Pass
 
@@ -33,6 +34,25 @@ authenticated session -> app restart pass, with no manual database edits.
 
 `SMS_PROVIDER=dev` and `DEV_EXPOSE_OTP=true` remain development-only; startup
 validation rejects them in production.
+
+### Validation Record
+
+Completed on 2026-08-05 using Expo web in Microsoft Edge against the local
+NestJS API and PostgreSQL 16 container. No manual database edits were used.
+
+- OTP request returned successfully and displayed the development OTP hint.
+- The persisted `otp.requested` notification job reached `sent` with provider
+  `dev` and a populated send timestamp.
+- OTP verification returned successfully and routed to the authenticated
+  dashboard.
+- The JWT remained in platform storage and restored the authenticated session
+  after a full page reload, the Expo web equivalent of an app restart.
+- Replacing the stored JWT with an invalid token produced a protected API 401;
+  the app cleared the token and returned to the login flow.
+- The browser reported no uncaught page errors during the pass.
+
+The workstation has no Android SDK/emulator (`adb` and `emulator` are not
+installed), so this record does not claim a native Android/iOS lifecycle pass.
 
 ## P1: Abuse Controls and Operator Diagnostics
 
@@ -81,7 +101,7 @@ Completed:
 
 Remaining:
 
-- [ ] Complete the P0 local mobile auth acceptance pass.
+- [x] Complete the P0 local mobile auth acceptance pass on Expo web.
 - [ ] Add stronger device-aware abuse controls.
 - [ ] Expand operator diagnostics for abuse and delivery failures.
 - [ ] Complete a real-provider, real-device OTP pass when sender access is
