@@ -1,6 +1,7 @@
 import { IsString, Matches } from 'class-validator';
+import type { VerifyOtpRequest } from '../../contracts/generated/types.gen';
 
-export class VerifyOtpDto {
+export class VerifyOtpDto implements VerifyOtpRequest {
   @IsString()
   @Matches(/^[A-Z]{2}$/, {
     message: 'countryIso must be a two-letter country code',

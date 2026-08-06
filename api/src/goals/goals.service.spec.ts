@@ -89,10 +89,10 @@ describe('GoalsService', () => {
       userId: 'user_1',
       name: 'Rent buffer',
       amountTotalKobo: 500_000,
-      dueDate,
+      dueDate: dueDate.toISOString(),
       monthlyIncomeKobo: 300_000,
       isActive: true,
-      createdAt,
+      createdAt: createdAt.toISOString(),
     });
   });
 
@@ -130,10 +130,10 @@ describe('GoalsService', () => {
       userId: 'user_1',
       name: 'Emergency fund',
       amountTotalKobo: 250_000,
-      dueDate,
+      dueDate: dueDate.toISOString(),
       monthlyIncomeKobo: null,
       isActive: true,
-      createdAt,
+      createdAt: createdAt.toISOString(),
     });
   });
 
@@ -193,10 +193,10 @@ describe('GoalsService', () => {
       userId: 'user_1',
       name: 'Emergency fund',
       amountTotalKobo: 250_000,
-      dueDate,
+      dueDate: dueDate.toISOString(),
       monthlyIncomeKobo: null,
       isActive: true,
-      createdAt,
+      createdAt: createdAt.toISOString(),
     });
   });
 
@@ -301,10 +301,10 @@ describe('GoalsService', () => {
       userId: 'user_1',
       name: 'Updated goal',
       amountTotalKobo: 750_000,
-      dueDate: updatedDueDate,
+      dueDate: updatedDueDate.toISOString(),
       monthlyIncomeKobo: 450_000,
       isActive: true,
-      createdAt,
+      createdAt: createdAt.toISOString(),
     });
     expect(prisma.$transaction).toHaveBeenCalledTimes(1);
   });
@@ -346,10 +346,10 @@ describe('GoalsService', () => {
       userId: 'user_1',
       name: 'Renamed inactive goal',
       amountTotalKobo: 500_000,
-      dueDate,
+      dueDate: dueDate.toISOString(),
       monthlyIncomeKobo: null,
       isActive: false,
-      createdAt,
+      createdAt: createdAt.toISOString(),
     });
   });
 });

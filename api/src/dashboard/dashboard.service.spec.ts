@@ -114,7 +114,7 @@ describe('DashboardService', () => {
         id: 'goal_1',
         name: 'School fees',
         amountTotalKobo: 500_000,
-        dueDate,
+        dueDate: dueDate.toISOString(),
         monthlyIncomeKobo: 400_000,
       },
       metrics: {

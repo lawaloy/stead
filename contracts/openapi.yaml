@@ -1,0 +1,608 @@
+openapi: 3.0.3
+info:
+  title: Stead API
+  version: 1.0.0
+  description: Authoritative contract for the API surface consumed by Stead mobile.
+servers:
+  - url: http://localhost:3000
+paths:
+  /auth/countries:
+    get:
+      operationId: getAuthCountries
+      responses:
+        '200':
+          description: Supported authentication countries.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthCountriesResponse'
+  /auth/request-otp:
+    post:
+      operationId: requestOtp
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RequestOtpRequest'
+      responses:
+        '201':
+          description: OTP accepted for queue-backed delivery.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RequestOtpResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+  /auth/verify-otp:
+    post:
+      operationId: verifyOtp
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VerifyOtpRequest'
+      responses:
+        '201':
+          description: OTP verified and JWT issued.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VerifyOtpResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+  /goals:
+    post:
+      operationId: createGoal
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateGoalRequest'
+      responses:
+        '201':
+          description: Goal created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Goal'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /goals/active:
+    get:
+      operationId: getActiveGoal
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Active goal.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Goal'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /goals/{id}:
+    patch:
+      operationId: updateGoal
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateGoalRequest'
+      responses:
+        '200':
+          description: Goal updated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Goal'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /transactions:
+    get:
+      operationId: listTransactions
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: from
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: to
+          in: query
+          schema:
+            type: string
+            format: date-time
+      responses:
+        '200':
+          description: Transactions in descending occurrence order.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Transaction'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    post:
+      operationId: createTransaction
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateTransactionRequest'
+      responses:
+        '201':
+          description: Transaction created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Transaction'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /transactions/{id}:
+    patch:
+      operationId: updateTransaction
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateTransactionRequest'
+      responses:
+        '200':
+          description: Transaction updated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Transaction'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      operationId: deleteTransaction
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      responses:
+        '200':
+          description: Transaction deleted.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OkResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /dashboard/stability:
+    get:
+      operationId: getDashboardStability
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Current stability metrics or the no-active-goal state.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DashboardStabilityResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  parameters:
+    ResourceId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        minLength: 1
+  responses:
+    BadRequest:
+      description: Request validation or domain validation failed.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    Unauthorized:
+      description: Authentication is missing or invalid.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    NotFound:
+      description: Resource not found.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    TooManyRequests:
+      description: OTP abuse-control limit reached.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+  schemas:
+    RequestOtpRequest:
+      type: object
+      additionalProperties: false
+      required: [countryIso, phone]
+      properties:
+        countryIso:
+          type: string
+          pattern: '^[A-Z]{2}$'
+        phone:
+          type: string
+          pattern: '^(?:\+?\d{6,15}|0\d{6,14}|00\d{6,15})$'
+    VerifyOtpRequest:
+      type: object
+      additionalProperties: false
+      required: [countryIso, phone, otp]
+      properties:
+        countryIso:
+          type: string
+          pattern: '^[A-Z]{2}$'
+        phone:
+          type: string
+          pattern: '^(?:\+?\d{6,15}|0\d{6,14}|00\d{6,15})$'
+        otp:
+          type: string
+          pattern: '^\d{6}$'
+    RequestOtpResponse:
+      type: object
+      additionalProperties: false
+      required: [ok]
+      properties:
+        ok:
+          type: boolean
+          enum: [true]
+        otp:
+          type: string
+          pattern: '^\d{6}$'
+          description: Development-only OTP hint when explicitly enabled.
+    VerifyOtpResponse:
+      type: object
+      additionalProperties: false
+      required: [token]
+      properties:
+        token:
+          type: string
+          minLength: 1
+    AuthCountry:
+      type: object
+      additionalProperties: false
+      required:
+        - iso
+        - label
+        - dialCode
+        - currencyCode
+        - phoneExample
+        - authEnabled
+        - marketEnabled
+        - defaultCountry
+      properties:
+        iso:
+          type: string
+          pattern: '^[A-Z]{2}$'
+        label:
+          type: string
+          minLength: 1
+        dialCode:
+          type: string
+          pattern: '^\+\d{1,4}$'
+        currencyCode:
+          type: string
+          pattern: '^[A-Z]{3}$'
+        phoneExample:
+          type: string
+          minLength: 1
+        authEnabled:
+          type: boolean
+        marketEnabled:
+          type: boolean
+        defaultCountry:
+          type: boolean
+    AuthCountriesResponse:
+      type: object
+      additionalProperties: false
+      required: [countries]
+      properties:
+        countries:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/AuthCountry'
+    CreateGoalRequest:
+      type: object
+      additionalProperties: false
+      required: [name, amountTotalKobo, dueDate]
+      properties:
+        name:
+          type: string
+          maxLength: 100
+        amountTotalKobo:
+          type: integer
+          minimum: 1
+        dueDate:
+          type: string
+          format: date-time
+        monthlyIncomeKobo:
+          type: integer
+          minimum: 0
+    UpdateGoalRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        name:
+          type: string
+          maxLength: 100
+        amountTotalKobo:
+          type: integer
+          minimum: 1
+        dueDate:
+          type: string
+          format: date-time
+        monthlyIncomeKobo:
+          type: integer
+          minimum: 0
+        isActive:
+          type: boolean
+    Goal:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - userId
+        - name
+        - amountTotalKobo
+        - dueDate
+        - monthlyIncomeKobo
+        - isActive
+        - createdAt
+      properties:
+        id:
+          type: string
+          minLength: 1
+        userId:
+          type: string
+          minLength: 1
+        name:
+          type: string
+        amountTotalKobo:
+          type: integer
+        dueDate:
+          type: string
+          format: date-time
+        monthlyIncomeKobo:
+          type: integer
+          nullable: true
+        isActive:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+    CreateTransactionRequest:
+      type: object
+      additionalProperties: false
+      required: [direction, amountKobo, occurredAt]
+      properties:
+        direction:
+          $ref: '#/components/schemas/TransactionDirection'
+        amountKobo:
+          type: integer
+          minimum: 1
+        occurredAt:
+          type: string
+          format: date-time
+        goalId:
+          type: string
+          minLength: 1
+        note:
+          type: string
+          maxLength: 280
+    UpdateTransactionRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        direction:
+          $ref: '#/components/schemas/TransactionDirection'
+        amountKobo:
+          type: integer
+          minimum: 1
+        occurredAt:
+          type: string
+          format: date-time
+        goalId:
+          type: string
+          nullable: true
+        note:
+          type: string
+          maxLength: 280
+          nullable: true
+    TransactionDirection:
+      type: string
+      enum: [in, out]
+    Transaction:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - userId
+        - goalId
+        - amountKobo
+        - direction
+        - occurredAt
+        - note
+        - createdAt
+      properties:
+        id:
+          type: string
+          minLength: 1
+        userId:
+          type: string
+          minLength: 1
+        goalId:
+          type: string
+          nullable: true
+        amountKobo:
+          type: integer
+        direction:
+          $ref: '#/components/schemas/TransactionDirection'
+        occurredAt:
+          type: string
+          format: date-time
+        note:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+    DashboardMetrics:
+      type: object
+      additionalProperties: false
+      required:
+        - daysRemaining
+        - remainingObligationKobo
+        - readinessPct
+        - paceRequiredMonthlyKobo
+        - safeToSpendKobo
+        - stabilityScore
+        - status
+        - goalSavedKobo
+        - estimatedBalanceKobo
+      properties:
+        daysRemaining:
+          type: integer
+        remainingObligationKobo:
+          type: integer
+        readinessPct:
+          type: number
+        paceRequiredMonthlyKobo:
+          type: integer
+        safeToSpendKobo:
+          type: integer
+        stabilityScore:
+          type: integer
+        status:
+          type: string
+          enum: [stable, warning, critical]
+        goalSavedKobo:
+          type: integer
+        estimatedBalanceKobo:
+          type: integer
+    DashboardGoal:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - name
+        - amountTotalKobo
+        - dueDate
+        - monthlyIncomeKobo
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        amountTotalKobo:
+          type: integer
+        dueDate:
+          type: string
+          format: date-time
+        monthlyIncomeKobo:
+          type: integer
+          nullable: true
+    DashboardStabilityOkResponse:
+      type: object
+      additionalProperties: false
+      required: [ok, goal, metrics]
+      properties:
+        ok:
+          type: boolean
+          enum: [true]
+        goal:
+          $ref: '#/components/schemas/DashboardGoal'
+        metrics:
+          $ref: '#/components/schemas/DashboardMetrics'
+    DashboardStabilityEmptyResponse:
+      type: object
+      additionalProperties: false
+      required: [ok, message]
+      properties:
+        ok:
+          type: boolean
+          enum: [false]
+        message:
+          type: string
+    DashboardStabilityResponse:
+      oneOf:
+        - $ref: '#/components/schemas/DashboardStabilityOkResponse'
+        - $ref: '#/components/schemas/DashboardStabilityEmptyResponse'
+    OkResponse:
+      type: object
+      additionalProperties: false
+      required: [ok]
+      properties:
+        ok:
+          type: boolean
+          enum: [true]
+    ErrorResponse:
+      type: object
+      required: [statusCode, message]
+      properties:
+        statusCode:
+          type: integer
+        message:
+          oneOf:
+            - type: string
+            - type: array
+              items:
+                type: string
+        error:
+          type: string

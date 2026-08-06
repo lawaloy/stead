@@ -2,12 +2,13 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateGoalDto } from './dto/create-goal.dto';
 import { UpdateGoalDto } from './dto/update-goal.dto';
+import type { Goal } from '../contracts/generated/types.gen';
 
 @Injectable()
 export class GoalsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async create(userId: string, dto: CreateGoalDto) {
+  async create(userId: string, dto: CreateGoalDto): Promise<Goal> {
     const goal = await this.prisma.$transaction(async (transaction) => {
       await transaction.goal.updateMany({
         where: { userId, isActive: true },
@@ -32,7 +33,7 @@ export class GoalsService {
     return this.serializeGoal(goal);
   }
 
-  async getActive(userId: string) {
+  async getActive(userId: string): Promise<Goal> {
     const goal = await this.prisma.goal.findFirst({
       where: { userId, isActive: true },
       orderBy: { createdAt: 'desc' },
@@ -42,7 +43,11 @@ export class GoalsService {
     return this.serializeGoal(goal);
   }
 
-  async update(userId: string, goalId: string, dto: UpdateGoalDto) {
+  async update(
+    userId: string,
+    goalId: string,
+    dto: UpdateGoalDto,
+  ): Promise<Goal> {
     const goal = await this.prisma.$transaction(async (transaction) => {
       const existing = await transaction.goal.findFirst({
         where: { id: goalId, userId },
@@ -87,17 +92,17 @@ export class GoalsService {
     monthlyIncomeKobo: bigint | null;
     isActive: boolean;
     createdAt: Date;
-  }) {
+  }): Goal {
     return {
       id: goal.id,
       userId: goal.userId,
       name: goal.name,
       amountTotalKobo: Number(goal.amountTotalKobo),
-      dueDate: goal.dueDate,
+      dueDate: goal.dueDate.toISOString(),
       monthlyIncomeKobo:
         goal.monthlyIncomeKobo === null ? null : Number(goal.monthlyIncomeKobo),
       isActive: goal.isActive,
-      createdAt: goal.createdAt,
+      createdAt: goal.createdAt.toISOString(),
     };
   }
 }

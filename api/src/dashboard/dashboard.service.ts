@@ -1,12 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { computeStability } from './engine';
+import type { DashboardStabilityResponse } from '../contracts/generated/types.gen';
 
 @Injectable()
 export class DashboardService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async getStability(userId: string) {
+  async getStability(userId: string): Promise<DashboardStabilityResponse> {
     const goal = await this.prisma.goal.findFirst({
       where: { userId, isActive: true },
       orderBy: { createdAt: 'desc' },
@@ -51,7 +52,7 @@ export class DashboardService {
         id: goal.id,
         name: goal.name,
         amountTotalKobo: Number(goal.amountTotalKobo),
-        dueDate: goal.dueDate,
+        dueDate: goal.dueDate.toISOString(),
         monthlyIncomeKobo: goal.monthlyIncomeKobo
           ? Number(goal.monthlyIncomeKobo)
           : null,

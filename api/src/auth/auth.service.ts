@@ -13,6 +13,10 @@ import { JwtService } from '@nestjs/jwt';
 import { AuthTelemetryService } from './auth-telemetry.service';
 import { CountryIso, normalizePhoneNumber } from './phone.util';
 import { CountriesService } from '../countries/countries.service';
+import type {
+  RequestOtpResponse,
+  VerifyOtpResponse,
+} from '../contracts/generated/types.gen';
 
 const DEFAULT_OTP_REQUEST_LIMIT_PER_HOUR = 10;
 const DEFAULT_OTP_RESEND_COOLDOWN_MS = 60_000;
@@ -89,7 +93,7 @@ export class AuthService {
     phone: string,
     countryIso: string,
     context: OtpRequestContext = {},
-  ) {
+  ): Promise<RequestOtpResponse> {
     const country = await this.countries.requireAuthCountry(countryIso);
     const normalizedPhone = normalizePhoneNumber(
       phone,
@@ -211,7 +215,7 @@ export class AuthService {
     countryIso: string,
     otp: string,
     context: OtpRequestContext = {},
-  ) {
+  ): Promise<VerifyOtpResponse> {
     const country = await this.countries.requireAuthCountry(countryIso);
     const normalizedPhone = normalizePhoneNumber(
       phone,

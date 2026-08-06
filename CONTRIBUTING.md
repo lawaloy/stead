@@ -1,6 +1,7 @@
 # Contributing to Stead
 
 ## Branching
+
 - Base all work on `main`.
 - Use short-lived branches:
   - `feature/<area>-<task>`
@@ -10,21 +11,25 @@
 - Keep one concern per branch.
 
 ## Commit Convention
+
 Use Conventional Commits.
 
 Format:
 `<type>(<scope>): <summary>`
 
 Examples:
+
 - `feat(auth): add refresh token rotation`
 - `fix(api): handle null amount in transaction mapper`
 - `feat(mobile): add goal setup screen`
 - `chore(ci): add npm cache to workflow`
 
 Common types:
+
 - `feat`, `fix`, `chore`, `docs`, `refactor`, `test`, `ci`
 
 ## Pull Requests
+
 - Open PRs into `main`.
 - Keep PRs focused and small.
 - Include clear testing notes.
@@ -34,9 +39,11 @@ Use the repo template format (see [`.github/pull_request_template.md`](.github/p
 
 ```markdown
 ## What + Why
+
 - Why this change exists (at least one bullet)
 
 ## Checks
+
 - [ ] `api`: `npm run lint -- --no-fix`
 - [ ] `api`: `npm run build`
 - [ ] `api`: `npm run test -- --ci --runInBand`
@@ -64,7 +71,7 @@ gh pr create --title "feat: your change" --body-file .github/pull_request_templa
 
 Local verification (recommended before push):
 
-- API: `npm run lint -- --no-fix`, `npm run test -- --runInBand`, `npm run test:e2e -- --runInBand`, `npm run build`
+- API: `npm run contracts:check`, `npm run lint -- --no-fix`, `npm run test -- --runInBand`, `npm run test:e2e -- --runInBand`, `npm run build`
 - Mobile: `npm run lint`, `npm run typecheck`, `npm test -- --runInBand`, `npm run build`
 
 API e2e tests require PostgreSQL and a dedicated `e2e` or test schema. The
@@ -92,6 +99,7 @@ npm run start
 ```
 
 ## Environment
+
 - Copy `api/.env.example` to `api/.env`.
 - Copy `mobile/.env.example` to `mobile/.env`.
 - Do not commit secrets.
@@ -100,7 +108,10 @@ npm run start
 - Add new required env vars to the matching `.env.example`.
 
 ## Definition of Done
+
 - Code is linted, tested, and builds.
 - API behavior and contracts are documented when changed.
-- Mobile API schema expectations are updated when API response shapes change.
+- `contracts/openapi.yaml` is updated before changing a mobile-consumed API
+  request or response, and `npm run contracts:generate` is run from `api/`.
+- Generated contract files are committed but never edited by hand.
 - PR approved and merged via squash.

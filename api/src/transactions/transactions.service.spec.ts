@@ -29,6 +29,12 @@ describe('TransactionsService', () => {
     note: 'Groceries',
     createdAt: new Date('2026-01-02T03:05:06.000Z'),
   };
+  const serializedTransactionRecord = {
+    ...transactionRecord,
+    amountKobo: 12_500,
+    occurredAt: transactionRecord.occurredAt.toISOString(),
+    createdAt: transactionRecord.createdAt.toISOString(),
+  };
 
   beforeEach(async () => {
     prisma = {
@@ -74,8 +80,7 @@ describe('TransactionsService', () => {
         note: 'Groceries',
       }),
     ).resolves.toEqual({
-      ...transactionRecord,
-      amountKobo: 12_500,
+      ...serializedTransactionRecord,
     });
 
     expect(prisma.goal.findFirst).toHaveBeenCalledWith({
@@ -123,7 +128,11 @@ describe('TransactionsService', () => {
         amountKobo: 12_500,
         occurredAt: occurredAt.toISOString(),
       }),
-    ).resolves.toEqual({ ...unlinked, amountKobo: 12_500 });
+    ).resolves.toEqual({
+      ...serializedTransactionRecord,
+      goalId: null,
+      note: null,
+    });
 
     expect(prisma.goal.findFirst).not.toHaveBeenCalled();
     expect(prisma.transaction.create).toHaveBeenCalledWith({
@@ -146,7 +155,7 @@ describe('TransactionsService', () => {
         from: '2026-01-01T00:00:00.000Z',
         to: '2026-01-31T23:59:59.000Z',
       }),
-    ).resolves.toEqual([{ ...transactionRecord, amountKobo: 12_500 }]);
+    ).resolves.toEqual([serializedTransactionRecord]);
 
     expect(prisma.transaction.findMany).toHaveBeenCalledWith({
       where: {
@@ -164,7 +173,7 @@ describe('TransactionsService', () => {
     prisma.transaction.findMany.mockResolvedValue([transactionRecord]);
 
     await expect(service.list('user_1', {})).resolves.toEqual([
-      { ...transactionRecord, amountKobo: 12_500 },
+      serializedTransactionRecord,
     ]);
 
     expect(prisma.transaction.findMany).toHaveBeenCalledWith({
@@ -270,7 +279,7 @@ describe('TransactionsService', () => {
         note: 'corrected note',
       }),
     ).resolves.toEqual({
-      ...transactionRecord,
+      ...serializedTransactionRecord,
       note: 'corrected note',
       amountKobo: 9_000,
     });
@@ -336,7 +345,11 @@ describe('TransactionsService', () => {
         goalId: '',
         note: '',
       }),
-    ).resolves.toEqual({ ...cleared, amountKobo: 12_500 });
+    ).resolves.toEqual({
+      ...serializedTransactionRecord,
+      goalId: null,
+      note: null,
+    });
 
     expect(prisma.goal.findFirst).not.toHaveBeenCalled();
     expect(prisma.transaction.create).toHaveBeenCalledWith({

@@ -7,8 +7,9 @@ import {
   MaxLength,
   Min,
 } from 'class-validator';
+import type { UpdateTransactionRequest } from '../../contracts/generated/types.gen';
 
-export class UpdateTransactionDto {
+export class UpdateTransactionDto implements UpdateTransactionRequest {
   @IsOptional()
   @IsIn(['in', 'out'])
   direction?: 'in' | 'out';
