@@ -2,15 +2,19 @@ import * as Joi from 'joi';
 
 type EnvInput = {
   NODE_ENV?: string;
+  JWT_SECRET?: string;
   SMS_PROVIDER?: string;
   DEV_EXPOSE_OTP?: string;
   AUTH_INSPECTION_OPERATOR_USER_IDS?: string;
+  AUTH_DEVICE_IDENTIFIER_SECRET?: string;
   NOTIFICATION_PAYLOAD_ENCRYPTION_KEY?: string;
   AUTH_OTP_REQUEST_LIMIT_PER_HOUR?: number;
   AUTH_OTP_REQUEST_LIMIT_PER_IP_PER_HOUR?: number;
+  AUTH_OTP_REQUEST_LIMIT_PER_DEVICE_PER_HOUR?: number;
   AUTH_OTP_RESEND_COOLDOWN_MS?: number;
   AUTH_OTP_MAX_VERIFY_ATTEMPTS?: number;
   AUTH_OTP_VERIFY_FAILURE_LIMIT_PER_IP_WINDOW?: number;
+  AUTH_OTP_VERIFY_FAILURE_LIMIT_PER_DEVICE_WINDOW?: number;
   AUTH_OTP_VERIFY_FAILURE_WINDOW_MS?: number;
   TWILIO_ACCOUNT_SID?: string;
   TWILIO_AUTH_TOKEN?: string;
@@ -29,12 +33,17 @@ export const envSchema = Joi.object({
   JWT_SECRET: Joi.string().min(16).required(),
   JWT_EXPIRES_IN: Joi.string().default('7d'),
   AUTH_INSPECTION_OPERATOR_USER_IDS: Joi.string().allow('').default(''),
+  AUTH_DEVICE_IDENTIFIER_SECRET: Joi.string().min(32).required(),
   NOTIFICATION_PAYLOAD_ENCRYPTION_KEY: Joi.string().min(32).required(),
   AUTH_OTP_REQUEST_LIMIT_PER_HOUR: Joi.number().integer().min(1).default(10),
   AUTH_OTP_REQUEST_LIMIT_PER_IP_PER_HOUR: Joi.number()
     .integer()
     .min(1)
     .default(20),
+  AUTH_OTP_REQUEST_LIMIT_PER_DEVICE_PER_HOUR: Joi.number()
+    .integer()
+    .min(1)
+    .default(10),
   AUTH_OTP_RESEND_COOLDOWN_MS: Joi.number()
     .integer()
     .min(1_000)
@@ -44,6 +53,10 @@ export const envSchema = Joi.object({
     .integer()
     .min(1)
     .default(10),
+  AUTH_OTP_VERIFY_FAILURE_LIMIT_PER_DEVICE_WINDOW: Joi.number()
+    .integer()
+    .min(1)
+    .default(8),
   AUTH_OTP_VERIFY_FAILURE_WINDOW_MS: Joi.number()
     .integer()
     .min(1_000)
@@ -62,6 +75,18 @@ export const envSchema = Joi.object({
     const value = rawValue as EnvInput;
     const provider = (value.SMS_PROVIDER || 'twilio').toLowerCase();
     const exposeOtp = value.DEV_EXPOSE_OTP === 'true';
+
+    if (
+      value.AUTH_DEVICE_IDENTIFIER_SECRET &&
+      (value.AUTH_DEVICE_IDENTIFIER_SECRET === value.JWT_SECRET ||
+        value.AUTH_DEVICE_IDENTIFIER_SECRET ===
+          value.NOTIFICATION_PAYLOAD_ENCRYPTION_KEY)
+    ) {
+      return helpers.message({
+        custom:
+          'AUTH_DEVICE_IDENTIFIER_SECRET must not reuse JWT_SECRET or NOTIFICATION_PAYLOAD_ENCRYPTION_KEY',
+      });
+    }
 
     if (value.NODE_ENV === 'production' && provider === 'dev') {
       return helpers.message({

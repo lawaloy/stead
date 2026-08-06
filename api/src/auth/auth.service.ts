@@ -17,12 +17,15 @@ import type {
   RequestOtpResponse,
   VerifyOtpResponse,
 } from '../contracts/generated/types.gen';
+import { hashDeviceIdentifier } from './device-identity.util';
 
 const DEFAULT_OTP_REQUEST_LIMIT_PER_HOUR = 10;
 const DEFAULT_OTP_RESEND_COOLDOWN_MS = 60_000;
 const DEFAULT_OTP_MAX_VERIFY_ATTEMPTS = 5;
 const DEFAULT_OTP_REQUEST_LIMIT_PER_IP_PER_HOUR = 20;
+const DEFAULT_OTP_REQUEST_LIMIT_PER_DEVICE_PER_HOUR = 10;
 const DEFAULT_OTP_VERIFY_FAILURE_LIMIT_PER_IP_WINDOW = 10;
+const DEFAULT_OTP_VERIFY_FAILURE_LIMIT_PER_DEVICE_WINDOW = 8;
 const DEFAULT_OTP_VERIFY_FAILURE_WINDOW_MS = 15 * 60 * 1000;
 const OTP_LENGTH = 6;
 const OTP_UPPER_BOUND = 10 ** OTP_LENGTH;
@@ -30,6 +33,7 @@ const OTP_UPPER_BOUND = 10 ** OTP_LENGTH;
 type OtpRequestContext = {
   ip?: string;
   userAgent?: string;
+  deviceId?: string;
 };
 
 function generateOtp() {
@@ -75,10 +79,25 @@ export class AuthService {
     );
   }
 
+  private get otpRequestLimitPerDevicePerHour() {
+    return (
+      this.config.get<number>('AUTH_OTP_REQUEST_LIMIT_PER_DEVICE_PER_HOUR') ??
+      DEFAULT_OTP_REQUEST_LIMIT_PER_DEVICE_PER_HOUR
+    );
+  }
+
   private get otpVerifyFailureLimitPerIpWindow() {
     return (
       this.config.get<number>('AUTH_OTP_VERIFY_FAILURE_LIMIT_PER_IP_WINDOW') ??
       DEFAULT_OTP_VERIFY_FAILURE_LIMIT_PER_IP_WINDOW
+    );
+  }
+
+  private get otpVerifyFailureLimitPerDeviceWindow() {
+    return (
+      this.config.get<number>(
+        'AUTH_OTP_VERIFY_FAILURE_LIMIT_PER_DEVICE_WINDOW',
+      ) ?? DEFAULT_OTP_VERIFY_FAILURE_LIMIT_PER_DEVICE_WINDOW
     );
   }
 
@@ -99,6 +118,15 @@ export class AuthService {
       phone,
       country.iso as CountryIso,
     );
+    const deviceHash = hashDeviceIdentifier(
+      context.deviceId,
+      this.config.get<string>('AUTH_DEVICE_IDENTIFIER_SECRET'),
+    );
+    const eventContext = {
+      ip: context.ip,
+      userAgent: context.userAgent,
+      deviceHash,
+    };
     const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
 
     if (context.ip) {
@@ -112,8 +140,7 @@ export class AuthService {
           type: 'otp_request_rate_limited',
           phone: normalizedPhone,
           countryIso: country.iso,
-          ip: context.ip,
-          userAgent: context.userAgent,
+          ...eventContext,
           metadata: {
             limit: this.otpRequestLimitPerIpPerHour,
             window: '1h',
@@ -122,6 +149,31 @@ export class AuthService {
         });
         throw new HttpException(
           'Too many OTP requests from this network. Try again later.',
+          HttpStatus.TOO_MANY_REQUESTS,
+        );
+      }
+    }
+
+    if (deviceHash) {
+      const recentByDevice = await this.telemetry.countRecentEvents({
+        types: ['otp_requested'],
+        since: oneHourAgo,
+        deviceHash,
+      });
+      if (recentByDevice >= this.otpRequestLimitPerDevicePerHour) {
+        await this.telemetry.recordEvent({
+          type: 'otp_request_rate_limited',
+          phone: normalizedPhone,
+          countryIso: country.iso,
+          ...eventContext,
+          metadata: {
+            limit: this.otpRequestLimitPerDevicePerHour,
+            window: '1h',
+            scope: 'device',
+          },
+        });
+        throw new HttpException(
+          'Too many OTP requests from this device. Try again later.',
           HttpStatus.TOO_MANY_REQUESTS,
         );
       }
@@ -138,8 +190,7 @@ export class AuthService {
         type: 'otp_request_rate_limited',
         phone: normalizedPhone,
         countryIso: country.iso,
-        ip: context.ip,
-        userAgent: context.userAgent,
+        ...eventContext,
         metadata: { limit: this.otpRequestLimitPerHour, window: '1h' },
       });
       throw new HttpException(
@@ -166,8 +217,7 @@ export class AuthService {
         type: 'otp_resend_blocked',
         phone: normalizedPhone,
         countryIso: country.iso,
-        ip: context.ip,
-        userAgent: context.userAgent,
+        ...eventContext,
         userId: user.id,
         otpCodeId: latestOtp.id,
         metadata: { cooldownMs: this.otpResendCooldownMs },
@@ -196,8 +246,7 @@ export class AuthService {
       type: 'otp_requested',
       phone: normalizedPhone,
       countryIso: country.iso,
-      ip: context.ip,
-      userAgent: context.userAgent,
+      ...eventContext,
       userId: user.id,
     });
 
@@ -221,6 +270,15 @@ export class AuthService {
       phone,
       country.iso as CountryIso,
     );
+    const deviceHash = hashDeviceIdentifier(
+      context.deviceId,
+      this.config.get<string>('AUTH_DEVICE_IDENTIFIER_SECRET'),
+    );
+    const eventContext = {
+      ip: context.ip,
+      userAgent: context.userAgent,
+      deviceHash,
+    };
     if (context.ip) {
       const recentVerifyFailuresByIp = await this.telemetry.countRecentEvents({
         types: ['otp_verify_failed', 'otp_verify_locked'],
@@ -233,8 +291,7 @@ export class AuthService {
           type: 'otp_verify_locked',
           phone: normalizedPhone,
           countryIso: country.iso,
-          ip: context.ip,
-          userAgent: context.userAgent,
+          ...eventContext,
           attemptNumber: recentVerifyFailuresByIp,
           metadata: {
             reason: 'ip_window_limit_reached',
@@ -244,6 +301,37 @@ export class AuthService {
         });
         throw new HttpException(
           'Too many invalid OTP attempts from this network. Try again later.',
+          HttpStatus.TOO_MANY_REQUESTS,
+        );
+      }
+    }
+
+    if (deviceHash) {
+      const recentVerifyFailuresByDevice =
+        await this.telemetry.countRecentEvents({
+          types: ['otp_verify_failed', 'otp_verify_locked'],
+          since: new Date(Date.now() - this.otpVerifyFailureWindowMs),
+          deviceHash,
+        });
+
+      if (
+        recentVerifyFailuresByDevice >=
+        this.otpVerifyFailureLimitPerDeviceWindow
+      ) {
+        await this.telemetry.recordEvent({
+          type: 'otp_verify_locked',
+          phone: normalizedPhone,
+          countryIso: country.iso,
+          ...eventContext,
+          attemptNumber: recentVerifyFailuresByDevice,
+          metadata: {
+            reason: 'device_window_limit_reached',
+            limit: this.otpVerifyFailureLimitPerDeviceWindow,
+            windowMs: this.otpVerifyFailureWindowMs,
+          },
+        });
+        throw new HttpException(
+          'Too many invalid OTP attempts from this device. Try again later.',
           HttpStatus.TOO_MANY_REQUESTS,
         );
       }
@@ -269,8 +357,7 @@ export class AuthService {
         type: 'otp_verify_locked',
         phone: normalizedPhone,
         countryIso: country.iso,
-        ip: context.ip,
-        userAgent: context.userAgent,
+        ...eventContext,
         userId: user.id,
         otpCodeId: record.id,
         attemptNumber: record.verifyAttempts,
@@ -301,8 +388,7 @@ export class AuthService {
           type: 'otp_verify_locked',
           phone: normalizedPhone,
           countryIso: country.iso,
-          ip: context.ip,
-          userAgent: context.userAgent,
+          ...eventContext,
           userId: user.id,
           otpCodeId: record.id,
           attemptNumber: verifyAttempts,
@@ -318,8 +404,7 @@ export class AuthService {
         type: 'otp_verify_failed',
         phone: normalizedPhone,
         countryIso: country.iso,
-        ip: context.ip,
-        userAgent: context.userAgent,
+        ...eventContext,
         userId: user.id,
         otpCodeId: record.id,
         attemptNumber: verifyAttempts,
@@ -343,8 +428,7 @@ export class AuthService {
       type: 'otp_verify_succeeded',
       phone: normalizedPhone,
       countryIso: country.iso,
-      ip: context.ip,
-      userAgent: context.userAgent,
+      ...eventContext,
       userId: user.id,
       otpCodeId: record.id,
       attemptNumber: record.verifyAttempts,

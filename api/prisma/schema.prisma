@@ -58,6 +58,7 @@ model AuthEvent {
   phone         String
   countryIso    String
   ip            String?
+  deviceHash    String?
   userAgent     String?
   attemptNumber Int?
   metadataJson  String?
@@ -69,6 +70,8 @@ model AuthEvent {
   otpCode       OtpCode?      @relation(fields: [otpCodeId], references: [id])
 
   @@index([phone, createdAt])
+  @@index([ip, createdAt])
+  @@index([deviceHash, createdAt])
   @@index([type, createdAt])
 }
 
@@ -139,4 +142,6 @@ model NotificationJob {
   updatedAt          DateTime              @updatedAt
 
   @@index([status, nextRunAt])
+  @@index([status, updatedAt])
+  @@index([failedAt])
 }

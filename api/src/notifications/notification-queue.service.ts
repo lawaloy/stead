@@ -163,6 +163,63 @@ export class NotificationQueueService {
     }, {});
   }
 
+  async getOperationalHealth(now = new Date()) {
+    const last24Hours = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+    const staleLockBefore = new Date(now.getTime() - JOB_LOCK_TIMEOUT_MS);
+    const [
+      retrying,
+      staleProcessing,
+      attemptFailuresLast24Hours,
+      deadLettersLast24Hours,
+      oldestPending,
+      lastFailure,
+    ] = await Promise.all([
+      this.prisma.notificationJob.count({
+        where: { status: 'pending', attempts: { gt: 0 } },
+      }),
+      this.prisma.notificationJob.count({
+        where: {
+          status: 'processing',
+          OR: [{ lockedAt: null }, { lockedAt: { lte: staleLockBefore } }],
+        },
+      }),
+      this.prisma.notificationJob.count({
+        where: { failedAt: { gte: last24Hours } },
+      }),
+      this.prisma.notificationJob.count({
+        where: {
+          status: 'dead_letter',
+          updatedAt: { gte: last24Hours },
+        },
+      }),
+      this.prisma.notificationJob.findFirst({
+        where: { status: 'pending' },
+        orderBy: { nextRunAt: 'asc' },
+        select: { id: true, nextRunAt: true, attempts: true },
+      }),
+      this.prisma.notificationJob.findFirst({
+        where: { failedAt: { not: null } },
+        orderBy: { failedAt: 'desc' },
+        select: {
+          id: true,
+          status: true,
+          failedAt: true,
+          lastError: true,
+        },
+      }),
+    ]);
+
+    return {
+      generatedAt: now,
+      retrying,
+      staleProcessing,
+      attemptFailuresLast24Hours,
+      deadLettersLast24Hours,
+      oldestPending: oldestPending ?? null,
+      lastFailure: lastFailure ?? null,
+    };
+  }
+
   async listRecentJobs(limit = 20): Promise<NotificationJob[]> {
     const jobs = await this.prisma.notificationJob.findMany({
       orderBy: { updatedAt: 'desc' },

@@ -19,8 +19,9 @@ export class NotificationsService {
 
   async getInspection(limit: number) {
     const boundedLimit = Math.min(Math.max(limit, 1), 50);
-    const [summary, recentJobs] = await Promise.all([
+    const [summary, health, recentJobs] = await Promise.all([
       this.queue.getStatusSummary(),
+      this.queue.getOperationalHealth(),
       this.queue.listRecentJobs(boundedLimit),
     ]);
 
@@ -34,6 +35,7 @@ export class NotificationsService {
           failed: summary.failed ?? 0,
           deadLetter: summary.dead_letter ?? 0,
         },
+        health,
         recent: recentJobs.map((job) => ({
           id: job.id,
           type: job.type,

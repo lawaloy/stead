@@ -4,6 +4,7 @@ describe('AuthTelemetryService corrupt metadataJson parsing', () => {
   let service: AuthTelemetryService;
   let prisma: {
     authEvent: {
+      count: jest.Mock;
       groupBy: jest.Mock;
       findMany: jest.Mock;
     };
@@ -12,6 +13,7 @@ describe('AuthTelemetryService corrupt metadataJson parsing', () => {
   beforeEach(() => {
     prisma = {
       authEvent: {
+        count: jest.fn().mockResolvedValue(0),
         groupBy: jest.fn().mockResolvedValue([]),
         findMany: jest.fn(),
       },
@@ -27,6 +29,7 @@ describe('AuthTelemetryService corrupt metadataJson parsing', () => {
         phone: '+2348012345678',
         countryIso: 'NG',
         ip: '127.0.0.1',
+        deviceHash: null,
         userAgent: null,
         attemptNumber: 1,
         userId: null,
@@ -45,6 +48,7 @@ describe('AuthTelemetryService corrupt metadataJson parsing', () => {
         phone: '+234***78',
         countryIso: 'NG',
         ip: '127.0.0.1',
+        deviceRef: null,
         userAgent: null,
         attemptNumber: 1,
         userId: null,
@@ -63,6 +67,7 @@ describe('AuthTelemetryService corrupt metadataJson parsing', () => {
         phone: '+2348012345678',
         countryIso: 'NG',
         ip: null,
+        deviceHash: null,
         userAgent: null,
         attemptNumber: null,
         userId: null,
@@ -76,6 +81,7 @@ describe('AuthTelemetryService corrupt metadataJson parsing', () => {
         phone: '+2348098765432',
         countryIso: 'NG',
         ip: null,
+        deviceHash: null,
         userAgent: null,
         attemptNumber: null,
         userId: null,

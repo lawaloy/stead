@@ -106,6 +106,29 @@ describe('auth-feedback', () => {
     );
   });
 
+  it('maps device request and verify lockouts', () => {
+    expect(
+      getAuthErrorMessage(
+        new ApiError({
+          message: 'Too many OTP requests from this device. Try again later.',
+          status: 429,
+        }),
+        'request',
+      ),
+    ).toBe('Too many code requests came from this device. Try again later.');
+
+    expect(
+      getAuthErrorMessage(
+        new ApiError({
+          message:
+            'Too many invalid OTP attempts from this device. Try again later.',
+          status: 429,
+        }),
+        'verify',
+      ),
+    ).toBe('Too many incorrect codes came from this device. Try again later.');
+  });
+
   it('preserves unknown api messages and falls back when empty', () => {
     expect(
       getAuthErrorMessage(

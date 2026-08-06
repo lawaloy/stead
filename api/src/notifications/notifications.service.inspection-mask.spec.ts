@@ -5,6 +5,7 @@ describe('NotificationsService inspection phone masking', () => {
   let queue: {
     enqueueOtpRequested: jest.Mock;
     getStatusSummary: jest.Mock;
+    getOperationalHealth: jest.Mock;
     listRecentJobs: jest.Mock;
   };
   let sms: {
@@ -15,6 +16,7 @@ describe('NotificationsService inspection phone masking', () => {
     queue = {
       enqueueOtpRequested: jest.fn(),
       getStatusSummary: jest.fn().mockResolvedValue({}),
+      getOperationalHealth: jest.fn().mockResolvedValue({}),
       listRecentJobs: jest.fn(),
     };
     sms = {

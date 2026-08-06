@@ -14,6 +14,12 @@ jest.mock('../lib/base-url', () => ({
   resolveApiBaseUrl: () => 'http://localhost:3000',
 }));
 
+jest.mock('../lib/installation-id-store', () => ({
+  installationIdStore: {
+    getOrCreateId: async () => '0f81c2a7-1e6d-4f05-9a1c-03de8a5f6b77',
+  },
+}));
+
 describe('api client', () => {
   const mock = createAxiosMock(apiClient);
 
@@ -33,6 +39,9 @@ describe('api client', () => {
 
     mock.onPost('/auth/request-otp').reply((config) => {
       expect(config.headers?.Authorization).toBe('Bearer jwt-token');
+      expect(config.headers?.['X-Stead-Device-Id']).toBe(
+        '0f81c2a7-1e6d-4f05-9a1c-03de8a5f6b77',
+      );
       return [200, { ok: true, otp: '123456' }];
     });
 

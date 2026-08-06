@@ -347,6 +347,75 @@ describe('NotificationQueueService', () => {
     });
   });
 
+  it('reports retry, stale-lock, and recent failure diagnostics', async () => {
+    const now = new Date('2026-08-05T12:00:00.000Z');
+    prisma.notificationJob.count
+      .mockResolvedValueOnce(2)
+      .mockResolvedValueOnce(1)
+      .mockResolvedValueOnce(4)
+      .mockResolvedValueOnce(1);
+    prisma.notificationJob.findFirst
+      .mockResolvedValueOnce({
+        id: 'job_pending',
+        nextRunAt: new Date('2026-08-05T11:55:00.000Z'),
+        attempts: 1,
+      })
+      .mockResolvedValueOnce({
+        id: 'job_failed',
+        status: 'dead_letter',
+        failedAt: new Date('2026-08-05T11:59:00.000Z'),
+        lastError: 'provider unavailable',
+      });
+
+    await expect(queue.getOperationalHealth(now)).resolves.toEqual({
+      generatedAt: now,
+      retrying: 2,
+      staleProcessing: 1,
+      attemptFailuresLast24Hours: 4,
+      deadLettersLast24Hours: 1,
+      oldestPending: {
+        id: 'job_pending',
+        nextRunAt: new Date('2026-08-05T11:55:00.000Z'),
+        attempts: 1,
+      },
+      lastFailure: {
+        id: 'job_failed',
+        status: 'dead_letter',
+        failedAt: new Date('2026-08-05T11:59:00.000Z'),
+        lastError: 'provider unavailable',
+      },
+    });
+    expect(prisma.notificationJob.count.mock.calls).toEqual([
+      [{ where: { status: 'pending', attempts: { gt: 0 } } }],
+      [
+        {
+          where: {
+            status: 'processing',
+            OR: [
+              { lockedAt: null },
+              { lockedAt: { lte: new Date('2026-08-05T11:55:00.000Z') } },
+            ],
+          },
+        },
+      ],
+      [
+        {
+          where: {
+            failedAt: { gte: new Date('2026-08-04T12:00:00.000Z') },
+          },
+        },
+      ],
+      [
+        {
+          where: {
+            status: 'dead_letter',
+            updatedAt: { gte: new Date('2026-08-04T12:00:00.000Z') },
+          },
+        },
+      ],
+    ]);
+  });
+
   it('lists recent jobs newest-first and maps payloads', async () => {
     const updatedAt = new Date('2026-01-02T00:00:00.000Z');
     prisma.notificationJob.findMany.mockResolvedValue([

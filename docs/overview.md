@@ -93,10 +93,11 @@ Implemented API modules:
    - OTP request and verify endpoints
    - Phone normalization by country
    - JWT-based sessions
-   - Per-phone and per-IP OTP request throttles
+   - Per-phone, per-IP, and keyed pseudonymous device OTP request throttles
    - OTP resend cooldown
    - Verify attempt lockout
    - Auth event telemetry for request, resend, verify failure, lockout, and success outcomes
+   - Multi-window operator diagnostics for lockout trends, repeated phones/IPs/devices, and device-signal coverage
 
 2. SMS and notification jobs
    - Twilio and Termii provider support
@@ -106,6 +107,7 @@ Implemented API modules:
    - Retry and dead-letter state
    - Provider metadata capture for sent jobs
    - Authenticated inspection endpoints for auth events and notification queue state
+   - Queue health diagnostics for retries, stale processing locks, recent attempt failures, dead letters, and the latest failure
 
 3. Obligation goals
    - Name
@@ -141,6 +143,7 @@ Implemented screens and flows:
 - Resend cooldown and clearer auth error states
 - Dev OTP hint support when the API enables `DEV_EXPOSE_OTP=true`
 - Token persistence and unauthorized-session clearing
+- A stable installation UUID sent with API requests for server-side abuse correlation; the API persists only a keyed hash
 - Active goal setup
 - Manual income/expense entry with optional active-goal tagging
 - Stability dashboard
@@ -172,26 +175,22 @@ work at the client, repository-policy, and external-provider boundaries.
 
 ### 6.1 Active Milestone: Production-readiness validation
 
-P0 work, in order:
+Completed P0 work:
 
-1. Complete the local mobile auth acceptance pass documented in
-   [Auth Hardening](auth-hardening.md#p0-local-mobile-auth-acceptance-pass).
-   This is the next engineering task because the API pipeline is automated, but
-   the mobile request, verification, authenticated routing, and restart behavior
-   have not been validated together.
-2. Make Dependency Review a blocking check and add it to the active `main`
-   ruleset. The workflow currently uses `continue-on-error: true`; see the
+1. The local Expo web mobile-auth acceptance pass now covers OTP request,
+   dev-provider delivery, verification, authenticated routing, session restore,
+   and unauthorized-session clearing. See the validation record in
+   [Auth Hardening](auth-hardening.md#validation-record).
+2. Dependency Review is blocking in its workflow and is a required check in the
+   active `main` ruleset. See the
    [Branch Protection Checklist](branch-protection-checklist.md).
 
-P1 work:
+P1 delivery status:
 
-1. Enforce API/mobile response contracts from one authoritative source. The
-   current mobile schema tests use hand-authored fixtures and cannot detect an
-   API serializer drifting independently.
-2. Add stronger device-aware abuse controls beyond the current phone and IP
-   limits.
-3. Expand operator-facing visibility around repeated auth failures, lockouts,
-   and dead-letter notification jobs.
+1. Authoritative API/mobile contract generation and CI drift enforcement are
+   implemented and under review.
+2. Device-aware OTP controls and stronger auth/notification operator diagnostics
+   are implemented and covered by unit and PostgreSQL-backed e2e tests.
 
 Real-provider OTP validation remains externally blocked until a paid or
 verified sender account is available. When available, configure credentials

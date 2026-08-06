@@ -12,6 +12,9 @@ process.env.JWT_SECRET = process.env.JWT_SECRET || 'stead-test-secret-12345';
 process.env.NOTIFICATION_PAYLOAD_ENCRYPTION_KEY =
   process.env.NOTIFICATION_PAYLOAD_ENCRYPTION_KEY ||
   'stead-test-notification-key-1234567890';
+process.env.AUTH_DEVICE_IDENTIFIER_SECRET =
+  process.env.AUTH_DEVICE_IDENTIFIER_SECRET ||
+  'stead-test-device-identifier-key-1234567890';
 process.env.SMS_PROVIDER = process.env.SMS_PROVIDER || 'dev';
 
 describe('App CORS (e2e)', () => {
@@ -38,7 +41,12 @@ describe('App CORS (e2e)', () => {
       .options('/auth/request-otp')
       .set('Origin', 'http://localhost:8081')
       .set('Access-Control-Request-Method', 'POST')
+      .set('Access-Control-Request-Headers', 'content-type,x-stead-device-id')
       .expect(204)
-      .expect('access-control-allow-origin', 'http://localhost:8081');
+      .expect('access-control-allow-origin', 'http://localhost:8081')
+      .expect(
+        'access-control-allow-headers',
+        /content-type,x-stead-device-id/i,
+      );
   });
 });

@@ -4,6 +4,7 @@ describe('envSchema', () => {
   const requiredEnv = {
     DATABASE_URL: 'postgresql://stead:stead@localhost:5432/stead',
     JWT_SECRET: 'a-secret-with-16-chars',
+    AUTH_DEVICE_IDENTIFIER_SECRET: 'a-device-identifier-secret-with-32-chars',
     NOTIFICATION_PAYLOAD_ENCRYPTION_KEY:
       'a-notification-encryption-key-with-32-chars',
   };
@@ -149,6 +150,25 @@ describe('envSchema', () => {
     );
   });
 
+  it('requires a separate 32-character device identifier secret', () => {
+    const missing = envSchema.validate({
+      ...requiredEnv,
+      AUTH_DEVICE_IDENTIFIER_SECRET: undefined,
+      SMS_PROVIDER: 'dev',
+    });
+    const reused = envSchema.validate({
+      ...requiredEnv,
+      AUTH_DEVICE_IDENTIFIER_SECRET:
+        requiredEnv.NOTIFICATION_PAYLOAD_ENCRYPTION_KEY,
+      SMS_PROVIDER: 'dev',
+    });
+
+    expect(missing.error?.message).toContain('AUTH_DEVICE_IDENTIFIER_SECRET');
+    expect(reused.error?.message).toContain(
+      'AUTH_DEVICE_IDENTIFIER_SECRET must not reuse',
+    );
+  });
+
   it('rejects otp abuse-control env values below their minimums', () => {
     const result = envSchema.validate(
       {
@@ -156,8 +176,10 @@ describe('envSchema', () => {
         SMS_PROVIDER: 'dev',
         AUTH_OTP_REQUEST_LIMIT_PER_HOUR: 0,
         AUTH_OTP_REQUEST_LIMIT_PER_IP_PER_HOUR: 0,
+        AUTH_OTP_REQUEST_LIMIT_PER_DEVICE_PER_HOUR: 0,
         AUTH_OTP_MAX_VERIFY_ATTEMPTS: 0,
         AUTH_OTP_VERIFY_FAILURE_LIMIT_PER_IP_WINDOW: 0,
+        AUTH_OTP_VERIFY_FAILURE_LIMIT_PER_DEVICE_WINDOW: 0,
         AUTH_OTP_RESEND_COOLDOWN_MS: 500,
         AUTH_OTP_VERIFY_FAILURE_WINDOW_MS: 500,
       },
@@ -177,12 +199,22 @@ describe('envSchema', () => {
     ).toBe(true);
     expect(
       details.some((message) =>
+        message.includes('AUTH_OTP_REQUEST_LIMIT_PER_DEVICE_PER_HOUR'),
+      ),
+    ).toBe(true);
+    expect(
+      details.some((message) =>
         message.includes('AUTH_OTP_MAX_VERIFY_ATTEMPTS'),
       ),
     ).toBe(true);
     expect(
       details.some((message) =>
         message.includes('AUTH_OTP_VERIFY_FAILURE_LIMIT_PER_IP_WINDOW'),
+      ),
+    ).toBe(true);
+    expect(
+      details.some((message) =>
+        message.includes('AUTH_OTP_VERIFY_FAILURE_LIMIT_PER_DEVICE_WINDOW'),
       ),
     ).toBe(true);
     expect(

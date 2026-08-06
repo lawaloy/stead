@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
+import { createHmac } from 'node:crypto';
 import * as bcrypt from 'bcrypt';
 import { BadRequestException, HttpException, HttpStatus } from '@nestjs/common';
 import { AuthService } from './auth.service';
@@ -266,6 +267,47 @@ describe('AuthService', () => {
       -1,
     ) as [{ metadata?: { scope?: string } }];
     expect(recordedRateLimitEvent.metadata?.scope).toBe('ip');
+  });
+
+  it('rate limits otp requests by keyed device identity', async () => {
+    const deviceId = '0f81c2a7-1e6d-4f05-9a1c-03de8a5f6b77';
+    const deviceSecret = 'test-device-identifier-secret-1234567890';
+    const deviceHash = createHmac('sha256', deviceSecret)
+      .update(deviceId)
+      .digest('hex');
+    config.get.mockImplementation((key: string) => {
+      if (key === 'AUTH_DEVICE_IDENTIFIER_SECRET') return deviceSecret;
+      if (key === 'AUTH_OTP_REQUEST_LIMIT_PER_DEVICE_PER_HOUR') return 2;
+      return undefined;
+    });
+    telemetry.countRecentEvents.mockResolvedValueOnce(2);
+
+    await expect(
+      service.requestOtp('08012345678', 'NG', {
+        deviceId,
+        userAgent: 'jest-agent',
+      }),
+    ).rejects.toMatchObject({
+      message: 'Too many OTP requests from this device. Try again later.',
+      status: HttpStatus.TOO_MANY_REQUESTS,
+    });
+
+    expect(telemetry.countRecentEvents).toHaveBeenCalledWith({
+      types: ['otp_requested'],
+      since: expect.any(Date) as unknown,
+      deviceHash,
+    });
+    expect(telemetry.recordEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'otp_request_rate_limited',
+        deviceHash,
+        metadata: { limit: 2, window: '1h', scope: 'device' },
+      }),
+    );
+    expect(JSON.stringify(telemetry.recordEvent.mock.calls)).not.toContain(
+      deviceId,
+    );
+    expect(prisma.otpCode.count).not.toHaveBeenCalled();
   });
 
   it('rate limits otp requests per phone within the hourly window', async () => {
@@ -589,6 +631,47 @@ describe('AuthService', () => {
         ip: '127.0.0.1',
       }),
     );
+  });
+
+  it('rate limits otp verification failures by keyed device identity', async () => {
+    const deviceId = '908de9d7-7c80-4275-a255-a5f6e1f7246f';
+    const deviceSecret = 'test-device-identifier-secret-1234567890';
+    const deviceHash = createHmac('sha256', deviceSecret)
+      .update(deviceId)
+      .digest('hex');
+    config.get.mockImplementation((key: string) => {
+      if (key === 'AUTH_DEVICE_IDENTIFIER_SECRET') return deviceSecret;
+      if (key === 'AUTH_OTP_VERIFY_FAILURE_LIMIT_PER_DEVICE_WINDOW') return 3;
+      if (key === 'AUTH_OTP_VERIFY_FAILURE_WINDOW_MS') return 60_000;
+      return undefined;
+    });
+    telemetry.countRecentEvents.mockResolvedValueOnce(3);
+
+    await expect(
+      service.verifyOtp('08012345678', 'NG', '123456', { deviceId }),
+    ).rejects.toMatchObject({
+      message:
+        'Too many invalid OTP attempts from this device. Try again later.',
+      status: HttpStatus.TOO_MANY_REQUESTS,
+    });
+
+    expect(telemetry.countRecentEvents).toHaveBeenCalledWith({
+      types: ['otp_verify_failed', 'otp_verify_locked'],
+      since: expect.any(Date) as unknown,
+      deviceHash,
+    });
+    expect(telemetry.recordEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'otp_verify_locked',
+        deviceHash,
+        metadata: {
+          reason: 'device_window_limit_reached',
+          limit: 3,
+          windowMs: 60_000,
+        },
+      }),
+    );
+    expect(prisma.user.findUnique).not.toHaveBeenCalled();
   });
 
   it('uses configured verify failure ip window limits', async () => {
