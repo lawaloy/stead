@@ -112,7 +112,8 @@ This sequence is intentional. Stead should prioritize user-facing product surfac
 
 - Lock module boundaries in API (`auth`, `countries`, `goals`, `transactions`, `dashboard`, `notifications`, and provider-specific `sms`).
 - Enforce contract tests between API responses and mobile schema decoders.
-- Add architecture decision records (ADRs) for key boundary choices.
+- Keep key boundary and ownership choices explicit in this roadmap and in
+  code-level interfaces.
 - Current status:
   - Core MVP modules exist in the API.
   - The authoritative OpenAPI contract generates API serializer/DTO types and
@@ -145,9 +146,8 @@ This sequence is intentional. Stead should prioritize user-facing product surfac
 - Preserve the existing retry/dead-letter semantics while replacing the in-process worker boundary with an independently deployable consumer.
 - Current status:
   - OTP delivery is already behind a notification queue abstraction.
-  - API Core reaches Messaging through the `NotificationPublisher` port;
-    [ADR 0002](adr/0002-notification-service-extraction-boundary.md) defines
-    the logical and future physical extraction boundary.
+  - API Core reaches Messaging through the `NotificationPublisher` port, which
+    is the logical boundary for a future independently deployed consumer.
   - Dead-letter handling and retry policy exist in the database-backed queue.
   - Physical service extraction is not done yet.
 - Exit criteria:
