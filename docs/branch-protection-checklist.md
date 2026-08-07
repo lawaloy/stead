@@ -2,7 +2,7 @@
 
 Target branch: `main`
 
-Last verified: 2026-08-05 through the GitHub repository ruleset API.
+Last verified: 2026-08-06 through the GitHub repository ruleset API.
 
 `main` is governed by the active `Stead Rules` repository ruleset. GitHub's
 classic branch-protection endpoint reports no classic protection, so the

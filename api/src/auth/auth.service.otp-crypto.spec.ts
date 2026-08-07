@@ -5,7 +5,7 @@ import { ConfigService } from '@nestjs/config';
 import { AuthService } from './auth.service';
 import { AuthTelemetryService } from './auth-telemetry.service';
 import { PrismaService } from '../prisma/prisma.service';
-import { NotificationsService } from '../notifications/notifications.service';
+import { NOTIFICATION_PUBLISHER } from '../notifications/notification-publisher';
 import { CountriesService } from '../countries/countries.service';
 
 jest.mock('node:crypto', () => {
@@ -29,7 +29,7 @@ describe('AuthService OTP crypto padding', () => {
       upsert: jest.Mock;
     };
   };
-  let notifications: { enqueueOtpRequested: jest.Mock };
+  let notificationPublisher: { publishOtpRequested: jest.Mock };
   let telemetry: { recordEvent: jest.Mock; countRecentEvents: jest.Mock };
 
   beforeEach(async () => {
@@ -46,8 +46,8 @@ describe('AuthService OTP crypto padding', () => {
         }),
       },
     };
-    notifications = {
-      enqueueOtpRequested: jest.fn(),
+    notificationPublisher = {
+      publishOtpRequested: jest.fn(),
     };
     telemetry = {
       recordEvent: jest.fn(),
@@ -58,7 +58,7 @@ describe('AuthService OTP crypto padding', () => {
       providers: [
         AuthService,
         { provide: PrismaService, useValue: prisma },
-        { provide: NotificationsService, useValue: notifications },
+        { provide: NOTIFICATION_PUBLISHER, useValue: notificationPublisher },
         { provide: JwtService, useValue: { signAsync: jest.fn() } },
         { provide: AuthTelemetryService, useValue: telemetry },
         {
@@ -113,10 +113,10 @@ describe('AuthService OTP crypto padding', () => {
 
       expect(randomInt).toHaveBeenCalledWith(0, 1_000_000);
       expect(response).toEqual({ ok: true, otp: expectedOtp });
-      expect(notifications.enqueueOtpRequested).toHaveBeenCalledWith(
-        '+2348012345678',
-        expectedOtp,
-      );
+      expect(notificationPublisher.publishOtpRequested).toHaveBeenCalledWith({
+        phone: '+2348012345678',
+        otp: expectedOtp,
+      });
     },
   );
 });

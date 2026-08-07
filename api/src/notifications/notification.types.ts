@@ -1,11 +1,10 @@
+import type { OtpRequestedPayload } from './notification-publisher';
+
+export type { OtpRequestedPayload } from './notification-publisher';
+
 export type NotificationEventType = 'otp.requested';
 export type NotificationJobStatus =
   'pending' | 'processing' | 'sent' | 'failed' | 'dead_letter';
-
-export interface OtpRequestedPayload {
-  phone: string;
-  otp: string;
-}
 
 export interface RedactedOtpRequestedPayload {
   phone: '<redacted>';

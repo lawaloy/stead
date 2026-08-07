@@ -3,11 +3,15 @@ import {
   BadRequestException,
   HttpException,
   HttpStatus,
+  Inject,
   Injectable,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
-import { NotificationsService } from '../notifications/notifications.service';
+import {
+  NOTIFICATION_PUBLISHER,
+  type NotificationPublisher,
+} from '../notifications/notification-publisher';
 import * as bcrypt from 'bcrypt';
 import { JwtService } from '@nestjs/jwt';
 import { AuthTelemetryService } from './auth-telemetry.service';
@@ -44,7 +48,8 @@ function generateOtp() {
 export class AuthService {
   constructor(
     private prisma: PrismaService,
-    private notifications: NotificationsService,
+    @Inject(NOTIFICATION_PUBLISHER)
+    private readonly notificationPublisher: NotificationPublisher,
     private jwt: JwtService,
     private telemetry: AuthTelemetryService,
     private readonly config: ConfigService,
@@ -250,7 +255,10 @@ export class AuthService {
       userId: user.id,
     });
 
-    await this.notifications.enqueueOtpRequested(normalizedPhone, otp);
+    await this.notificationPublisher.publishOtpRequested({
+      phone: normalizedPhone,
+      otp,
+    });
 
     if (this.config.get<string>('DEV_EXPOSE_OTP') === 'true') {
       return { ok: true, otp };
