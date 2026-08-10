@@ -1,0 +1,11 @@
+{
+  "name": "@stead/image-size-compat",
+  "version": "1.0.2",
+  "description": "Metro-compatible image metadata boundary for Stead",
+  "private": true,
+  "main": "index.cjs",
+  "license": "MIT",
+  "dependencies": {
+    "image-meta": "0.2.2"
+  }
+}

@@ -41,7 +41,7 @@ const auditRemediationPins = [
   },
   {
     packageName: 'js-yaml',
-    version: '4.3.0',
+    version: '4.3.1',
     lockfilePath: 'node_modules/js-yaml',
   },
   {

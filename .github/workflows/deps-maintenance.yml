@@ -10,6 +10,9 @@ permissions:
   contents: write
   pull-requests: write
 
+env:
+  NPM_CHECK_UPDATES_VERSION: 22.2.9
+
 concurrency:
   group: dependency-maintenance
   cancel-in-progress: false
@@ -46,15 +49,20 @@ jobs:
         working-directory: api
         run: npm ci
 
-      - name: Update API lockfile and patch vulnerabilities
+      - name: Update API dependencies and patch vulnerabilities
         working-directory: api
         run: |
-          npm update
+          npx --yes "npm-check-updates@${NPM_CHECK_UPDATES_VERSION}" --upgrade --target latest --reject typescript
+          npm install
           npm audit fix || true
 
       - name: API audit report (non-blocking)
         working-directory: api
         run: npm audit --audit-level=moderate || true
+
+      - name: Verify API lockfile consistency
+        working-directory: api
+        run: npm ci --ignore-scripts
 
       - name: Pin mobile npm version
         run: npm install --global npm@10.9.7
@@ -63,17 +71,39 @@ jobs:
         working-directory: mobile
         run: npm ci
 
-      - name: Update mobile lockfile and patch vulnerabilities
+      - name: Update mobile dependencies and patch vulnerabilities
         working-directory: mobile
         run: |
-          npm update
+          npx --yes "npm-check-updates@${NPM_CHECK_UPDATES_VERSION}" --upgrade --target latest --reject typescript
+          npm install
           npm audit fix || true
 
       - name: Mobile audit report (non-blocking)
         working-directory: mobile
         run: npm audit --audit-level=moderate || true
 
+      - name: Verify mobile lockfile consistency
+        working-directory: mobile
+        run: npm ci --ignore-scripts
+
+      - name: Detect dependency changes
+        id: dependency-changes
+        shell: bash
+        run: |
+          if git diff --quiet -- \
+            api/package.json api/package-lock.json \
+            mobile/package.json mobile/package-lock.json; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "No dependency changes detected; no pull request is needed."
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            git diff --stat -- \
+              api/package.json api/package-lock.json \
+              mobile/package.json mobile/package-lock.json
+          fi
+
       - name: Create or update maintenance PR
+        if: steps.dependency-changes.outputs.changed == 'true'
         uses: peter-evans/create-pull-request@v7
         with:
           token: ${{ steps.app-token.outputs.token }}
@@ -85,8 +115,10 @@ jobs:
           commit-message: 'chore(deps): automated dependency maintenance'
           body: |
             Automated dependency maintenance run:
-            - `api`: `npm update`, `npm audit fix`, `npm audit --audit-level=moderate` (non-blocking report)
-            - `mobile`: `npm update`, `npm audit fix`, `npm audit --audit-level=moderate` (non-blocking report)
+            - Advances direct dependency manifest ranges with pinned `npm-check-updates@22.2.9`.
+            - Preserves the TypeScript 7 hold until the API and mobile toolchains support it.
+            - Regenerates and verifies the `api` and `mobile` lockfiles with their CI-pinned npm versions.
+            - Runs `npm audit fix` and records moderate-or-higher audit findings as non-blocking reports.
 
             This updates the same PR while it is still open. If that PR is merged, the action deletes the branch and the next run will create a new branch/PR named `security/deps-maintenance`.
           labels: |
