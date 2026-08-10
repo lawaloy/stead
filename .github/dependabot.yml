@@ -35,15 +35,12 @@ updates:
     schedule:
       interval: "cron"
       cronjob: "0 13 * * *"
+    # Routine version updates are handled by the repository-owned dependency
+    # maintenance workflow, which safely exits when an update produces no diff.
+    # A zero limit disables version PRs without disabling security updates.
+    open-pull-requests-limit: 0
     groups:
-      npm-safe:
+      npm-security:
+        applies-to: "security-updates"
         patterns:
           - "*"
-        update-types:
-          - "minor"
-          - "patch"
-      npm-major:
-        patterns:
-          - "*"
-        update-types:
-          - "major"

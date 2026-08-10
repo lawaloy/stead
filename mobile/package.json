@@ -25,13 +25,14 @@
     "expo-router": "~57.0.8",
     "expo-secure-store": "~57.0.1",
     "expo-status-bar": "~57.0.1",
+    "image-size": "file:vendor/image-size-compat",
     "libphonenumber-js": "^1.13.9",
     "react": "19.2.8",
     "react-dom": "19.2.8",
     "react-native": "0.86.2",
     "react-native-gesture-handler": "~3.1.0",
     "react-native-safe-area-context": "~5.8.0",
-    "react-native-screens": "~4.26.2",
+    "react-native-screens": "~4.27.0",
     "react-native-web": "^0.21.2",
     "zod": "^4.4.3"
   },
@@ -54,7 +55,7 @@
     "node-forge": "1.4.0",
     "uuid": "14.0.0",
     "yaml": "2.8.3",
-    "js-yaml": "4.3.0",
+    "js-yaml": "4.3.1",
     "handlebars": "4.7.9",
     "anymatch": {
       "picomatch": "2.3.2"
