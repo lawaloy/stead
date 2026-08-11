@@ -1,9 +1,8 @@
-name: Dependency Maintenance
+name: Mobile Dependency Maintenance
 
 on:
   schedule:
-    - cron: '0 10 * * 1'
-    - cron: '0 10 * * 4'
+    - cron: '0 13 * * *'
   workflow_dispatch:
 
 permissions:
@@ -11,10 +10,12 @@ permissions:
   pull-requests: write
 
 env:
+  CI: 'true'
+  EXPO_DOCTOR_VERSION: 1.20.1
   NPM_CHECK_UPDATES_VERSION: 22.2.9
 
 concurrency:
-  group: dependency-maintenance
+  group: mobile-dependency-maintenance
   cancel-in-progress: false
 
 jobs:
@@ -38,67 +39,72 @@ jobs:
         with:
           node-version: 24
           cache: npm
-          cache-dependency-path: |
-            api/package-lock.json
-            mobile/package-lock.json
+          cache-dependency-path: mobile/package-lock.json
 
       - name: Pin npm version
-        run: npm install --global npm@11.6.2
-
-      - name: Install API dependencies
-        working-directory: api
-        run: npm ci
-
-      - name: Update API dependencies and patch vulnerabilities
-        working-directory: api
-        run: |
-          npx --yes "npm-check-updates@${NPM_CHECK_UPDATES_VERSION}" --upgrade --target latest --reject typescript
-          npm install
-          npm audit fix || true
-
-      - name: API audit report (non-blocking)
-        working-directory: api
-        run: npm audit --audit-level=moderate || true
-
-      - name: Verify API lockfile consistency
-        working-directory: api
-        run: npm ci --ignore-scripts
-
-      - name: Pin mobile npm version
         run: npm install --global npm@10.9.7
 
       - name: Install mobile dependencies
         working-directory: mobile
         run: npm ci
 
-      - name: Update mobile dependencies and patch vulnerabilities
+      - name: Update mobile dependencies
         working-directory: mobile
         run: |
-          npx --yes "npm-check-updates@${NPM_CHECK_UPDATES_VERSION}" --upgrade --target latest --reject typescript
+          npx --yes "npm-check-updates@${NPM_CHECK_UPDATES_VERSION}" \
+            --upgrade \
+            --target semver \
+            --cooldown 3 \
+            --format cooldown \
+            --reject "typescript,expo,expo-*,react,react-dom,react-native,react-native-*,@types/react,babel-preset-expo,eslint-config-expo,@types/jest,jest,jest-util"
           npm install
-          npm audit fix || true
 
-      - name: Mobile audit report (non-blocking)
+      - name: Block high-severity production vulnerabilities
         working-directory: mobile
-        run: npm audit --audit-level=moderate || true
+        run: npm audit --omit=dev --audit-level=high
+
+      - name: Mobile full-tree audit report
+        continue-on-error: true
+        working-directory: mobile
+        run: npm audit --audit-level=moderate
 
       - name: Verify mobile lockfile consistency
         working-directory: mobile
         run: npm ci --ignore-scripts
+
+      - name: Verify Expo dependency compatibility
+        working-directory: mobile
+        run: |
+          npx expo install --check
+          npx --yes "expo-doctor@${EXPO_DOCTOR_VERSION}"
+
+      - name: Lint mobile
+        working-directory: mobile
+        run: npm run lint
+
+      - name: Typecheck mobile
+        working-directory: mobile
+        run: npm run typecheck
+
+      - name: Test mobile
+        working-directory: mobile
+        run: npm test -- --ci --runInBand
+
+      - name: Build mobile
+        working-directory: mobile
+        run: npm run build
 
       - name: Detect dependency changes
         id: dependency-changes
         shell: bash
         run: |
           if git diff --quiet -- \
-            api/package.json api/package-lock.json \
             mobile/package.json mobile/package-lock.json; then
             echo "changed=false" >> "$GITHUB_OUTPUT"
             echo "No dependency changes detected; no pull request is needed."
           else
             echo "changed=true" >> "$GITHUB_OUTPUT"
             git diff --stat -- \
-              api/package.json api/package-lock.json \
               mobile/package.json mobile/package-lock.json
           fi
 
@@ -109,23 +115,22 @@ jobs:
           token: ${{ steps.app-token.outputs.token }}
           author: "lawaloy <40930161+lawaloy@users.noreply.github.com>"
           committer: "stead-deps[bot] <stead-deps[bot]@users.noreply.github.com>"
-          branch: security/deps-maintenance
+          branch: chore/mobile-deps-maintenance
           delete-branch: true
-          title: 'chore(deps): automated dependency maintenance'
-          commit-message: 'chore(deps): automated dependency maintenance'
+          title: 'chore(deps): automated mobile dependency maintenance'
+          commit-message: 'chore(deps): automated mobile dependency maintenance'
           body: |
-            Automated dependency maintenance run:
-            - Advances direct dependency manifest ranges with pinned `npm-check-updates@22.2.9`.
-            - Preserves the TypeScript 7 hold until the API and mobile toolchains support it.
-            - Regenerates and verifies the `api` and `mobile` lockfiles with their CI-pinned npm versions.
-            - Runs `npm audit fix` and records moderate-or-higher audit findings as non-blocking reports.
+            Automated mobile dependency maintenance run:
+            - Advances direct mobile dependencies only within their declared semver ranges using pinned `npm-check-updates@22.2.9` and a three-day release cooldown.
+            - Excludes the Expo/React Native platform stack, Jest baseline, exact pins, and TypeScript 7 so those upgrades remain deliberate engineering work.
+            - Verifies the accepted Expo compatibility baseline with Expo CLI and pinned `expo-doctor@1.20.1`; it does not silently downgrade tested exceptions.
+            - Regenerates and verifies the mobile lockfile with the CI-pinned npm version.
+            - Leaves vulnerability remediation to native Dependabot, blocks high-severity production findings, and records moderate-or-higher full-tree findings.
+            - Passes mobile lint, typecheck, tests, and build before this PR is created or updated.
 
-            This updates the same PR while it is still open. If that PR is merged, the action deletes the branch and the next run will create a new branch/PR named `security/deps-maintenance`.
+            This updates the same PR while it is still open. If that PR is merged, the action deletes the branch and the next run will create a new branch/PR named `chore/mobile-deps-maintenance`.
           labels: |
             dependencies
-            security
           add-paths: |
-            api/package.json
-            api/package-lock.json
             mobile/package.json
             mobile/package-lock.json

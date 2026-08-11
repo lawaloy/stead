@@ -97,10 +97,9 @@ jobs:
               return (
                 pr.head.repo?.full_name === `${owner}/${repo}` &&
                 pr.base?.ref === 'main' &&
-                pr.head?.ref === 'security/deps-maintenance' &&
+                pr.head?.ref === 'chore/mobile-deps-maintenance' &&
                 ['app/github-actions', 'github-actions[bot]', 'stead-deps[bot]', 'app/stead-deps'].includes(authorLogin) &&
-                labels.includes('dependencies') &&
-                labels.includes('security')
+                labels.includes('dependencies')
               );
             };
 
@@ -142,6 +141,13 @@ jobs:
               }
 
               if (pullRequest.mergeable_state === 'behind') {
+                if (lane === 'dependabot') {
+                  core.info(
+                    `Waiting for Dependabot to rebase PR #${pull_number}; a synchronized run will retry auto-merge.`,
+                  );
+                  return;
+                }
+
                 try {
                   await github.rest.pulls.updateBranch({
                     owner,

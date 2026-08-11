@@ -34,10 +34,13 @@ These are the exact contexts stored in the active ruleset:
 - [x] `build`
 - [x] `mobile-test` — includes mobile typecheck and unit tests
 - [x] `CodeQL`
-- [x] `dependency-review` — blocks critical runtime dependency findings
+- [x] `dependency-review` — blocks high-severity or critical runtime dependency findings
 
 The Dependency Review workflow is required and its scan step propagates
-failures, so a critical runtime dependency finding blocks a merge.
+failures, so a newly introduced high-severity or critical runtime dependency
+finding blocks a merge. The API Dependency Audit runs daily and on demand to
+detect high-severity findings already present in the full production dependency
+tree; it is an operational monitor rather than a second pull-request gate.
 
 ## Urgent Follow-up
 

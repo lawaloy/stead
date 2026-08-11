@@ -1,0 +1,43 @@
+name: API Dependency Audit
+
+on:
+  schedule:
+    - cron: '30 13 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: api-dependency-audit-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: api
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: api/package-lock.json
+
+      - name: Pin npm version
+        run: npm install --global npm@11.6.2
+
+      - name: Verify lockfile installation
+        run: npm ci --ignore-scripts
+
+      - name: Fail on high-severity production vulnerabilities
+        run: npm audit --omit=dev --audit-level=high
+
+      - name: Report moderate-or-higher full-tree vulnerabilities
+        continue-on-error: true
+        run: npm audit --audit-level=moderate
