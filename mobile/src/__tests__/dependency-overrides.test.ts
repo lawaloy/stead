@@ -67,6 +67,25 @@ const lockfileDependencyCandidates = (
 };
 
 describe('dependency overrides', () => {
+  it('documents the tested Expo dependency compatibility exceptions', () => {
+    const packageJson = readJson<{
+      expo?: { install?: { exclude?: string[] } };
+    }>('package.json');
+
+    expect(packageJson.expo?.install?.exclude).toEqual([
+      '@types/jest',
+      'expo',
+      'expo-constants',
+      'expo-router',
+      'jest',
+      'react',
+      'react-dom',
+      'react-native-gesture-handler',
+      'react-native-safe-area-context',
+      'react-native-screens',
+    ]);
+  });
+
   it('uses patched YAML and a local safe image metadata boundary', () => {
     const packageJson = readJson<{
       dependencies?: Record<string, string>;
