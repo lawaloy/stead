@@ -1,11 +1,6 @@
 name: API Dependency Audit
 
 on:
-  pull_request:
-    branches: [main]
-    paths:
-      - 'api/package.json'
-      - 'api/package-lock.json'
   schedule:
     - cron: '30 13 * * *'
   workflow_dispatch:
@@ -14,7 +9,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: api-dependency-audit-${{ github.event.pull_request.number || github.ref }}
+  group: api-dependency-audit-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -40,7 +35,7 @@ jobs:
       - name: Verify lockfile installation
         run: npm ci --ignore-scripts
 
-      - name: Block high-severity production vulnerabilities
+      - name: Fail on high-severity production vulnerabilities
         run: npm audit --omit=dev --audit-level=high
 
       - name: Report moderate-or-higher full-tree vulnerabilities
