@@ -123,14 +123,14 @@ describe('dependency overrides', () => {
 
     expect(packageJson).toMatchObject({
       overrides: {
-        postcss: '8.5.23',
+        postcss: '8.5.26',
       },
     });
 
     expect(packageLock).toMatchObject({
       packages: {
         'node_modules/postcss': {
-          version: '8.5.23',
+          version: '8.5.26',
         },
       },
     });
