@@ -15,54 +15,9 @@ type PackageLock = {
 
 const auditRemediationPins = [
   {
-    packageName: '@angular-devkit/core',
-    version: '21.2.14',
-    lockfilePath: 'node_modules/@angular-devkit/core',
-  },
-  {
-    packageName: '@angular-devkit/schematics',
-    version: '21.2.14',
-    lockfilePath: 'node_modules/@angular-devkit/schematics',
-  },
-  {
-    packageName: '@angular-devkit/schematics-cli',
-    version: '21.2.14',
-    lockfilePath: 'node_modules/@angular-devkit/schematics-cli',
-  },
-  {
-    packageName: 'file-type',
-    version: '21.3.2',
-    lockfilePath: 'node_modules/file-type',
-  },
-  {
-    packageName: 'find-my-way',
-    version: '9.7.0',
-    lockfilePath: 'node_modules/find-my-way',
-  },
-  {
     packageName: 'js-yaml',
     version: '4.3.1',
     lockfilePath: 'node_modules/js-yaml',
-  },
-  {
-    packageName: 'lodash',
-    version: '4.18.1',
-    lockfilePath: 'node_modules/lodash',
-  },
-  {
-    packageName: 'multer',
-    version: '2.2.0',
-    lockfilePath: 'node_modules/multer',
-  },
-  {
-    packageName: 'handlebars',
-    version: '4.7.9',
-    lockfilePath: 'node_modules/handlebars',
-  },
-  {
-    packageName: 'valibot',
-    version: '1.4.2',
-    lockfilePath: 'node_modules/valibot',
   },
 ] as const;
 
@@ -106,13 +61,7 @@ describe('dependency lockfile', () => {
     const packageLock = readJson<PackageLock>('package-lock.json');
 
     for (const pin of auditRemediationPins) {
-      if (pin.packageName === 'handlebars') {
-        expect(packageJson.overrides['ts-jest']).toMatchObject({
-          handlebars: pin.version,
-        });
-      } else {
-        expect(packageJson.overrides[pin.packageName]).toBe(pin.version);
-      }
+      expect(packageJson.overrides[pin.packageName]).toBe(pin.version);
 
       expect(packageLock.packages[pin.lockfilePath]).toMatchObject({
         version: pin.version,

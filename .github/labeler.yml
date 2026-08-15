@@ -10,6 +10,7 @@ security:
   - changed-files:
       - any-glob-to-any-file:
           - ".github/workflows/deps-maintenance.yml"
+          - ".github/workflows/dependency-audit.yml"
           - ".github/workflows/dependency-review.yml"
           - "api/package.json"
           - "api/package-lock.json"

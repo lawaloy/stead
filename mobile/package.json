@@ -60,7 +60,6 @@
     "@typescript-eslint/parser": "^8.67.0",
     "axios-mock-adapter": "^2.1.0",
     "babel-preset-expo": "~57.0.1",
-    "chalk": "5.6.2",
     "eslint": "^10.8.1",
     "eslint-config-expo": "^57.0.0",
     "jest": "~30.4.2",
@@ -69,42 +68,12 @@
     "typescript": "~6.0.3"
   },
   "overrides": {
-    "node-forge": "1.4.0",
-    "uuid": "14.0.0",
-    "yaml": "2.8.3",
     "js-yaml": "4.3.1",
+    "uuid": "14.0.1",
+    "node-forge": "1.4.0",
+    "yaml": "2.8.3",
     "handlebars": "4.7.9",
-    "anymatch": {
-      "picomatch": "2.3.2"
-    },
-    "micromatch": {
-      "picomatch": "2.3.2"
-    },
-    "fdir": {
-      "picomatch": "4.0.4"
-    },
-    "tinyglobby": {
-      "picomatch": "4.0.4"
-    },
-    "jest-haste-map": {
-      "picomatch": "4.0.4"
-    },
-    "metro": {
-      "picomatch": "2.3.2"
-    },
-    "metro-file-map": {
-      "picomatch": "2.3.2"
-    },
-    "minimatch@3": {
-      "brace-expansion": "1.1.18"
-    },
-    "minimatch@9": {
-      "brace-expansion": "2.1.4"
-    },
-    "minimatch@10": {
-      "brace-expansion": "5.0.9"
-    },
-    "postcss": "8.5.23"
+    "postcss": "8.5.26"
   },
   "private": true
 }
