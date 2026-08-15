@@ -38,9 +38,10 @@ These are the exact contexts stored in the active ruleset:
 
 The Dependency Review workflow is required and its scan step propagates
 failures, so a newly introduced high-severity or critical runtime dependency
-finding blocks a merge. The API Dependency Audit runs daily and on demand to
-detect high-severity findings already present in the full production dependency
-tree; it is an operational monitor rather than a second pull-request gate.
+finding blocks a merge. The Dependency Audit workflow runs daily for both API
+and mobile (and on demand) to detect high-severity findings already present in
+each production dependency tree; it is an operational monitor rather than a
+second pull-request gate.
 
 ## Urgent Follow-up
 
