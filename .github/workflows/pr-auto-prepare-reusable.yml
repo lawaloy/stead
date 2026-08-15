@@ -61,7 +61,7 @@ jobs:
               return (
                 pr.head.repo?.full_name === `${owner}/${repo}` &&
                 pr.base.ref === 'main' &&
-                pr.head.ref === 'chore/mobile-deps-maintenance' &&
+                ['chore/mobile-deps-maintenance', 'chore/api-deps-maintenance'].includes(pr.head.ref) &&
                 ['app/github-actions', 'github-actions[bot]', 'stead-deps[bot]', 'app/stead-deps'].includes(authorLogin) &&
                 labels.includes('dependencies')
               );

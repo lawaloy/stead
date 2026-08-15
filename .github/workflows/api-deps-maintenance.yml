@@ -1,0 +1,124 @@
+name: API Dependency Maintenance
+
+on:
+  schedule:
+    - cron: '0 13 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+env:
+  CI: 'true'
+  NPM_CHECK_UPDATES_VERSION: 22.2.9
+
+concurrency:
+  group: api-dependency-maintenance
+  cancel-in-progress: false
+
+jobs:
+  maintain:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Generate GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ vars.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          token: ${{ steps.app-token.outputs.token }}
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: api/package-lock.json
+
+      - name: Pin npm version
+        run: npm install --global npm@11.6.2
+
+      - name: Install API dependencies
+        working-directory: api
+        run: npm ci
+
+      - name: Update API dependencies
+        working-directory: api
+        run: |
+          npx --yes "npm-check-updates@${NPM_CHECK_UPDATES_VERSION}" \
+            --upgrade \
+            --target semver \
+            --cooldown 3 \
+            --format cooldown \
+            --reject "typescript,@typescript/native,@hey-api/openapi-ts"
+          npm install
+
+      - name: Block high-severity production vulnerabilities
+        working-directory: api
+        run: npm audit --omit=dev --audit-level=high
+
+      - name: API full-tree audit report
+        continue-on-error: true
+        working-directory: api
+        run: npm audit --audit-level=moderate
+
+      - name: Verify API lockfile consistency
+        working-directory: api
+        run: npm ci --ignore-scripts
+
+      - name: Lint API
+        working-directory: api
+        run: npm run lint -- --no-fix
+
+      - name: Build API
+        working-directory: api
+        run: npm run build
+
+      - name: Test API
+        working-directory: api
+        run: npm test -- --ci --runInBand
+
+      - name: Detect dependency changes
+        id: dependency-changes
+        shell: bash
+        run: |
+          if git diff --quiet -- \
+            api/package.json api/package-lock.json; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "No dependency changes detected; no pull request is needed."
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            git diff --stat -- \
+              api/package.json api/package-lock.json
+          fi
+
+      - name: Create or update maintenance PR
+        if: steps.dependency-changes.outputs.changed == 'true'
+        uses: peter-evans/create-pull-request@v7
+        with:
+          token: ${{ steps.app-token.outputs.token }}
+          author: "lawaloy <40930161+lawaloy@users.noreply.github.com>"
+          committer: "stead-deps[bot] <stead-deps[bot]@users.noreply.github.com>"
+          branch: chore/api-deps-maintenance
+          delete-branch: true
+          title: 'chore(deps): automated API dependency maintenance'
+          commit-message: 'chore(deps): automated API dependency maintenance'
+          body: |
+            Automated API dependency maintenance run:
+            - Advances direct API dependencies only within their declared semver ranges using pinned `npm-check-updates@22.2.9` and a three-day release cooldown.
+            - Leaves TypeScript major upgrades, the TypeScript 7 native alias, and exact OpenAPI codegen pins as deliberate engineering work.
+            - Regenerates and verifies the API lockfile with the CI-pinned npm version.
+            - Leaves vulnerability remediation to native Dependabot, blocks high-severity production findings, and records moderate-or-higher full-tree findings.
+            - Passes API lint, build, and unit tests before this PR is created or updated.
+
+            This updates the same PR while it is still open. If that PR is merged, the action deletes the branch and the next run will create a new branch/PR named `chore/api-deps-maintenance`.
+          labels: |
+            dependencies
+          add-paths: |
+            api/package.json
+            api/package-lock.json

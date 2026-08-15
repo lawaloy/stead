@@ -59,6 +59,14 @@ jobs:
             --reject "typescript,expo,expo-*,react,react-dom,react-native,react-native-*,@types/react,babel-preset-expo,eslint-config-expo,@types/jest,jest,jest-util"
           npm install
 
+      - name: Align Expo SDK packages within the accepted baseline
+        working-directory: mobile
+        run: |
+          # Keep deliberate exceptions in expo.install.exclude untouched, but
+          # sync every other Expo-managed package to the SDK-recommended
+          # versions so daily runs do not fail on patch drift that ncu rejects.
+          npx expo install --fix
+
       - name: Block high-severity production vulnerabilities
         working-directory: mobile
         run: npm audit --omit=dev --audit-level=high
@@ -123,10 +131,11 @@ jobs:
             Automated mobile dependency maintenance run:
             - Advances direct mobile dependencies only within their declared semver ranges using pinned `npm-check-updates@22.2.9` and a three-day release cooldown.
             - Excludes the Expo/React Native platform stack, Jest baseline, exact pins, and TypeScript 7 so those upgrades remain deliberate engineering work.
-            - Verifies the accepted Expo compatibility baseline with Expo CLI and pinned `expo-doctor@1.20.1`; it does not silently downgrade tested exceptions.
+            - Aligns non-excluded Expo SDK packages with `expo install --fix`, then verifies the accepted baseline with Expo CLI and pinned `expo-doctor@1.20.1`.
             - Regenerates and verifies the mobile lockfile with the CI-pinned npm version.
             - Leaves vulnerability remediation to native Dependabot, blocks high-severity production findings, and records moderate-or-higher full-tree findings.
             - Passes mobile lint, typecheck, tests, and build before this PR is created or updated.
+            - Exits successfully with no PR when the update produces no dependency diff.
 
             This updates the same PR while it is still open. If that PR is merged, the action deletes the branch and the next run will create a new branch/PR named `chore/mobile-deps-maintenance`.
           labels: |

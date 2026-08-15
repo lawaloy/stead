@@ -10,28 +10,12 @@ updates:
     schedule:
       interval: "cron"
       cronjob: "0 13 * * *"
-    # Keep Dependabot responsible for refreshing its own update branches after
-    # another dependency PR merges.
     rebase-strategy: "auto"
-    # TypeScript 7 is blocked until the API lint/test toolchain supports it.
-    # The typescript-7-readiness workflow checks this weekly so the ignore
-    # can be removed when upstream packages are ready.
-    ignore:
-      - dependency-name: "typescript"
-        update-types:
-          - "version-update:semver-major"
+    # Routine version updates are handled by the repository-owned API dependency
+    # maintenance workflow, which safely exits when an update produces no diff.
+    # A zero limit disables version PRs without disabling security updates.
+    open-pull-requests-limit: 0
     groups:
-      npm-safe:
-        patterns:
-          - "*"
-        update-types:
-          - "minor"
-          - "patch"
-      npm-major:
-        patterns:
-          - "*"
-        update-types:
-          - "major"
       npm-security:
         applies-to: "security-updates"
         patterns:
@@ -43,9 +27,10 @@ updates:
       interval: "cron"
       cronjob: "0 13 * * *"
     rebase-strategy: "auto"
-    # Routine version updates are handled by the repository-owned dependency
-    # maintenance workflow, which safely exits when an update produces no diff.
-    # A zero limit disables version PRs without disabling security updates.
+    # Routine version updates are handled by the repository-owned mobile
+    # dependency maintenance workflow, which safely exits when an update
+    # produces no diff. A zero limit disables version PRs without disabling
+    # security updates.
     open-pull-requests-limit: 0
     groups:
       npm-security:
