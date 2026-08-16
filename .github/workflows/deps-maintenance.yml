@@ -45,10 +45,6 @@ jobs:
       - name: Pin npm version
         run: npm install --global npm@11.6.2
 
-      - name: Install API dependencies
-        working-directory: api
-        run: npm ci
-
       - name: Update API dependencies
         working-directory: api
         run: |
@@ -68,10 +64,6 @@ jobs:
         continue-on-error: true
         working-directory: api
         run: npm audit --audit-level=moderate
-
-      - name: Verify API lockfile consistency
-        working-directory: api
-        run: npm ci --ignore-scripts
 
       - name: Lint API
         working-directory: api
@@ -114,7 +106,7 @@ jobs:
             Automated API dependency maintenance run:
             - Advances direct API dependencies only within their declared semver ranges using pinned `npm-check-updates@22.2.9` and a three-day release cooldown.
             - Leaves TypeScript major upgrades, the TypeScript 7 native alias, and exact OpenAPI codegen pins as deliberate engineering work.
-            - Regenerates and verifies the API lockfile with the CI-pinned npm version.
+            - Installs the updated lockfile with scripts enabled (including Prisma generate) using the CI-pinned npm version.
             - Leaves vulnerability remediation to native Dependabot, blocks high-severity production findings, and records moderate-or-higher full-tree findings.
             - Passes API lint, build, and unit tests before this PR is created or updated.
             - Exits successfully with no PR when the update produces no dependency diff.
@@ -152,10 +144,6 @@ jobs:
       - name: Pin npm version
         run: npm install --global npm@10.9.7
 
-      - name: Install mobile dependencies
-        working-directory: mobile
-        run: npm ci
-
       - name: Update mobile dependencies
         working-directory: mobile
         run: |
@@ -183,10 +171,6 @@ jobs:
         continue-on-error: true
         working-directory: mobile
         run: npm audit --audit-level=moderate
-
-      - name: Verify mobile lockfile consistency
-        working-directory: mobile
-        run: npm ci --ignore-scripts
 
       - name: Verify Expo dependency compatibility
         working-directory: mobile
@@ -240,7 +224,7 @@ jobs:
             - Advances direct mobile dependencies only within their declared semver ranges using pinned `npm-check-updates@22.2.9` and a three-day release cooldown.
             - Excludes the Expo/React Native platform stack, Jest baseline, exact pins, and TypeScript 7 so those upgrades remain deliberate engineering work.
             - Aligns non-excluded Expo SDK packages with `expo install --fix`, then verifies the accepted baseline with Expo CLI and pinned `expo-doctor@1.20.1`.
-            - Regenerates and verifies the mobile lockfile with the CI-pinned npm version.
+            - Installs the updated lockfile with the CI-pinned npm version before Expo checks and app gates.
             - Leaves vulnerability remediation to native Dependabot, blocks high-severity production findings, and records moderate-or-higher full-tree findings.
             - Passes mobile lint, typecheck, tests, and build before this PR is created or updated.
             - Exits successfully with no PR when the update produces no dependency diff.
