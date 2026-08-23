@@ -15,17 +15,26 @@ Standard commands for lint, test, build, and dev are documented in the root `REA
 
 Open PRs **ready for review by default**. Use `--draft` only when the user explicitly requests a draft or the work is intentionally incomplete.
 
-When creating PRs (including via `gh pr create`), use [`.github/pull_request_template.md`](.github/pull_request_template.md):
+When creating PRs, use [`.github/pull_request_template.md`](.github/pull_request_template.md):
 
 - **`## What + Why`** with at least one filled bullet (not `## Summary`)
 - **`## Checks`** for local verification before push
 - **`<!-- AUTO:START -->` … `<!-- AUTO:END -->`** markers so the PR Description workflow can update the file list in place
 
-```bash
-gh pr create --title "..." --body-file .github/pull_request_template.md
-```
-
 Fill in **What + Why** before the next push. Details: [CONTRIBUTING.md](CONTRIBUTING.md#pull-requests).
+
+### GitHub operations
+
+- Use the installed GitHub app connector first for remote GitHub operations,
+  including pull requests, issues, reviews, checks, workflow runs, labels, and
+  auto-merge.
+- Do not default to the `gh` CLI and do not treat an expired or missing `gh`
+  token as a blocker while the GitHub app connector is available.
+- Use `gh` only when the user explicitly requests it or after confirming that
+  the GitHub app connector does not expose the required operation.
+- Continue to use local `git` commands for working-tree inspection, branches,
+  commits, and synchronizing the local checkout. `git` and `gh` are separate
+  tools; this preference does not prohibit normal local Git workflows.
 
 ### Prerequisites
 
