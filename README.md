@@ -2,15 +2,25 @@
 
 Stead is a Financial Stability Layer that turns cashflow into decision intelligence to help users plan for obligations and spend safely.
 
-Current repo status:
+Current repository status:
 
-- API: NestJS, Prisma, Postgres, JWT auth, OTP over SMS, goals, manual transactions, stability dashboard, and persisted notification jobs.
-- Mobile: Expo Router app with OTP login, token persistence, active goal setup, manual transaction entry, and stability dashboard screens.
-- CI: API/mobile lint, API unit and PostgreSQL-backed e2e tests, API/mobile builds, mobile typecheck/tests, blocking Dependency Review, and CodeQL are present.
+- API: the core auth, single-active-goal, manual-transaction, stability-dashboard,
+  and persisted OTP-notification boundaries are implemented.
+- Mobile: the core vertical slice supports OTP login, active-goal creation,
+  manual transaction creation, and dashboard viewing. It does not yet expose
+  all API capabilities; goal updates and transaction list/update/delete are
+  notable gaps.
+- Verification: auth/notification has PostgreSQL-backed e2e coverage. Finance
+  currently relies mainly on unit and API-client tests, and the app has no
+  automated screen or native-device journey suite.
+- Production readiness: live SMS delivery on real devices, production session
+  lifecycle, finance e2e coverage, operations, and several product workflows
+  remain incomplete.
 
 Quick links
 
 - Overview: [docs/overview.md](docs/overview.md)
+- Capability and test status: [docs/project-status.md](docs/project-status.md)
 - Active architecture milestone: [docs/architecture-roadmap.md](docs/architecture-roadmap.md#delivery-roadmap)
 - Auth readiness work: [docs/auth-hardening.md](docs/auth-hardening.md)
 - Repository rules audit: [docs/branch-protection-checklist.md](docs/branch-protection-checklist.md)

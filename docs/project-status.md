@@ -1,0 +1,114 @@
+# Project Status
+
+Last reviewed against the repository: 2026-08-22.
+
+This document separates four states that should not be treated as equivalent:
+
+- **Implemented**: production code exists in this repository.
+- **Exposed in mobile**: a user can reach the capability in the Expo app.
+- **Automated coverage**: a repeatable automated test exercises the stated
+  boundary.
+- **Production-validated**: the capability has been exercised with its real
+  external dependencies and target device/runtime.
+
+An implemented endpoint is not automatically a finished product feature, and
+unit coverage is not the same as a full mobile-to-database acceptance test.
+
+## Capability Matrix
+
+| Capability | API | Mobile | Current verification | Remaining work |
+| --- | --- | --- | --- | --- |
+| Authentication countries | Implemented | Country selector with offline NG/US/GB fallback | API and mobile unit tests; generated response schema | Validate country configuration and copy for each launch market |
+| OTP request and verification | Implemented with normalized phones, hashed OTPs, resend cooldown, attempt limits, and JWT issuance | Implemented | API unit tests; PostgreSQL e2e for the dev provider; manual Expo web flow | Complete a real-provider pass on native Android and iOS |
+| Session persistence and logout | JWT verification implemented | Token persistence, restore, 401 clearing, and local logout implemented | Mobile storage/API-client unit tests; manual Expo web restore/401 pass | Add automated route/screen coverage; define refresh, expiry UX, revocation, and rotation strategy |
+| OTP abuse controls | Per-phone, IP, and pseudonymous device limits implemented | Stable installation UUID is sent | API unit and PostgreSQL e2e coverage | Decide whether native attestation or an edge risk service is required |
+| Auth and queue inspection | Allowlisted API endpoints implemented | No operator UI | API unit and PostgreSQL e2e coverage | Build an operations surface and production alerting/runbooks |
+| Goals | Create, read active, and update implemented; database enforces one active goal per user | Read active and create only | API service/controller unit tests; mobile API-client tests | Add finance e2e coverage; add mobile edit/deactivate/history UX |
+| Transactions | Create, list, update, and delete implemented | Create only | API service/controller unit tests; mobile create-client tests | Add finance e2e coverage; add mobile ledger, filters, edit, and delete |
+| Stability dashboard | Implemented for an active goal | Implemented | Scoring/service/controller unit tests; mobile response parsing; auth e2e checks only the no-goal response | Add database-backed finance scenarios and screen/journey tests; validate the scoring model with users |
+| OTP notification queue | Encrypted persisted jobs, leases, retry, and dead-letter behavior implemented | Not directly user-facing | Extensive unit tests and PostgreSQL e2e coverage | Move the serial in-process worker only when an independent deployment is justified |
+| SMS providers | Dev, Twilio, and Termii adapters implemented | OTP UI is provider-agnostic | Mocked provider unit tests; dev-provider e2e | Live Twilio or Termii delivery has not been production-validated |
+| Weekly readiness and risk alerts | Not implemented | Not implemented | None | Define triggers, preferences, templates, delivery channels, and tests |
+| API/mobile contracts | OpenAPI generation for mobile-consumed routes implemented | Generated types and Zod response validation used | CI regeneration/drift check and schema tests | Add every newly consumed route before mobile integration; inspection routes remain intentionally internal |
+| User profile and account lifecycle | Not implemented beyond the phone-based user record | Not implemented | None | Define profile, consent, data export, account deletion, and support flows |
+| Automatic financial data | Not implemented | Manual entry only | None | Decide whether to integrate bank data, imports, or another ingestion source |
+| Multiple simultaneous goals | Intentionally unsupported; only one active goal is allowed | Not supported | Unit tests plus a schema/migration invariant test | Revisit the product rule before implementing multi-goal planning |
+
+## Test Coverage Boundaries
+
+### Automated today
+
+- API unit tests cover validation, auth, rate limits, telemetry, operator
+  authorization, goals, transactions, dashboard scoring, notification queue
+  behavior, SMS adapters, environment validation, and ownership scoping.
+- PostgreSQL-backed API e2e tests cover the basic app/CORS boundary and the OTP
+  pipeline: persistence, dev delivery, verification, device limits, inspection,
+  retries, and dead-lettering.
+- Mobile unit tests cover phone/OTP helpers, auth feedback, environment and base
+  URL selection, session and installation-ID storage, API-client behavior,
+  finance request/response parsing, generated contract shapes, and dependency
+  compatibility safeguards.
+- CI checks API/mobile lint and builds, API unit/e2e tests, mobile typecheck/unit
+  tests, contract drift, dependency review, dependency audit, and CodeQL.
+
+### Not automated today
+
+- There is no PostgreSQL-backed happy-path e2e suite for creating/updating goals,
+  full transaction CRUD, or populated dashboard calculations.
+- There are no React Native screen/component tests for the auth, goal,
+  transaction, or dashboard screens.
+- There is no automated mobile-to-API journey test.
+- There is no native Android or iOS acceptance suite.
+- There is no live Twilio or Termii integration test.
+- There are no load, soak, failover, accessibility, or security-penetration
+  suites, and no enforced code-coverage threshold.
+
+The recorded manual acceptance pass covers Expo web only. See
+[Auth Hardening](auth-hardening.md#validation-record) for its exact scope.
+
+## Known Delivery Gaps
+
+The following ordering is a recommended planning aid, not a promise that every
+item is committed to a release.
+
+### Before a production pilot
+
+1. Validate OTP delivery and verification with the chosen live SMS provider on
+   real Android and iOS devices.
+2. Add PostgreSQL-backed e2e coverage for goal, transaction, and populated
+   dashboard flows.
+3. Add an automated critical mobile journey covering authentication, goal
+   setup, transaction entry, dashboard refresh, session restore, and logout.
+4. Define production session behavior: token expiry UX, revocation, rotation,
+   and incident response.
+5. Guard money conversions against values outside JavaScript's safe-integer
+   range, or adopt a lossless client representation.
+6. Establish deployment, monitoring, alerting, backup/restore, privacy, data
+   retention, and account-deletion procedures.
+
+### Product completeness
+
+1. Add a transaction ledger with filtering, editing, and deletion in mobile.
+2. Add goal editing, deactivation, and history instead of creating a replacement
+   goal for every change.
+3. Replace raw kobo and ISO timestamp inputs with user-friendly currency and
+   date controls.
+4. Add screen-level empty, loading, offline, retry, validation, and
+   accessibility coverage.
+5. Define and implement weekly readiness updates and risk-warning alerts.
+6. Validate the stability-score inputs, weights, labels, and recommendations
+   with target users before treating the score as financial guidance.
+
+### Later platform expansion
+
+- Automatic transaction ingestion or bank connectivity.
+- Multiple concurrent obligations and richer planning scenarios.
+- Customer profile, preferences, consent, export, and support tooling.
+- Marketing website, web product, internal admin tools, and the service
+  extractions described in the [Architecture Roadmap](architecture-roadmap.md).
+
+## Keeping This Current
+
+Update this file whenever a capability crosses one of the boundaries above.
+When closing a gap, link the implementation and test in the pull request and
+change only the claims that the new evidence supports.

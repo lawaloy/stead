@@ -9,6 +9,11 @@
 - [System Architecture](#5-system-architecture)
 - [Remaining Gaps](#6-remaining-gaps)
 
+For the endpoint-by-endpoint product and verification matrix, see
+[Project Status](project-status.md). That document is the source of truth for
+distinguishing implemented code from mobile exposure, automated coverage, and
+production validation.
+
 ## 1.1 Vision
 
 Stead is a Financial Stability Layer that helps Nigerians stay prepared for future financial obligations by translating their cashflow into decision intelligence.
@@ -150,6 +155,10 @@ Implemented screens and flows:
 
 Mobile API responses are parsed with Zod schemas before the UI consumes them.
 
+The mobile product surface is smaller than the API surface. It can create a
+goal and create a transaction, but it cannot update an existing goal or list,
+edit, and delete transactions. Those API operations exist server-side only.
+
 ## 5. System Architecture
 
 ### 5.1 High-Level Architecture
@@ -169,35 +178,24 @@ Mobile API responses are parsed with Zod schemas before the UI consumes them.
 
 ## 6. Remaining Gaps
 
-The MVP flow is implemented, and the server-side OTP notification pipeline now
-has PostgreSQL-backed e2e coverage in CI. Production readiness still depends on
-work at the client, repository-policy, and external-provider boundaries.
+The repository contains a working core vertical slice, not a complete or
+production-validated financial product.
 
-### 6.1 Active Milestone: Production-readiness validation
+The largest current gaps are:
 
-Completed P0 work:
+1. Real-provider OTP validation on native Android and iOS devices.
+2. PostgreSQL-backed e2e coverage for goals, transaction CRUD, and populated
+   dashboard calculations.
+3. Automated mobile screen and mobile-to-API journey coverage.
+4. Mobile transaction history/edit/delete and goal edit/history workflows.
+5. Production session lifecycle, operational monitoring, backup/restore,
+   privacy, retention, and account-deletion procedures.
+6. Weekly readiness and risk alerts; the notification queue currently delivers
+   OTPs only.
+7. Automatic financial-data ingestion, richer obligation planning, customer
+   profile/preferences, and internal operations tooling.
 
-1. The local Expo web mobile-auth acceptance pass now covers OTP request,
-   dev-provider delivery, verification, authenticated routing, session restore,
-   and unauthorized-session clearing. See the validation record in
-   [Auth Hardening](auth-hardening.md#validation-record).
-2. Dependency Review is blocking in its workflow and is a required check in the
-   active `main` ruleset. See the
-   [Branch Protection Checklist](branch-protection-checklist.md).
-
-P1 delivery status:
-
-1. Authoritative API/mobile contract generation and CI drift enforcement are
-   implemented and enforced on `main`.
-2. Device-aware OTP controls and stronger auth/notification operator diagnostics
-   are implemented on `main` and covered by unit and PostgreSQL-backed e2e tests.
-3. Identity now publishes OTP delivery through a narrow notification port while
-   the durable worker remains in-process.
-
-Real-provider OTP validation remains externally blocked until a paid or
-verified sender account is available. When available, configure credentials
-outside source control, run a real-phone request and verify pass, and capture
-the operator failure-response playbook.
-
-Weekly readiness updates and risk warning alerts remain later roadmap items;
-the current notification pipeline is used for OTP delivery.
+See [Project Status](project-status.md) for the full capability matrix, exact
+test boundaries, and recommended delivery ordering. See
+[Auth Hardening](auth-hardening.md) for the completed Expo web validation and
+the still-deferred real-provider pass.

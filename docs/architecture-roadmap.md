@@ -5,6 +5,9 @@
 - Product: Stead Financial Stability Layer.
 - Current state: one backend API (`api`) and one Expo Router mobile app (`mobile`) in the same repository.
 - Constraint: long-term direction is multiple services, without locking into a monorepo as the end state.
+- Delivery status and test boundaries are tracked separately in
+  [Project Status](project-status.md); roadmap items are not shipped features
+  unless that status document says they are implemented.
 
 ## v2 Goals
 
@@ -132,6 +135,10 @@ This sequence is intentional. Stead should prioritize user-facing product surfac
     they are introduced.
   - P1: validate real-provider OTP delivery and the operator response playbook
     when a paid or verified sender account is available.
+  - P1: add PostgreSQL-backed finance e2e scenarios and an automated critical
+    mobile journey before treating the vertical slice as production-ready.
+  - P1: close the mobile/API capability gap for goal maintenance and transaction
+    history only after the intended product workflow is agreed.
   - Next extraction step: define the cross-process command envelope,
     correlation/idempotency strategy, and queue selection criteria before
     moving the worker out of the API deployment.

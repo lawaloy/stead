@@ -2,7 +2,7 @@
 
 Target branch: `main`
 
-Last verified: 2026-08-06 through the GitHub repository ruleset API.
+Last verified: 2026-08-22 through the GitHub repository ruleset API.
 
 `main` is governed by the active `Stead Rules` repository ruleset. GitHub's
 classic branch-protection endpoint reports no classic protection, so the
@@ -22,8 +22,8 @@ checklist.
 - [ ] Allow only squash merge — merge, squash, and rebase are currently allowed
 
 The ruleset also blocks branch deletion and non-fast-forward updates, requires
-CodeQL findings to stay below the configured threshold, and enables Copilot
-code review on pushes.
+CodeQL findings to stay below the configured threshold, enforces code-quality
+errors, and enables Copilot code review on pushes.
 
 ## Required Status Checks
 
