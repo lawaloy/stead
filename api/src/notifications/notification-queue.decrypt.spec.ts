@@ -81,7 +81,15 @@ describe('NotificationQueueService decrypt fail-closed paths', () => {
   it('rejects opaque payloads that are neither OTP nor encrypted envelopes', async () => {
     await expect(
       claimWithPayload(JSON.stringify({ note: 'not-an-otp-payload' })),
-    ).rejects.toThrow('Invalid notification payload');
+    ).resolves.toBeNull();
+    expect(prisma.notificationJob.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'job_1' },
+        data: expect.objectContaining({
+          lastError: 'Invalid notification payload',
+        }) as unknown,
+      }),
+    );
   });
 
   it('rejects encrypted envelopes produced with a different key', async () => {
@@ -93,8 +101,14 @@ describe('NotificationQueueService decrypt fail-closed paths', () => {
       },
     );
 
-    await expect(claimWithPayload(payloadJson)).rejects.toThrow(
-      'Unable to decrypt notification payload',
+    await expect(claimWithPayload(payloadJson)).resolves.toBeNull();
+    expect(prisma.notificationJob.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'job_1' },
+        data: expect.objectContaining({
+          lastError: 'Unable to decrypt notification payload',
+        }) as unknown,
+      }),
     );
   });
 
@@ -107,8 +121,16 @@ describe('NotificationQueueService decrypt fail-closed paths', () => {
     ) as { v: number; iv: string; authTag: string; ciphertext: string };
     envelope.ciphertext = Buffer.from('tampered-ciphertext').toString('base64');
 
-    await expect(claimWithPayload(JSON.stringify(envelope))).rejects.toThrow(
-      'Unable to decrypt notification payload',
+    await expect(
+      claimWithPayload(JSON.stringify(envelope)),
+    ).resolves.toBeNull();
+    expect(prisma.notificationJob.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'job_1' },
+        data: expect.objectContaining({
+          lastError: 'Unable to decrypt notification payload',
+        }) as unknown,
+      }),
     );
   });
 
@@ -117,8 +139,14 @@ describe('NotificationQueueService decrypt fail-closed paths', () => {
       phone: '+2348000000000',
     });
 
-    await expect(claimWithPayload(payloadJson)).rejects.toThrow(
-      'Unable to decrypt notification payload',
+    await expect(claimWithPayload(payloadJson)).resolves.toBeNull();
+    expect(prisma.notificationJob.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'job_1' },
+        data: expect.objectContaining({
+          lastError: 'Unable to decrypt notification payload',
+        }) as unknown,
+      }),
     );
   });
 
@@ -131,8 +159,16 @@ describe('NotificationQueueService decrypt fail-closed paths', () => {
     ) as { v: number; iv: string; authTag: string; ciphertext: string };
     envelope.v = 2;
 
-    await expect(claimWithPayload(JSON.stringify(envelope))).rejects.toThrow(
-      'Invalid notification payload',
+    await expect(
+      claimWithPayload(JSON.stringify(envelope)),
+    ).resolves.toBeNull();
+    expect(prisma.notificationJob.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'job_1' },
+        data: expect.objectContaining({
+          lastError: 'Invalid notification payload',
+        }) as unknown,
+      }),
     );
   });
 

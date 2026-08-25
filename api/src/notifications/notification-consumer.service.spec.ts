@@ -32,11 +32,16 @@ describe('NotificationConsumerService', () => {
     updatedAt: new Date('2026-03-29T12:00:00Z'),
   };
 
+  let errorSpy: jest.SpiedFunction<Logger['error']>;
+
   const tick = () => (service as unknown as { tick(): Promise<void> }).tick();
 
   beforeEach(() => {
     jest.spyOn(Logger.prototype, 'log').mockImplementation(() => undefined);
     jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+    errorSpy = jest
+      .spyOn(Logger.prototype, 'error')
+      .mockImplementation(() => undefined);
 
     queue = {
       claimReadyJob: jest.fn(),
@@ -268,5 +273,29 @@ describe('NotificationConsumerService', () => {
         message: 'OTP notification payload has been redacted',
       }),
     );
+  });
+
+  it('swallows claim errors so the poll loop cannot crash the process', async () => {
+    queue.claimReadyJob.mockRejectedValue(new Error('db unavailable'));
+
+    await expect(tick()).resolves.toBeUndefined();
+
+    expect(sms.sendOtp).not.toHaveBeenCalled();
+    expect(queue.markSucceeded).not.toHaveBeenCalled();
+    expect(queue.markFailed).not.toHaveBeenCalled();
+    expect(errorSpy).toHaveBeenCalledWith(
+      'Notification poll failed: db unavailable',
+    );
+  });
+
+  it('resets the in-flight flag after a claim failure so the next poll can run', async () => {
+    queue.claimReadyJob
+      .mockRejectedValueOnce(new Error('db unavailable'))
+      .mockResolvedValueOnce(null);
+
+    await tick();
+    await tick();
+
+    expect(queue.claimReadyJob).toHaveBeenCalledTimes(2);
   });
 });

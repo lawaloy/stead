@@ -37,7 +37,7 @@ describe('NotificationQueueService claim-before-decrypt ordering', () => {
     );
   });
 
-  it('locks the job to processing before decrypt rejection leaves it claimed', async () => {
+  it('locks the job to processing then dead-letters the claim when decrypt fails', async () => {
     prisma.notificationJob.findFirst.mockResolvedValue({ id: 'job_poison' });
     prisma.notificationJob.updateMany.mockResolvedValue({ count: 1 });
     prisma.notificationJob.findUniqueOrThrow.mockResolvedValue({
@@ -58,9 +58,7 @@ describe('NotificationQueueService claim-before-decrypt ordering', () => {
       updatedAt: new Date(),
     });
 
-    await expect(queue.claimReadyJob()).rejects.toThrow(
-      'Invalid notification payload',
-    );
+    await expect(queue.claimReadyJob()).resolves.toBeNull();
 
     expect(prisma.notificationJob.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -74,5 +72,16 @@ describe('NotificationQueueService claim-before-decrypt ordering', () => {
     expect(prisma.notificationJob.findUniqueOrThrow).toHaveBeenCalledWith({
       where: { id: 'job_poison' },
     });
+    expect(prisma.notificationJob.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'job_poison' },
+        data: expect.objectContaining({
+          attempts: 1,
+          status: 'pending',
+          lastError: 'Invalid notification payload',
+          lockedAt: null,
+        }) as unknown,
+      }),
+    );
   });
 });

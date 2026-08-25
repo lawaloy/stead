@@ -86,8 +86,14 @@ describe('NotificationQueueService decrypt without encryption key', () => {
     });
     configGet.mockReturnValue(undefined);
 
-    await expect(claimWithPayload(payloadJson)).rejects.toThrow(
-      'Unable to decrypt notification payload',
+    await expect(claimWithPayload(payloadJson)).resolves.toBeNull();
+    expect(prisma.notificationJob.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'job_1' },
+        data: expect.objectContaining({
+          lastError: 'Unable to decrypt notification payload',
+        }) as unknown,
+      }),
     );
   });
 
@@ -116,9 +122,12 @@ describe('NotificationQueueService decrypt without encryption key', () => {
     ]);
     configGet.mockReturnValue(undefined);
 
-    await expect(queue.listRecentJobs(1)).rejects.toThrow(
-      'Unable to decrypt notification payload',
-    );
+    await expect(queue.listRecentJobs(1)).resolves.toEqual([
+      expect.objectContaining({
+        id: 'job_encrypted',
+        payload: { phone: '<redacted>', redacted: true },
+      }),
+    ]);
   });
 
   it('still maps redacted payloads when the encryption key is unset', async () => {
