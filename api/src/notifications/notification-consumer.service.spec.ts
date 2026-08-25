@@ -204,6 +204,26 @@ describe('NotificationConsumerService', () => {
     );
   });
 
+  it('does not start a second claim while the first claim is still awaiting', async () => {
+    let resolveClaim: (value: NotificationJob | null) => void;
+    const claimPromise = new Promise<NotificationJob | null>((resolve) => {
+      resolveClaim = resolve;
+    });
+    queue.claimReadyJob.mockReturnValue(claimPromise);
+
+    const firstTick = tick();
+    await tick();
+
+    expect(queue.claimReadyJob).toHaveBeenCalledTimes(1);
+
+    resolveClaim!(null);
+    await firstTick;
+
+    expect(sms.sendOtp).not.toHaveBeenCalled();
+    expect(queue.markSucceeded).not.toHaveBeenCalled();
+    expect(queue.markFailed).not.toHaveBeenCalled();
+  });
+
   it('does not claim another job while a send is in flight', async () => {
     let resolveSend: (value: {
       ok: boolean;
@@ -294,6 +314,24 @@ describe('NotificationConsumerService', () => {
       .mockResolvedValueOnce(null);
 
     await tick();
+    await tick();
+
+    expect(queue.claimReadyJob).toHaveBeenCalledTimes(2);
+  });
+
+  it('swallows markFailed errors so a persistence failure cannot crash the poll', async () => {
+    const providerError = new Error('provider down');
+    queue.claimReadyJob.mockResolvedValueOnce(job).mockResolvedValueOnce(null);
+    sms.sendOtp.mockRejectedValue(providerError);
+    queue.markFailed.mockRejectedValueOnce(new Error('db write failed'));
+
+    await expect(tick()).resolves.toBeUndefined();
+
+    expect(queue.markFailed).toHaveBeenCalledWith(job, providerError);
+    expect(errorSpy).toHaveBeenCalledWith(
+      'Notification poll failed: db write failed',
+    );
+
     await tick();
 
     expect(queue.claimReadyJob).toHaveBeenCalledTimes(2);
