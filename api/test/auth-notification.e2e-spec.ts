@@ -244,6 +244,57 @@ describe('Auth notification pipeline (e2e)', () => {
     });
     expect(deadLetterJob.failedAt).toBeInstanceOf(Date);
     expect(JSON.parse(deadLetterJob.payloadJson)).toEqual({ redacted: true });
+
+    const failureAttempts = await prisma.notificationFailureAttempt.findMany({
+      where: { notificationJobId: deadLetterJob.id },
+      orderBy: { attemptNumber: 'asc' },
+    });
+    expect(failureAttempts).toHaveLength(3);
+    expect(failureAttempts.map((row) => row.attemptNumber)).toEqual([1, 2, 3]);
+    expect(failureAttempts.map((row) => row.terminal)).toEqual([
+      false,
+      false,
+      true,
+    ]);
+
+    const operator = await prisma.user.create({
+      data: {
+        id: 'operator-e2e',
+        phone: '+2348099999999',
+      },
+    });
+    const operatorToken = jwt.sign(
+      { sub: operator.id, phone: operator.phone },
+      process.env.JWT_SECRET as string,
+    );
+    const notificationInspection = await request(app.getHttpServer())
+      .get('/notifications/inspection')
+      .set('Authorization', `Bearer ${operatorToken}`)
+      .expect(200);
+    const notificationBody = notificationInspection.body as {
+      jobs: {
+        summary: { deadLetter: number };
+        health: {
+          attemptFailuresLast24Hours: number;
+          deadLettersLast24Hours: number;
+          lastFailure: {
+            id: string;
+            status: string;
+            lastError: string | null;
+          } | null;
+        };
+      };
+    };
+    expect(notificationBody.jobs.summary.deadLetter).toBe(1);
+    expect(notificationBody.jobs.health).toMatchObject({
+      attemptFailuresLast24Hours: 3,
+      deadLettersLast24Hours: 1,
+      lastFailure: {
+        id: deadLetterJob.id,
+        status: 'dead_letter',
+        lastError: 'simulated provider outage',
+      },
+    });
   }, 20_000);
 
   it('rate limits OTP requests and verification failures by device', async () => {
