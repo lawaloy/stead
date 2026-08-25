@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
   createCipheriv,
@@ -15,6 +15,10 @@ import {
 
 const JOB_LOCK_TIMEOUT_MS = 5 * 60 * 1000;
 const REDACTED_PAYLOAD_JSON = JSON.stringify({ redacted: true });
+const REDACTED_OTP_PAYLOAD: RedactedOtpRequestedPayload = {
+  phone: '<redacted>',
+  redacted: true,
+};
 
 type EncryptedPayloadEnvelope = {
   v: 1;
@@ -23,8 +27,28 @@ type EncryptedPayloadEnvelope = {
   ciphertext: string;
 };
 
+type StoredNotificationJob = {
+  id: string;
+  type: string;
+  payloadJson: string;
+  status: 'pending' | 'processing' | 'sent' | 'failed' | 'dead_letter';
+  attempts: number;
+  maxAttempts: number;
+  nextRunAt: Date;
+  lockedAt: Date | null;
+  sentAt: Date | null;
+  failedAt: Date | null;
+  lastError: string | null;
+  provider: string | null;
+  providerMessageId: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
 @Injectable()
 export class NotificationQueueService {
+  private readonly logger = new Logger(NotificationQueueService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
@@ -80,11 +104,19 @@ export class NotificationQueueService {
 
     if (claimed.count === 0) return null;
 
-    return this.mapJob(
-      await this.prisma.notificationJob.findUniqueOrThrow({
-        where: { id: candidate.id },
-      }),
-    );
+    const locked = await this.prisma.notificationJob.findUniqueOrThrow({
+      where: { id: candidate.id },
+    });
+
+    try {
+      return this.mapJob(locked);
+    } catch (error: unknown) {
+      this.logger.warn(
+        `Notification job payload unreadable id=${locked.id}; marking failed`,
+      );
+      await this.markFailed(this.mapUndecryptableJob(locked), error);
+      return null;
+    }
   }
 
   async markSucceeded(
@@ -238,30 +270,19 @@ export class NotificationQueueService {
       take: limit,
     });
 
-    return jobs.map((job) => this.mapJob(job));
+    return jobs.map((job) => {
+      try {
+        return this.mapJob(job);
+      } catch {
+        return this.mapUndecryptableJob(job);
+      }
+    });
   }
 
-  private mapJob(job: {
-    id: string;
-    type: string;
-    payloadJson: string;
-    status: 'pending' | 'processing' | 'sent' | 'failed' | 'dead_letter';
-    attempts: number;
-    maxAttempts: number;
-    nextRunAt: Date;
-    lockedAt: Date | null;
-    sentAt: Date | null;
-    failedAt: Date | null;
-    lastError: string | null;
-    provider: string | null;
-    providerMessageId: string | null;
-    createdAt: Date;
-    updatedAt: Date;
-  }): NotificationJob {
+  private mapJobMetadata(job: StoredNotificationJob) {
     return {
       id: job.id,
-      type: 'otp.requested',
-      payload: this.decryptPayload(job.payloadJson),
+      type: 'otp.requested' as const,
       status: job.status,
       attempts: job.attempts,
       maxAttempts: job.maxAttempts,
@@ -274,6 +295,20 @@ export class NotificationQueueService {
       providerMessageId: job.providerMessageId,
       createdAt: job.createdAt,
       updatedAt: job.updatedAt,
+    };
+  }
+
+  private mapJob(job: StoredNotificationJob): NotificationJob {
+    return {
+      ...this.mapJobMetadata(job),
+      payload: this.decryptPayload(job.payloadJson),
+    };
+  }
+
+  private mapUndecryptableJob(job: StoredNotificationJob): NotificationJob {
+    return {
+      ...this.mapJobMetadata(job),
+      payload: REDACTED_OTP_PAYLOAD,
     };
   }
 
@@ -303,7 +338,7 @@ export class NotificationQueueService {
   ): OtpRequestedPayload | RedactedOtpRequestedPayload {
     const stored = JSON.parse(payloadJson) as Record<string, unknown>;
     if (stored.redacted === true) {
-      return { phone: '<redacted>', redacted: true };
+      return REDACTED_OTP_PAYLOAD;
     }
 
     if (this.isOtpPayload(stored)) {

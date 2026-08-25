@@ -89,7 +89,15 @@ describe('NotificationQueueService OTP payload shape edges', () => {
           ciphertext: '',
         }),
       ),
-    ).rejects.toThrow('Unable to decrypt notification payload');
+    ).resolves.toBeNull();
+    expect(prisma.notificationJob.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'job_1' },
+        data: expect.objectContaining({
+          lastError: 'Unable to decrypt notification payload',
+        }) as unknown,
+      }),
+    );
   });
 
   it('rejects payloads that look like envelopes but omit required string fields', async () => {
@@ -102,6 +110,14 @@ describe('NotificationQueueService OTP payload shape edges', () => {
           ciphertext: 'dGVzdA==',
         }),
       ),
-    ).rejects.toThrow('Invalid notification payload');
+    ).resolves.toBeNull();
+    expect(prisma.notificationJob.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'job_1' },
+        data: expect.objectContaining({
+          lastError: 'Invalid notification payload',
+        }) as unknown,
+      }),
+    );
   });
 });

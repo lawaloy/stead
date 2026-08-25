@@ -37,7 +37,7 @@ describe('NotificationQueueService claim-before-decrypt ordering', () => {
     );
   });
 
-  it('locks the job to processing before decrypt rejection leaves it claimed', async () => {
+  it('locks the job to processing then retries the claim when decrypt fails before max attempts', async () => {
     prisma.notificationJob.findFirst.mockResolvedValue({ id: 'job_poison' });
     prisma.notificationJob.updateMany.mockResolvedValue({ count: 1 });
     prisma.notificationJob.findUniqueOrThrow.mockResolvedValue({
@@ -58,9 +58,7 @@ describe('NotificationQueueService claim-before-decrypt ordering', () => {
       updatedAt: new Date(),
     });
 
-    await expect(queue.claimReadyJob()).rejects.toThrow(
-      'Invalid notification payload',
-    );
+    await expect(queue.claimReadyJob()).resolves.toBeNull();
 
     expect(prisma.notificationJob.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -74,5 +72,59 @@ describe('NotificationQueueService claim-before-decrypt ordering', () => {
     expect(prisma.notificationJob.findUniqueOrThrow).toHaveBeenCalledWith({
       where: { id: 'job_poison' },
     });
+    expect(prisma.notificationJob.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'job_poison' },
+        data: expect.objectContaining({
+          attempts: 1,
+          status: 'pending',
+          lastError: 'Invalid notification payload',
+          lockedAt: null,
+        }) as unknown,
+      }),
+    );
+  });
+
+  it('dead-letters a poison claim on the last decrypt attempt', async () => {
+    prisma.notificationJob.findFirst.mockResolvedValue({ id: 'job_poison' });
+    prisma.notificationJob.updateMany.mockResolvedValue({ count: 1 });
+    prisma.notificationJob.findUniqueOrThrow.mockResolvedValue({
+      id: 'job_poison',
+      type: 'otp.requested',
+      payloadJson: JSON.stringify({ note: 'not-an-otp-payload' }),
+      status: 'processing',
+      attempts: 2,
+      maxAttempts: 3,
+      nextRunAt: new Date(),
+      lockedAt: new Date(),
+      sentAt: null,
+      failedAt: null,
+      lastError: null,
+      provider: null,
+      providerMessageId: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    await expect(queue.claimReadyJob()).resolves.toBeNull();
+
+    expect(prisma.notificationJob.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'job_poison' },
+        data: expect.objectContaining({
+          attempts: 3,
+          status: 'dead_letter',
+          payloadJson: JSON.stringify({ redacted: true }),
+          lastError: 'Invalid notification payload',
+          lockedAt: null,
+          failureAttempts: {
+            create: expect.objectContaining({
+              attemptNumber: 3,
+              terminal: true,
+            }) as unknown,
+          },
+        }) as unknown,
+      }),
+    );
   });
 });

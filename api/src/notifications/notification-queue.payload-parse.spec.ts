@@ -58,7 +58,17 @@ describe('NotificationQueueService corrupt payloadJson parsing', () => {
       updatedAt: new Date(),
     });
 
-    await expect(queue.claimReadyJob()).rejects.toThrow(SyntaxError);
+    await expect(queue.claimReadyJob()).resolves.toBeNull();
+    expect(prisma.notificationJob.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'job_bad_json' },
+        data: expect.objectContaining({
+          attempts: 1,
+          status: 'pending',
+          lockedAt: null,
+        }) as unknown,
+      }),
+    );
   });
 
   it('fails closed when listRecentJobs encounters non-JSON payloadJson', async () => {
@@ -82,6 +92,62 @@ describe('NotificationQueueService corrupt payloadJson parsing', () => {
       },
     ]);
 
-    await expect(queue.listRecentJobs(1)).rejects.toThrow(SyntaxError);
+    await expect(queue.listRecentJobs(1)).resolves.toEqual([
+      expect.objectContaining({
+        id: 'job_bad_json',
+        payload: { phone: '<redacted>', redacted: true },
+      }),
+    ]);
+  });
+
+  it('redacts unreadable jobs without dropping readable neighbors in listRecentJobs', async () => {
+    const updatedAt = new Date('2026-01-02T00:00:00.000Z');
+    prisma.notificationJob.findMany.mockResolvedValue([
+      {
+        id: 'job_ok',
+        type: 'otp.requested',
+        payloadJson: JSON.stringify({ phone: '+2348000000000', otp: '123456' }),
+        status: 'pending',
+        attempts: 0,
+        maxAttempts: 3,
+        nextRunAt: updatedAt,
+        lockedAt: null,
+        sentAt: null,
+        failedAt: null,
+        lastError: null,
+        provider: null,
+        providerMessageId: null,
+        createdAt: updatedAt,
+        updatedAt,
+      },
+      {
+        id: 'job_bad_json',
+        type: 'otp.requested',
+        payloadJson: '{broken',
+        status: 'pending',
+        attempts: 0,
+        maxAttempts: 3,
+        nextRunAt: updatedAt,
+        lockedAt: null,
+        sentAt: null,
+        failedAt: null,
+        lastError: null,
+        provider: null,
+        providerMessageId: null,
+        createdAt: updatedAt,
+        updatedAt,
+      },
+    ]);
+
+    await expect(queue.listRecentJobs(2)).resolves.toEqual([
+      expect.objectContaining({
+        id: 'job_ok',
+        payload: { phone: '+2348000000000', otp: '123456' },
+      }),
+      expect.objectContaining({
+        id: 'job_bad_json',
+        payload: { phone: '<redacted>', redacted: true },
+      }),
+    ]);
   });
 });

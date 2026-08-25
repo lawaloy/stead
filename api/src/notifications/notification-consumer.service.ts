@@ -38,21 +38,29 @@ export class NotificationConsumerService
   private async tick() {
     if (this.isProcessing) return;
 
-    const job = await this.queue.claimReadyJob();
-    if (!job) return;
-
     this.isProcessing = true;
     try {
-      const result = await this.processJob(job);
-      await this.queue.markSucceeded(job, result);
-      this.logger.log(
-        `Notification job sent id=${job.id} type=${job.type} provider=${result.provider ?? 'unknown'} phone=${this.maskPhone(job.payload.phone)}`,
-      );
+      const job = await this.queue.claimReadyJob();
+      if (!job) return;
+
+      try {
+        const result = await this.processJob(job);
+        await this.queue.markSucceeded(job, result);
+        this.logger.log(
+          `Notification job sent id=${job.id} type=${job.type} provider=${result.provider ?? 'unknown'} phone=${this.maskPhone(job.payload.phone)}`,
+        );
+      } catch (error: unknown) {
+        await this.queue.markFailed(job, error);
+        this.logger.warn(
+          `Notification job failed id=${job.id} type=${job.type} attempts=${job.attempts + 1} phone=${this.maskPhone(job.payload.phone)}`,
+        );
+      }
     } catch (error: unknown) {
-      await this.queue.markFailed(job, error);
-      this.logger.warn(
-        `Notification job failed id=${job.id} type=${job.type} attempts=${job.attempts + 1} phone=${this.maskPhone(job.payload.phone)}`,
-      );
+      const message =
+        error instanceof Error
+          ? error.message
+          : 'unknown notification poll error';
+      this.logger.error(`Notification poll failed: ${message}`);
     } finally {
       this.isProcessing = false;
     }
