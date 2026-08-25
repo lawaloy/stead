@@ -279,6 +279,96 @@ describe('Auth OTP lifecycle edges (e2e)', () => {
     expect(record.consumedAt).toEqual(expect.any(Date));
   });
 
+  it('rejects a superseded OTP after a newer code is issued', async () => {
+    const phone = '08010101010';
+    const first = await requestOtp(phone);
+
+    await prisma.otpCode.updateMany({
+      data: { createdAt: new Date(Date.now() - 2 * 60 * 1000) },
+    });
+
+    const second = await requestOtp(phone);
+    let latestOtp = second.otp;
+    if (latestOtp === first.otp) {
+      latestOtp = first.otp === '000000' ? '111111' : '000000';
+      const newest = await prisma.otpCode.findFirstOrThrow({
+        orderBy: { createdAt: 'desc' },
+      });
+      await prisma.otpCode.update({
+        where: { id: newest.id },
+        data: { codeHash: await bcrypt.hash(latestOtp, 4) },
+      });
+    }
+
+    await request(app.getHttpServer())
+      .post('/auth/verify-otp')
+      .send({ phone, countryIso: 'NG', otp: first.otp })
+      .expect(400)
+      .expect((response) => {
+        expect(response.body).toMatchObject({
+          message: 'Invalid phone or code',
+        });
+      });
+
+    await expect(
+      prisma.authEvent.count({ where: { type: 'otp_verify_succeeded' } }),
+    ).resolves.toBe(0);
+
+    const afterStale = await prisma.otpCode.findMany({
+      orderBy: { createdAt: 'asc' },
+    });
+    expect(afterStale).toHaveLength(2);
+    expect(afterStale[0]?.consumedAt).toBeNull();
+    expect(afterStale[0]?.verifyAttempts).toBe(0);
+    expect(afterStale[1]?.consumedAt).toBeNull();
+    expect(afterStale[1]?.verifyAttempts).toBe(1);
+
+    const latest = await request(app.getHttpServer())
+      .post('/auth/verify-otp')
+      .send({ phone, countryIso: 'NG', otp: latestOtp })
+      .expect(201);
+    expect((latest.body as { token: string }).token).toEqual(
+      expect.any(String),
+    );
+
+    const records = await prisma.otpCode.findMany({
+      orderBy: { createdAt: 'asc' },
+    });
+    expect(records[0]?.consumedAt).toBeNull();
+    expect(records[1]?.consumedAt).toEqual(expect.any(Date));
+    await expect(
+      prisma.authEvent.count({ where: { type: 'otp_verify_succeeded' } }),
+    ).resolves.toBe(1);
+  });
+
+  it('blocks another OTP request after a successful verify during cooldown', async () => {
+    const phone = '08020202020';
+    const { otp } = await requestOtp(phone);
+
+    await request(app.getHttpServer())
+      .post('/auth/verify-otp')
+      .send({ phone, countryIso: 'NG', otp })
+      .expect(201);
+
+    await request(app.getHttpServer())
+      .post('/auth/request-otp')
+      .send({ phone, countryIso: 'NG' })
+      .expect(429)
+      .expect((response) => {
+        expect(response.body).toMatchObject({
+          message: 'Please wait before requesting another OTP.',
+        });
+      });
+
+    const record = await prisma.otpCode.findFirstOrThrow();
+    expect(record.consumedAt).toEqual(expect.any(Date));
+    const blocked = await prisma.authEvent.findFirstOrThrow({
+      where: { type: 'otp_resend_blocked' },
+    });
+    expect(blocked.otpCodeId).toBe(record.id);
+    await expect(prisma.otpCode.count()).resolves.toBe(1);
+  });
+
   it('still accepts the correct OTP after a single invalid attempt', async () => {
     const phone = '08044556677';
     const { otp } = await requestOtp(phone);
