@@ -143,4 +143,56 @@ describe('Operator inspection access (e2e)', () => {
       1,
     );
   });
+
+  it('bounds the notification inspection recent window over HTTP, including a zero limit', async () => {
+    const operator = await prisma.user.create({
+      data: {
+        id: 'operator-e2e',
+        phone: '+2348099999999',
+      },
+    });
+    const operatorToken = jwt.sign(
+      { sub: operator.id, phone: operator.phone },
+      process.env.JWT_SECRET as string,
+    );
+    const redactedPayload = JSON.stringify({ redacted: true });
+
+    await prisma.notificationJob.createMany({
+      data: [
+        {
+          type: 'otp.requested',
+          payloadJson: redactedPayload,
+          status: 'sent',
+        },
+        {
+          type: 'otp.requested',
+          payloadJson: redactedPayload,
+          status: 'sent',
+        },
+        {
+          type: 'otp.requested',
+          payloadJson: redactedPayload,
+          status: 'dead_letter',
+        },
+      ],
+    });
+
+    const bounded = await request(app.getHttpServer())
+      .get('/notifications/inspection')
+      .query({ limit: 2 })
+      .set('Authorization', `Bearer ${operatorToken}`)
+      .expect(200);
+    expect(
+      (bounded.body as { jobs: { recent: unknown[] } }).jobs.recent,
+    ).toHaveLength(2);
+
+    const raisedMinimum = await request(app.getHttpServer())
+      .get('/notifications/inspection')
+      .query({ limit: 0 })
+      .set('Authorization', `Bearer ${operatorToken}`)
+      .expect(200);
+    expect(
+      (raisedMinimum.body as { jobs: { recent: unknown[] } }).jobs.recent,
+    ).toHaveLength(1);
+  });
 });

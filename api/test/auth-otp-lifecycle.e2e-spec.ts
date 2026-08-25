@@ -251,4 +251,65 @@ describe('Auth OTP lifecycle edges (e2e)', () => {
     expect(limited.metadataJson).not.toContain('"scope"');
     await expect(prisma.otpCode.count()).resolves.toBe(PHONE_HOURLY_LIMIT);
   });
+
+  it('rejects a second verify of a still-correct OTP after it is consumed', async () => {
+    const phone = '08033445566';
+    const { otp } = await requestOtp(phone);
+
+    const first = await request(app.getHttpServer())
+      .post('/auth/verify-otp')
+      .send({ phone, countryIso: 'NG', otp })
+      .expect(201);
+    expect((first.body as { token: string }).token).toEqual(expect.any(String));
+
+    await request(app.getHttpServer())
+      .post('/auth/verify-otp')
+      .send({ phone, countryIso: 'NG', otp })
+      .expect(400)
+      .expect((response) => {
+        expect(response.body).toMatchObject({
+          message: 'OTP expired or not found',
+        });
+      });
+
+    await expect(
+      prisma.authEvent.count({ where: { type: 'otp_verify_succeeded' } }),
+    ).resolves.toBe(1);
+    const record = await prisma.otpCode.findFirstOrThrow();
+    expect(record.consumedAt).toEqual(expect.any(Date));
+  });
+
+  it('still accepts the correct OTP after a single invalid attempt', async () => {
+    const phone = '08044556677';
+    const { otp } = await requestOtp(phone);
+    const wrongOtp = otp === '000000' ? '111111' : '000000';
+
+    await request(app.getHttpServer())
+      .post('/auth/verify-otp')
+      .send({ phone, countryIso: 'NG', otp: wrongOtp })
+      .expect(400)
+      .expect((response) => {
+        expect(response.body).toMatchObject({
+          message: 'Invalid phone or code',
+        });
+      });
+
+    const afterMiss = await prisma.otpCode.findFirstOrThrow();
+    expect(afterMiss.verifyAttempts).toBe(1);
+    expect(afterMiss.consumedAt).toBeNull();
+
+    const second = await request(app.getHttpServer())
+      .post('/auth/verify-otp')
+      .send({ phone, countryIso: 'NG', otp })
+      .expect(201);
+    expect((second.body as { token: string }).token).toEqual(
+      expect.any(String),
+    );
+
+    const record = await prisma.otpCode.findFirstOrThrow();
+    expect(record.consumedAt).toEqual(expect.any(Date));
+    await expect(
+      prisma.authEvent.count({ where: { type: 'otp_verify_succeeded' } }),
+    ).resolves.toBe(1);
+  });
 });
