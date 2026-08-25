@@ -125,4 +125,56 @@ describe('api response contract shapes', () => {
       }),
     ).toEqual({ ok: false, message: 'No active goal found' });
   });
+
+  it('rejects fractional kobo amounts and unknown stability statuses', () => {
+    expect(() =>
+      GoalSchema.parse({
+        id: 'goal_1',
+        userId: 'user_1',
+        name: 'Rent',
+        amountTotalKobo: 120000000.5,
+        dueDate: '2026-12-31T00:00:00.000Z',
+        monthlyIncomeKobo: 30000000,
+        isActive: true,
+        createdAt: '2026-06-21T12:00:00.000Z',
+      }),
+    ).toThrow();
+
+    expect(() =>
+      TransactionSchema.parse({
+        id: 'tx_1',
+        userId: 'user_1',
+        goalId: 'goal_1',
+        amountKobo: 500000.5,
+        direction: 'in',
+        occurredAt: '2026-06-21T12:00:00.000Z',
+        note: 'manual entry',
+        createdAt: '2026-06-21T12:01:00.000Z',
+      }),
+    ).toThrow();
+
+    expect(() =>
+      DashboardStabilityResponseSchema.parse({
+        ok: true,
+        goal: {
+          id: 'goal_1',
+          name: 'Rent',
+          amountTotalKobo: 120000000,
+          dueDate: '2026-12-31T00:00:00.000Z',
+          monthlyIncomeKobo: null,
+        },
+        metrics: {
+          daysRemaining: 120,
+          remainingObligationKobo: 60000000,
+          readinessPct: 50,
+          paceRequiredMonthlyKobo: 15000000,
+          safeToSpendKobo: 10000000,
+          stabilityScore: 72,
+          status: 'ok',
+          goalSavedKobo: 60000000,
+          estimatedBalanceKobo: 70000000,
+        },
+      }),
+    ).toThrow();
+  });
 });

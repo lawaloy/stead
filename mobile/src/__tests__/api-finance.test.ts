@@ -1,5 +1,6 @@
 import { createAxiosMock } from './axios-mock';
 import {
+  ApiError,
   apiClient,
   configureApiAuth,
   createGoal,
@@ -129,6 +130,42 @@ describe('api finance client', () => {
       ok: false,
       message: 'No active goal found',
     });
+  });
+
+  it('calls unauthorized handler on 401 from authenticated finance reads', async () => {
+    const onUnauthorized = jest.fn();
+    configureApiAuth({
+      getToken: async () => 'expired-jwt',
+      onUnauthorized,
+    });
+
+    mock.onGet('/goals/active').reply(401, { message: 'Unauthorized' });
+    await expect(getActiveGoal()).rejects.toMatchObject({
+      name: 'ApiError',
+      status: 401,
+      message: 'Unauthorized',
+    });
+    expect(onUnauthorized).toHaveBeenCalledTimes(1);
+
+    mock.onGet('/dashboard/stability').reply(401, { message: 'Unauthorized' });
+    await expect(getDashboardStability()).rejects.toBeInstanceOf(ApiError);
+    expect(onUnauthorized).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not treat 403 finance responses as session expiry', async () => {
+    const onUnauthorized = jest.fn();
+    configureApiAuth({
+      getToken: async () => 'jwt-token',
+      onUnauthorized,
+    });
+
+    mock.onGet('/goals/active').reply(403, { message: 'Forbidden' });
+    await expect(getActiveGoal()).rejects.toMatchObject({
+      name: 'ApiError',
+      status: 403,
+      message: 'Forbidden',
+    });
+    expect(onUnauthorized).not.toHaveBeenCalled();
   });
 
   it('rejects malformed finance responses that fail Zod parsing', async () => {
