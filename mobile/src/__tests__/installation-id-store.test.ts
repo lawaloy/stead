@@ -69,6 +69,32 @@ describe('installationIdStore', () => {
     expect(randomUUID).not.toHaveBeenCalled();
   });
 
+  it('coalesces concurrent cold-start callers onto one identifier', async () => {
+    let resolveGet: ((value: string | null) => void) | undefined;
+    const gatedGet = new Promise<string | null>((resolve) => {
+      resolveGet = resolve;
+    });
+    const originalGet = mockSecureStore.getItemAsync;
+    mockSecureStore.getItemAsync = jest.fn(async () => gatedGet);
+
+    try {
+      const pending = Promise.all([
+        installationIdStore.getOrCreateId(),
+        installationIdStore.getOrCreateId(),
+        installationIdStore.getOrCreateId(),
+      ]);
+      resolveGet?.(null);
+      const ids = await pending;
+
+      expect(new Set(ids)).toEqual(
+        new Set(['0f81c2a7-1e6d-4f05-9a1c-03de8a5f6b77']),
+      );
+      expect(randomUUID).toHaveBeenCalledTimes(1);
+    } finally {
+      mockSecureStore.getItemAsync = originalGet;
+    }
+  });
+
   it('replaces corrupted persisted values', async () => {
     secureStoreValues.set('stead.installation-id', 'not-a-device-id');
 
