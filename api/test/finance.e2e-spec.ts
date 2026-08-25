@@ -472,4 +472,47 @@ describe('Finance flows (e2e)', () => {
       },
     });
   });
+
+  it('filters listed transactions by from/to query bounds over HTTP', async () => {
+    const { token } = await createAuthedUser();
+
+    await authed('post', '/transactions', token)
+      .send({
+        direction: 'in',
+        amountKobo: 1_000,
+        occurredAt: '2026-01-01T00:00:00.000Z',
+        note: 'jan',
+      })
+      .expect(201);
+    await authed('post', '/transactions', token)
+      .send({
+        direction: 'out',
+        amountKobo: 2_000,
+        occurredAt: '2026-02-15T00:00:00.000Z',
+        note: 'feb',
+      })
+      .expect(201);
+    await authed('post', '/transactions', token)
+      .send({
+        direction: 'in',
+        amountKobo: 3_000,
+        occurredAt: '2026-03-31T00:00:00.000Z',
+        note: 'mar',
+      })
+      .expect(201);
+
+    const bounded = await authed('get', '/transactions', token)
+      .query({
+        from: '2026-02-01T00:00:00.000Z',
+        to: '2026-02-28T23:59:59.000Z',
+      })
+      .expect(200);
+    expect(bounded.body as TransactionBody[]).toEqual([
+      expect.objectContaining({ amountKobo: 2_000, note: 'feb' }),
+    ]);
+
+    await authed('get', '/transactions', token)
+      .query({ from: 'not-a-date' })
+      .expect(400);
+  });
 });
