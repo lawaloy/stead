@@ -40,6 +40,12 @@ describe('OTP request input', () => {
       phone: '+2348012345678',
       countryIso: 'NG',
     });
+    expect(
+      buildOtpRequestInput('4155552671', 'US', nigerianCountries),
+    ).toBeNull();
+    expect(
+      buildOtpRequestInput('(415) 555-2671', 'US', nigerianCountries),
+    ).toBeNull();
   });
 
   it('falls back to NG when the country list is empty', () => {
