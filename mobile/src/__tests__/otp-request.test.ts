@@ -42,6 +42,14 @@ describe('OTP request input', () => {
     });
   });
 
+  it('falls back to NG when the country list is empty', () => {
+    expect(resolveEffectiveCountryIso('US', [])).toBe('NG');
+    expect(buildOtpRequestInput('08012345678', 'US', [])).toEqual({
+      phone: '+2348012345678',
+      countryIso: 'NG',
+    });
+  });
+
   it('returns null when the phone is invalid for the effective country', () => {
     expect(
       buildOtpRequestInput('08012345678', 'US', fallbackAuthCountries),

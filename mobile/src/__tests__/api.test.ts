@@ -194,6 +194,19 @@ describe('api client', () => {
     });
   });
 
+  it('rejects malformed auth responses that fail Zod parsing', async () => {
+    mock.onGet('/auth/countries').reply(200, {
+      countries: [{ iso: 'NG' }],
+    });
+    await expect(fetchAuthCountries()).rejects.toThrow();
+
+    mock.onPost('/auth/request-otp').reply(200, { ok: false });
+    await expect(requestOtp('08012345678', 'NG')).rejects.toThrow();
+
+    mock.onPost('/auth/verify-otp').reply(200, { accessToken: 'jwt-token' });
+    await expect(verifyOtp('08012345678', 'NG', '123456')).rejects.toThrow();
+  });
+
   it('joins Zod validation issues and ignores non-Zod values', () => {
     const zodError = new z.ZodError([
       {
