@@ -127,6 +127,42 @@ describe('Finance flows (e2e)', () => {
     await request(app.getHttpServer()).get('/dashboard/stability').expect(401);
   });
 
+  it('rejects expired, claim-incomplete, and wrongly signed finance tokens', async () => {
+    const { user } = await createAuthedUser();
+    const secret = process.env.JWT_SECRET as string;
+    const expired = jwt.sign(
+      {
+        sub: user.id,
+        phone: user.phone,
+        exp: Math.floor(Date.now() / 1000) - 60,
+      },
+      secret,
+    );
+    const missingSub = jwt.sign({ phone: user.phone }, secret);
+    const wrongSecret = jwt.sign(
+      { sub: user.id, phone: user.phone },
+      'wrong-finance-jwt-secret',
+    );
+
+    await request(app.getHttpServer())
+      .get('/goals/active')
+      .set('Authorization', `Bearer ${expired}`)
+      .expect(401);
+    await request(app.getHttpServer())
+      .get('/dashboard/stability')
+      .set('Authorization', `Bearer ${missingSub}`)
+      .expect(401);
+    await request(app.getHttpServer())
+      .post('/transactions')
+      .set('Authorization', `Bearer ${wrongSecret}`)
+      .send({
+        direction: 'in',
+        amountKobo: 1_000,
+        occurredAt: '2026-01-01T00:00:00.000Z',
+      })
+      .expect(401);
+  });
+
   it('creates a goal, records in/out transactions, and aggregates dashboard metrics', async () => {
     const { user, token } = await createAuthedUser();
     const dueDate = '2099-01-15T00:00:00.000Z';
