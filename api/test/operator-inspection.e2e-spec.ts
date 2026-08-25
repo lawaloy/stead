@@ -94,4 +94,53 @@ describe('Operator inspection access (e2e)', () => {
       .set('Authorization', `Bearer ${operatorToken}`)
       .expect(200);
   });
+
+  it('bounds the auth inspection recent window over HTTP, including a zero limit', async () => {
+    const operator = await prisma.user.create({
+      data: {
+        id: 'operator-e2e',
+        phone: '+2348099999999',
+      },
+    });
+    const operatorToken = jwt.sign(
+      { sub: operator.id, phone: operator.phone },
+      process.env.JWT_SECRET as string,
+    );
+
+    await prisma.authEvent.createMany({
+      data: [
+        {
+          type: 'otp_requested',
+          phone: '+2348010000001',
+          countryIso: 'NG',
+        },
+        {
+          type: 'otp_verify_failed',
+          phone: '+2348010000002',
+          countryIso: 'NG',
+        },
+        {
+          type: 'otp_verify_succeeded',
+          phone: '+2348010000003',
+          countryIso: 'NG',
+        },
+      ],
+    });
+
+    const bounded = await request(app.getHttpServer())
+      .get('/auth/inspection')
+      .query({ limit: 2 })
+      .set('Authorization', `Bearer ${operatorToken}`)
+      .expect(200);
+    expect((bounded.body as { recent: unknown[] }).recent).toHaveLength(2);
+
+    const raisedMinimum = await request(app.getHttpServer())
+      .get('/auth/inspection')
+      .query({ limit: 0 })
+      .set('Authorization', `Bearer ${operatorToken}`)
+      .expect(200);
+    expect((raisedMinimum.body as { recent: unknown[] }).recent).toHaveLength(
+      1,
+    );
+  });
 });
