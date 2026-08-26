@@ -534,11 +534,18 @@ describe('AuthService', () => {
     expect(prisma.user.findUnique).toHaveBeenCalledWith({
       where: { phone: '+2348012345678' },
     });
-    expect(prisma.otpCode.updateMany).toHaveBeenCalledWith({
+    expect(prisma.otpCode.updateMany).toHaveBeenNthCalledWith(1, {
       where: {
         id: 'otp_1',
         consumedAt: null,
         expiresAt: { gt: expect.any(Date) as unknown },
+      },
+      data: { consumedAt: expect.any(Date) as unknown },
+    });
+    expect(prisma.otpCode.updateMany).toHaveBeenNthCalledWith(2, {
+      where: {
+        userId: 'user_1',
+        consumedAt: null,
       },
       data: { consumedAt: expect.any(Date) as unknown },
     });
@@ -556,6 +563,37 @@ describe('AuthService', () => {
       phone: '+2348012345678',
     });
     expect(result).toEqual({ token: 'jwt_token' });
+  });
+
+  it('consumes leftover live OTPs for the user after a successful verify', async () => {
+    const otp = '123456';
+    prisma.user.findUnique.mockResolvedValue({
+      id: 'user_1',
+      phone: '+2348012345678',
+    } satisfies MockUser);
+    prisma.otpCode.findFirst.mockResolvedValue({
+      id: 'otp_new',
+      codeHash: await bcrypt.hash(otp, 1),
+      verifyAttempts: 0,
+      expiresAt: new Date(Date.now() + 60_000),
+      consumedAt: null,
+    } satisfies MockOtpRecord);
+    prisma.otpCode.updateMany.mockResolvedValue({ count: 1 });
+    jwt.signAsync.mockResolvedValue('jwt_token');
+
+    await expect(service.verifyOtp('08012345678', 'NG', otp)).resolves.toEqual({
+      token: 'jwt_token',
+    });
+
+    expect(prisma.otpCode.updateMany).toHaveBeenCalledTimes(2);
+    expect(prisma.otpCode.updateMany).toHaveBeenNthCalledWith(2, {
+      where: {
+        userId: 'user_1',
+        consumedAt: null,
+      },
+      data: { consumedAt: expect.any(Date) as unknown },
+    });
+    expect(jwt.signAsync).toHaveBeenCalledTimes(1);
   });
 
   it('rejects verification when no user exists for the phone', async () => {
@@ -602,6 +640,7 @@ describe('AuthService', () => {
       BadRequestException,
     );
 
+    expect(prisma.otpCode.updateMany).toHaveBeenCalledTimes(1);
     expect(jwt.signAsync).not.toHaveBeenCalled();
     expect(telemetry.recordEvent).not.toHaveBeenCalledWith(
       expect.objectContaining({ type: 'otp_verify_succeeded' }),
