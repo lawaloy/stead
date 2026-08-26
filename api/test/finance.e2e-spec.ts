@@ -434,6 +434,55 @@ describe('Finance flows (e2e)', () => {
       .expect(400);
   });
 
+  it('recomputes dashboard remaining obligation after a goal amount update', async () => {
+    const { token } = await createAuthedUser();
+    const goal = (
+      await authed('post', '/goals', token)
+        .send({
+          name: 'Rent',
+          amountTotalKobo: 300_000,
+          dueDate: '2026-11-01T00:00:00.000Z',
+        })
+        .expect(201)
+    ).body as GoalBody;
+
+    await authed('post', '/transactions', token)
+      .send({
+        direction: 'in',
+        amountKobo: 80_000,
+        occurredAt: '2026-01-20T00:00:00.000Z',
+        goalId: goal.id,
+      })
+      .expect(201);
+
+    await authed('patch', `/goals/${goal.id}`, token)
+      .send({ amountTotalKobo: 200_000 })
+      .expect(200)
+      .expect((response) => {
+        expect(response.body as GoalBody).toMatchObject({
+          id: goal.id,
+          amountTotalKobo: 200_000,
+          isActive: true,
+        });
+      });
+
+    const dashboard = await authed('get', '/dashboard/stability', token).expect(
+      200,
+    );
+    expect(dashboard.body as DashboardBody).toMatchObject({
+      ok: true,
+      goal: {
+        id: goal.id,
+        amountTotalKobo: 200_000,
+      },
+      metrics: {
+        remainingObligationKobo: 120_000,
+        goalSavedKobo: 80_000,
+        estimatedBalanceKobo: 80_000,
+      },
+    });
+  });
+
   it('deletes an owned transaction and drops it from dashboard totals', async () => {
     const { token } = await createAuthedUser();
     const goal = (

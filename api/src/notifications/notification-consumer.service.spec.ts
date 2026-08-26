@@ -308,6 +308,19 @@ describe('NotificationConsumerService', () => {
     );
   });
 
+  it('logs a fallback message when the poll fails with a non-Error rejection', async () => {
+    queue.claimReadyJob.mockRejectedValue('db unavailable');
+
+    await expect(tick()).resolves.toBeUndefined();
+
+    expect(sms.sendOtp).not.toHaveBeenCalled();
+    expect(queue.markSucceeded).not.toHaveBeenCalled();
+    expect(queue.markFailed).not.toHaveBeenCalled();
+    expect(errorSpy).toHaveBeenCalledWith(
+      'Notification poll failed: unknown notification poll error',
+    );
+  });
+
   it('resets the in-flight flag after a claim failure so the next poll can run', async () => {
     queue.claimReadyJob
       .mockRejectedValueOnce(new Error('db unavailable'))

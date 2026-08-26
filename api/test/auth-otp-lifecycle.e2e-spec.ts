@@ -252,6 +252,38 @@ describe('Auth OTP lifecycle edges (e2e)', () => {
     await expect(prisma.otpCode.count()).resolves.toBe(PHONE_HOURLY_LIMIT);
   });
 
+  it('issues only one JWT when the same OTP is verified concurrently', async () => {
+    const phone = '08055667788';
+    const { otp } = await requestOtp(phone);
+
+    const [first, second] = await Promise.all([
+      request(app.getHttpServer())
+        .post('/auth/verify-otp')
+        .send({ phone, countryIso: 'NG', otp }),
+      request(app.getHttpServer())
+        .post('/auth/verify-otp')
+        .send({ phone, countryIso: 'NG', otp }),
+    ]);
+
+    const statuses = [first.status, second.status].sort((a, b) => a - b);
+    expect(statuses).toEqual([201, 400]);
+
+    const success = first.status === 201 ? first : second;
+    const failure = first.status === 400 ? first : second;
+    expect((success.body as { token: string }).token).toEqual(
+      expect.any(String),
+    );
+    expect(failure.body).toMatchObject({
+      message: 'OTP expired or not found',
+    });
+
+    await expect(
+      prisma.authEvent.count({ where: { type: 'otp_verify_succeeded' } }),
+    ).resolves.toBe(1);
+    const record = await prisma.otpCode.findFirstOrThrow();
+    expect(record.consumedAt).toEqual(expect.any(Date));
+  });
+
   it('rejects a second verify of a still-correct OTP after it is consumed', async () => {
     const phone = '08033445566';
     const { otp } = await requestOtp(phone);
