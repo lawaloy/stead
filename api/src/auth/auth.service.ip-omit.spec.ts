@@ -140,6 +140,7 @@ describe('AuthService IP omit branches', () => {
     ).resolves.toEqual({ token: 'token' });
 
     expect(telemetry.countRecentEvents).not.toHaveBeenCalled();
+    expect(prisma.otpCode.updateMany).toHaveBeenCalledTimes(2);
     expect(telemetry.recordEvent).toHaveBeenCalledWith(
       expect.objectContaining({
         type: 'otp_verify_succeeded',

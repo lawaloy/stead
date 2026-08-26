@@ -420,17 +420,29 @@ export class AuthService {
       throw new BadRequestException('Invalid phone or code');
     }
 
+    const consumedAt = new Date();
     const consumed = await this.prisma.otpCode.updateMany({
       where: {
         id: record.id,
         consumedAt: null,
-        expiresAt: { gt: new Date() },
+        expiresAt: { gt: consumedAt },
       },
-      data: { consumedAt: new Date() },
+      data: { consumedAt },
     });
     if (consumed.count === 0) {
       throw new BadRequestException('OTP expired or not found');
     }
+
+    // A newer successful verify must retire every other live code for this
+    // user. Otherwise the previous SMS still matches findFirst after this
+    // row is consumed and issues a second session.
+    await this.prisma.otpCode.updateMany({
+      where: {
+        userId: user.id,
+        consumedAt: null,
+      },
+      data: { consumedAt },
+    });
 
     await this.telemetry.recordEvent({
       type: 'otp_verify_succeeded',
