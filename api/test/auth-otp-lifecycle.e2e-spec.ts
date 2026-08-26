@@ -422,6 +422,66 @@ describe('Auth OTP lifecycle edges (e2e)', () => {
     );
   });
 
+  it('does not consume another user leftover OTP when retiring live codes', async () => {
+    const phoneA = '08012121212';
+    const phoneB = '08013131313';
+    const firstA = await requestOtp(phoneA);
+
+    await prisma.otpCode.updateMany({
+      data: { createdAt: new Date(Date.now() - 2 * 60 * 1000) },
+    });
+
+    const secondA = await requestOtp(phoneA);
+    let latestA = secondA.otp;
+    if (latestA === firstA.otp) {
+      latestA = firstA.otp === '000000' ? '111111' : '000000';
+      const newest = await prisma.otpCode.findFirstOrThrow({
+        where: { user: { phone: '+2348012121212' } },
+        orderBy: { createdAt: 'desc' },
+      });
+      await prisma.otpCode.update({
+        where: { id: newest.id },
+        data: { codeHash: await bcrypt.hash(latestA, 4) },
+      });
+    }
+
+    const other = await requestOtp(phoneB);
+
+    await request(app.getHttpServer())
+      .post('/auth/verify-otp')
+      .send({ phone: phoneA, countryIso: 'NG', otp: latestA })
+      .expect(201);
+
+    const aliceCodes = await prisma.otpCode.findMany({
+      where: { user: { phone: '+2348012121212' } },
+    });
+    expect(aliceCodes).toHaveLength(2);
+    expect(
+      aliceCodes.every((record) => record.consumedAt instanceof Date),
+    ).toBe(true);
+
+    const bobCode = await prisma.otpCode.findFirstOrThrow({
+      where: { user: { phone: '+2348013131313' } },
+    });
+    expect(bobCode.consumedAt).toBeNull();
+
+    const bobVerify = await request(app.getHttpServer())
+      .post('/auth/verify-otp')
+      .send({ phone: phoneB, countryIso: 'NG', otp: other.otp })
+      .expect(201);
+    expect((bobVerify.body as { token: string }).token).toEqual(
+      expect.any(String),
+    );
+
+    await expect(
+      prisma.authEvent.count({ where: { type: 'otp_verify_succeeded' } }),
+    ).resolves.toBe(2);
+    const consumedBob = await prisma.otpCode.findFirstOrThrow({
+      where: { id: bobCode.id },
+    });
+    expect(consumedBob.consumedAt).toEqual(expect.any(Date));
+  });
+
   it('blocks another OTP request after a successful verify during cooldown', async () => {
     const phone = '08020202020';
     const { otp } = await requestOtp(phone);
