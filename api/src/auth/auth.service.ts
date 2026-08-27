@@ -380,18 +380,20 @@ export class AuthService {
     const ok = await bcrypt.compare(otp, record.codeHash);
     if (!ok) {
       const verifyAttempts = record.verifyAttempts + 1;
+      const locked = verifyAttempts >= this.otpMaxVerifyAttempts;
+      const lockConsumedAt = locked ? new Date() : undefined;
       await this.prisma.otpCode.update({
         where: { id: record.id },
         data: {
           verifyAttempts,
-          consumedAt:
-            verifyAttempts >= this.otpMaxVerifyAttempts
-              ? new Date()
-              : undefined,
+          consumedAt: lockConsumedAt,
         },
       });
 
-      if (verifyAttempts >= this.otpMaxVerifyAttempts) {
+      if (locked && lockConsumedAt) {
+        // Locking the latest row would otherwise leave an older unconsumed
+        // SMS selectable by findFirst and able to mint a session.
+        await this.retireLiveOtpsForUser(user.id, lockConsumedAt);
         await this.telemetry.recordEvent({
           type: 'otp_verify_locked',
           phone: normalizedPhone,
@@ -436,13 +438,7 @@ export class AuthService {
     // A newer successful verify must retire every other live code for this
     // user. Otherwise the previous SMS still matches findFirst after this
     // row is consumed and issues a second session.
-    await this.prisma.otpCode.updateMany({
-      where: {
-        userId: user.id,
-        consumedAt: null,
-      },
-      data: { consumedAt },
-    });
+    await this.retireLiveOtpsForUser(user.id, consumedAt);
 
     await this.telemetry.recordEvent({
       type: 'otp_verify_succeeded',
@@ -456,5 +452,15 @@ export class AuthService {
 
     const token = await this.jwt.signAsync({ sub: user.id, phone: user.phone });
     return { token };
+  }
+
+  private retireLiveOtpsForUser(userId: string, consumedAt: Date) {
+    return this.prisma.otpCode.updateMany({
+      where: {
+        userId,
+        consumedAt: null,
+      },
+      data: { consumedAt },
+    });
   }
 }

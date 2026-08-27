@@ -422,6 +422,72 @@ describe('Auth OTP lifecycle edges (e2e)', () => {
     );
   });
 
+  it('rejects a superseded OTP after the newer code is locked', async () => {
+    const phone = '08040404040';
+    const first = await requestOtp(phone);
+
+    await prisma.otpCode.updateMany({
+      data: { createdAt: new Date(Date.now() - 2 * 60 * 1000) },
+    });
+
+    const second = await requestOtp(phone);
+    let latestOtp = second.otp;
+    if (latestOtp === first.otp) {
+      latestOtp = first.otp === '000000' ? '111111' : '000000';
+      const newest = await prisma.otpCode.findFirstOrThrow({
+        orderBy: { createdAt: 'desc' },
+      });
+      await prisma.otpCode.update({
+        where: { id: newest.id },
+        data: { codeHash: await bcrypt.hash(latestOtp, 4) },
+      });
+    }
+
+    const newest = await prisma.otpCode.findFirstOrThrow({
+      orderBy: { createdAt: 'desc' },
+    });
+    await prisma.otpCode.update({
+      where: { id: newest.id },
+      data: { verifyAttempts: 4 },
+    });
+
+    const wrongOtp =
+      latestOtp === '000000'
+        ? '111111'
+        : latestOtp === '111111'
+          ? '222222'
+          : '000000';
+
+    await request(app.getHttpServer())
+      .post('/auth/verify-otp')
+      .send({ phone, countryIso: 'NG', otp: wrongOtp })
+      .expect(429)
+      .expect((response) => {
+        expect(response.body).toMatchObject({
+          message: 'Too many invalid OTP attempts. Request a new code.',
+        });
+      });
+
+    await request(app.getHttpServer())
+      .post('/auth/verify-otp')
+      .send({ phone, countryIso: 'NG', otp: first.otp })
+      .expect(400)
+      .expect((response) => {
+        expect(response.body).toMatchObject({
+          message: 'OTP expired or not found',
+        });
+      });
+
+    await expect(
+      prisma.authEvent.count({ where: { type: 'otp_verify_succeeded' } }),
+    ).resolves.toBe(0);
+    const leftover = await prisma.otpCode.findMany();
+    expect(leftover).toHaveLength(2);
+    expect(leftover.every((record) => record.consumedAt instanceof Date)).toBe(
+      true,
+    );
+  });
+
   it('does not consume another user leftover OTP when retiring live codes', async () => {
     const phoneA = '08012121212';
     const phoneB = '08013131313';
