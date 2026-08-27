@@ -100,4 +100,36 @@ describe('AuthService leftover OTP consume', () => {
       expect.objectContaining({ type: 'otp_verify_succeeded' }),
     );
   });
+
+  it('issues a session even when the leftover sweep retires zero extra codes', async () => {
+    const otp = '123456';
+    prisma.user.findUnique.mockResolvedValue({
+      id: 'user_1',
+      phone: '+2348012345678',
+    });
+    prisma.otpCode.findFirst.mockResolvedValue({
+      id: 'otp_latest',
+      codeHash: await bcrypt.hash(otp, 1),
+      verifyAttempts: 0,
+      expiresAt: new Date(Date.now() + 60_000),
+      consumedAt: null,
+    });
+    prisma.otpCode.updateMany
+      .mockResolvedValueOnce({ count: 1 })
+      .mockResolvedValueOnce({ count: 0 });
+    jwt.signAsync.mockResolvedValue('jwt_token');
+
+    await expect(service.verifyOtp('08012345678', 'NG', otp)).resolves.toEqual({
+      token: 'jwt_token',
+    });
+
+    expect(prisma.otpCode.updateMany).toHaveBeenNthCalledWith(2, {
+      where: {
+        userId: 'user_1',
+        consumedAt: null,
+      },
+      data: { consumedAt: expect.any(Date) as unknown },
+    });
+    expect(jwt.signAsync).toHaveBeenCalledTimes(1);
+  });
 });

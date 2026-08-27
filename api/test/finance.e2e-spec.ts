@@ -123,7 +123,22 @@ describe('Finance flows (e2e)', () => {
         dueDate: '2026-12-01T00:00:00.000Z',
       })
       .expect(401);
+    await request(app.getHttpServer())
+      .patch('/goals/goal_unauth')
+      .send({ isActive: false })
+      .expect(401);
     await request(app.getHttpServer()).get('/transactions').expect(401);
+    await request(app.getHttpServer())
+      .post('/transactions')
+      .send({
+        direction: 'in',
+        amountKobo: 1_000,
+        occurredAt: '2026-01-01T00:00:00.000Z',
+      })
+      .expect(401);
+    await request(app.getHttpServer())
+      .delete('/transactions/tx_unauth')
+      .expect(401);
     await request(app.getHttpServer()).get('/dashboard/stability').expect(401);
   });
 
@@ -143,6 +158,11 @@ describe('Finance flows (e2e)', () => {
       { sub: user.id, phone: user.phone },
       'wrong-finance-jwt-secret',
     );
+    const encodeJwtPart = (value: unknown) =>
+      Buffer.from(JSON.stringify(value)).toString('base64url');
+    const unsigned = `${encodeJwtPart({ alg: 'none', typ: 'JWT' })}.${encodeJwtPart(
+      { sub: user.id, phone: user.phone },
+    )}.`;
 
     await request(app.getHttpServer())
       .get('/goals/active')
@@ -160,6 +180,10 @@ describe('Finance flows (e2e)', () => {
         amountKobo: 1_000,
         occurredAt: '2026-01-01T00:00:00.000Z',
       })
+      .expect(401);
+    await request(app.getHttpServer())
+      .get('/goals/active')
+      .set('Authorization', `Bearer ${unsigned}`)
       .expect(401);
   });
 
@@ -563,5 +587,121 @@ describe('Finance flows (e2e)', () => {
     await authed('get', '/transactions', token)
       .query({ from: 'not-a-date' })
       .expect(400);
+
+    const fromOnly = await authed('get', '/transactions', token)
+      .query({ from: '2026-02-01T00:00:00.000Z' })
+      .expect(200);
+    expect((fromOnly.body as TransactionBody[]).map((row) => row.note)).toEqual(
+      ['mar', 'feb'],
+    );
+
+    const toOnly = await authed('get', '/transactions', token)
+      .query({ to: '2026-02-01T00:00:00.000Z' })
+      .expect(200);
+    expect((toOnly.body as TransactionBody[]).map((row) => row.note)).toEqual([
+      'jan',
+    ]);
+  });
+
+  it('unlinks a transaction from its goal over HTTP and drops it from goal saved totals', async () => {
+    const { token } = await createAuthedUser();
+    const goal = (
+      await authed('post', '/goals', token)
+        .send({
+          name: 'Rent',
+          amountTotalKobo: 300_000,
+          dueDate: '2026-11-01T00:00:00.000Z',
+        })
+        .expect(201)
+    ).body as GoalBody;
+
+    const linked = (
+      await authed('post', '/transactions', token)
+        .send({
+          direction: 'in',
+          amountKobo: 80_000,
+          occurredAt: '2026-01-20T00:00:00.000Z',
+          goalId: goal.id,
+        })
+        .expect(201)
+    ).body as TransactionBody;
+    await authed('post', '/transactions', token)
+      .send({
+        direction: 'in',
+        amountKobo: 20_000,
+        occurredAt: '2026-01-21T00:00:00.000Z',
+      })
+      .expect(201);
+
+    const beforeUnlink = await authed(
+      'get',
+      '/dashboard/stability',
+      token,
+    ).expect(200);
+    expect(beforeUnlink.body as DashboardBody).toMatchObject({
+      ok: true,
+      metrics: {
+        goalSavedKobo: 80_000,
+        estimatedBalanceKobo: 100_000,
+        remainingObligationKobo: 220_000,
+      },
+    });
+
+    await authed('patch', `/transactions/${linked.id}`, token)
+      .send({ goalId: null })
+      .expect(200)
+      .expect((response) => {
+        expect(response.body as TransactionBody).toMatchObject({
+          id: linked.id,
+          goalId: null,
+          amountKobo: 80_000,
+        });
+      });
+
+    const afterUnlink = await authed(
+      'get',
+      '/dashboard/stability',
+      token,
+    ).expect(200);
+    expect(afterUnlink.body as DashboardBody).toMatchObject({
+      ok: true,
+      metrics: {
+        goalSavedKobo: 0,
+        estimatedBalanceKobo: 100_000,
+        remainingObligationKobo: 300_000,
+      },
+    });
+  });
+
+  it('clears the active goal and dashboard after the only goal is deactivated', async () => {
+    const { token } = await createAuthedUser();
+    const goal = (
+      await authed('post', '/goals', token)
+        .send({
+          name: 'Rent',
+          amountTotalKobo: 300_000,
+          dueDate: '2026-11-01T00:00:00.000Z',
+        })
+        .expect(201)
+    ).body as GoalBody;
+
+    await authed('patch', `/goals/${goal.id}`, token)
+      .send({ isActive: false })
+      .expect(200)
+      .expect((response) => {
+        expect(response.body as GoalBody).toMatchObject({
+          id: goal.id,
+          isActive: false,
+        });
+      });
+
+    await authed('get', '/goals/active', token).expect(404);
+    const dashboard = await authed('get', '/dashboard/stability', token).expect(
+      200,
+    );
+    expect(dashboard.body).toEqual({
+      ok: false,
+      message: 'No active goal found',
+    });
   });
 });
