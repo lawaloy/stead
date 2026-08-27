@@ -818,6 +818,13 @@ describe('AuthService', () => {
         consumedAt: expect.any(Date) as unknown,
       },
     });
+    expect(prisma.otpCode.updateMany).toHaveBeenCalledWith({
+      where: {
+        userId: 'user_1',
+        consumedAt: null,
+      },
+      data: { consumedAt: expect.any(Date) as unknown },
+    });
     expect(telemetry.recordEvent).toHaveBeenCalledWith(
       expect.objectContaining({
         type: 'otp_verify_locked',
@@ -890,6 +897,13 @@ describe('AuthService', () => {
         verifyAttempts: 2,
         consumedAt: expect.any(Date) as unknown,
       },
+    });
+    expect(prisma.otpCode.updateMany).toHaveBeenCalledWith({
+      where: {
+        userId: 'user_1',
+        consumedAt: null,
+      },
+      data: { consumedAt: expect.any(Date) as unknown },
     });
     expect(telemetry.recordEvent).toHaveBeenCalledWith(
       expect.objectContaining({
