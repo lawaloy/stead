@@ -5,8 +5,11 @@ import {
   configureApiAuth,
   createGoal,
   createTransaction,
+  deleteTransaction,
   getActiveGoal,
   getDashboardStability,
+  listTransactions,
+  updateTransaction,
 } from '../lib/api';
 
 jest.mock('../lib/base-url', () => ({
@@ -94,6 +97,64 @@ describe('api finance client', () => {
         goalId: 'goal_1',
       }),
     ).resolves.toEqual(transactionResponse);
+  });
+
+  it('lists transactions with optional date bounds and parses every row', async () => {
+    mock.onGet('/transactions').reply((config) => {
+      expect(config.params).toEqual({
+        from: '2026-06-01T00:00:00.000Z',
+        to: '2026-06-30T23:59:59.000Z',
+      });
+      return [200, [transactionResponse]];
+    });
+
+    await expect(
+      listTransactions({
+        from: '2026-06-01T00:00:00.000Z',
+        to: '2026-06-30T23:59:59.000Z',
+      }),
+    ).resolves.toEqual([transactionResponse]);
+
+    mock
+      .onGet('/transactions')
+      .reply(200, [{ ...transactionResponse, amountKobo: 'invalid' }]);
+    await expect(listTransactions()).rejects.toThrow();
+  });
+
+  it('updates a transaction and parses the returned transaction', async () => {
+    const updated = {
+      ...transactionResponse,
+      direction: 'out' as const,
+      amountKobo: 750_000,
+      goalId: null,
+      note: 'Corrected expense',
+    };
+    mock.onPatch('/transactions/tx_1').reply((config) => {
+      expect(JSON.parse(config.data as string)).toEqual({
+        direction: 'out',
+        amountKobo: 750_000,
+        goalId: null,
+        note: 'Corrected expense',
+      });
+      return [200, updated];
+    });
+
+    await expect(
+      updateTransaction('tx_1', {
+        direction: 'out',
+        amountKobo: 750_000,
+        goalId: null,
+        note: 'Corrected expense',
+      }),
+    ).resolves.toEqual(updated);
+  });
+
+  it('deletes a transaction and validates the acknowledgement', async () => {
+    mock.onDelete('/transactions/tx_1').replyOnce(200, { ok: true });
+    await expect(deleteTransaction('tx_1')).resolves.toEqual({ ok: true });
+
+    mock.onDelete('/transactions/tx_1').replyOnce(200, { ok: false });
+    await expect(deleteTransaction('tx_1')).rejects.toThrow();
   });
 
   it('parses dashboard stability responses for active and missing goals', async () => {

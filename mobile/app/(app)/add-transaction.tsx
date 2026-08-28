@@ -3,12 +3,15 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { ApiError, createTransaction, getActiveGoal } from '../../src/lib/api';
 import { queryClient } from '../../src/lib/query-client';
+import { dateInputToIso, nairaInputToKobo } from '../../src/lib/transactions';
 import { ScreenShell } from '../../src/components/screen-shell';
 
 export default function AddTransactionScreen() {
   const [direction, setDirection] = useState<'in' | 'out'>('in');
-  const [amountKobo, setAmountKobo] = useState('500000');
-  const [occurredAt, setOccurredAt] = useState(new Date().toISOString());
+  const [amountNaira, setAmountNaira] = useState('5000');
+  const [occurredOn, setOccurredOn] = useState(
+    new Date().toISOString().slice(0, 10),
+  );
   const [note, setNote] = useState('manual entry');
   const [tagGoal, setTagGoal] = useState(true);
   const [success, setSuccess] = useState('');
@@ -20,23 +23,37 @@ export default function AddTransactionScreen() {
   });
 
   const validation = useMemo(() => {
-    if (!/^\d+$/.test(amountKobo) || Number(amountKobo) <= 0) return 'amountKobo must be > 0';
-    if (Number.isNaN(Date.parse(occurredAt))) return 'occurredAt must be a valid ISO date';
+    if (nairaInputToKobo(amountNaira) === null) {
+      return 'Enter an amount greater than zero with at most two decimal places.';
+    }
+    if (dateInputToIso(occurredOn) === null) {
+      return 'Enter a valid date in YYYY-MM-DD format.';
+    }
+    if (note.length > 280) return 'Note must be 280 characters or fewer.';
     return '';
-  }, [amountKobo, occurredAt]);
+  }, [amountNaira, note.length, occurredOn]);
 
   const mutation = useMutation({
-    mutationFn: async () =>
-      createTransaction({
+    mutationFn: async () => {
+      const amountKobo = nairaInputToKobo(amountNaira);
+      const occurredAt = dateInputToIso(occurredOn);
+      if (amountKobo === null || occurredAt === null) {
+        throw new Error('Transaction form is invalid');
+      }
+
+      return createTransaction({
         direction,
-        amountKobo: Number(amountKobo),
+        amountKobo,
         occurredAt,
         note: note || undefined,
         goalId: tagGoal ? activeGoalQuery.data?.id : undefined,
-      }),
+      });
+    },
     onSuccess: async () => {
       setSuccess('Transaction added');
-      await queryClient.invalidateQueries({ queryKey: ['dashboard', 'stability'] });
+      await queryClient.invalidateQueries({
+        queryKey: ['dashboard', 'stability'],
+      });
       await queryClient.invalidateQueries({ queryKey: ['goal', 'active'] });
       await queryClient.invalidateQueries({ queryKey: ['transactions'] });
     },
@@ -46,37 +63,62 @@ export default function AddTransactionScreen() {
     <ScreenShell title="Add Transaction">
       <View style={styles.segment}>
         <Pressable
-          style={[styles.segmentBtn, direction === 'in' && styles.segmentActive]}
+          style={[
+            styles.segmentBtn,
+            direction === 'in' && styles.segmentActive,
+          ]}
           onPress={() => setDirection('in')}
         >
           <Text style={styles.segmentText}>Income</Text>
         </Pressable>
         <Pressable
-          style={[styles.segmentBtn, direction === 'out' && styles.segmentActive]}
+          style={[
+            styles.segmentBtn,
+            direction === 'out' && styles.segmentActive,
+          ]}
           onPress={() => setDirection('out')}
         >
           <Text style={styles.segmentText}>Expense</Text>
         </Pressable>
       </View>
 
-      <Text style={styles.label}>Amount (kobo)</Text>
+      <Text style={styles.label}>Amount (naira)</Text>
       <TextInput
+        accessibilityLabel="Transaction amount in naira"
         style={styles.input}
-        value={amountKobo}
-        keyboardType="number-pad"
-        onChangeText={setAmountKobo}
+        value={amountNaira}
+        keyboardType="decimal-pad"
+        onChangeText={setAmountNaira}
       />
 
-      <Text style={styles.label}>Occurred At (ISO)</Text>
-      <TextInput style={styles.input} value={occurredAt} onChangeText={setOccurredAt} />
+      <Text style={styles.label}>Date</Text>
+      <TextInput
+        accessibilityLabel="Transaction date"
+        style={styles.input}
+        value={occurredOn}
+        placeholder="YYYY-MM-DD"
+        onChangeText={setOccurredOn}
+      />
 
       <Text style={styles.label}>Note</Text>
-      <TextInput style={styles.input} value={note} onChangeText={setNote} />
+      <TextInput
+        accessibilityLabel="Transaction note"
+        style={styles.input}
+        value={note}
+        maxLength={280}
+        onChangeText={setNote}
+      />
 
-      <Pressable onPress={() => setTagGoal((v) => !v)} style={styles.checkboxWrap}>
+      <Pressable
+        accessibilityRole="checkbox"
+        accessibilityState={{ checked: tagGoal }}
+        onPress={() => setTagGoal((v) => !v)}
+        style={styles.checkboxWrap}
+      >
         <View style={[styles.checkbox, tagGoal && styles.checkboxOn]} />
         <Text>
-          Tag active goal contribution ({activeGoalQuery.data ? activeGoalQuery.data.name : 'no active goal'})
+          Tag active goal contribution (
+          {activeGoalQuery.data ? activeGoalQuery.data.name : 'no active goal'})
         </Text>
       </Pressable>
 
@@ -87,7 +129,10 @@ export default function AddTransactionScreen() {
       {success ? <Text style={styles.success}>{success}</Text> : null}
 
       <Pressable
-        style={[styles.button, (!!validation || mutation.isPending) && styles.buttonDisabled]}
+        style={[
+          styles.button,
+          (!!validation || mutation.isPending) && styles.buttonDisabled,
+        ]}
         disabled={!!validation || mutation.isPending}
         onPress={() => {
           setSuccess('');
@@ -103,8 +148,18 @@ export default function AddTransactionScreen() {
 }
 
 const styles = StyleSheet.create({
-  segment: { flexDirection: 'row', backgroundColor: '#e7eef9', borderRadius: 10, padding: 4 },
-  segmentBtn: { flex: 1, paddingVertical: 8, alignItems: 'center', borderRadius: 8 },
+  segment: {
+    flexDirection: 'row',
+    backgroundColor: '#e7eef9',
+    borderRadius: 10,
+    padding: 4,
+  },
+  segmentBtn: {
+    flex: 1,
+    paddingVertical: 8,
+    alignItems: 'center',
+    borderRadius: 8,
+  },
   segmentActive: { backgroundColor: '#ffffff' },
   segmentText: { fontWeight: '700' },
   label: { fontWeight: '600', color: '#25324a' },
@@ -117,7 +172,13 @@ const styles = StyleSheet.create({
     backgroundColor: '#ffffff',
   },
   checkboxWrap: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  checkbox: { width: 16, height: 16, borderWidth: 1, borderColor: '#6a7690', borderRadius: 4 },
+  checkbox: {
+    width: 16,
+    height: 16,
+    borderWidth: 1,
+    borderColor: '#6a7690',
+    borderRadius: 4,
+  },
   checkboxOn: { backgroundColor: '#0f6fff', borderColor: '#0f6fff' },
   button: {
     backgroundColor: '#0f6fff',

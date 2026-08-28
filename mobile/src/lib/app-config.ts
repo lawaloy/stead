@@ -16,6 +16,8 @@ export const appConfig = {
       },
       transactions: {
         create: '/transactions',
+        list: '/transactions',
+        detail: (id: string) => `/transactions/${id}`,
       },
       dashboard: {
         stability: '/dashboard/stability',
