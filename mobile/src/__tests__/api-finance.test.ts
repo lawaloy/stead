@@ -100,7 +100,7 @@ describe('api finance client', () => {
   });
 
   it('lists transactions with optional date bounds and parses every row', async () => {
-    mock.onGet('/transactions').reply((config) => {
+    mock.onGet('/transactions').replyOnce((config) => {
       expect(config.params).toEqual({
         from: '2026-06-01T00:00:00.000Z',
         to: '2026-06-30T23:59:59.000Z',
@@ -114,6 +114,12 @@ describe('api finance client', () => {
         to: '2026-06-30T23:59:59.000Z',
       }),
     ).resolves.toEqual([transactionResponse]);
+
+    mock.onGet('/transactions').replyOnce((config) => {
+      expect(config.params).toBeUndefined();
+      return [200, []];
+    });
+    await expect(listTransactions()).resolves.toEqual([]);
 
     mock
       .onGet('/transactions')
@@ -147,6 +153,14 @@ describe('api finance client', () => {
         note: 'Corrected expense',
       }),
     ).resolves.toEqual(updated);
+
+    mock.onPatch('/transactions/tx_1').reply(200, {
+      ...updated,
+      direction: 'sideways',
+    });
+    await expect(
+      updateTransaction('tx_1', { direction: 'out' }),
+    ).rejects.toThrow();
   });
 
   it('deletes a transaction and validates the acknowledgement', async () => {
@@ -211,6 +225,25 @@ describe('api finance client', () => {
     mock.onGet('/dashboard/stability').reply(401, { message: 'Unauthorized' });
     await expect(getDashboardStability()).rejects.toBeInstanceOf(ApiError);
     expect(onUnauthorized).toHaveBeenCalledTimes(2);
+
+    mock.onGet('/transactions').reply(401, { message: 'Unauthorized' });
+    await expect(listTransactions()).rejects.toMatchObject({
+      name: 'ApiError',
+      status: 401,
+    });
+    expect(onUnauthorized).toHaveBeenCalledTimes(3);
+
+    mock.onPatch('/transactions/tx_1').reply(401, { message: 'Unauthorized' });
+    await expect(
+      updateTransaction('tx_1', { amountKobo: 1_000 }),
+    ).rejects.toMatchObject({ status: 401 });
+    expect(onUnauthorized).toHaveBeenCalledTimes(4);
+
+    mock.onDelete('/transactions/tx_1').reply(401, { message: 'Unauthorized' });
+    await expect(deleteTransaction('tx_1')).rejects.toMatchObject({
+      status: 401,
+    });
+    expect(onUnauthorized).toHaveBeenCalledTimes(5);
   });
 
   it('does not treat 403 finance responses as session expiry', async () => {

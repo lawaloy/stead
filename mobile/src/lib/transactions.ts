@@ -1,4 +1,7 @@
-import type { Transaction } from '../contracts/generated/types.gen';
+import type {
+  Transaction,
+  UpdateTransactionRequest,
+} from '../contracts/generated/types.gen';
 
 export type TransactionFilter = 'all' | Transaction['direction'];
 
@@ -69,4 +72,33 @@ export const nairaInputToKobo = (value: string) => {
   if (amount <= 0n || amount > BigInt(Number.MAX_SAFE_INTEGER)) return null;
 
   return Number(amount);
+};
+
+export type TransactionUpdateForm = {
+  direction: Transaction['direction'];
+  amountNaira: string;
+  occurredOn: string;
+  note: string;
+  tagGoal: boolean;
+  wasLinked: boolean;
+  activeGoalId?: string;
+};
+
+export const buildTransactionUpdatePayload = (
+  form: TransactionUpdateForm,
+): UpdateTransactionRequest | null => {
+  const amountKobo = nairaInputToKobo(form.amountNaira);
+  const occurredAt = dateInputToIso(form.occurredOn);
+  if (amountKobo === null || occurredAt === null) return null;
+
+  const payload: UpdateTransactionRequest = {
+    direction: form.direction,
+    amountKobo,
+    occurredAt,
+    note: form.note.trim() || null,
+  };
+  if (form.tagGoal !== form.wasLinked) {
+    payload.goalId = form.tagGoal ? form.activeGoalId : null;
+  }
+  return payload;
 };

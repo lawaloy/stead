@@ -24,6 +24,7 @@ import { useAuth } from '../../src/lib/auth-state';
 import { queryClient } from '../../src/lib/query-client';
 import { sessionQueryKeys } from '../../src/lib/session-query-cache';
 import {
+  buildTransactionUpdatePayload,
   calculateNetKobo,
   dateInputToIso,
   filterTransactions,
@@ -141,20 +142,16 @@ export default function TransactionsScreen() {
 
   const saveEdit = () => {
     if (!editing || validation) return;
-    const amountKobo = nairaInputToKobo(amountNaira);
-    const occurredAt = dateInputToIso(occurredOn);
-    if (amountKobo === null || occurredAt === null) return;
-
-    const payload: UpdateTransactionRequest = {
+    const payload = buildTransactionUpdatePayload({
       direction,
-      amountKobo,
-      occurredAt,
-      note: note.trim() || null,
-    };
-    const wasLinked = editing.goalId !== null;
-    if (tagGoal !== wasLinked) {
-      payload.goalId = tagGoal ? activeGoalQuery.data?.id : null;
-    }
+      amountNaira,
+      occurredOn,
+      note,
+      tagGoal,
+      wasLinked: editing.goalId !== null,
+      activeGoalId: activeGoalQuery.data?.id,
+    });
+    if (!payload) return;
 
     updateMutation.mutate({ id: editing.id, payload });
   };
