@@ -4,16 +4,18 @@ import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { ApiError, createTransaction, getActiveGoal } from '../../src/lib/api';
 import { useAuth } from '../../src/lib/auth-state';
 import { queryClient } from '../../src/lib/query-client';
-import { dateInputToIso, nairaInputToKobo } from '../../src/lib/transactions';
+import {
+  dateInputToIso,
+  nairaInputToKobo,
+  todayDateInput,
+} from '../../src/lib/transactions';
 import { sessionQueryKeys } from '../../src/lib/session-query-cache';
 import { ScreenShell } from '../../src/components/screen-shell';
 
 export default function AddTransactionScreen() {
   const [direction, setDirection] = useState<'in' | 'out'>('in');
   const [amountNaira, setAmountNaira] = useState('5000');
-  const [occurredOn, setOccurredOn] = useState(
-    new Date().toISOString().slice(0, 10),
-  );
+  const [occurredOn, setOccurredOn] = useState(() => todayDateInput());
   const [note, setNote] = useState('manual entry');
   const [tagGoal, setTagGoal] = useState(true);
   const [success, setSuccess] = useState('');
