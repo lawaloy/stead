@@ -96,25 +96,43 @@ describe('transaction presentation helpers', () => {
     expect(isoToDateInput(dateInputToIso('2024-02-29') as string)).toBe(
       '2024-02-29',
     );
+    expect(isoToDateInput('2026-08-21T00:00:00+14:00')).toBe('2026-08-21');
+    expect(isoToDateInput('2026-08-20T10:00:00.000Z')).toBe('2026-08-20');
     expect(dateInputToIso('2025-02-29')).toBeNull();
     expect(dateInputToIso('2026-04-31')).toBeNull();
     expect(dateInputToIso('2026-02-30')).toBeNull();
+    expect(dateInputToIso('2026-13-01')).toBeNull();
+    expect(dateInputToIso('2026-00-10')).toBeNull();
     expect(dateInputToIso('08/21/2026')).toBeNull();
     expect(dateInputToIso('')).toBeNull();
   });
 
   it('omits goalId on save when the target goal did not change', () => {
     const occurredAt = dateInputToIso('2026-08-21');
+    const unchanged = {
+      direction: 'in' as const,
+      amountNaira: '10',
+      occurredOn: '2026-08-21',
+      note: '  kept  ',
+      tagGoal: true,
+      currentGoalId: 'goal_current',
+      activeGoalId: 'goal_current',
+    };
     expect(
       buildTransactionUpdatePayload({
-        direction: 'in',
-        amountNaira: '10',
-        occurredOn: '2026-08-21',
-        note: '  kept  ',
-        tagGoal: true,
+        ...unchanged,
         goalSelectionChanged: false,
-        currentGoalId: 'goal_current',
-        activeGoalId: 'goal_current',
+      }),
+    ).toEqual({
+      direction: 'in',
+      amountKobo: 1_000,
+      occurredAt,
+      note: 'kept',
+    });
+    expect(
+      buildTransactionUpdatePayload({
+        ...unchanged,
+        goalSelectionChanged: true,
       }),
     ).toEqual({
       direction: 'in',
@@ -210,6 +228,7 @@ describe('transaction presentation helpers', () => {
   });
 
   it('preserves an older goal until the customer explicitly changes the selection', () => {
+    const occurredAt = dateInputToIso('2026-08-21');
     expect(
       buildTransactionUpdatePayload({
         direction: 'in',
@@ -221,7 +240,12 @@ describe('transaction presentation helpers', () => {
         currentGoalId: 'goal_old',
         activeGoalId: 'goal_active',
       }),
-    ).not.toHaveProperty('goalId');
+    ).toEqual({
+      direction: 'in',
+      amountKobo: 1_000,
+      occurredAt,
+      note: 'note only',
+    });
 
     expect(
       buildTransactionUpdatePayload({
@@ -234,7 +258,13 @@ describe('transaction presentation helpers', () => {
         currentGoalId: 'goal_old',
         activeGoalId: 'goal_active',
       }),
-    ).toMatchObject({ goalId: 'goal_active' });
+    ).toEqual({
+      direction: 'in',
+      amountKobo: 1_000,
+      occurredAt,
+      note: 'reassigned',
+      goalId: 'goal_active',
+    });
     expect(resolveTransactionGoalId('goal_old', true, 'goal_active')).toBe(
       'goal_active',
     );
@@ -242,5 +272,39 @@ describe('transaction presentation helpers', () => {
     expect(
       resolveTransactionGoalId('goal_old', false, 'goal_active'),
     ).toBeNull();
+  });
+
+  it('keeps an existing goal link when the active goal is missing', () => {
+    const occurredAt = dateInputToIso('2026-08-21');
+    const keptLink = {
+      direction: 'in' as const,
+      amountNaira: '10',
+      occurredOn: '2026-08-21',
+      note: 'kept',
+      tagGoal: true,
+      currentGoalId: 'goal_old',
+    };
+    expect(
+      buildTransactionUpdatePayload({
+        ...keptLink,
+        goalSelectionChanged: false,
+      }),
+    ).toEqual({
+      direction: 'in',
+      amountKobo: 1_000,
+      occurredAt,
+      note: 'kept',
+    });
+    expect(
+      buildTransactionUpdatePayload({
+        ...keptLink,
+        goalSelectionChanged: true,
+      }),
+    ).toEqual({
+      direction: 'in',
+      amountKobo: 1_000,
+      occurredAt,
+      note: 'kept',
+    });
   });
 });
