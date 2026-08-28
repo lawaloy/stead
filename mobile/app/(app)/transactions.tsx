@@ -148,7 +148,7 @@ export default function TransactionsScreen() {
       occurredOn,
       note,
       tagGoal,
-      wasLinked: editing.goalId !== null,
+      currentGoalId: editing.goalId,
       activeGoalId: activeGoalQuery.data?.id,
     });
     if (!payload) return;

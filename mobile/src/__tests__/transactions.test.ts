@@ -8,6 +8,8 @@ import {
   isoToDateInput,
   koboToNairaInput,
   nairaInputToKobo,
+  resolveTransactionGoalId,
+  todayDateInput,
 } from '../lib/transactions';
 
 const transactions: Transaction[] = [
@@ -86,10 +88,14 @@ describe('transaction presentation helpers', () => {
     expect(koboToNairaInput(250_000)).toBe('2500');
   });
 
-  it('round-trips valid date inputs and rejects impossible dates', () => {
-    expect(dateInputToIso('2026-08-21')).toBe('2026-08-21T12:00:00.000Z');
-    expect(isoToDateInput('2026-08-21T12:00:00.000Z')).toBe('2026-08-21');
-    expect(dateInputToIso('2024-02-29')).toBe('2024-02-29T12:00:00.000Z');
+  it('round-trips local calendar dates and rejects impossible dates', () => {
+    const occurredAt = dateInputToIso('2026-08-21');
+    expect(occurredAt).not.toBeNull();
+    expect(new Date(occurredAt as string).getHours()).toBe(12);
+    expect(isoToDateInput(occurredAt as string)).toBe('2026-08-21');
+    expect(isoToDateInput(dateInputToIso('2024-02-29') as string)).toBe(
+      '2024-02-29',
+    );
     expect(dateInputToIso('2025-02-29')).toBeNull();
     expect(dateInputToIso('2026-04-31')).toBeNull();
     expect(dateInputToIso('2026-02-30')).toBeNull();
@@ -97,7 +103,8 @@ describe('transaction presentation helpers', () => {
     expect(dateInputToIso('')).toBeNull();
   });
 
-  it('omits goalId on save when the link checkbox did not change', () => {
+  it('omits goalId on save when the target goal did not change', () => {
+    const occurredAt = dateInputToIso('2026-08-21');
     expect(
       buildTransactionUpdatePayload({
         direction: 'in',
@@ -105,18 +112,19 @@ describe('transaction presentation helpers', () => {
         occurredOn: '2026-08-21',
         note: '  kept  ',
         tagGoal: true,
-        wasLinked: true,
+        currentGoalId: 'goal_current',
         activeGoalId: 'goal_current',
       }),
     ).toEqual({
       direction: 'in',
       amountKobo: 1_000,
-      occurredAt: '2026-08-21T12:00:00.000Z',
+      occurredAt,
       note: 'kept',
     });
   });
 
   it('unlinks or newly links a transaction only when the checkbox changed', () => {
+    const occurredAt = dateInputToIso('2026-08-21');
     expect(
       buildTransactionUpdatePayload({
         direction: 'out',
@@ -124,13 +132,13 @@ describe('transaction presentation helpers', () => {
         occurredOn: '2026-08-21',
         note: '',
         tagGoal: false,
-        wasLinked: true,
+        currentGoalId: 'goal_current',
         activeGoalId: 'goal_current',
       }),
     ).toEqual({
       direction: 'out',
       amountKobo: 5_000,
-      occurredAt: '2026-08-21T12:00:00.000Z',
+      occurredAt,
       note: null,
       goalId: null,
     });
@@ -142,13 +150,13 @@ describe('transaction presentation helpers', () => {
         occurredOn: '2026-08-21',
         note: '   ',
         tagGoal: true,
-        wasLinked: false,
+        currentGoalId: null,
         activeGoalId: 'goal_current',
       }),
     ).toEqual({
       direction: 'in',
       amountKobo: 5_000,
-      occurredAt: '2026-08-21T12:00:00.000Z',
+      occurredAt,
       note: null,
       goalId: 'goal_current',
     });
@@ -162,7 +170,7 @@ describe('transaction presentation helpers', () => {
         occurredOn: '2026-08-21',
         note: 'ok',
         tagGoal: false,
-        wasLinked: false,
+        currentGoalId: null,
       }),
     ).toBeNull();
     expect(
@@ -172,8 +180,35 @@ describe('transaction presentation helpers', () => {
         occurredOn: '2026-02-30',
         note: 'ok',
         tagGoal: false,
-        wasLinked: false,
+        currentGoalId: null,
       }),
+    ).toBeNull();
+  });
+
+  it('uses the device-local day for new and existing transactions', () => {
+    const localDate = new Date(2026, 7, 21, 23, 30);
+    expect(todayDateInput(localDate)).toBe('2026-08-21');
+    expect(isoToDateInput(localDate.toISOString())).toBe('2026-08-21');
+  });
+
+  it('moves an older linked transaction to the current active goal', () => {
+    expect(
+      buildTransactionUpdatePayload({
+        direction: 'in',
+        amountNaira: '10',
+        occurredOn: '2026-08-21',
+        note: 'reassigned',
+        tagGoal: true,
+        currentGoalId: 'goal_old',
+        activeGoalId: 'goal_active',
+      }),
+    ).toMatchObject({ goalId: 'goal_active' });
+    expect(resolveTransactionGoalId('goal_old', true, 'goal_active')).toBe(
+      'goal_active',
+    );
+    expect(resolveTransactionGoalId('goal_old', true, null)).toBe('goal_old');
+    expect(
+      resolveTransactionGoalId('goal_old', false, 'goal_active'),
     ).toBeNull();
   });
 });
