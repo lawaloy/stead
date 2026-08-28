@@ -99,6 +99,8 @@ describe('transaction presentation helpers', () => {
     expect(dateInputToIso('2025-02-29')).toBeNull();
     expect(dateInputToIso('2026-04-31')).toBeNull();
     expect(dateInputToIso('2026-02-30')).toBeNull();
+    expect(dateInputToIso('2026-13-01')).toBeNull();
+    expect(dateInputToIso('2026-00-10')).toBeNull();
     expect(dateInputToIso('08/21/2026')).toBeNull();
     expect(dateInputToIso('')).toBeNull();
   });
@@ -189,9 +191,13 @@ describe('transaction presentation helpers', () => {
     const localDate = new Date(2026, 7, 21, 23, 30);
     expect(todayDateInput(localDate)).toBe('2026-08-21');
     expect(isoToDateInput(localDate.toISOString())).toBe('2026-08-21');
+    expect(isoToDateInput('2026-08-21T00:00:00+14:00')).toBe(
+      isoToDateInput('2026-08-20T10:00:00.000Z'),
+    );
   });
 
   it('moves an older linked transaction to the current active goal', () => {
+    const occurredAt = dateInputToIso('2026-08-21');
     expect(
       buildTransactionUpdatePayload({
         direction: 'in',
@@ -202,7 +208,13 @@ describe('transaction presentation helpers', () => {
         currentGoalId: 'goal_old',
         activeGoalId: 'goal_active',
       }),
-    ).toMatchObject({ goalId: 'goal_active' });
+    ).toEqual({
+      direction: 'in',
+      amountKobo: 1_000,
+      occurredAt,
+      note: 'reassigned',
+      goalId: 'goal_active',
+    });
     expect(resolveTransactionGoalId('goal_old', true, 'goal_active')).toBe(
       'goal_active',
     );
@@ -210,5 +222,24 @@ describe('transaction presentation helpers', () => {
     expect(
       resolveTransactionGoalId('goal_old', false, 'goal_active'),
     ).toBeNull();
+  });
+
+  it('keeps an existing goal link when the active goal is missing', () => {
+    const occurredAt = dateInputToIso('2026-08-21');
+    expect(
+      buildTransactionUpdatePayload({
+        direction: 'in',
+        amountNaira: '10',
+        occurredOn: '2026-08-21',
+        note: 'kept',
+        tagGoal: true,
+        currentGoalId: 'goal_old',
+      }),
+    ).toEqual({
+      direction: 'in',
+      amountKobo: 1_000,
+      occurredAt,
+      note: 'kept',
+    });
   });
 });
