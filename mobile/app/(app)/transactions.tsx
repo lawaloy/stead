@@ -24,6 +24,7 @@ import { useAuth } from '../../src/lib/auth-state';
 import { queryClient } from '../../src/lib/query-client';
 import { sessionQueryKeys } from '../../src/lib/session-query-cache';
 import {
+  buildTransactionUpdatePayload,
   calculateNetKobo,
   dateInputToIso,
   filterTransactions,
@@ -32,7 +33,6 @@ import {
   isoToDateInput,
   koboToNairaInput,
   nairaInputToKobo,
-  resolveTransactionGoalId,
 } from '../../src/lib/transactions';
 import type { TransactionFilter } from '../../src/lib/transactions';
 import { ScreenShell } from '../../src/components/screen-shell';
@@ -142,24 +142,16 @@ export default function TransactionsScreen() {
 
   const saveEdit = () => {
     if (!editing || validation) return;
-    const amountKobo = nairaInputToKobo(amountNaira);
-    const occurredAt = dateInputToIso(occurredOn);
-    if (amountKobo === null || occurredAt === null) return;
-
-    const payload: UpdateTransactionRequest = {
+    const payload = buildTransactionUpdatePayload({
       direction,
-      amountKobo,
-      occurredAt,
-      note: note.trim() || null,
-    };
-    const targetGoalId = resolveTransactionGoalId(
-      editing.goalId,
+      amountNaira,
+      occurredOn,
+      note,
       tagGoal,
-      activeGoalQuery.data?.id ?? null,
-    );
-    if (targetGoalId !== editing.goalId) {
-      payload.goalId = targetGoalId;
-    }
+      currentGoalId: editing.goalId,
+      activeGoalId: activeGoalQuery.data?.id,
+    });
+    if (!payload) return;
 
     updateMutation.mutate({ id: editing.id, payload });
   };
