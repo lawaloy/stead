@@ -150,14 +150,17 @@ Implemented screens and flows:
 - Token persistence and unauthorized-session clearing
 - A stable installation UUID sent with API requests for server-side abuse correlation; the API persists only a keyed hash
 - Active goal setup
-- Manual income/expense entry with optional active-goal tagging
+- Manual income/expense entry in naira with a calendar-date input and optional
+  active-goal tagging
+- Transaction activity history with income/expense filters, visible net,
+  editing, explicit goal-link management, and confirmed deletion
 - Stability dashboard
 
 Mobile API responses are parsed with Zod schemas before the UI consumes them.
 
-The mobile product surface is smaller than the API surface. It can create a
-goal and create a transaction, but it cannot update an existing goal or list,
-edit, and delete transactions. Those API operations exist server-side only.
+The mobile product surface is still smaller than the API surface. Transaction
+create/list/update/delete is exposed, but existing goals cannot yet be edited,
+deactivated, or reviewed as history in the app.
 
 ## 5. System Architecture
 
@@ -181,18 +184,18 @@ edit, and delete transactions. Those API operations exist server-side only.
 The repository contains a working core vertical slice, not a complete or
 production-validated financial product.
 
-The largest current gaps are:
+Product milestones and enabling delivery work are tracked separately in
+[Project Status](project-status.md#milestone-tracking). The largest current
+gaps are:
 
 1. Real-provider OTP validation on native Android and iOS devices.
-2. PostgreSQL-backed e2e coverage for goals, transaction CRUD, and populated
-   dashboard calculations.
-3. Automated mobile screen and mobile-to-API journey coverage.
-4. Mobile transaction history/edit/delete and goal edit/history workflows.
-5. Production session lifecycle, operational monitoring, backup/restore,
+2. Automated mobile screen and mobile-to-API journey coverage.
+3. Mobile goal editing, deactivation, and history workflows.
+4. Production session lifecycle, operational monitoring, backup/restore,
    privacy, retention, and account-deletion procedures.
-6. Weekly readiness and risk alerts; the notification queue currently delivers
+5. Weekly readiness and risk alerts; the notification queue currently delivers
    OTPs only.
-7. Automatic financial-data ingestion, richer obligation planning, customer
+6. Automatic financial-data ingestion, richer obligation planning, customer
    profile/preferences, and internal operations tooling.
 
 See [Project Status](project-status.md) for the full capability matrix, exact

@@ -126,19 +126,31 @@ This sequence is intentional. Stead should prioritize user-facing product surfac
     provider details to the auth module.
   - Notification jobs are already persisted in the database, but the worker still runs in-process.
   - PostgreSQL-backed e2e tests cover OTP persistence, dev delivery, verification, retries, and dead-lettering in CI.
-- Immediate priorities:
+  - PostgreSQL-backed finance e2e tests cover goal lifecycle rules, transaction
+    CRUD/ownership, and populated dashboard recalculation.
+  - Mobile exposes transaction activity, filtering, edit, explicit goal-link
+    management, and delete in addition to transaction creation.
+- Product delivery priorities (customer value):
+  - Completed: transaction history and management, including user-friendly
+    naira and calendar-date entry.
+  - Next: agree and implement goal editing, intentional deactivation or
+    replacement, and goal history in mobile.
+  - Then: define weekly readiness/risk-alert preferences and delivery behavior.
+  - Detailed status and sequencing live in
+    [Project Status](project-status.md#milestone-tracking).
+- Enabling and architecture priorities:
   - Completed P0: the local mobile auth acceptance pass is recorded and
     Dependency Review is blocking in the active `main` ruleset.
   - Completed P1: authoritative API/mobile contract generation and device-aware
     OTP abuse controls with stronger operator diagnostics.
+  - Completed P1: PostgreSQL-backed finance e2e scenarios for goals,
+    transactions, and populated dashboard calculations.
   - P1: extend contract enforcement to any new mobile-consumed endpoints as
     they are introduced.
   - P1: validate real-provider OTP delivery and the operator response playbook
     when a paid or verified sender account is available.
-  - P1: add PostgreSQL-backed finance e2e scenarios and an automated critical
-    mobile journey before treating the vertical slice as production-ready.
-  - P1: close the mobile/API capability gap for goal maintenance and transaction
-    history only after the intended product workflow is agreed.
+  - P1: add an automated critical mobile journey before treating the vertical
+    slice as production-ready.
   - Next extraction step: define the cross-process command envelope,
     correlation/idempotency strategy, and queue selection criteria before
     moving the worker out of the API deployment.

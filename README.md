@@ -7,20 +7,20 @@ Current repository status:
 - API: the core auth, single-active-goal, manual-transaction, stability-dashboard,
   and persisted OTP-notification boundaries are implemented.
 - Mobile: the core vertical slice supports OTP login, active-goal creation,
-  manual transaction creation, and dashboard viewing. It does not yet expose
-  all API capabilities; goal updates and transaction list/update/delete are
-  notable gaps.
-- Verification: auth/notification has PostgreSQL-backed e2e coverage. Finance
-  currently relies mainly on unit and API-client tests, and the app has no
-  automated screen or native-device journey suite.
+  manual transaction creation, transaction history/filtering/edit/delete, and
+  dashboard viewing. Goal maintenance and history remain notable API/mobile
+  capability gaps.
+- Verification: auth/notification and finance have PostgreSQL-backed e2e
+  coverage. The app still has no automated screen or native-device journey
+  suite.
 - Production readiness: live SMS delivery on real devices, production session
-  lifecycle, finance e2e coverage, operations, and several product workflows
-  remain incomplete.
+  lifecycle, operations, automated critical mobile journeys, and several
+  product workflows remain incomplete.
 
 Quick links
 
 - Overview: [docs/overview.md](docs/overview.md)
-- Capability and test status: [docs/project-status.md](docs/project-status.md)
+- Product milestones, capability, and test status: [docs/project-status.md](docs/project-status.md)
 - Active architecture milestone: [docs/architecture-roadmap.md](docs/architecture-roadmap.md#delivery-roadmap)
 - Auth readiness work: [docs/auth-hardening.md](docs/auth-hardening.md)
 - Repository rules audit: [docs/branch-protection-checklist.md](docs/branch-protection-checklist.md)
