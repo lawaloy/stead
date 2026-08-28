@@ -66,6 +66,7 @@ export default function TransactionsScreen() {
   const [occurredOn, setOccurredOn] = useState('');
   const [note, setNote] = useState('');
   const [tagGoal, setTagGoal] = useState(false);
+  const [goalSelectionChanged, setGoalSelectionChanged] = useState(false);
 
   const transactionsQuery = useQuery({
     queryKey: sessionQueryKeys.transactions(token),
@@ -98,7 +99,7 @@ export default function TransactionsScreen() {
       return 'Enter a valid date in YYYY-MM-DD format.';
     }
     if (note.length > 280) return 'Note must be 280 characters or fewer.';
-    if (tagGoal && !editing.goalId && !activeGoalQuery.data) {
+    if (tagGoal && goalSelectionChanged && !activeGoalQuery.data) {
       return 'Create an active goal before linking this transaction.';
     }
     return '';
@@ -106,6 +107,7 @@ export default function TransactionsScreen() {
     activeGoalQuery.data,
     amountNaira,
     editing,
+    goalSelectionChanged,
     note.length,
     occurredOn,
     tagGoal,
@@ -138,6 +140,7 @@ export default function TransactionsScreen() {
     setOccurredOn(isoToDateInput(transaction.occurredAt));
     setNote(transaction.note ?? '');
     setTagGoal(transaction.goalId !== null);
+    setGoalSelectionChanged(false);
   };
 
   const saveEdit = () => {
@@ -148,6 +151,7 @@ export default function TransactionsScreen() {
       occurredOn,
       note,
       tagGoal,
+      goalSelectionChanged,
       currentGoalId: editing.goalId,
       activeGoalId: activeGoalQuery.data?.id,
     });
@@ -274,12 +278,17 @@ export default function TransactionsScreen() {
           <Pressable
             accessibilityRole="checkbox"
             accessibilityState={{ checked: tagGoal }}
-            onPress={() => setTagGoal((current) => !current)}
+            onPress={() => {
+              setTagGoal((current) => !current);
+              setGoalSelectionChanged(true);
+            }}
             style={styles.checkboxRow}
           >
             <View style={[styles.checkbox, tagGoal && styles.checkboxActive]} />
             <Text style={styles.checkboxLabel}>
-              Count toward {activeGoalQuery.data?.name ?? 'the linked goal'}
+              {editing.goalId && !goalSelectionChanged
+                ? 'Keep the current goal link'
+                : `Count toward ${activeGoalQuery.data?.name ?? 'the linked goal'}`}
             </Text>
           </Pressable>
 

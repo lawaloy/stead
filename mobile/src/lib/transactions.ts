@@ -37,6 +37,7 @@ export const formatTransactionDate = (occurredAt: string) =>
     day: 'numeric',
     month: 'short',
     year: 'numeric',
+    timeZone: 'UTC',
   });
 
 const datePartsToInput = (date: Date) =>
@@ -48,19 +49,15 @@ const datePartsToInput = (date: Date) =>
 
 export const todayDateInput = (now = new Date()) => datePartsToInput(now);
 
-export const isoToDateInput = (occurredAt: string) =>
-  datePartsToInput(new Date(occurredAt));
+export const isoToDateInput = (occurredAt: string) => occurredAt.slice(0, 10);
 
 export const dateInputToIso = (value: string) => {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
 
-  const [year, month, day] = value.split('-').map(Number);
-  const date = new Date(year, month - 1, day, 12);
+  const date = new Date(`${value}T12:00:00.000Z`);
   if (
     Number.isNaN(date.getTime()) ||
-    date.getFullYear() !== year ||
-    date.getMonth() !== month - 1 ||
-    date.getDate() !== day
+    date.toISOString().slice(0, 10) !== value
   ) {
     return null;
   }
@@ -99,6 +96,7 @@ export type TransactionUpdateForm = {
   occurredOn: string;
   note: string;
   tagGoal: boolean;
+  goalSelectionChanged: boolean;
   currentGoalId: string | null;
   activeGoalId?: string;
 };
@@ -109,6 +107,9 @@ export const buildTransactionUpdatePayload = (
   const amountKobo = nairaInputToKobo(form.amountNaira);
   const occurredAt = dateInputToIso(form.occurredOn);
   if (amountKobo === null || occurredAt === null) return null;
+  if (form.goalSelectionChanged && form.tagGoal && !form.activeGoalId) {
+    return null;
+  }
 
   const payload: UpdateTransactionRequest = {
     direction: form.direction,
@@ -116,13 +117,15 @@ export const buildTransactionUpdatePayload = (
     occurredAt,
     note: form.note.trim() || null,
   };
-  const targetGoalId = resolveTransactionGoalId(
-    form.currentGoalId,
-    form.tagGoal,
-    form.activeGoalId ?? null,
-  );
-  if (targetGoalId !== form.currentGoalId) {
-    payload.goalId = targetGoalId;
+  if (form.goalSelectionChanged) {
+    const targetGoalId = resolveTransactionGoalId(
+      form.currentGoalId,
+      form.tagGoal,
+      form.activeGoalId ?? null,
+    );
+    if (targetGoalId !== form.currentGoalId) {
+      payload.goalId = targetGoalId;
+    }
   }
   return payload;
 };
