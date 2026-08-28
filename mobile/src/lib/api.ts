@@ -10,12 +10,14 @@ import {
   AuthVerifyOtpResponseSchema,
   DashboardStabilityResponseSchema,
   GoalSchema,
+  OkResponseSchema,
   TransactionSchema,
 } from '../types/api';
 import type {
   CreateGoalRequest,
   CreateTransactionRequest,
   RequestOtpRequest,
+  UpdateTransactionRequest,
   VerifyOtpRequest,
 } from '../contracts/generated/types.gen';
 
@@ -128,6 +130,34 @@ export const createTransaction = async (payload: CreateTransactionRequest) => {
     payload,
   );
   return TransactionSchema.parse(response.data);
+};
+
+export const listTransactions = async (query?: {
+  from?: string;
+  to?: string;
+}) => {
+  const response = await apiClient.get(appConfig.api.routes.transactions.list, {
+    params: query,
+  });
+  return z.array(TransactionSchema).parse(response.data);
+};
+
+export const updateTransaction = async (
+  id: string,
+  payload: UpdateTransactionRequest,
+) => {
+  const response = await apiClient.patch(
+    appConfig.api.routes.transactions.detail(id),
+    payload,
+  );
+  return TransactionSchema.parse(response.data);
+};
+
+export const deleteTransaction = async (id: string) => {
+  const response = await apiClient.delete(
+    appConfig.api.routes.transactions.detail(id),
+  );
+  return OkResponseSchema.parse(response.data);
 };
 
 export const getDashboardStability = async () => {

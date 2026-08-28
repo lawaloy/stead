@@ -5,8 +5,11 @@ import {
   configureApiAuth,
   createGoal,
   createTransaction,
+  deleteTransaction,
   getActiveGoal,
   getDashboardStability,
+  listTransactions,
+  updateTransaction,
 } from '../lib/api';
 
 jest.mock('../lib/base-url', () => ({
@@ -96,6 +99,78 @@ describe('api finance client', () => {
     ).resolves.toEqual(transactionResponse);
   });
 
+  it('lists transactions with optional date bounds and parses every row', async () => {
+    mock.onGet('/transactions').replyOnce((config) => {
+      expect(config.params).toEqual({
+        from: '2026-06-01T00:00:00.000Z',
+        to: '2026-06-30T23:59:59.000Z',
+      });
+      return [200, [transactionResponse]];
+    });
+
+    await expect(
+      listTransactions({
+        from: '2026-06-01T00:00:00.000Z',
+        to: '2026-06-30T23:59:59.000Z',
+      }),
+    ).resolves.toEqual([transactionResponse]);
+
+    mock.onGet('/transactions').replyOnce((config) => {
+      expect(config.params).toBeUndefined();
+      return [200, []];
+    });
+    await expect(listTransactions()).resolves.toEqual([]);
+
+    mock
+      .onGet('/transactions')
+      .reply(200, [{ ...transactionResponse, amountKobo: 'invalid' }]);
+    await expect(listTransactions()).rejects.toThrow();
+  });
+
+  it('updates a transaction and parses the returned transaction', async () => {
+    const updated = {
+      ...transactionResponse,
+      direction: 'out' as const,
+      amountKobo: 750_000,
+      goalId: null,
+      note: 'Corrected expense',
+    };
+    mock.onPatch('/transactions/tx_1').reply((config) => {
+      expect(JSON.parse(config.data as string)).toEqual({
+        direction: 'out',
+        amountKobo: 750_000,
+        goalId: null,
+        note: 'Corrected expense',
+      });
+      return [200, updated];
+    });
+
+    await expect(
+      updateTransaction('tx_1', {
+        direction: 'out',
+        amountKobo: 750_000,
+        goalId: null,
+        note: 'Corrected expense',
+      }),
+    ).resolves.toEqual(updated);
+
+    mock.onPatch('/transactions/tx_1').reply(200, {
+      ...updated,
+      direction: 'sideways',
+    });
+    await expect(
+      updateTransaction('tx_1', { direction: 'out' }),
+    ).rejects.toThrow();
+  });
+
+  it('deletes a transaction and validates the acknowledgement', async () => {
+    mock.onDelete('/transactions/tx_1').replyOnce(200, { ok: true });
+    await expect(deleteTransaction('tx_1')).resolves.toEqual({ ok: true });
+
+    mock.onDelete('/transactions/tx_1').replyOnce(200, { ok: false });
+    await expect(deleteTransaction('tx_1')).rejects.toThrow();
+  });
+
   it('parses dashboard stability responses for active and missing goals', async () => {
     const stabilityOk = {
       ok: true as const,
@@ -150,6 +225,25 @@ describe('api finance client', () => {
     mock.onGet('/dashboard/stability').reply(401, { message: 'Unauthorized' });
     await expect(getDashboardStability()).rejects.toBeInstanceOf(ApiError);
     expect(onUnauthorized).toHaveBeenCalledTimes(2);
+
+    mock.onGet('/transactions').reply(401, { message: 'Unauthorized' });
+    await expect(listTransactions()).rejects.toMatchObject({
+      name: 'ApiError',
+      status: 401,
+    });
+    expect(onUnauthorized).toHaveBeenCalledTimes(3);
+
+    mock.onPatch('/transactions/tx_1').reply(401, { message: 'Unauthorized' });
+    await expect(
+      updateTransaction('tx_1', { amountKobo: 1_000 }),
+    ).rejects.toMatchObject({ status: 401 });
+    expect(onUnauthorized).toHaveBeenCalledTimes(4);
+
+    mock.onDelete('/transactions/tx_1').reply(401, { message: 'Unauthorized' });
+    await expect(deleteTransaction('tx_1')).rejects.toMatchObject({
+      status: 401,
+    });
+    expect(onUnauthorized).toHaveBeenCalledTimes(5);
   });
 
   it('does not treat 403 finance responses as session expiry', async () => {

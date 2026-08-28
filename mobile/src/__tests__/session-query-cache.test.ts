@@ -30,11 +30,17 @@ describe('session query cache', () => {
       id: 'goal_a',
       name: 'User A rent',
     });
+    client.setQueryData(sessionQueryKeys.transactions('token-a'), [
+      { id: 'tx_a' },
+    ]);
 
     await clearSessionQueryCache(client);
 
     expect(client.getQueryData(sessionQueryKeys.dashboard('token-a'))).toBeUndefined();
     expect(client.getQueryData(sessionQueryKeys.activeGoal('token-a'))).toBeUndefined();
+    expect(
+      client.getQueryData(sessionQueryKeys.transactions('token-a')),
+    ).toBeUndefined();
     expect(client.getQueryData(sessionQueryKeys.dashboard('token-b'))).toBeUndefined();
   });
 
@@ -144,5 +150,29 @@ describe('session query cache', () => {
     await Promise.resolve();
 
     expect(client.getQueryData(sessionQueryKeys.dashboard('token-a'))).toBeUndefined();
+  });
+
+  it('invalidates only the matching session transaction list after a mutation', async () => {
+    const client = new QueryClient({
+      defaultOptions: { queries: { staleTime: 15_000, retry: false } },
+    });
+    const rowsA = [{ id: 'tx_a' }];
+    const rowsB = [{ id: 'tx_b' }];
+    client.setQueryData(sessionQueryKeys.transactions('token-a'), rowsA);
+    client.setQueryData(sessionQueryKeys.transactions('token-b'), rowsB);
+
+    await client.invalidateQueries({
+      queryKey: sessionQueryKeys.transactions('token-a'),
+    });
+
+    expect(
+      client.getQueryState(sessionQueryKeys.transactions('token-a'))?.isInvalidated,
+    ).toBe(true);
+    expect(
+      client.getQueryState(sessionQueryKeys.transactions('token-b'))?.isInvalidated,
+    ).toBe(false);
+    expect(client.getQueryData(sessionQueryKeys.transactions('token-b'))).toEqual(
+      rowsB,
+    );
   });
 });
