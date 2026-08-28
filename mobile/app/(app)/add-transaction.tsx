@@ -2,7 +2,9 @@ import React, { useMemo, useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { ApiError, createTransaction, getActiveGoal } from '../../src/lib/api';
+import { useAuth } from '../../src/lib/auth-state';
 import { queryClient } from '../../src/lib/query-client';
+import { sessionQueryKeys } from '../../src/lib/session-query-cache';
 import { ScreenShell } from '../../src/components/screen-shell';
 
 export default function AddTransactionScreen() {
@@ -13,9 +15,11 @@ export default function AddTransactionScreen() {
   const [tagGoal, setTagGoal] = useState(true);
   const [success, setSuccess] = useState('');
 
+  const { token } = useAuth();
   const activeGoalQuery = useQuery({
-    queryKey: ['goal', 'active'],
+    queryKey: sessionQueryKeys.activeGoal(token),
     queryFn: getActiveGoal,
+    enabled: Boolean(token),
     retry: 1,
   });
 

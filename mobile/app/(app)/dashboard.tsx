@@ -2,6 +2,8 @@ import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { getDashboardStability } from '../../src/lib/api';
+import { useAuth } from '../../src/lib/auth-state';
+import { sessionQueryKeys } from '../../src/lib/session-query-cache';
 import { ScreenShell } from '../../src/components/screen-shell';
 
 const koboToNaira = (kobo: number) => `₦${(kobo / 100).toLocaleString()}`;
@@ -17,13 +19,15 @@ const StatusBadge = ({ status }: { status: 'stable' | 'warning' | 'critical' }) 
 };
 
 export default function DashboardScreen() {
+  const { token } = useAuth();
   const query = useQuery({
-    queryKey: ['dashboard', 'stability'],
+    queryKey: sessionQueryKeys.dashboard(token),
     queryFn: getDashboardStability,
+    enabled: Boolean(token),
     retry: 1,
   });
 
-  if (query.isPending) {
+  if (query.isLoading) {
     return (
       <ScreenShell title="Stability Dashboard">
         <Text>Loading stability metrics...</Text>
