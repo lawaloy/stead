@@ -107,6 +107,9 @@ export const buildTransactionUpdatePayload = (
   const amountKobo = nairaInputToKobo(form.amountNaira);
   const occurredAt = dateInputToIso(form.occurredOn);
   if (amountKobo === null || occurredAt === null) return null;
+  if (form.goalSelectionChanged && form.tagGoal && !form.activeGoalId) {
+    return null;
+  }
 
   const payload: UpdateTransactionRequest = {
     direction: form.direction,

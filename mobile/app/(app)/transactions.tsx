@@ -99,7 +99,7 @@ export default function TransactionsScreen() {
       return 'Enter a valid date in YYYY-MM-DD format.';
     }
     if (note.length > 280) return 'Note must be 280 characters or fewer.';
-    if (tagGoal && !editing.goalId && !activeGoalQuery.data) {
+    if (tagGoal && goalSelectionChanged && !activeGoalQuery.data) {
       return 'Create an active goal before linking this transaction.';
     }
     return '';
@@ -107,6 +107,7 @@ export default function TransactionsScreen() {
     activeGoalQuery.data,
     amountNaira,
     editing,
+    goalSelectionChanged,
     note.length,
     occurredOn,
     tagGoal,

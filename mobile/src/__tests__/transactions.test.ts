@@ -190,6 +190,20 @@ describe('transaction presentation helpers', () => {
     ).toBeNull();
   });
 
+  it('rejects an explicit goal reassignment until the active goal is loaded', () => {
+    expect(
+      buildTransactionUpdatePayload({
+        direction: 'in',
+        amountNaira: '10',
+        occurredOn: '2026-08-21',
+        note: 'reassign after load',
+        tagGoal: true,
+        goalSelectionChanged: true,
+        currentGoalId: 'goal_old',
+      }),
+    ).toBeNull();
+  });
+
   it('uses the device-local day when initializing a new transaction', () => {
     const localDate = new Date(2026, 7, 21, 23, 30);
     expect(todayDateInput(localDate)).toBe('2026-08-21');
