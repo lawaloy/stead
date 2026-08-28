@@ -88,11 +88,11 @@ describe('transaction presentation helpers', () => {
     expect(koboToNairaInput(250_000)).toBe('2500');
   });
 
-  it('round-trips local calendar dates and rejects impossible dates', () => {
+  it('round-trips calendar dates through a stable UTC anchor', () => {
     const occurredAt = dateInputToIso('2026-08-21');
-    expect(occurredAt).not.toBeNull();
-    expect(new Date(occurredAt as string).getHours()).toBe(12);
+    expect(occurredAt).toBe('2026-08-21T12:00:00.000Z');
     expect(isoToDateInput(occurredAt as string)).toBe('2026-08-21');
+    expect(isoToDateInput('2026-08-21T23:30:00.000Z')).toBe('2026-08-21');
     expect(isoToDateInput(dateInputToIso('2024-02-29') as string)).toBe(
       '2024-02-29',
     );
@@ -112,6 +112,7 @@ describe('transaction presentation helpers', () => {
         occurredOn: '2026-08-21',
         note: '  kept  ',
         tagGoal: true,
+        goalSelectionChanged: false,
         currentGoalId: 'goal_current',
         activeGoalId: 'goal_current',
       }),
@@ -132,6 +133,7 @@ describe('transaction presentation helpers', () => {
         occurredOn: '2026-08-21',
         note: '',
         tagGoal: false,
+        goalSelectionChanged: true,
         currentGoalId: 'goal_current',
         activeGoalId: 'goal_current',
       }),
@@ -150,6 +152,7 @@ describe('transaction presentation helpers', () => {
         occurredOn: '2026-08-21',
         note: '   ',
         tagGoal: true,
+        goalSelectionChanged: true,
         currentGoalId: null,
         activeGoalId: 'goal_current',
       }),
@@ -170,6 +173,7 @@ describe('transaction presentation helpers', () => {
         occurredOn: '2026-08-21',
         note: 'ok',
         tagGoal: false,
+        goalSelectionChanged: false,
         currentGoalId: null,
       }),
     ).toBeNull();
@@ -180,18 +184,31 @@ describe('transaction presentation helpers', () => {
         occurredOn: '2026-02-30',
         note: 'ok',
         tagGoal: false,
+        goalSelectionChanged: false,
         currentGoalId: null,
       }),
     ).toBeNull();
   });
 
-  it('uses the device-local day for new and existing transactions', () => {
+  it('uses the device-local day when initializing a new transaction', () => {
     const localDate = new Date(2026, 7, 21, 23, 30);
     expect(todayDateInput(localDate)).toBe('2026-08-21');
-    expect(isoToDateInput(localDate.toISOString())).toBe('2026-08-21');
   });
 
-  it('moves an older linked transaction to the current active goal', () => {
+  it('preserves an older goal until the customer explicitly changes the selection', () => {
+    expect(
+      buildTransactionUpdatePayload({
+        direction: 'in',
+        amountNaira: '10',
+        occurredOn: '2026-08-21',
+        note: 'note only',
+        tagGoal: true,
+        goalSelectionChanged: false,
+        currentGoalId: 'goal_old',
+        activeGoalId: 'goal_active',
+      }),
+    ).not.toHaveProperty('goalId');
+
     expect(
       buildTransactionUpdatePayload({
         direction: 'in',
@@ -199,6 +216,7 @@ describe('transaction presentation helpers', () => {
         occurredOn: '2026-08-21',
         note: 'reassigned',
         tagGoal: true,
+        goalSelectionChanged: true,
         currentGoalId: 'goal_old',
         activeGoalId: 'goal_active',
       }),
