@@ -274,7 +274,7 @@ describe('transaction presentation helpers', () => {
     ).toBeNull();
   });
 
-  it('keeps an existing goal link when the active goal is missing', () => {
+  it('keeps an untouched goal link but blocks an explicit reassignment while the active goal is missing', () => {
     const occurredAt = dateInputToIso('2026-08-21');
     const keptLink = {
       direction: 'in' as const,
@@ -300,11 +300,6 @@ describe('transaction presentation helpers', () => {
         ...keptLink,
         goalSelectionChanged: true,
       }),
-    ).toEqual({
-      direction: 'in',
-      amountKobo: 1_000,
-      occurredAt,
-      note: 'kept',
-    });
+    ).toBeNull();
   });
 });
