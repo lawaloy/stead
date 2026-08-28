@@ -704,4 +704,143 @@ describe('Finance flows (e2e)', () => {
       message: 'No active goal found',
     });
   });
+
+  it('rejects moving an owned transaction onto another user goal over HTTP', async () => {
+    const owner = await createAuthedUser();
+    const other = await createAuthedUser();
+
+    const ownerGoal = (
+      await authed('post', '/goals', owner.token)
+        .send({
+          name: 'Owner goal',
+          amountTotalKobo: 400_000,
+          dueDate: '2026-09-01T00:00:00.000Z',
+        })
+        .expect(201)
+    ).body as GoalBody;
+    const otherGoal = (
+      await authed('post', '/goals', other.token)
+        .send({
+          name: 'Other goal',
+          amountTotalKobo: 50_000,
+          dueDate: '2026-10-01T00:00:00.000Z',
+        })
+        .expect(201)
+    ).body as GoalBody;
+
+    const ownerTx = (
+      await authed('post', '/transactions', owner.token)
+        .send({
+          direction: 'in',
+          amountKobo: 80_000,
+          occurredAt: '2026-01-10T00:00:00.000Z',
+          goalId: ownerGoal.id,
+        })
+        .expect(201)
+    ).body as TransactionBody;
+
+    await authed('patch', `/transactions/${ownerTx.id}`, owner.token)
+      .send({ goalId: otherGoal.id })
+      .expect(404);
+
+    const ownerList = await authed('get', '/transactions', owner.token).expect(
+      200,
+    );
+    expect(ownerList.body as TransactionBody[]).toEqual([
+      expect.objectContaining({
+        id: ownerTx.id,
+        goalId: ownerGoal.id,
+        amountKobo: 80_000,
+      }),
+    ]);
+
+    const ownerDashboard = await authed(
+      'get',
+      '/dashboard/stability',
+      owner.token,
+    ).expect(200);
+    expect(ownerDashboard.body as DashboardBody).toMatchObject({
+      ok: true,
+      goal: { id: ownerGoal.id },
+      metrics: {
+        goalSavedKobo: 80_000,
+        estimatedBalanceKobo: 80_000,
+      },
+    });
+
+    const otherDashboard = await authed(
+      'get',
+      '/dashboard/stability',
+      other.token,
+    ).expect(200);
+    expect(otherDashboard.body as DashboardBody).toMatchObject({
+      ok: true,
+      goal: { id: otherGoal.id },
+      metrics: {
+        goalSavedKobo: 0,
+        estimatedBalanceKobo: 0,
+      },
+    });
+  });
+
+  it('inverts dashboard totals when a linked inflow is flipped to an outflow', async () => {
+    const { token } = await createAuthedUser();
+    const goal = (
+      await authed('post', '/goals', token)
+        .send({
+          name: 'Rent',
+          amountTotalKobo: 300_000,
+          dueDate: '2026-11-01T00:00:00.000Z',
+        })
+        .expect(201)
+    ).body as GoalBody;
+
+    const tx = (
+      await authed('post', '/transactions', token)
+        .send({
+          direction: 'in',
+          amountKobo: 80_000,
+          occurredAt: '2026-01-20T00:00:00.000Z',
+          goalId: goal.id,
+        })
+        .expect(201)
+    ).body as TransactionBody;
+
+    const before = await authed('get', '/dashboard/stability', token).expect(
+      200,
+    );
+    expect(before.body as DashboardBody).toMatchObject({
+      ok: true,
+      metrics: {
+        goalSavedKobo: 80_000,
+        estimatedBalanceKobo: 80_000,
+        remainingObligationKobo: 220_000,
+      },
+    });
+
+    await authed('patch', `/transactions/${tx.id}`, token)
+      .send({ direction: 'out' })
+      .expect(200)
+      .expect((response) => {
+        expect(response.body as TransactionBody).toMatchObject({
+          id: tx.id,
+          direction: 'out',
+          amountKobo: 80_000,
+          goalId: goal.id,
+        });
+      });
+
+    const after = await authed('get', '/dashboard/stability', token).expect(
+      200,
+    );
+    expect(after.body as DashboardBody).toMatchObject({
+      ok: true,
+      metrics: {
+        goalSavedKobo: -80_000,
+        estimatedBalanceKobo: -80_000,
+        remainingObligationKobo: 300_000,
+        safeToSpendKobo: 0,
+      },
+    });
+  });
 });
