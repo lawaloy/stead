@@ -20,7 +20,9 @@ import {
   listTransactions,
   updateTransaction,
 } from '../../src/lib/api';
+import { useAuth } from '../../src/lib/auth-state';
 import { queryClient } from '../../src/lib/query-client';
+import { sessionQueryKeys } from '../../src/lib/session-query-cache';
 import {
   calculateNetKobo,
   dateInputToIso,
@@ -40,15 +42,22 @@ const filters: { label: string; value: TransactionFilter }[] = [
   { label: 'Expenses', value: 'out' },
 ];
 
-const refreshFinanceQueries = async () => {
+const refreshFinanceQueries = async (sessionId: string | null) => {
   await Promise.all([
-    queryClient.invalidateQueries({ queryKey: ['transactions'] }),
-    queryClient.invalidateQueries({ queryKey: ['dashboard', 'stability'] }),
-    queryClient.invalidateQueries({ queryKey: ['goal', 'active'] }),
+    queryClient.invalidateQueries({
+      queryKey: sessionQueryKeys.transactions(sessionId),
+    }),
+    queryClient.invalidateQueries({
+      queryKey: sessionQueryKeys.dashboard(sessionId),
+    }),
+    queryClient.invalidateQueries({
+      queryKey: sessionQueryKeys.activeGoal(sessionId),
+    }),
   ]);
 };
 
 export default function TransactionsScreen() {
+  const { token } = useAuth();
   const [filter, setFilter] = useState<TransactionFilter>('all');
   const [editing, setEditing] = useState<Transaction | null>(null);
   const [direction, setDirection] = useState<Transaction['direction']>('in');
@@ -58,13 +67,15 @@ export default function TransactionsScreen() {
   const [tagGoal, setTagGoal] = useState(false);
 
   const transactionsQuery = useQuery({
-    queryKey: ['transactions'],
+    queryKey: sessionQueryKeys.transactions(token),
     queryFn: () => listTransactions(),
+    enabled: Boolean(token),
     retry: 1,
   });
   const activeGoalQuery = useQuery({
-    queryKey: ['goal', 'active'],
+    queryKey: sessionQueryKeys.activeGoal(token),
     queryFn: getActiveGoal,
+    enabled: Boolean(token),
     retry: false,
   });
 
@@ -109,13 +120,13 @@ export default function TransactionsScreen() {
     }) => updateTransaction(id, payload),
     onSuccess: async () => {
       setEditing(null);
-      await refreshFinanceQueries();
+      await refreshFinanceQueries(token);
     },
   });
 
   const deleteMutation = useMutation({
     mutationFn: deleteTransaction,
-    onSuccess: refreshFinanceQueries,
+    onSuccess: () => refreshFinanceQueries(token),
   });
 
   const beginEdit = (transaction: Transaction) => {

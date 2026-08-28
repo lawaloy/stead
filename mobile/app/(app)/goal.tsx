@@ -2,7 +2,9 @@ import React, { useMemo, useState, useEffect } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { ApiError, createGoal, getActiveGoal } from '../../src/lib/api';
+import { useAuth } from '../../src/lib/auth-state';
 import { queryClient } from '../../src/lib/query-client';
+import { sessionQueryKeys } from '../../src/lib/session-query-cache';
 import { ScreenShell } from '../../src/components/screen-shell';
 
 const toNaira = (kobo: number) => `₦${(kobo / 100).toLocaleString()}`;
@@ -14,9 +16,11 @@ export default function GoalScreen() {
   const [monthlyIncomeKobo, setMonthlyIncomeKobo] = useState('30000000');
   const [success, setSuccess] = useState('');
 
+  const { token } = useAuth();
   const activeGoalQuery = useQuery({
-    queryKey: ['goal', 'active'],
+    queryKey: sessionQueryKeys.activeGoal(token),
     queryFn: getActiveGoal,
+    enabled: Boolean(token),
     retry: 1,
   });
 
@@ -59,7 +63,7 @@ export default function GoalScreen() {
     <ScreenShell title="Active Goal">
       <View style={styles.card}>
         <Text style={styles.cardTitle}>Current Active Goal</Text>
-        {activeGoalQuery.isPending ? <Text>Loading...</Text> : null}
+        {activeGoalQuery.isLoading ? <Text>Loading...</Text> : null}
         {activeGoalQuery.error ? (
           <Text style={styles.muted}>No active goal yet. Create one below.</Text>
         ) : null}
