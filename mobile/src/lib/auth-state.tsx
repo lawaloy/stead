@@ -12,6 +12,7 @@ import {
   AuthCountryIso,
   defaultAuthCountryIso,
 } from './countries';
+import { clearSessionQueryCache } from './session-query-cache';
 
 type AuthContextValue = {
   token: string | null;
@@ -48,6 +49,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     setPendingOtpRequestedAt(null);
     setDevOtpHint('');
     await tokenStore.clearToken();
+    await clearSessionQueryCache();
   }, []);
 
   const resetPendingAuth = useCallback(() => {
@@ -57,6 +59,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   }, []);
 
   const completeAuth = useCallback(async (jwt: string) => {
+    await clearSessionQueryCache();
     setToken(jwt);
     resetPendingAuth();
     await tokenStore.setToken(jwt);
