@@ -7,6 +7,8 @@ import {
   isoToDateInput,
   koboToNairaInput,
   nairaInputToKobo,
+  resolveTransactionGoalId,
+  todayDateInput,
 } from '../lib/transactions';
 
 const transactions: Transaction[] = [
@@ -70,10 +72,28 @@ describe('transaction presentation helpers', () => {
     expect(koboToNairaInput(250_000)).toBe('2500');
   });
 
-  it('round-trips valid date inputs and rejects impossible dates', () => {
-    expect(dateInputToIso('2026-08-21')).toBe('2026-08-21T12:00:00.000Z');
-    expect(isoToDateInput('2026-08-21T12:00:00.000Z')).toBe('2026-08-21');
+  it('round-trips local calendar dates and rejects impossible dates', () => {
+    const occurredAt = dateInputToIso('2026-08-21');
+    expect(occurredAt).not.toBeNull();
+    expect(new Date(occurredAt as string).getHours()).toBe(12);
+    expect(isoToDateInput(occurredAt as string)).toBe('2026-08-21');
     expect(dateInputToIso('2026-02-30')).toBeNull();
     expect(dateInputToIso('08/21/2026')).toBeNull();
+  });
+
+  it('uses the device-local day for new and existing transactions', () => {
+    const localDate = new Date(2026, 7, 21, 23, 30);
+    expect(todayDateInput(localDate)).toBe('2026-08-21');
+    expect(isoToDateInput(localDate.toISOString())).toBe('2026-08-21');
+  });
+
+  it('moves an older linked transaction to the current active goal', () => {
+    expect(resolveTransactionGoalId('goal_old', true, 'goal_active')).toBe(
+      'goal_active',
+    );
+    expect(resolveTransactionGoalId('goal_old', true, null)).toBe('goal_old');
+    expect(
+      resolveTransactionGoalId('goal_old', false, 'goal_active'),
+    ).toBeNull();
   });
 });

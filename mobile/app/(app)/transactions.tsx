@@ -32,6 +32,7 @@ import {
   isoToDateInput,
   koboToNairaInput,
   nairaInputToKobo,
+  resolveTransactionGoalId,
 } from '../../src/lib/transactions';
 import type { TransactionFilter } from '../../src/lib/transactions';
 import { ScreenShell } from '../../src/components/screen-shell';
@@ -151,9 +152,13 @@ export default function TransactionsScreen() {
       occurredAt,
       note: note.trim() || null,
     };
-    const wasLinked = editing.goalId !== null;
-    if (tagGoal !== wasLinked) {
-      payload.goalId = tagGoal ? activeGoalQuery.data?.id : null;
+    const targetGoalId = resolveTransactionGoalId(
+      editing.goalId,
+      tagGoal,
+      activeGoalQuery.data?.id ?? null,
+    );
+    if (targetGoalId !== editing.goalId) {
+      payload.goalId = targetGoalId;
     }
 
     updateMutation.mutate({ id: editing.id, payload });
