@@ -673,6 +673,110 @@ describe('Finance flows (e2e)', () => {
     });
   });
 
+  it('keeps replaced-goal savings out of the new dashboard and restores them on reactivation', async () => {
+    const { token } = await createAuthedUser();
+
+    const first = (
+      await authed('post', '/goals', token)
+        .send({
+          name: 'First',
+          amountTotalKobo: 300_000,
+          dueDate: '2026-11-01T00:00:00.000Z',
+        })
+        .expect(201)
+    ).body as GoalBody;
+
+    await authed('post', '/transactions', token)
+      .send({
+        direction: 'in',
+        amountKobo: 80_000,
+        occurredAt: '2026-01-20T00:00:00.000Z',
+        goalId: first.id,
+      })
+      .expect(201);
+
+    const second = (
+      await authed('post', '/goals', token)
+        .send({
+          name: 'Second',
+          amountTotalKobo: 200_000,
+          dueDate: '2026-12-01T00:00:00.000Z',
+        })
+        .expect(201)
+    ).body as GoalBody;
+
+    const afterReplacement = await authed(
+      'get',
+      '/dashboard/stability',
+      token,
+    ).expect(200);
+    expect(afterReplacement.body as DashboardBody).toMatchObject({
+      ok: true,
+      goal: {
+        id: second.id,
+        amountTotalKobo: 200_000,
+      },
+      metrics: {
+        goalSavedKobo: 0,
+        estimatedBalanceKobo: 80_000,
+        remainingObligationKobo: 200_000,
+        safeToSpendKobo: 0,
+      },
+    });
+
+    const linkedToInactive = (
+      await authed('post', '/transactions', token)
+        .send({
+          direction: 'in',
+          amountKobo: 20_000,
+          occurredAt: '2026-01-21T00:00:00.000Z',
+          goalId: first.id,
+        })
+        .expect(201)
+    ).body as TransactionBody;
+    expect(linkedToInactive).toMatchObject({
+      goalId: first.id,
+      amountKobo: 20_000,
+    });
+
+    const afterInactiveLink = await authed(
+      'get',
+      '/dashboard/stability',
+      token,
+    ).expect(200);
+    expect(afterInactiveLink.body as DashboardBody).toMatchObject({
+      ok: true,
+      goal: { id: second.id },
+      metrics: {
+        goalSavedKobo: 0,
+        estimatedBalanceKobo: 100_000,
+        remainingObligationKobo: 200_000,
+      },
+    });
+
+    await authed('patch', `/goals/${first.id}`, token)
+      .send({ isActive: true })
+      .expect(200);
+
+    const afterReactivate = await authed(
+      'get',
+      '/dashboard/stability',
+      token,
+    ).expect(200);
+    expect(afterReactivate.body as DashboardBody).toMatchObject({
+      ok: true,
+      goal: {
+        id: first.id,
+        amountTotalKobo: 300_000,
+      },
+      metrics: {
+        goalSavedKobo: 100_000,
+        estimatedBalanceKobo: 100_000,
+        remainingObligationKobo: 200_000,
+      },
+    });
+  });
+
   it('clears the active goal and dashboard after the only goal is deactivated', async () => {
     const { token } = await createAuthedUser();
     const goal = (
