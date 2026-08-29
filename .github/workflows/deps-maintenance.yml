@@ -43,7 +43,7 @@ jobs:
           cache-dependency-path: api/package-lock.json
 
       - name: Pin npm version
-        run: npm install --global npm@11.6.2
+        run: npm install --global npm@11.19.1
 
       - name: Update API dependencies
         working-directory: api
@@ -142,7 +142,7 @@ jobs:
           cache-dependency-path: mobile/package-lock.json
 
       - name: Pin npm version
-        run: npm install --global npm@10.9.7
+        run: npm install --global npm@11.19.1
 
       - name: Update mobile dependencies
         working-directory: mobile

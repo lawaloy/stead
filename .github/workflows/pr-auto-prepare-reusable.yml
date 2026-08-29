@@ -107,7 +107,7 @@ jobs:
 
       - name: Pin npm to CI version
         if: steps.pr.outputs.trusted == 'true' && steps.pr.outputs.changed-workspaces != '[]'
-        run: npm install --global npm@11.6.2
+        run: npm install --global npm@11.19.1
 
       - name: Normalize npm lockfiles
         if: steps.pr.outputs.trusted == 'true' && steps.pr.outputs.changed-workspaces != '[]'
@@ -117,14 +117,7 @@ jobs:
         run: |
           node -e "const workspaces = JSON.parse(process.env.CHANGED_WORKSPACES); if (!Array.isArray(workspaces) || workspaces.length === 0) process.exit(0);"
           for workspace in $(node -pe "JSON.parse(process.env.CHANGED_WORKSPACES).join(' ')"); do
-            case "$workspace" in
-              mobile)
-                (cd "$workspace" && npx --yes npm@10.9.7 install --package-lock-only --ignore-scripts)
-                ;;
-              *)
-                (cd "$workspace" && npm install --package-lock-only --ignore-scripts)
-                ;;
-            esac
+            (cd "$workspace" && npm install --package-lock-only --ignore-scripts)
           done
 
       - name: Commit normalized lockfiles
