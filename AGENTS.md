@@ -23,6 +23,13 @@ When creating PRs, use [`.github/pull_request_template.md`](.github/pull_request
 
 Fill in **What + Why** before the next push. Details: [CONTRIBUTING.md](CONTRIBUTING.md#pull-requests).
 
+Before merging or declaring a PR complete, inspect its conversation comments,
+submitted reviews, and inline review threads. Address every actionable item,
+reply with the outcome, and resolve the thread only after the concern is fixed
+or answered with a documented rationale. Re-check all three surfaces after each
+push and immediately before completion because feedback can arrive while CI is
+running.
+
 ### GitHub operations
 
 - Use the installed GitHub app connector first for remote GitHub operations,

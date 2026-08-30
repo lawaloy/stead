@@ -25,9 +25,13 @@ export default function AddTransactionScreen() {
     queryKey: sessionQueryKeys.activeGoal(token),
     queryFn: getActiveGoal,
     enabled: Boolean(token),
-    retry: 1,
+    retry: (failureCount, error) =>
+      !(error instanceof ApiError && error.status === 404) && failureCount < 1,
   });
   const goalLinkPending = tagGoal && activeGoalQuery.isPending;
+  const activeGoalMissing =
+    activeGoalQuery.error instanceof ApiError &&
+    activeGoalQuery.error.status === 404;
 
   const validation = useMemo(() => {
     if (nairaInputToKobo(amountNaira) === null) {
@@ -37,8 +41,8 @@ export default function AddTransactionScreen() {
       return 'Enter a valid date in YYYY-MM-DD format.';
     }
     if (note.length > 280) return 'Note must be 280 characters or fewer.';
-    if (tagGoal && !activeGoalQuery.data) {
-      return activeGoalQuery.error
+    if (tagGoal && !activeGoalQuery.isPending && !activeGoalQuery.data) {
+      return activeGoalQuery.error && !activeGoalMissing
         ? 'Your active goal is unavailable. Reconnect or turn off goal linking.'
         : 'Create an active goal or turn off goal linking.';
     }
@@ -46,6 +50,8 @@ export default function AddTransactionScreen() {
   }, [
     activeGoalQuery.data,
     activeGoalQuery.error,
+    activeGoalQuery.isPending,
+    activeGoalMissing,
     amountNaira,
     note.length,
     occurredOn,
@@ -145,7 +151,12 @@ export default function AddTransactionScreen() {
         <View style={[styles.checkbox, tagGoal && styles.checkboxOn]} />
         <Text>
           Tag active goal contribution (
-          {activeGoalQuery.data ? activeGoalQuery.data.name : 'no active goal'})
+          {activeGoalQuery.isPending
+            ? 'checking...'
+            : activeGoalQuery.data
+              ? activeGoalQuery.data.name
+              : 'no active goal'}
+          )
         </Text>
       </Pressable>
 
