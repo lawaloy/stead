@@ -3,6 +3,10 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { ApiError, createGoal, getActiveGoal } from '../../src/lib/api';
 import { useAuth } from '../../src/lib/auth-state';
+import {
+  buildCreateGoalPayload,
+  goalFormValidationError,
+} from '../../src/lib/goal-form';
 import { queryClient } from '../../src/lib/query-client';
 import { sessionQueryKeys } from '../../src/lib/session-query-cache';
 import { ScreenShell } from '../../src/components/screen-shell';
@@ -24,24 +28,30 @@ export default function GoalScreen() {
     retry: 1,
   });
 
-  const validation = useMemo(() => {
-    if (!name.trim()) return 'Goal name is required';
-    if (!/^\d+$/.test(amountKobo) || Number(amountKobo) <= 0) return 'amountTotalKobo must be > 0';
-    if (Number.isNaN(Date.parse(dueDate))) return 'dueDate must be a valid ISO date';
-    if (monthlyIncomeKobo && (!/^\d+$/.test(monthlyIncomeKobo) || Number(monthlyIncomeKobo) < 0)) {
-      return 'monthlyIncomeKobo must be >= 0';
-    }
-    return '';
-  }, [amountKobo, dueDate, monthlyIncomeKobo, name]);
+  const validation = useMemo(
+    () =>
+      goalFormValidationError({
+        name,
+        amountKobo,
+        dueDate,
+        monthlyIncomeKobo,
+      }),
+    [amountKobo, dueDate, monthlyIncomeKobo, name],
+  );
 
   const mutation = useMutation({
-    mutationFn: async () =>
-      createGoal({
-        name: name.trim(),
-        amountTotalKobo: Number(amountKobo),
+    mutationFn: async () => {
+      const payload = buildCreateGoalPayload({
+        name,
+        amountKobo,
         dueDate,
-        monthlyIncomeKobo: monthlyIncomeKobo ? Number(monthlyIncomeKobo) : undefined,
-      }),
+        monthlyIncomeKobo,
+      });
+      if (!payload) {
+        throw new Error('Goal form is invalid');
+      }
+      return createGoal(payload);
+    },
     onSuccess: async () => {
       setSuccess('Goal saved');
       await queryClient.invalidateQueries({ queryKey: ['goal', 'active'] });

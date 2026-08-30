@@ -314,6 +314,45 @@ describe('transaction screens', () => {
     ).toBeOnTheScreen();
   });
 
+  it('omits goalId when the customer turns off goal tagging', async () => {
+    await renderWithQueryClient(<AddTransactionScreen />);
+
+    await waitFor(() =>
+      expect(
+        screen.getByRole('button', { name: 'Add Transaction' }),
+      ).toBeEnabled(),
+    );
+    expect(screen.getByRole('checkbox')).toBeChecked();
+    await fireEvent.press(screen.getByRole('checkbox'));
+    expect(screen.getByRole('checkbox')).not.toBeChecked();
+
+    await fireEvent.press(screen.getByRole('tab', { name: 'Expense' }));
+    await fireEvent.changeText(
+      screen.getByLabelText('Transaction amount in naira'),
+      '40',
+    );
+    await fireEvent.changeText(
+      screen.getByLabelText('Transaction note'),
+      'Unlinked fare',
+    );
+    await fireEvent.press(
+      screen.getByRole('button', { name: 'Add Transaction' }),
+    );
+
+    await waitFor(() =>
+      expect(mockCreateTransaction).toHaveBeenCalledWith({
+        direction: 'out',
+        amountKobo: 4_000,
+        occurredAt: expect.any(String),
+        note: 'Unlinked fare',
+        goalId: undefined,
+      }),
+    );
+    expect(
+      await screen.findByRole('alert', { name: 'Transaction added' }),
+    ).toBeOnTheScreen();
+  });
+
   it('shows a cold-load failure without inventing cached activity', async () => {
     mockListTransactions.mockRejectedValue(
       new ApiError({ message: 'Unexpected network error' }),
