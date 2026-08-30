@@ -145,6 +145,9 @@ This sequence is intentional. Stead should prioritize user-facing product surfac
     OTP abuse controls with stronger operator diagnostics.
   - Completed P1: PostgreSQL-backed finance e2e scenarios for goals,
     transactions, and populated dashboard calculations.
+  - Completed transaction-screen enabling coverage: create/filter/edit/delete,
+    validation, warm-session cached activity and retry, disconnected writes,
+    and accessibility semantics.
   - P1: extend contract enforcement to any new mobile-consumed endpoints as
     they are introduced.
   - P1: validate real-provider OTP delivery and the operator response playbook

@@ -27,6 +27,7 @@ export default function AddTransactionScreen() {
     enabled: Boolean(token),
     retry: 1,
   });
+  const goalLinkPending = tagGoal && activeGoalQuery.isPending;
 
   const validation = useMemo(() => {
     if (nairaInputToKobo(amountNaira) === null) {
@@ -36,8 +37,20 @@ export default function AddTransactionScreen() {
       return 'Enter a valid date in YYYY-MM-DD format.';
     }
     if (note.length > 280) return 'Note must be 280 characters or fewer.';
+    if (tagGoal && !activeGoalQuery.data) {
+      return activeGoalQuery.error
+        ? 'Your active goal is unavailable. Reconnect or turn off goal linking.'
+        : 'Create an active goal or turn off goal linking.';
+    }
     return '';
-  }, [amountNaira, note.length, occurredOn]);
+  }, [
+    activeGoalQuery.data,
+    activeGoalQuery.error,
+    amountNaira,
+    note.length,
+    occurredOn,
+    tagGoal,
+  ]);
 
   const mutation = useMutation({
     mutationFn: async () => {
@@ -71,8 +84,10 @@ export default function AddTransactionScreen() {
 
   return (
     <ScreenShell title="Add Transaction">
-      <View style={styles.segment}>
+      <View style={styles.segment} accessibilityRole="tablist">
         <Pressable
+          accessibilityRole="tab"
+          accessibilityState={{ selected: direction === 'in' }}
           style={[
             styles.segmentBtn,
             direction === 'in' && styles.segmentActive,
@@ -82,6 +97,8 @@ export default function AddTransactionScreen() {
           <Text style={styles.segmentText}>Income</Text>
         </Pressable>
         <Pressable
+          accessibilityRole="tab"
+          accessibilityState={{ selected: direction === 'out' }}
           style={[
             styles.segmentBtn,
             direction === 'out' && styles.segmentActive,
@@ -132,18 +149,49 @@ export default function AddTransactionScreen() {
         </Text>
       </Pressable>
 
-      {validation ? <Text style={styles.error}>{validation}</Text> : null}
-      {mutation.error ? (
-        <Text style={styles.error}>{(mutation.error as ApiError).message}</Text>
+      {goalLinkPending ? (
+        <Text accessibilityLiveRegion="polite">Checking your active goal...</Text>
       ) : null}
-      {success ? <Text style={styles.success}>{success}</Text> : null}
+      {validation ? (
+        <Text
+          style={styles.error}
+          accessibilityRole="alert"
+          accessibilityLiveRegion="assertive"
+        >
+          {validation}
+        </Text>
+      ) : null}
+      {mutation.error ? (
+        <Text
+          style={styles.error}
+          accessibilityRole="alert"
+          accessibilityLiveRegion="assertive"
+        >
+          {(mutation.error as ApiError).message}
+        </Text>
+      ) : null}
+      {success ? (
+        <Text
+          style={styles.success}
+          accessibilityRole="alert"
+          accessibilityLiveRegion="polite"
+        >
+          {success}
+        </Text>
+      ) : null}
 
       <Pressable
+        accessibilityRole="button"
+        accessibilityState={{
+          disabled:
+            Boolean(validation) || goalLinkPending || mutation.isPending,
+        }}
         style={[
           styles.button,
-          (!!validation || mutation.isPending) && styles.buttonDisabled,
+          (Boolean(validation) || goalLinkPending || mutation.isPending) &&
+            styles.buttonDisabled,
         ]}
-        disabled={!!validation || mutation.isPending}
+        disabled={Boolean(validation) || goalLinkPending || mutation.isPending}
         onPress={() => {
           setSuccess('');
           mutation.mutate();

@@ -11,8 +11,8 @@ Current repository status:
   dashboard viewing. Goal maintenance and history remain notable API/mobile
   capability gaps.
 - Verification: auth/notification and finance have PostgreSQL-backed e2e
-  coverage. The app still has no automated screen or native-device journey
-  suite.
+  coverage. Transaction screens have automated component journeys; the app
+  still lacks a full mobile-to-API and native-device acceptance suite.
 - Production readiness: live SMS delivery on real devices, production session
   lifecycle, operations, automated critical mobile journeys, and several
   product workflows remain incomplete.
