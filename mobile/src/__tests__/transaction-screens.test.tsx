@@ -195,6 +195,37 @@ describe('transaction screens', () => {
     );
   });
 
+  it('blocks goal-linked submit while the active goal is still loading', async () => {
+    let releaseGoal: (value: typeof activeGoal) => void = () => undefined;
+    mockGetActiveGoal.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          releaseGoal = resolve;
+        }),
+    );
+
+    await renderWithQueryClient(<AddTransactionScreen />);
+
+    expect(
+      await screen.findByText('Checking your active goal...'),
+    ).toBeOnTheScreen();
+    expect(
+      screen.getByRole('button', { name: 'Add Transaction' }),
+    ).toBeDisabled();
+    expect(mockCreateTransaction).not.toHaveBeenCalled();
+
+    releaseGoal(activeGoal);
+
+    await waitFor(() =>
+      expect(
+        screen.getByRole('button', { name: 'Add Transaction' }),
+      ).toBeEnabled(),
+    );
+    expect(
+      screen.queryByText('Checking your active goal...'),
+    ).not.toBeOnTheScreen();
+  });
+
   it('blocks unverifiable goal links and reports disconnected writes accessibly', async () => {
     mockGetActiveGoal.mockRejectedValue(
       new ApiError({ message: 'Unexpected network error' }),
@@ -260,6 +291,50 @@ describe('transaction screens', () => {
     expect(
       await screen.findByRole('alert', { name: 'Transaction added' }),
     ).toBeOnTheScreen();
+  });
+
+  it('shows a cold-load failure without inventing cached activity', async () => {
+    mockListTransactions.mockRejectedValue(
+      new ApiError({ message: 'Unexpected network error' }),
+    );
+
+    await renderWithQueryClient(<TransactionsScreen />);
+
+    await waitFor(
+      () =>
+        expect(
+          screen.getByRole('alert', {
+            name: 'We could not load your activity. Reconnect and try again.',
+          }),
+        ).toBeOnTheScreen(),
+      { timeout: 3_000 },
+    );
+    expect(screen.queryByText('Salary slice')).not.toBeOnTheScreen();
+    expect(
+      screen.getByRole('button', { name: 'Retry loading activity' }),
+    ).toBeOnTheScreen();
+  });
+
+  it('blocks an explicit edit goal link when no active goal is available', async () => {
+    mockGetActiveGoal.mockRejectedValue(
+      new ApiError({ message: 'No active goal found', status: 404 }),
+    );
+
+    await renderWithQueryClient(<TransactionsScreen />);
+    await screen.findByText('Groceries');
+
+    await fireEvent.press(
+      screen.getByRole('button', { name: 'Edit Groceries transaction' }),
+    );
+    await fireEvent.press(screen.getByRole('checkbox'));
+
+    expect(
+      screen.getByRole('alert', {
+        name: 'Create an active goal before linking this transaction.',
+      }),
+    ).toBeOnTheScreen();
+    expect(screen.getByRole('button', { name: 'Save changes' })).toBeDisabled();
+    expect(mockUpdateTransaction).not.toHaveBeenCalled();
   });
 
   it('requires destructive confirmation before deleting a transaction', async () => {
