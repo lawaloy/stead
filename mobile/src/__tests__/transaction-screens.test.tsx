@@ -209,6 +209,7 @@ describe('transaction screens', () => {
     expect(
       await screen.findByText('Checking your active goal...'),
     ).toBeOnTheScreen();
+    expect(screen.queryByRole('alert')).not.toBeOnTheScreen();
     expect(
       screen.getByRole('button', { name: 'Add Transaction' }),
     ).toBeDisabled();
@@ -224,6 +225,26 @@ describe('transaction screens', () => {
     expect(
       screen.queryByText('Checking your active goal...'),
     ).not.toBeOnTheScreen();
+  });
+
+  it('prompts for a goal when the active-goal lookup settles with 404', async () => {
+    mockGetActiveGoal.mockRejectedValue(
+      new ApiError({ message: 'No active goal found', status: 404 }),
+    );
+
+    await renderWithQueryClient(<AddTransactionScreen />);
+
+    expect(
+      await screen.findByRole('alert', {
+        name: 'Create an active goal or turn off goal linking.',
+      }),
+    ).toBeOnTheScreen();
+    expect(
+      screen.queryByText('Checking your active goal...'),
+    ).not.toBeOnTheScreen();
+    expect(
+      screen.getByRole('button', { name: 'Add Transaction' }),
+    ).toBeDisabled();
   });
 
   it('blocks unverifiable goal links and reports disconnected writes accessibly', async () => {
