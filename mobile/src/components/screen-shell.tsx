@@ -11,7 +11,9 @@ export const ScreenShell = ({
 }) => (
   <SafeAreaView style={styles.safe}>
     <ScrollView contentContainerStyle={styles.wrap}>
-      <Text style={styles.title}>{title}</Text>
+      <Text style={styles.title} accessibilityRole="header">
+        {title}
+      </Text>
       <View style={styles.body}>{children}</View>
     </ScrollView>
   </SafeAreaView>

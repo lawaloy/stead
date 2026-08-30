@@ -1,6 +1,6 @@
 # Project Status
 
-Last reviewed against the repository: 2026-08-28.
+Last reviewed against the repository: 2026-08-29.
 
 This document separates four states that should not be treated as equivalent:
 
@@ -24,7 +24,7 @@ unit coverage is not the same as a full mobile-to-database acceptance test.
 | OTP abuse controls                 | Per-phone, IP, and pseudonymous device limits implemented                                          | Stable installation UUID is sent                                       | API unit and PostgreSQL e2e coverage                                                                       | Decide whether native attestation or an edge risk service is required                                     |
 | Auth and queue inspection          | Allowlisted API endpoints implemented                                                              | No operator UI                                                         | API unit and PostgreSQL e2e coverage                                                                       | Build an operations surface and production alerting/runbooks                                              |
 | Goals                              | Create, read active, and update implemented; database enforces one active goal per user            | Read active and create only                                            | API service/controller unit tests; PostgreSQL finance e2e; mobile API-client tests                         | Add mobile edit, deactivation, and history UX                                                             |
-| Transactions                       | Create, list, update, and delete implemented                                                       | Create, list, filter, edit, relink/unlink, and delete                  | API service/controller unit tests; PostgreSQL finance e2e; mobile API-client and presentation-helper tests | Add screen/journey, offline, and accessibility coverage                                                   |
+| Transactions                       | Create, list, update, and delete implemented                                                       | Create, list, filter, edit, relink/unlink, and delete                  | API service/controller unit tests; PostgreSQL finance e2e; mobile API-client, presentation-helper, and screen-journey tests covering cached-read failure/retry and accessibility semantics | Run a native TalkBack/VoiceOver pass; decide separately whether durable cold-start history or queued offline writes justify persistence and conflict-resolution complexity |
 | Stability dashboard                | Implemented for an active goal                                                                     | Implemented                                                            | Scoring/service/controller unit tests; populated PostgreSQL finance e2e; mobile response parsing           | Add screen/journey tests; validate the scoring model with users                                           |
 | OTP notification queue             | Encrypted persisted jobs, leases, retry, and dead-letter behavior implemented                      | Not directly user-facing                                               | Extensive unit tests and PostgreSQL e2e coverage                                                           | Move the serial in-process worker only when an independent deployment is justified                        |
 | SMS providers                      | Dev, Twilio, and Termii adapters implemented                                                       | OTP UI is provider-agnostic                                            | Mocked provider unit tests; dev-provider e2e                                                               | Live Twilio or Termii delivery has not been production-validated                                          |
@@ -52,18 +52,24 @@ unit coverage is not the same as a full mobile-to-database acceptance test.
   session-scoped finance caches, transaction money/date/goal-link behavior,
   finance request/response parsing, generated contract shapes, and dependency
   compatibility safeguards.
+- React Native transaction-screen tests cover create, list/filter, edit, delete
+  confirmation, validation, cached activity during refresh failure, retry,
+  disconnected-write feedback, and accessible roles, names, states, and live
+  announcements.
 - CI checks API/mobile lint and builds, API unit/e2e tests, mobile typecheck/unit
   tests, contract drift, dependency review, dependency audit, and CodeQL.
 
 ### Not automated today
 
-- There are no React Native screen/component tests for the auth, goal,
-  transaction, or dashboard screens.
+- There are no React Native screen/component tests yet for the auth, goal, or
+  dashboard screens; transaction screens have automated component journeys.
 - There is no automated mobile-to-API journey test.
 - There is no native Android or iOS acceptance suite.
 - There is no live Twilio or Termii integration test.
-- There are no load, soak, failover, accessibility, or security-penetration
-  suites, and no enforced code-coverage threshold.
+- There are no load, soak, failover, broad accessibility-audit, or
+  security-penetration suites, and no enforced code-coverage threshold. The
+  transaction tests verify accessibility semantics but are not a native
+  TalkBack or VoiceOver acceptance pass.
 
 The recorded manual acceptance pass covers Expo web only. See
 [Auth Hardening](auth-hardening.md#validation-record) for its exact scope.
@@ -87,7 +93,7 @@ the product milestone.
 
 | Order                | Milestone                          | Customer outcome                                                                                                                                       | Status                    | Remaining scope                                                                                                                                           |
 | -------------------- | ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Completed            | Transaction history and management | Customers can review and filter activity, see the visible net, correct transaction details or goal links, and delete mistakes                          | Implemented in mobile     | Screen/journey, offline, and accessibility coverage remain enabling work                                                                                  |
+| Completed            | Transaction history and management | Customers can review and filter activity, see the visible net, correct transaction details or goal links, and delete mistakes                          | Implemented in mobile     | Automated transaction-screen journeys now cover validation, warm-session cached/offline behavior, retry, and accessibility semantics; durable cold-start offline support and native assistive-technology validation remain separate decisions/checks |
 | Next                 | Goal lifecycle and history         | Customers can correct an active goal, intentionally deactivate or replace it, and understand prior goal state without creating accidental replacements | Not implemented in mobile | Agree the replacement/history workflow; expose edit, deactivate, and history UX using the existing goal update boundary or an explicit contract extension |
 | After goal lifecycle | Weekly readiness and risk alerts   | Customers receive timely progress and risk updates instead of needing to open the dashboard                                                            | Not implemented           | Define triggers, preferences, templates, delivery channels, and opt-out behavior before implementation                                                    |
 | Later                | Account and data self-service      | Customers can manage profile/consent, export data, and delete their account                                                                            | Not implemented           | Define policy, API contracts, support path, and mobile UX                                                                                                 |
@@ -106,6 +112,9 @@ alongside product discovery before the score is treated as financial guidance.
 - Safe-integer-aware naira-to-kobo conversion and stable date-only transaction
   handling in the mobile transaction workflow.
 - Session-scoped finance query caches that are cleared across login changes.
+- Transaction-screen journeys covering create/filter/edit/delete, validation,
+  warm-session cached activity and retry during refresh failure, disconnected
+  writes, and accessibility semantics.
 
 #### Before a production pilot
 
@@ -118,8 +127,9 @@ alongside product discovery before the score is treated as financial guidance.
    and incident response.
 4. Establish deployment, monitoring, alerting, backup/restore, privacy, data
    retention, and account-deletion procedures.
-5. Add screen-level offline, retry, validation, and accessibility verification
-   for the critical mobile flows.
+5. Extend screen-level offline, retry, validation, and accessibility
+   verification beyond transactions to the other critical mobile flows, then
+   run native TalkBack and VoiceOver acceptance checks.
 
 ### Later platform expansion
 

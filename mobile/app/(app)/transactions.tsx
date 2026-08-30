@@ -89,6 +89,7 @@ export default function TransactionsScreen() {
     () => calculateNetKobo(visibleTransactions),
     [visibleTransactions],
   );
+  const hasSavedActivity = transactionsQuery.data !== undefined;
 
   const validation = useMemo(() => {
     if (!editing) return '';
@@ -128,7 +129,7 @@ export default function TransactionsScreen() {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: deleteTransaction,
+    mutationFn: (id: string) => deleteTransaction(id),
     onSuccess: () => refreshFinanceQueries(token),
   });
 
@@ -180,7 +181,10 @@ export default function TransactionsScreen() {
       <View style={styles.hero}>
         <View>
           <Text style={styles.eyebrow}>VISIBLE NET</Text>
-          <Text style={styles.netAmount}>
+          <Text
+            style={styles.netAmount}
+            accessibilityLabel={`Visible net ${formatKoboAsNaira(visibleNetKobo)}`}
+          >
             {formatKoboAsNaira(visibleNetKobo)}
           </Text>
           <Text style={styles.muted}>
@@ -231,10 +235,12 @@ export default function TransactionsScreen() {
             </Pressable>
           </View>
 
-          <View style={styles.segment}>
+          <View style={styles.segment} accessibilityRole="tablist">
             {(['in', 'out'] as const).map((value) => (
               <Pressable
                 key={value}
+                accessibilityRole="tab"
+                accessibilityState={{ selected: direction === value }}
                 style={[
                   styles.segmentButton,
                   direction === value && styles.segmentButtonActive,
@@ -292,15 +298,30 @@ export default function TransactionsScreen() {
             </Text>
           </Pressable>
 
-          {validation ? <Text style={styles.error}>{validation}</Text> : null}
+          {validation ? (
+            <Text
+              style={styles.error}
+              accessibilityRole="alert"
+              accessibilityLiveRegion="assertive"
+            >
+              {validation}
+            </Text>
+          ) : null}
           {updateMutation.error ? (
-            <Text style={styles.error}>
+            <Text
+              style={styles.error}
+              accessibilityRole="alert"
+              accessibilityLiveRegion="assertive"
+            >
               {(updateMutation.error as ApiError).message}
             </Text>
           ) : null}
 
           <Pressable
             accessibilityRole="button"
+            accessibilityState={{
+              disabled: Boolean(validation) || updateMutation.isPending,
+            }}
             disabled={Boolean(validation) || updateMutation.isPending}
             onPress={saveEdit}
             style={[
@@ -318,21 +339,36 @@ export default function TransactionsScreen() {
       ) : null}
 
       {transactionsQuery.isPending ? (
-        <Text>Loading transactions...</Text>
+        <Text accessibilityRole="progressbar" accessibilityLiveRegion="polite">
+          Loading transactions...
+        </Text>
       ) : null}
       {transactionsQuery.error ? (
         <View style={styles.messageCard}>
-          <Text style={styles.error}>We could not load your activity.</Text>
+          <Text
+            style={styles.error}
+            accessibilityRole="alert"
+            accessibilityLiveRegion="assertive"
+          >
+            {hasSavedActivity
+              ? 'We could not refresh your activity. Showing saved activity while you reconnect.'
+              : 'We could not load your activity. Reconnect and try again.'}
+          </Text>
           <Pressable
             onPress={() => transactionsQuery.refetch()}
             accessibilityRole="button"
+            accessibilityLabel="Retry loading activity"
           >
             <Text style={styles.linkText}>Try again</Text>
           </Pressable>
         </View>
       ) : null}
       {deleteMutation.error ? (
-        <Text style={styles.error}>
+        <Text
+          style={styles.error}
+          accessibilityRole="alert"
+          accessibilityLiveRegion="assertive"
+        >
           {(deleteMutation.error as ApiError).message}
         </Text>
       ) : null}
@@ -403,6 +439,7 @@ export default function TransactionsScreen() {
           <View style={styles.actions}>
             <Pressable
               accessibilityRole="button"
+              accessibilityLabel={`Edit ${transaction.note || formatKoboAsNaira(transaction.amountKobo)} transaction`}
               onPress={() => beginEdit(transaction)}
               style={styles.secondaryButton}
             >
@@ -410,6 +447,8 @@ export default function TransactionsScreen() {
             </Pressable>
             <Pressable
               accessibilityRole="button"
+              accessibilityLabel={`Delete ${transaction.note || formatKoboAsNaira(transaction.amountKobo)} transaction`}
+              accessibilityState={{ disabled: deleteMutation.isPending }}
               disabled={deleteMutation.isPending}
               onPress={() => confirmDelete(transaction)}
               style={styles.deleteButton}
