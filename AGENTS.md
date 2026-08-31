@@ -23,12 +23,9 @@ When creating PRs, use [`.github/pull_request_template.md`](.github/pull_request
 
 Fill in **What + Why** before the next push. Details: [CONTRIBUTING.md](CONTRIBUTING.md#pull-requests).
 
-Before merging or declaring a PR complete, inspect its conversation comments,
-submitted reviews, and inline review threads. Address every actionable item,
-reply with the outcome, and resolve the thread only after the concern is fixed
-or answered with a documented rationale. Re-check all three surfaces after each
-push and immediately before completion because feedback can arrive while CI is
-running.
+For ordinary PRs, do not enable auto-merge when creating the PR. Wait until all workflows and check integrations expected for the PR’s event and changed paths have produced runs for the latest head commit and every resulting run is terminal, including checks not required by branch protection. Also wait for any PR review automation still running against an earlier commit, because it may post relevant feedback after a push. If an expected run does not appear, investigate the missing run rather than treating its absence as success. Success is acceptable; accept a skipped or neutral conclusion only when it is expected and documented. Failure, cancellation, timeout, or action-required conclusions block completion.
+Then inspect the PR conversation, submitted reviews, and inline review threads. Address every actionable item, reply with the outcome, and resolve a thread only after the concern is fixed or answered with documented rationale.
+Repeat the complete wait-and-inspect cycle after every push because a new head commit invalidates the previous check and review assessment. Immediately before completion, re-check the latest commit, all check and review-automation runs, and all three feedback surfaces. Merge manually only when nothing is pending, no expected runs are missing, no unacceptable conclusions remain, and no actionable feedback is unresolved.
 
 ### GitHub operations
 
