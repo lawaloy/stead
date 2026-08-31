@@ -947,4 +947,80 @@ describe('Finance flows (e2e)', () => {
       },
     });
   });
+
+  it('moves replaced-goal savings onto the new active goal when the transaction is relinked', async () => {
+    const { token } = await createAuthedUser();
+
+    const first = (
+      await authed('post', '/goals', token)
+        .send({
+          name: 'First',
+          amountTotalKobo: 300_000,
+          dueDate: '2026-11-01T00:00:00.000Z',
+        })
+        .expect(201)
+    ).body as GoalBody;
+
+    const tagged = (
+      await authed('post', '/transactions', token)
+        .send({
+          direction: 'in',
+          amountKobo: 80_000,
+          occurredAt: '2026-01-20T00:00:00.000Z',
+          goalId: first.id,
+        })
+        .expect(201)
+    ).body as TransactionBody;
+
+    const second = (
+      await authed('post', '/goals', token)
+        .send({
+          name: 'Second',
+          amountTotalKobo: 200_000,
+          dueDate: '2026-12-01T00:00:00.000Z',
+        })
+        .expect(201)
+    ).body as GoalBody;
+
+    const beforeRelink = await authed(
+      'get',
+      '/dashboard/stability',
+      token,
+    ).expect(200);
+    expect(beforeRelink.body as DashboardBody).toMatchObject({
+      ok: true,
+      goal: { id: second.id },
+      metrics: {
+        goalSavedKobo: 0,
+        estimatedBalanceKobo: 80_000,
+        remainingObligationKobo: 200_000,
+      },
+    });
+
+    await authed('patch', `/transactions/${tagged.id}`, token)
+      .send({ goalId: second.id })
+      .expect(200)
+      .expect((response) => {
+        expect(response.body as TransactionBody).toMatchObject({
+          id: tagged.id,
+          goalId: second.id,
+          amountKobo: 80_000,
+        });
+      });
+
+    const afterRelink = await authed(
+      'get',
+      '/dashboard/stability',
+      token,
+    ).expect(200);
+    expect(afterRelink.body as DashboardBody).toMatchObject({
+      ok: true,
+      goal: { id: second.id },
+      metrics: {
+        goalSavedKobo: 80_000,
+        estimatedBalanceKobo: 80_000,
+        remainingObligationKobo: 120_000,
+      },
+    });
+  });
 });
