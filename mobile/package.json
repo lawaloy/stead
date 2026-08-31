@@ -51,7 +51,7 @@
     "react-native-safe-area-context": "~5.8.0",
     "react-native-screens": "~4.27.0",
     "react-native-web": "^0.21.2",
-    "zod": "^4.4.3"
+    "zod": "^4.5.1"
   },
   "devDependencies": {
     "@eslint/compat": "^2.1.0",
