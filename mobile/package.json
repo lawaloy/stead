@@ -32,7 +32,7 @@
     "build": "expo export --platform web --output-dir dist"
   },
   "dependencies": {
-    "@tanstack/react-query": "^5.102.5",
+    "@tanstack/react-query": "^5.102.8",
     "axios": "1.19.0",
     "expo": "~57.0.8",
     "expo-constants": "~57.0.2",
@@ -43,7 +43,7 @@
     "expo-splash-screen": "~57.0.8",
     "expo-status-bar": "~57.0.1",
     "image-size": "file:vendor/image-size-compat",
-    "libphonenumber-js": "^1.13.11",
+    "libphonenumber-js": "^1.13.12",
     "react": "19.2.8",
     "react-dom": "19.2.8",
     "react-native": "0.86.3",
@@ -51,7 +51,7 @@
     "react-native-safe-area-context": "~5.8.0",
     "react-native-screens": "~4.27.0",
     "react-native-web": "^0.21.2",
-    "zod": "^4.4.3"
+    "zod": "^4.5.1"
   },
   "devDependencies": {
     "@eslint/compat": "^2.1.0",

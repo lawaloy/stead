@@ -314,6 +314,45 @@ describe('transaction screens', () => {
     ).toBeOnTheScreen();
   });
 
+  it('omits goalId when the customer turns off goal tagging', async () => {
+    await renderWithQueryClient(<AddTransactionScreen />);
+
+    await waitFor(() =>
+      expect(
+        screen.getByRole('button', { name: 'Add Transaction' }),
+      ).toBeEnabled(),
+    );
+    expect(screen.getByRole('checkbox')).toBeChecked();
+    await fireEvent.press(screen.getByRole('checkbox'));
+    expect(screen.getByRole('checkbox')).not.toBeChecked();
+
+    await fireEvent.press(screen.getByRole('tab', { name: 'Expense' }));
+    await fireEvent.changeText(
+      screen.getByLabelText('Transaction amount in naira'),
+      '40',
+    );
+    await fireEvent.changeText(
+      screen.getByLabelText('Transaction note'),
+      'Unlinked fare',
+    );
+    await fireEvent.press(
+      screen.getByRole('button', { name: 'Add Transaction' }),
+    );
+
+    await waitFor(() =>
+      expect(mockCreateTransaction).toHaveBeenCalledWith({
+        direction: 'out',
+        amountKobo: 4_000,
+        occurredAt: expect.any(String),
+        note: 'Unlinked fare',
+        goalId: undefined,
+      }),
+    );
+    expect(
+      await screen.findByRole('alert', { name: 'Transaction added' }),
+    ).toBeOnTheScreen();
+  });
+
   it('shows a cold-load failure without inventing cached activity', async () => {
     mockListTransactions.mockRejectedValue(
       new ApiError({ message: 'Unexpected network error' }),
@@ -334,6 +373,72 @@ describe('transaction screens', () => {
     expect(
       screen.getByRole('button', { name: 'Retry loading activity' }),
     ).toBeOnTheScreen();
+  });
+
+  it('keeps an older goal link until the customer explicitly retags the transaction', async () => {
+    const olderLinked: Transaction = {
+      id: 'tx_old_goal',
+      userId: 'user_1',
+      goalId: 'goal_old',
+      amountKobo: 80_000,
+      direction: 'in',
+      occurredAt: '2026-08-19T12:00:00.000Z',
+      note: 'Old rent slice',
+      createdAt: '2026-08-19T12:00:00.000Z',
+    };
+    mockListTransactions.mockResolvedValue([olderLinked]);
+
+    await renderWithQueryClient(<TransactionsScreen />);
+    await screen.findByText('Old rent slice');
+
+    await fireEvent.press(
+      screen.getByRole('button', { name: 'Edit Old rent slice transaction' }),
+    );
+
+    expect(screen.getByText('Keep the current goal link')).toBeOnTheScreen();
+    expect(screen.getByRole('checkbox')).toBeChecked();
+
+    await fireEvent.changeText(
+      screen.getByLabelText('Transaction amount in naira'),
+      '900',
+    );
+    await fireEvent.press(screen.getByRole('button', { name: 'Save changes' }));
+
+    await waitFor(() =>
+      expect(mockUpdateTransaction).toHaveBeenCalledWith('tx_old_goal', {
+        direction: 'in',
+        amountKobo: 90_000,
+        occurredAt: '2026-08-19T12:00:00.000Z',
+        note: 'Old rent slice',
+      }),
+    );
+    expect(mockUpdateTransaction.mock.calls[0][1]).not.toHaveProperty('goalId');
+
+    mockUpdateTransaction.mockClear();
+    await fireEvent.press(
+      screen.getByRole('button', { name: 'Edit Old rent slice transaction' }),
+    );
+    expect(
+      await screen.findByText('Keep the current goal link'),
+    ).toBeOnTheScreen();
+
+    await fireEvent.press(screen.getByRole('checkbox'));
+    expect(screen.getByRole('checkbox')).not.toBeChecked();
+    await fireEvent.press(screen.getByRole('checkbox'));
+    expect(screen.getByRole('checkbox')).toBeChecked();
+    expect(screen.getByText('Count toward Emergency fund')).toBeOnTheScreen();
+
+    await fireEvent.press(screen.getByRole('button', { name: 'Save changes' }));
+
+    await waitFor(() =>
+      expect(mockUpdateTransaction).toHaveBeenCalledWith('tx_old_goal', {
+        direction: 'in',
+        amountKobo: 80_000,
+        occurredAt: '2026-08-19T12:00:00.000Z',
+        note: 'Old rent slice',
+        goalId: 'goal_1',
+      }),
+    );
   });
 
   it('blocks an explicit edit goal link when no active goal is available', async () => {
