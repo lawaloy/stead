@@ -387,6 +387,10 @@ describe('transaction screens', () => {
       createdAt: '2026-08-19T12:00:00.000Z',
     };
     mockListTransactions.mockResolvedValue([olderLinked]);
+    mockUpdateTransaction.mockImplementation(async (_id, payload) => ({
+      ...olderLinked,
+      ...payload,
+    }));
 
     await renderWithQueryClient(<TransactionsScreen />);
     await screen.findByText('Old rent slice');
@@ -414,6 +418,9 @@ describe('transaction screens', () => {
     );
     expect(mockUpdateTransaction.mock.calls[0][1]).not.toHaveProperty('goalId');
 
+    mockListTransactions.mockResolvedValue([
+      { ...olderLinked, amountKobo: 90_000 },
+    ]);
     mockUpdateTransaction.mockClear();
     await fireEvent.press(
       screen.getByRole('button', { name: 'Edit Old rent slice transaction' }),
@@ -433,12 +440,87 @@ describe('transaction screens', () => {
     await waitFor(() =>
       expect(mockUpdateTransaction).toHaveBeenCalledWith('tx_old_goal', {
         direction: 'in',
-        amountKobo: 80_000,
+        amountKobo: 90_000,
         occurredAt: '2026-08-19T12:00:00.000Z',
         note: 'Old rent slice',
         goalId: 'goal_1',
       }),
     );
+  });
+
+  it('does not revert a just-saved amount when re-editing before the list refetch completes', async () => {
+    let releaseRefetch: (value: Transaction[]) => void = () => undefined;
+    let listCalls = 0;
+    mockListTransactions.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          listCalls += 1;
+          if (listCalls === 1) {
+            resolve(rows);
+            return;
+          }
+          releaseRefetch = resolve;
+        }),
+    );
+    mockUpdateTransaction.mockImplementation(async (id, payload) => ({
+      ...rows.find((row) => row.id === id)!,
+      ...payload,
+    }));
+
+    await renderWithQueryClient(<TransactionsScreen />);
+    await screen.findByText('Salary slice');
+
+    await fireEvent.press(
+      screen.getByRole('button', { name: 'Edit Salary slice transaction' }),
+    );
+    await fireEvent.changeText(
+      screen.getByLabelText('Transaction amount in naira'),
+      '6000',
+    );
+    await fireEvent.press(screen.getByRole('button', { name: 'Save changes' }));
+
+    await waitFor(() =>
+      expect(mockUpdateTransaction).toHaveBeenCalledWith(
+        'tx_income',
+        expect.objectContaining({ amountKobo: 600_000 }),
+      ),
+    );
+    await waitFor(() =>
+      expect(
+        screen.queryByRole('button', { name: 'Save changes' }),
+      ).not.toBeOnTheScreen(),
+    );
+
+    await fireEvent.press(
+      screen.getByRole('button', { name: 'Edit Salary slice transaction' }),
+    );
+    expect(screen.getByLabelText('Transaction amount in naira')).toHaveDisplayValue(
+      '6000',
+    );
+
+    await fireEvent.changeText(
+      screen.getByLabelText('Transaction note'),
+      'Salary slice, corrected',
+    );
+    await fireEvent.press(screen.getByRole('button', { name: 'Save changes' }));
+
+    await waitFor(() =>
+      expect(mockUpdateTransaction).toHaveBeenLastCalledWith('tx_income', {
+        direction: 'in',
+        amountKobo: 600_000,
+        occurredAt: '2026-08-20T12:00:00.000Z',
+        note: 'Salary slice, corrected',
+      }),
+    );
+
+    releaseRefetch([
+      {
+        ...rows[0],
+        amountKobo: 600_000,
+        note: 'Salary slice, corrected',
+      },
+      rows[1],
+    ]);
   });
 
   it('blocks an explicit edit goal link when no active goal is available', async () => {

@@ -23,6 +23,20 @@ export const calculateNetKobo = (transactions: Transaction[]) =>
     0,
   );
 
+export const replaceTransactionInList = (
+  transactions: Transaction[] | undefined,
+  updated: Transaction,
+): Transaction[] => {
+  if (!transactions?.length) return [updated];
+  const index = transactions.findIndex(
+    (transaction) => transaction.id === updated.id,
+  );
+  if (index === -1) return [...transactions, updated];
+  return transactions.map((transaction) =>
+    transaction.id === updated.id ? updated : transaction,
+  );
+};
+
 export const formatKoboAsNaira = (amountKobo: number) => {
   const absolute = Math.abs(amountKobo) / 100;
   const sign = amountKobo < 0 ? '-' : '';

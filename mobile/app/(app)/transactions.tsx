@@ -33,6 +33,7 @@ import {
   isoToDateInput,
   koboToNairaInput,
   nairaInputToKobo,
+  replaceTransactionInList,
 } from '../../src/lib/transactions';
 import type { TransactionFilter } from '../../src/lib/transactions';
 import { ScreenShell } from '../../src/components/screen-shell';
@@ -122,7 +123,11 @@ export default function TransactionsScreen() {
       id: string;
       payload: UpdateTransactionRequest;
     }) => updateTransaction(id, payload),
-    onSuccess: async () => {
+    onSuccess: async (updated) => {
+      queryClient.setQueryData<Transaction[]>(
+        sessionQueryKeys.transactions(token),
+        (current) => replaceTransactionInList(current, updated),
+      );
       setEditing(null);
       await refreshFinanceQueries(token);
     },

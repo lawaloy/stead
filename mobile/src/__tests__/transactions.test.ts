@@ -8,6 +8,7 @@ import {
   isoToDateInput,
   koboToNairaInput,
   nairaInputToKobo,
+  replaceTransactionInList,
   resolveTransactionGoalId,
   todayDateInput,
 } from '../lib/transactions';
@@ -55,6 +56,22 @@ describe('transaction presentation helpers', () => {
     expect(calculateNetKobo(filterTransactions(transactions, 'out'))).toBe(
       -50_000,
     );
+  });
+
+  it('replaces a saved transaction in the cached activity list', () => {
+    const updated = { ...transactions[0], amountKobo: 400_000 };
+    expect(replaceTransactionInList(undefined, updated)).toEqual([updated]);
+    expect(replaceTransactionInList([], updated)).toEqual([updated]);
+    expect(replaceTransactionInList(transactions, updated)[0]).toEqual(updated);
+    expect(replaceTransactionInList(transactions, updated)[1]).toEqual(
+      transactions[1],
+    );
+    expect(
+      replaceTransactionInList(transactions, {
+        ...updated,
+        id: 'tx_new',
+      }).map((row) => row.id),
+    ).toEqual(['tx_income', 'tx_expense', 'tx_new']);
   });
 
   it('formats kobo as naira for positive and negative totals', () => {
