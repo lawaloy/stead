@@ -386,11 +386,12 @@ describe('transaction screens', () => {
       note: 'Old rent slice',
       createdAt: '2026-08-19T12:00:00.000Z',
     };
-    mockListTransactions.mockResolvedValue([olderLinked]);
-    mockUpdateTransaction.mockImplementation(async (_id, payload) => ({
-      ...olderLinked,
-      ...payload,
-    }));
+    let serverRow = olderLinked;
+    mockListTransactions.mockImplementation(async () => [serverRow]);
+    mockUpdateTransaction.mockImplementation(async (_id, payload) => {
+      serverRow = { ...olderLinked, ...payload };
+      return serverRow;
+    });
 
     await renderWithQueryClient(<TransactionsScreen />);
     await screen.findByText('Old rent slice');
@@ -418,9 +419,6 @@ describe('transaction screens', () => {
     );
     expect(mockUpdateTransaction.mock.calls[0][1]).not.toHaveProperty('goalId');
 
-    mockListTransactions.mockResolvedValue([
-      { ...olderLinked, amountKobo: 90_000 },
-    ]);
     mockUpdateTransaction.mockClear();
     await fireEvent.press(
       screen.getByRole('button', { name: 'Edit Old rent slice transaction' }),
