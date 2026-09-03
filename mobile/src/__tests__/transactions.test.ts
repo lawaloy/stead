@@ -60,12 +60,15 @@ describe('transaction presentation helpers', () => {
 
   it('replaces a saved transaction in the cached activity list', () => {
     const updated = { ...transactions[0], amountKobo: 400_000 };
+    const snapshot = transactions.map((row) => ({ ...row }));
+    const next = replaceTransactionInList(transactions, updated);
+
     expect(replaceTransactionInList(undefined, updated)).toEqual([updated]);
     expect(replaceTransactionInList([], updated)).toEqual([updated]);
-    expect(replaceTransactionInList(transactions, updated)[0]).toEqual(updated);
-    expect(replaceTransactionInList(transactions, updated)[1]).toEqual(
-      transactions[1],
-    );
+    expect(next).not.toBe(transactions);
+    expect(transactions).toEqual(snapshot);
+    expect(next[0]).toEqual(updated);
+    expect(next[1]).toEqual(transactions[1]);
     expect(
       replaceTransactionInList(transactions, {
         ...updated,

@@ -489,6 +489,11 @@ describe('transaction screens', () => {
       ).not.toBeOnTheScreen(),
     );
 
+    expect(screen.getByText('Groceries')).toBeOnTheScreen();
+    expect(screen.getByText('+₦6,000.00')).toBeOnTheScreen();
+    expect(screen.getByText('-₦500.00')).toBeOnTheScreen();
+    expect(screen.getByLabelText('Visible net ₦5,500.00')).toBeOnTheScreen();
+
     await fireEvent.press(
       screen.getByRole('button', { name: 'Edit Salary slice transaction' }),
     );
