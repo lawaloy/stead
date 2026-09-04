@@ -105,7 +105,7 @@ jobs:
           body: |
             Automated API dependency maintenance run:
             - Advances direct API dependencies only within their declared semver ranges using pinned `npm-check-updates@22.2.9` and a three-day release cooldown.
-            - Leaves TypeScript major upgrades, the TypeScript 7 native alias, and exact OpenAPI codegen pins as deliberate engineering work.
+            - Leaves the TypeScript 7 CLI, its TypeScript 6 compatibility alias, and exact OpenAPI codegen pins as deliberate engineering work.
             - Installs the updated lockfile with scripts enabled (including Prisma generate) using the CI-pinned npm version.
             - Leaves vulnerability remediation to native Dependabot, blocks high-severity production findings, and records moderate-or-higher full-tree findings.
             - Passes API lint, build, and unit tests before this PR is created or updated.
@@ -152,7 +152,7 @@ jobs:
             --target semver \
             --cooldown 3 \
             --format cooldown \
-            --reject "typescript,expo,expo-*,react,react-dom,react-native,react-native-*,@types/react,babel-preset-expo,eslint-config-expo,@types/jest,jest,jest-util"
+            --reject "typescript,@typescript/native,expo,expo-*,react,react-dom,react-native,react-native-*,@types/react,babel-preset-expo,eslint-config-expo,@types/jest,jest,jest-util"
           npm install
 
       - name: Align Expo SDK packages within the accepted baseline
@@ -222,7 +222,7 @@ jobs:
           body: |
             Automated mobile dependency maintenance run:
             - Advances direct mobile dependencies only within their declared semver ranges using pinned `npm-check-updates@22.2.9` and a three-day release cooldown.
-            - Excludes the Expo/React Native platform stack, Jest baseline, exact pins, and TypeScript 7 so those upgrades remain deliberate engineering work.
+            - Excludes the Expo/React Native platform stack, Jest baseline, exact pins, the TypeScript 7 CLI, and its TypeScript 6 compatibility alias so those upgrades remain deliberate engineering work.
             - Aligns non-excluded Expo SDK packages with `expo install --fix`, then verifies the accepted baseline with Expo CLI and pinned `expo-doctor@1.20.1`.
             - Installs the updated lockfile with the CI-pinned npm version before Expo checks and app gates.
             - Leaves vulnerability remediation to native Dependabot, blocks high-severity production findings, and records moderate-or-higher full-tree findings.

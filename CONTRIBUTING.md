@@ -80,6 +80,11 @@ README for the local migration command.
 
 ## Local Setup
 
+API and mobile scripts invoke the TypeScript 7 CLI through
+`@typescript/native`. Keep the `typescript` dependency mapped to
+`@typescript/typescript6` until the TypeScript 6 Removal Readiness workflow
+reports that a fully tested removal trial is eligible.
+
 API:
 
 ```bash

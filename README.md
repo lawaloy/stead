@@ -32,6 +32,12 @@ Prerequisites: Node.js 22.18+ on the 22.x line or Node.js 24.x, plus Docker
 for the local PostgreSQL database. Both npm projects enforce the supported
 Node.js range during dependency installation.
 
+Both projects use the TypeScript 7 native CLI for typechecking and API builds.
+The package named `typescript` remains mapped to Microsoft's TypeScript 6
+compatibility package for tools that still require the legacy compiler API.
+The scheduled TypeScript 6 Removal Readiness workflow tracks when that
+compatibility layer can be removed safely.
+
 Get started
 
 API (from `api/`):

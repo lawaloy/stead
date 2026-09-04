@@ -1,4 +1,4 @@
-name: TypeScript 7 Readiness
+name: TypeScript 6 Removal Readiness
 
 on:
   schedule:
@@ -9,8 +9,8 @@ permissions:
   contents: read
 
 jobs:
-  api-toolchain:
-    name: API toolchain readiness
+  compatibility-removal:
+    name: Compatibility removal readiness
     runs-on: ubuntu-latest
 
     steps:
@@ -23,9 +23,9 @@ jobs:
           node-version: 22
 
       - name: Install readiness checker dependency
-        run: npm --prefix "$RUNNER_TEMP/typescript-7-readiness" install semver@latest
+        run: npm --prefix "$RUNNER_TEMP/typescript-6-removal-readiness" install semver@latest
 
-      - name: Check TypeScript 7 support
+      - name: Check TypeScript 6 removal support
         env:
-          NODE_PATH: ${{ runner.temp }}/typescript-7-readiness/node_modules
+          NODE_PATH: ${{ runner.temp }}/typescript-6-removal-readiness/node_modules
         run: node .github/scripts/check-typescript-7-readiness.cjs

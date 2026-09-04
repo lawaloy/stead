@@ -42,7 +42,7 @@ Repeat the complete wait-and-inspect cycle after every push because a new head c
 
 ### Prerequisites
 
-- **Node.js 22.18+ (22.x) or 24.x** (required by the contract generator and TypeScript ~6.0)
+- **Node.js 22.18+ (22.x) or 24.x** (required by the contract generator and TypeScript 7 CLI; TypeScript 6 remains installed only as a compiler-API compatibility layer for supporting tools)
 - **Docker** (required for PostgreSQL via `api/docker-compose.yml`)
 
 ### Starting the database
