@@ -446,6 +446,60 @@ describe('transaction screens', () => {
     );
   });
 
+  it('blocks cancel and re-edit so an in-flight save cannot be overwritten with the stale list amount', async () => {
+    let releaseUpdate: (value: Transaction) => void = () => undefined;
+    mockUpdateTransaction.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          releaseUpdate = resolve;
+        }),
+    );
+
+    await renderWithQueryClient(<TransactionsScreen />);
+    await screen.findByText('Salary slice');
+
+    await fireEvent.press(
+      screen.getByRole('button', { name: 'Edit Salary slice transaction' }),
+    );
+    await fireEvent.changeText(
+      screen.getByLabelText('Transaction amount in naira'),
+      '6000',
+    );
+    await fireEvent.press(screen.getByRole('button', { name: 'Save changes' }));
+
+    expect(await screen.findByText('Saving...')).toBeOnTheScreen();
+    expect(screen.getByRole('button', { name: 'Cancel' })).toBeDisabled();
+    expect(
+      screen.getByRole('button', { name: 'Edit Salary slice transaction' }),
+    ).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Saving...' })).toBeDisabled();
+
+    await fireEvent.press(screen.getByRole('button', { name: 'Cancel' }));
+    await fireEvent.press(
+      screen.getByRole('button', { name: 'Edit Salary slice transaction' }),
+    );
+
+    expect(screen.getByRole('button', { name: 'Saving...' })).toBeOnTheScreen();
+    expect(screen.getByText('Saving...')).toBeOnTheScreen();
+    expect(screen.getByLabelText('Transaction amount in naira')).toHaveDisplayValue(
+      '6000',
+    );
+    expect(mockUpdateTransaction).toHaveBeenCalledTimes(1);
+
+    const saved = {
+      ...rows[0],
+      amountKobo: 600_000,
+    };
+    mockListTransactions.mockResolvedValue([saved, rows[1]]);
+    releaseUpdate(saved);
+
+    await waitFor(() =>
+      expect(screen.queryByText('Saving...')).not.toBeOnTheScreen(),
+    );
+    expect(screen.getByText('+₦6,000.00')).toBeOnTheScreen();
+    expect(mockUpdateTransaction).toHaveBeenCalledTimes(1);
+  });
+
   it('does not revert a just-saved amount when re-editing before the list refetch completes', async () => {
     let releaseRefetch: (value: Transaction[]) => void = () => undefined;
     let listCalls = 0;
