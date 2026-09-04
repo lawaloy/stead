@@ -139,6 +139,7 @@ export default function TransactionsScreen() {
   });
 
   const beginEdit = (transaction: Transaction) => {
+    if (updateMutation.isPending) return;
     updateMutation.reset();
     setEditing(transaction);
     setDirection(transaction.direction);
@@ -233,10 +234,22 @@ export default function TransactionsScreen() {
           <View style={styles.rowBetween}>
             <Text style={styles.sectionTitle}>Edit transaction</Text>
             <Pressable
-              onPress={() => setEditing(null)}
               accessibilityRole="button"
+              accessibilityState={{ disabled: updateMutation.isPending }}
+              disabled={updateMutation.isPending}
+              onPress={() => {
+                if (updateMutation.isPending) return;
+                setEditing(null);
+              }}
             >
-              <Text style={styles.linkText}>Cancel</Text>
+              <Text
+                style={[
+                  styles.linkText,
+                  updateMutation.isPending && styles.disabled,
+                ]}
+              >
+                Cancel
+              </Text>
             </Pressable>
           </View>
 
@@ -445,18 +458,29 @@ export default function TransactionsScreen() {
             <Pressable
               accessibilityRole="button"
               accessibilityLabel={`Edit ${transaction.note || formatKoboAsNaira(transaction.amountKobo)} transaction`}
+              accessibilityState={{ disabled: updateMutation.isPending }}
+              disabled={updateMutation.isPending}
               onPress={() => beginEdit(transaction)}
-              style={styles.secondaryButton}
+              style={[
+                styles.secondaryButton,
+                updateMutation.isPending && styles.disabled,
+              ]}
             >
               <Text style={styles.secondaryButtonText}>Edit</Text>
             </Pressable>
             <Pressable
               accessibilityRole="button"
               accessibilityLabel={`Delete ${transaction.note || formatKoboAsNaira(transaction.amountKobo)} transaction`}
-              accessibilityState={{ disabled: deleteMutation.isPending }}
-              disabled={deleteMutation.isPending}
+              accessibilityState={{
+                disabled: deleteMutation.isPending || updateMutation.isPending,
+              }}
+              disabled={deleteMutation.isPending || updateMutation.isPending}
               onPress={() => confirmDelete(transaction)}
-              style={styles.deleteButton}
+              style={[
+                styles.deleteButton,
+                (deleteMutation.isPending || updateMutation.isPending) &&
+                  styles.disabled,
+              ]}
             >
               <Text style={styles.deleteButtonText}>Delete</Text>
             </Pressable>
