@@ -472,31 +472,29 @@ describe('transaction screens', () => {
     expect(
       screen.getByRole('button', { name: 'Edit Salary slice transaction' }),
     ).toBeDisabled();
-    expect(
-      screen.getByRole('button', { name: 'Save changes' }),
-    ).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Saving...' })).toBeDisabled();
 
     await fireEvent.press(screen.getByRole('button', { name: 'Cancel' }));
     await fireEvent.press(
       screen.getByRole('button', { name: 'Edit Salary slice transaction' }),
     );
 
-    expect(screen.getByRole('button', { name: 'Save changes' })).toBeOnTheScreen();
+    expect(screen.getByRole('button', { name: 'Saving...' })).toBeOnTheScreen();
     expect(screen.getByText('Saving...')).toBeOnTheScreen();
     expect(screen.getByLabelText('Transaction amount in naira')).toHaveDisplayValue(
       '6000',
     );
     expect(mockUpdateTransaction).toHaveBeenCalledTimes(1);
 
-    releaseUpdate({
+    const saved = {
       ...rows[0],
       amountKobo: 600_000,
-    });
+    };
+    mockListTransactions.mockResolvedValue([saved, rows[1]]);
+    releaseUpdate(saved);
 
     await waitFor(() =>
-      expect(
-        screen.queryByRole('button', { name: 'Save changes' }),
-      ).not.toBeOnTheScreen(),
+      expect(screen.queryByText('Saving...')).not.toBeOnTheScreen(),
     );
     expect(screen.getByText('+₦6,000.00')).toBeOnTheScreen();
     expect(mockUpdateTransaction).toHaveBeenCalledTimes(1);

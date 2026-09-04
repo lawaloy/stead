@@ -137,9 +137,10 @@ export default function TransactionsScreen() {
     mutationFn: (id: string) => deleteTransaction(id),
     onSuccess: () => refreshFinanceQueries(token),
   });
+  const editorLocked = updateMutation.isPending && editing !== null;
 
   const beginEdit = (transaction: Transaction) => {
-    if (updateMutation.isPending) return;
+    if (editorLocked) return;
     updateMutation.reset();
     setEditing(transaction);
     setDirection(transaction.direction);
@@ -235,18 +236,15 @@ export default function TransactionsScreen() {
             <Text style={styles.sectionTitle}>Edit transaction</Text>
             <Pressable
               accessibilityRole="button"
-              accessibilityState={{ disabled: updateMutation.isPending }}
-              disabled={updateMutation.isPending}
+              accessibilityState={{ disabled: editorLocked }}
+              disabled={editorLocked}
               onPress={() => {
-                if (updateMutation.isPending) return;
+                if (editorLocked) return;
                 setEditing(null);
               }}
             >
               <Text
-                style={[
-                  styles.linkText,
-                  updateMutation.isPending && styles.disabled,
-                ]}
+                style={[styles.linkText, editorLocked && styles.disabled]}
               >
                 Cancel
               </Text>
@@ -458,12 +456,12 @@ export default function TransactionsScreen() {
             <Pressable
               accessibilityRole="button"
               accessibilityLabel={`Edit ${transaction.note || formatKoboAsNaira(transaction.amountKobo)} transaction`}
-              accessibilityState={{ disabled: updateMutation.isPending }}
-              disabled={updateMutation.isPending}
+              accessibilityState={{ disabled: editorLocked }}
+              disabled={editorLocked}
               onPress={() => beginEdit(transaction)}
               style={[
                 styles.secondaryButton,
-                updateMutation.isPending && styles.disabled,
+                editorLocked && styles.disabled,
               ]}
             >
               <Text style={styles.secondaryButtonText}>Edit</Text>
@@ -472,14 +470,13 @@ export default function TransactionsScreen() {
               accessibilityRole="button"
               accessibilityLabel={`Delete ${transaction.note || formatKoboAsNaira(transaction.amountKobo)} transaction`}
               accessibilityState={{
-                disabled: deleteMutation.isPending || updateMutation.isPending,
+                disabled: deleteMutation.isPending || editorLocked,
               }}
-              disabled={deleteMutation.isPending || updateMutation.isPending}
+              disabled={deleteMutation.isPending || editorLocked}
               onPress={() => confirmDelete(transaction)}
               style={[
                 styles.deleteButton,
-                (deleteMutation.isPending || updateMutation.isPending) &&
-                  styles.disabled,
+                (deleteMutation.isPending || editorLocked) && styles.disabled,
               ]}
             >
               <Text style={styles.deleteButtonText}>Delete</Text>
