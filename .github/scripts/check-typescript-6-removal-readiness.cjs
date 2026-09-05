@@ -2,7 +2,7 @@ const { execFileSync, execSync } = require('node:child_process');
 const fs = require('node:fs');
 const semver = require('semver');
 
-const targetTypeScript = '7.0.0';
+const minimumTypeScriptApiVersion = '7.1.0';
 const npmCommand = process.platform === 'win32' ? 'npm.cmd' : 'npm';
 
 function npmView(packageSpec, field) {
@@ -38,14 +38,14 @@ function getPeerRange(packageName) {
   return peerDependencies?.typescript;
 }
 
-function supportsTypeScript7(packageName) {
+function supportsTypeScript(packageName, targetTypeScript) {
   const range = getPeerRange(packageName);
 
   if (!range) {
     return {
       packageName,
-      ready: true,
-      range: '(no TypeScript peer dependency)',
+      ready: false,
+      range: '(no declared TypeScript peer dependency)',
     };
   }
 
@@ -62,36 +62,39 @@ function packageVersion(packageName) {
   return npmView(`${packageName}@latest`, 'version');
 }
 
-const lintPackages = [
+const targetTypeScript = packageVersion('typescript');
+const compilerApiReady = semver.gte(
+  targetTypeScript,
+  minimumTypeScriptApiVersion,
+  { includePrerelease: true },
+);
+
+const toolPackages = [
   'typescript-eslint',
   '@typescript-eslint/parser',
   '@typescript-eslint/eslint-plugin',
-].map(supportsTypeScript7);
+  'ts-jest',
+  'ts-loader',
+  'ts-node',
+  '@hey-api/openapi-ts',
+].map((packageName) => supportsTypeScript(packageName, targetTypeScript));
 
-const tsJest = supportsTypeScript7('ts-jest');
-const swcJestAvailable =
-  Boolean(packageVersion('@swc/jest')) && Boolean(packageVersion('@swc/core'));
-
-const lintReady = lintPackages.every((result) => result.ready);
-const jestReady = tsJest.ready || swcJestAvailable;
-const ready = lintReady && jestReady;
+const toolsReady = toolPackages.every((result) => result.ready);
+const ready = compilerApiReady && toolsReady;
 
 const lines = [
-  '# TypeScript 7 API Toolchain Readiness',
+  '# TypeScript 6 Compatibility Removal Readiness',
   '',
-  `Target TypeScript version checked: \`${targetTypeScript}\``,
+  `Latest stable TypeScript checked: \`${targetTypeScript}\``,
+  `Stable compiler API required from: \`${minimumTypeScriptApiVersion}\``,
+  `- TypeScript compiler API: ${compilerApiReady ? 'ready' : 'blocked'}`,
   '',
-  '## Lint Toolchain',
+  '## Compiler API Consumers',
   '',
-  ...lintPackages.map((result) => {
+  ...toolPackages.map((result) => {
     const status = result.ready ? 'ready' : 'blocked';
     return `- \`${result.packageName}\`: ${status}; peer range \`${result.range}\``;
   }),
-  '',
-  '## Jest Transform',
-  '',
-  `- \`ts-jest\`: ${tsJest.ready ? 'ready' : 'blocked'}; peer range \`${tsJest.range}\``,
-  `- \`@swc/jest\` replacement path: ${swcJestAvailable ? 'available' : 'unavailable'}`,
   '',
 ];
 
@@ -99,13 +102,14 @@ if (ready) {
   lines.push(
     '## Result',
     '',
-    'TypeScript 7 appears ready for an API migration. Remove the Dependabot ignore and open a migration PR.',
+    'The published package metadata indicates that the TypeScript 6 compatibility layer is eligible for a removal trial.',
+    'Open a dedicated PR that removes the compatibility aliases and run the complete API and mobile CI suites before removal.',
   );
 } else {
   lines.push(
     '## Result',
     '',
-    'TypeScript 7 is still blocked for the API toolchain. Keep the Dependabot major-version ignore in place.',
+    'TypeScript 6 is still required by the repository toolchain. Keep the compatibility aliases and dependency-maintenance exclusions in place.',
   );
 }
 

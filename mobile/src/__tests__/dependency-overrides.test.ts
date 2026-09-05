@@ -83,6 +83,7 @@ describe('dependency overrides', () => {
       'react-native-gesture-handler',
       'react-native-safe-area-context',
       'react-native-screens',
+      'typescript',
     ]);
   });
 

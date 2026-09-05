@@ -1,0 +1,31 @@
+name: TypeScript 6 Removal Readiness
+
+on:
+  schedule:
+    - cron: "0 15 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  compatibility-removal:
+    name: Compatibility removal readiness
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install readiness checker dependency
+        run: npm --prefix "$RUNNER_TEMP/typescript-6-removal-readiness" install semver@latest
+
+      - name: Check TypeScript 6 removal support
+        env:
+          NODE_PATH: ${{ runner.temp }}/typescript-6-removal-readiness/node_modules
+        run: node .github/scripts/check-typescript-6-removal-readiness.cjs
