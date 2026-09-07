@@ -6,10 +6,13 @@ import {
   createGoal,
   createTransaction,
   deleteTransaction,
+  endGoal,
   getActiveGoal,
   getDashboardStability,
+  listGoals,
   listTransactions,
   updateTransaction,
+  updateGoal,
 } from '../lib/api';
 
 jest.mock('../lib/base-url', () => ({
@@ -27,6 +30,8 @@ describe('api finance client', () => {
     dueDate: '2026-12-31T00:00:00.000Z',
     monthlyIncomeKobo: 30_000_000,
     isActive: true,
+    status: 'active' as const,
+    endedAt: null,
     createdAt: '2026-06-21T12:00:00.000Z',
   };
 
@@ -74,6 +79,51 @@ describe('api finance client', () => {
         monthlyIncomeKobo: 30_000_000,
       }),
     ).resolves.toEqual(goalResponse);
+  });
+
+  it('lists, updates, and ends goals through lifecycle routes', async () => {
+    const historical = {
+      ...goalResponse,
+      id: 'goal_old',
+      isActive: false,
+      status: 'replaced' as const,
+      endedAt: '2026-07-01T00:00:00.000Z',
+    };
+    mock.onGet('/goals').reply(200, [goalResponse, historical]);
+    await expect(listGoals()).resolves.toEqual([goalResponse, historical]);
+
+    mock.onPatch('/goals/goal_1').reply((config) => {
+      expect(JSON.parse(config.data as string)).toEqual({
+        name: 'Updated rent',
+      });
+      return [200, { ...goalResponse, name: 'Updated rent' }];
+    });
+    await expect(
+      updateGoal('goal_1', { name: 'Updated rent' }),
+    ).resolves.toMatchObject({
+      name: 'Updated rent',
+    });
+
+    mock.onPost('/goals/goal_1/end').reply((config) => {
+      expect(JSON.parse(config.data as string)).toEqual({
+        status: 'completed',
+      });
+      return [
+        200,
+        {
+          ...goalResponse,
+          isActive: false,
+          status: 'completed',
+          endedAt: '2026-08-01T00:00:00.000Z',
+        },
+      ];
+    });
+    await expect(
+      endGoal('goal_1', { status: 'completed' }),
+    ).resolves.toMatchObject({
+      isActive: false,
+      status: 'completed',
+    });
   });
 
   it('posts createTransaction payloads and parses the TransactionSchema response', async () => {

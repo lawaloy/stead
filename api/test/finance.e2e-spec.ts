@@ -15,6 +15,8 @@ type GoalBody = {
   dueDate: string;
   monthlyIncomeKobo: number | null;
   isActive: boolean;
+  status: 'active' | 'completed' | 'cancelled' | 'replaced';
+  endedAt: string | null;
 };
 
 type TransactionBody = {
@@ -115,6 +117,7 @@ describe('Finance flows (e2e)', () => {
 
   it('rejects unauthenticated finance reads and writes', async () => {
     await request(app.getHttpServer()).get('/goals/active').expect(401);
+    await request(app.getHttpServer()).get('/goals').expect(401);
     await request(app.getHttpServer())
       .post('/goals')
       .send({
@@ -126,6 +129,10 @@ describe('Finance flows (e2e)', () => {
     await request(app.getHttpServer())
       .patch('/goals/goal_unauth')
       .send({ isActive: false })
+      .expect(401);
+    await request(app.getHttpServer())
+      .post('/goals/goal_unauth/end')
+      .send({ status: 'cancelled' })
       .expect(401);
     await request(app.getHttpServer()).get('/transactions').expect(401);
     await request(app.getHttpServer())
@@ -324,6 +331,122 @@ describe('Finance flows (e2e)', () => {
     await expect(
       prisma.goal.count({ where: { userId: user.id, isActive: true } }),
     ).resolves.toBe(1);
+  });
+
+  it('edits, replaces, completes, cancels, and lists owned goal history', async () => {
+    const owner = await createAuthedUser();
+    const other = await createAuthedUser();
+
+    const first = (
+      await authed('post', '/goals', owner.token)
+        .send({
+          name: 'First rent goal',
+          amountTotalKobo: 300_000,
+          dueDate: '2026-11-01T00:00:00.000Z',
+        })
+        .expect(201)
+    ).body as GoalBody;
+    const linked = (
+      await authed('post', '/transactions', owner.token)
+        .send({
+          direction: 'in',
+          amountKobo: 80_000,
+          occurredAt: '2026-01-20T00:00:00.000Z',
+          goalId: first.id,
+        })
+        .expect(201)
+    ).body as TransactionBody;
+
+    const replacement = (
+      await authed('post', '/goals', owner.token)
+        .send({
+          name: 'Replacement rent goal',
+          amountTotalKobo: 400_000,
+          dueDate: '2027-01-01T00:00:00.000Z',
+        })
+        .expect(201)
+    ).body as GoalBody;
+
+    const afterReplacement = await authed('get', '/goals', owner.token).expect(
+      200,
+    );
+    expect(afterReplacement.body as GoalBody[]).toEqual([
+      expect.objectContaining({
+        id: replacement.id,
+        isActive: true,
+        status: 'active',
+        endedAt: null,
+      }),
+      expect.objectContaining({
+        id: first.id,
+        isActive: false,
+        status: 'replaced',
+        endedAt: expect.any(String) as unknown,
+      }),
+    ]);
+
+    await authed('patch', `/goals/${replacement.id}`, owner.token)
+      .send({ name: 'Updated replacement', amountTotalKobo: 450_000 })
+      .expect(200)
+      .expect((response) => {
+        expect(response.body as GoalBody).toMatchObject({
+          id: replacement.id,
+          name: 'Updated replacement',
+          amountTotalKobo: 450_000,
+          status: 'active',
+        });
+      });
+
+    await authed('post', `/goals/${replacement.id}/end`, other.token)
+      .send({ status: 'completed' })
+      .expect(404);
+    await authed('post', `/goals/${replacement.id}/end`, owner.token)
+      .send({ status: 'completed' })
+      .expect(200)
+      .expect((response) => {
+        expect(response.body as GoalBody).toMatchObject({
+          id: replacement.id,
+          isActive: false,
+          status: 'completed',
+          endedAt: expect.any(String) as unknown,
+        });
+      });
+    await authed('post', `/goals/${replacement.id}/end`, owner.token)
+      .send({ status: 'cancelled' })
+      .expect(400);
+    await authed('get', '/goals/active', owner.token).expect(404);
+
+    const cancelled = (
+      await authed('post', '/goals', owner.token)
+        .send({
+          name: 'Short-term goal',
+          amountTotalKobo: 50_000,
+          dueDate: '2027-02-01T00:00:00.000Z',
+        })
+        .expect(201)
+    ).body as GoalBody;
+    await authed('post', `/goals/${cancelled.id}/end`, owner.token)
+      .send({ status: 'cancelled' })
+      .expect(200);
+
+    const history = await authed('get', '/goals', owner.token).expect(200);
+    expect(history.body as GoalBody[]).toEqual([
+      expect.objectContaining({ id: cancelled.id, status: 'cancelled' }),
+      expect.objectContaining({ id: replacement.id, status: 'completed' }),
+      expect.objectContaining({ id: first.id, status: 'replaced' }),
+    ]);
+    expect(
+      (await authed('get', '/goals', other.token).expect(200)).body,
+    ).toEqual([]);
+
+    const transactions = await authed(
+      'get',
+      '/transactions',
+      owner.token,
+    ).expect(200);
+    expect(transactions.body as TransactionBody[]).toEqual([
+      expect.objectContaining({ id: linked.id, goalId: first.id }),
+    ]);
   });
 
   it('enforces the one-active-goal unique index when a second active row is inserted', async () => {

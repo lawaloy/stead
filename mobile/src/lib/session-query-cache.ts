@@ -6,6 +6,8 @@ export const sessionQueryKeys = {
     ['dashboard', 'stability', sessionId] as const,
   activeGoal: (sessionId: string | null) =>
     ['goal', 'active', sessionId] as const,
+  goalHistory: (sessionId: string | null) =>
+    ['goals', 'history', sessionId] as const,
   transactions: (sessionId: string | null) =>
     ['transactions', sessionId] as const,
 };

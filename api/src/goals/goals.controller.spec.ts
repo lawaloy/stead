@@ -7,7 +7,9 @@ describe('GoalsController', () => {
   let controller: GoalsController;
   const goals = {
     create: jest.fn(),
+    list: jest.fn(),
     getActive: jest.fn(),
+    end: jest.fn(),
     update: jest.fn(),
   };
 
@@ -55,6 +57,23 @@ describe('GoalsController', () => {
     void controller.getActive(req as never);
 
     expect(goals.getActive).toHaveBeenCalledWith('user_1');
+  });
+
+  it('scopes history to the authenticated user id', () => {
+    const req = { user: { userId: 'user_1' } };
+
+    void controller.list(req as never);
+
+    expect(goals.list).toHaveBeenCalledWith('user_1');
+  });
+
+  it('scopes lifecycle completion to the authenticated user id and goal id', () => {
+    const dto = { status: 'completed' as const };
+    const req = { user: { userId: 'user_1' } };
+
+    void controller.end(req as never, 'goal_1', dto);
+
+    expect(goals.end).toHaveBeenCalledWith('user_1', 'goal_1', dto);
   });
 
   it('scopes update to the authenticated user id and goal id', () => {

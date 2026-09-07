@@ -27,7 +27,7 @@ export class UpdateGoalDto implements UpdateGoalRequest {
   @IsOptional()
   @IsInt()
   @Min(0)
-  monthlyIncomeKobo?: number;
+  monthlyIncomeKobo?: number | null;
 
   @IsOptional()
   @IsBoolean()

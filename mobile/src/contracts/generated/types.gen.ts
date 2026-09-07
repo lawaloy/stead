@@ -53,9 +53,20 @@ export type UpdateGoalRequest = {
   name?: string;
   amountTotalKobo?: number;
   dueDate?: string;
-  monthlyIncomeKobo?: number;
+  monthlyIncomeKobo?: number | null;
+  /**
+   * Legacy activation control. New clients should use goal lifecycle actions.
+   *
+   * @deprecated
+   */
   isActive?: boolean;
 };
+
+export type EndGoalRequest = {
+  status: 'completed' | 'cancelled';
+};
+
+export type GoalStatus = 'active' | 'completed' | 'cancelled' | 'replaced';
 
 export type Goal = {
   id: string;
@@ -65,6 +76,8 @@ export type Goal = {
   dueDate: string;
   monthlyIncomeKobo: number | null;
   isActive: boolean;
+  status: GoalStatus;
+  endedAt: string | null;
   createdAt: string;
 };
 
@@ -236,6 +249,31 @@ export type VerifyOtpResponses = {
 
 export type VerifyOtpResponse2 = VerifyOtpResponses[keyof VerifyOtpResponses];
 
+export type ListGoalsData = {
+  body?: never;
+  path?: never;
+  query?: never;
+  url: '/goals';
+};
+
+export type ListGoalsErrors = {
+  /**
+   * Authentication is missing or invalid.
+   */
+  401: ErrorResponse;
+};
+
+export type ListGoalsError = ListGoalsErrors[keyof ListGoalsErrors];
+
+export type ListGoalsResponses = {
+  /**
+   * Goals in descending creation order, including lifecycle history.
+   */
+  200: Array<Goal>;
+};
+
+export type ListGoalsResponse = ListGoalsResponses[keyof ListGoalsResponses];
+
 export type CreateGoalData = {
   body: CreateGoalRequest;
   path?: never;
@@ -329,6 +367,41 @@ export type UpdateGoalResponses = {
 };
 
 export type UpdateGoalResponse = UpdateGoalResponses[keyof UpdateGoalResponses];
+
+export type EndGoalData = {
+  body: EndGoalRequest;
+  path: {
+    id: string;
+  };
+  query?: never;
+  url: '/goals/{id}/end';
+};
+
+export type EndGoalErrors = {
+  /**
+   * Request validation or domain validation failed.
+   */
+  400: ErrorResponse;
+  /**
+   * Authentication is missing or invalid.
+   */
+  401: ErrorResponse;
+  /**
+   * Resource not found.
+   */
+  404: ErrorResponse;
+};
+
+export type EndGoalError = EndGoalErrors[keyof EndGoalErrors];
+
+export type EndGoalResponses = {
+  /**
+   * Goal completed or cancelled.
+   */
+  200: Goal;
+};
+
+export type EndGoalResponse = EndGoalResponses[keyof EndGoalResponses];
 
 export type ListTransactionsData = {
   body?: never;

@@ -35,6 +35,13 @@ enum NotificationJobStatus {
   dead_letter
 }
 
+enum GoalStatus {
+  active
+  completed
+  cancelled
+  replaced
+}
+
 model OtpCode {
   id          String   @id @default(uuid())
   userId      String
@@ -102,11 +109,14 @@ model Goal {
   dueDate         DateTime
   monthlyIncomeKobo BigInt?     // optional, improves forecasts
   isActive        Boolean       @default(true)
+  status          GoalStatus    @default(active)
+  endedAt         DateTime?
   createdAt       DateTime      @default(now())
 
   transactions    Transaction[]
 
   @@unique([userId], map: "Goal_one_active_per_user_idx", where: { isActive: true })
+  @@index([userId, createdAt])
 }
 
 model Transaction {

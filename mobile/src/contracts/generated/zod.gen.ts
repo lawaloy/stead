@@ -51,9 +51,20 @@ export const zUpdateGoalRequest = z.object({
   name: z.string().max(100).optional(),
   amountTotalKobo: z.int().gte(1).optional(),
   dueDate: z.iso.datetime().optional(),
-  monthlyIncomeKobo: z.int().gte(0).optional(),
+  monthlyIncomeKobo: z.int().gte(0).nullish(),
   isActive: z.boolean().optional(),
 });
+
+export const zEndGoalRequest = z.object({
+  status: z.enum(['completed', 'cancelled']),
+});
+
+export const zGoalStatus = z.enum([
+  'active',
+  'completed',
+  'cancelled',
+  'replaced',
+]);
 
 export const zGoal = z.object({
   id: z.string().min(1),
@@ -63,6 +74,8 @@ export const zGoal = z.object({
   dueDate: z.iso.datetime(),
   monthlyIncomeKobo: z.int().nullable(),
   isActive: z.boolean(),
+  status: zGoalStatus,
+  endedAt: z.iso.datetime().nullable(),
   createdAt: z.iso.datetime(),
 });
 
@@ -189,6 +202,11 @@ export const zVerifyOtpHeaders = z.object({
  */
 export const zVerifyOtpResponse2 = zVerifyOtpResponse;
 
+/**
+ * Goals in descending creation order, including lifecycle history.
+ */
+export const zListGoalsResponse = z.array(zGoal);
+
 export const zCreateGoalBody = zCreateGoalRequest;
 
 /**
@@ -211,6 +229,17 @@ export const zUpdateGoalPath = z.object({
  * Goal updated.
  */
 export const zUpdateGoalResponse = zGoal;
+
+export const zEndGoalBody = zEndGoalRequest;
+
+export const zEndGoalPath = z.object({
+  id: z.string().min(1),
+});
+
+/**
+ * Goal completed or cancelled.
+ */
+export const zEndGoalResponse = zGoal;
 
 export const zListTransactionsQuery = z.object({
   from: z.iso.datetime().optional(),

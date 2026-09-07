@@ -130,12 +130,15 @@ This sequence is intentional. Stead should prioritize user-facing product surfac
     CRUD/ownership, and populated dashboard recalculation.
   - Mobile exposes transaction activity, filtering, edit, explicit goal-link
     management, and delete in addition to transaction creation.
+  - Goal lifecycle and history are exposed end to end: edit, intentional
+    replacement, completion/cancellation, historical state, and preserved
+    transaction links.
 - Product delivery priorities (customer value):
   - Completed: transaction history and management, including user-friendly
     naira and calendar-date entry.
-  - Next: agree and implement goal editing, intentional deactivation or
-    replacement, and goal history in mobile.
-  - Then: define weekly readiness/risk-alert preferences and delivery behavior.
+  - Completed: goal editing, intentional replacement, completion/cancellation,
+    and history in mobile.
+  - Next: define weekly readiness/risk-alert preferences and delivery behavior.
   - Detailed status and sequencing live in
     [Project Status](project-status.md#milestone-tracking).
 - Enabling and architecture priorities:

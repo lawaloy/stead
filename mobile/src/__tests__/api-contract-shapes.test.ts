@@ -62,6 +62,8 @@ describe('api response contract shapes', () => {
         dueDate: '2026-12-31T00:00:00.000Z',
         monthlyIncomeKobo: 30000000,
         isActive: true,
+        status: 'active',
+        endedAt: null,
         createdAt: '2026-06-21T12:00:00.000Z',
       }),
     ).toMatchObject({
@@ -136,6 +138,8 @@ describe('api response contract shapes', () => {
         dueDate: '2026-12-31T00:00:00.000Z',
         monthlyIncomeKobo: 30000000,
         isActive: true,
+        status: 'active',
+        endedAt: null,
         createdAt: '2026-06-21T12:00:00.000Z',
       }),
     ).toThrow();
