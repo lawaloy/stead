@@ -57,6 +57,15 @@ const formatDate = (value: string) =>
     timeZone: 'UTC',
   });
 
+const loadActiveGoal = async (): Promise<Goal | null> => {
+  try {
+    return await getActiveGoal();
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 404) return null;
+    throw error;
+  }
+};
+
 export default function GoalScreen() {
   const { token } = useAuth();
   const [mode, setMode] = useState<FormMode>('view');
@@ -65,10 +74,9 @@ export default function GoalScreen() {
 
   const activeGoalQuery = useQuery({
     queryKey: sessionQueryKeys.activeGoal(token),
-    queryFn: getActiveGoal,
+    queryFn: loadActiveGoal,
     enabled: Boolean(token),
-    retry: (failureCount, error) =>
-      !(error instanceof ApiError && error.status === 404) && failureCount < 1,
+    retry: 1,
   });
   const historyQuery = useQuery({
     queryKey: sessionQueryKeys.goalHistory(token),
@@ -76,9 +84,10 @@ export default function GoalScreen() {
     enabled: Boolean(token),
   });
 
-  const activeGoal = activeGoalQuery.data;
+  const activeGoal = activeGoalQuery.data ?? undefined;
+  const activeMissing = activeGoalQuery.data === null;
   const history = (historyQuery.data ?? []).filter((goal) => !goal.isActive);
-  const effectiveMode = !activeGoal && mode === 'view' ? 'create' : mode;
+  const effectiveMode = activeMissing && mode === 'view' ? 'create' : mode;
   const formVisible = effectiveMode !== 'view';
   const validation = useMemo(
     () => (formVisible ? goalFormValidationError(form) : ''),
@@ -133,7 +142,10 @@ export default function GoalScreen() {
           ? 'Goal marked completed'
           : 'Goal cancelled',
       );
-      queryClient.setQueryData(sessionQueryKeys.activeGoal(token), undefined);
+      queryClient.setQueryData<Goal | null>(
+        sessionQueryKeys.activeGoal(token),
+        null,
+      );
       setForm(emptyForm());
       setMode('create');
       await refreshGoals();
@@ -181,9 +193,6 @@ export default function GoalScreen() {
     );
   };
 
-  const activeMissing =
-    activeGoalQuery.error instanceof ApiError &&
-    activeGoalQuery.error.status === 404;
   const mutationError = saveMutation.error ?? endMutation.error;
 
   return (
@@ -195,7 +204,7 @@ export default function GoalScreen() {
         {activeGoalQuery.isLoading ? (
           <Text>Loading current goal...</Text>
         ) : null}
-        {activeGoalQuery.error && !activeMissing ? (
+        {activeGoalQuery.error ? (
           <Text accessibilityRole="alert" style={styles.error}>
             Could not load your current goal. Check your connection and retry.
           </Text>

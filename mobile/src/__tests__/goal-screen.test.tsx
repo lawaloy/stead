@@ -115,6 +115,24 @@ describe('goal lifecycle screen', () => {
     jest.restoreAllMocks();
   });
 
+  it('waits for a definitive active-goal result before offering creation', async () => {
+    let resolveActive!: (goal: Goal) => void;
+    mockGetActiveGoal.mockReturnValue(
+      new Promise<Goal>((resolve) => {
+        resolveActive = resolve;
+      }),
+    );
+
+    await renderScreen();
+    expect(screen.getByText('Loading current goal...')).toBeOnTheScreen();
+    expect(
+      screen.queryByRole('header', { name: 'Create a goal' }),
+    ).not.toBeOnTheScreen();
+
+    resolveActive(activeGoal);
+    expect(await screen.findByText('Annual rent')).toBeOnTheScreen();
+  });
+
   it('offers goal creation when no active goal exists', async () => {
     mockGetActiveGoal.mockRejectedValue(
       new ApiError({ status: 404, message: 'No active goal found' }),
@@ -175,5 +193,28 @@ describe('goal lifecycle screen', () => {
     );
     expect(mockEndGoal).not.toHaveBeenCalled();
     expect(mockUpdateGoal).not.toHaveBeenCalled();
+
+    const actions = jest.mocked(Alert.alert).mock.calls.at(-1)?.[2];
+    const completion = actions?.find(
+      (action) => action.text === 'Mark completed',
+    );
+    mockGetActiveGoal.mockRejectedValue(
+      new ApiError({ status: 404, message: 'No active goal found' }),
+    );
+    completion?.onPress?.();
+    await waitFor(() =>
+      expect(mockEndGoal).toHaveBeenCalledWith('goal_active', {
+        status: 'completed',
+      }),
+    );
+    await waitFor(() =>
+      expect(
+        queryClient.getQueryData(['goal', 'active', 'session-token']),
+      ).toBeNull(),
+    );
+    expect(
+      await screen.findByRole('header', { name: 'Create a goal' }),
+    ).toBeOnTheScreen();
+    expect(screen.queryByText('Annual rent')).not.toBeOnTheScreen();
   });
 });

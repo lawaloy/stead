@@ -50,6 +50,10 @@ describe('Goal one-active-per-user invariant', () => {
     expect(migration).toContain('CREATE TYPE "GoalStatus"');
     expect(migration).toMatch(/SET\s+"status" = CASE/);
     expect(migration).toContain('THEN \'replaced\'::"GoalStatus"');
+    expect(
+      migration.match(/newer\."createdAt" = goal\."createdAt"/g),
+    ).toHaveLength(2);
+    expect(migration.match(/newer\."id" > goal\."id"/g)).toHaveLength(2);
     expect(migration).toContain('ADD COLUMN "endedAt" TIMESTAMP(3)');
     expect(migration).toContain('CREATE INDEX "Goal_userId_createdAt_idx"');
   });

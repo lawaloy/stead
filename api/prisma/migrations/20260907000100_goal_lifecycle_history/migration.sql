@@ -11,7 +11,13 @@ SET
       SELECT 1
       FROM "Goal" AS newer
       WHERE newer."userId" = goal."userId"
-        AND newer."createdAt" > goal."createdAt"
+            AND (
+              newer."createdAt" > goal."createdAt"
+              OR (
+                newer."createdAt" = goal."createdAt"
+                AND newer."id" > goal."id"
+              )
+            )
     ) THEN 'replaced'::"GoalStatus"
     ELSE 'cancelled'::"GoalStatus"
   END,
@@ -19,7 +25,13 @@ SET
     SELECT MIN(newer."createdAt")
     FROM "Goal" AS newer
     WHERE newer."userId" = goal."userId"
-      AND newer."createdAt" > goal."createdAt"
+          AND (
+            newer."createdAt" > goal."createdAt"
+            OR (
+              newer."createdAt" = goal."createdAt"
+              AND newer."id" > goal."id"
+            )
+          )
   )
 WHERE goal."isActive" = false;
 
