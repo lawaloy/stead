@@ -137,6 +137,22 @@ describe('dependency overrides', () => {
     });
   });
 
+  it('pins URL decoding to the patched version in package metadata and lockfile', () => {
+    const packageJson = readJson('package.json');
+    const packageLock = readJson<PackageLock>('package-lock.json');
+
+    expect(packageJson).toMatchObject({
+      overrides: {
+        'decode-uri-component': '0.5.0',
+      },
+    });
+    expect(
+      packageLock.packages['node_modules/decode-uri-component'],
+    ).toMatchObject({
+      version: '0.5.0',
+    });
+  });
+
   it('keeps every package dependency resolvable in the lockfile', () => {
     const packageLock = readJson<PackageLock>('package-lock.json');
 
