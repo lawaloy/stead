@@ -120,6 +120,8 @@ Implemented API modules:
    - Due date
    - Optional monthly income estimate
    - Single active goal per user
+   - Active, completed, cancelled, and replaced lifecycle states
+   - Authenticated goal history with preserved transaction links
 
 4. Manual transactions
    - Income entry
@@ -149,7 +151,8 @@ Implemented screens and flows:
 - Dev OTP hint support when the API enables `DEV_EXPOSE_OTP=true`
 - Token persistence and unauthorized-session clearing
 - A stable installation UUID sent with API requests for server-side abuse correlation; the API persists only a keyed hash
-- Active goal setup
+- Goal setup, editing, intentional replacement, completion/cancellation, and
+  lifecycle history
 - Manual income/expense entry in naira with a calendar-date input and optional
   active-goal tagging
 - Transaction activity history with income/expense filters, visible net,
@@ -158,9 +161,9 @@ Implemented screens and flows:
 
 Mobile API responses are parsed with Zod schemas before the UI consumes them.
 
-The mobile product surface is still smaller than the API surface. Transaction
-create/list/update/delete is exposed, but existing goals cannot yet be edited,
-deactivated, or reviewed as history in the app.
+The mobile product exposes the customer-facing goal and transaction lifecycle
+surfaces implemented by the API. Internal auth and queue inspection endpoints
+remain intentionally operator-only.
 
 ## 5. System Architecture
 
@@ -189,14 +192,13 @@ Product milestones and enabling delivery work are tracked separately in
 gaps are:
 
 1. Real-provider OTP validation on native Android and iOS devices.
-2. Automated auth, goal, and dashboard screen coverage plus a full
-   mobile-to-API journey; transaction screens now have component journeys.
-3. Mobile goal editing, deactivation, and history workflows.
+2. Automated auth and dashboard screen coverage plus a full mobile-to-API
+   journey; transaction and goal screens now have component journeys.
+3. Weekly readiness and risk alerts; the notification queue currently delivers
+   OTPs only.
 4. Production session lifecycle, operational monitoring, backup/restore,
    privacy, retention, and account-deletion procedures.
-5. Weekly readiness and risk alerts; the notification queue currently delivers
-   OTPs only.
-6. Automatic financial-data ingestion, richer obligation planning, customer
+5. Automatic financial-data ingestion, richer obligation planning, customer
    profile/preferences, and internal operations tooling.
 
 See [Project Status](project-status.md) for the full capability matrix, exact

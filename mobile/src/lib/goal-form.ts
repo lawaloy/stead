@@ -1,42 +1,94 @@
-import type { CreateGoalRequest } from '../contracts/generated/types.gen';
+import type {
+  CreateGoalRequest,
+  Goal,
+  UpdateGoalRequest,
+} from '../contracts/generated/types.gen';
+import {
+  dateInputToIso,
+  koboToNairaInput,
+  nairaInputToKobo,
+} from './transactions';
 
 export type GoalFormFields = {
   name: string;
-  amountKobo: string;
-  dueDate: string;
-  monthlyIncomeKobo: string;
+  amountNaira: string;
+  dueOn: string;
+  monthlyIncomeNaira: string;
+};
+
+const optionalNairaInputToKobo = (value: string) => {
+  const normalized = value.trim().replace(/,/g, '');
+  if (!normalized) return undefined;
+  if (!/^\d+(?:\.\d{1,2})?$/.test(normalized)) return null;
+
+  const [whole, fraction = ''] = normalized.split('.');
+  const amount = BigInt(whole) * 100n + BigInt(fraction.padEnd(2, '0'));
+  if (amount > BigInt(Number.MAX_SAFE_INTEGER)) return null;
+  return Number(amount);
 };
 
 export const goalFormValidationError = (fields: GoalFormFields): string => {
   if (!fields.name.trim()) return 'Goal name is required';
-  if (!/^\d+$/.test(fields.amountKobo) || Number(fields.amountKobo) <= 0) {
-    return 'amountTotalKobo must be > 0';
+  if (nairaInputToKobo(fields.amountNaira) === null) {
+    return 'Enter a goal amount greater than zero';
   }
-  if (Number.isNaN(Date.parse(fields.dueDate))) {
-    return 'dueDate must be a valid ISO date';
+  if (dateInputToIso(fields.dueOn) === null) {
+    return 'Enter a valid due date as YYYY-MM-DD';
   }
-  if (
-    fields.monthlyIncomeKobo &&
-    (!/^\d+$/.test(fields.monthlyIncomeKobo) ||
-      Number(fields.monthlyIncomeKobo) < 0)
-  ) {
-    return 'monthlyIncomeKobo must be >= 0';
+  if (optionalNairaInputToKobo(fields.monthlyIncomeNaira) === null) {
+    return 'Enter a valid monthly income or leave it blank';
   }
   return '';
+};
+
+const buildGoalFields = (fields: GoalFormFields) => {
+  if (goalFormValidationError(fields)) return null;
+
+  const amountTotalKobo = nairaInputToKobo(fields.amountNaira);
+  const dueDate = dateInputToIso(fields.dueOn);
+  const monthlyIncomeKobo = optionalNairaInputToKobo(fields.monthlyIncomeNaira);
+  if (
+    amountTotalKobo === null ||
+    dueDate === null ||
+    monthlyIncomeKobo === null
+  ) {
+    return null;
+  }
+
+  return {
+    name: fields.name.trim(),
+    amountTotalKobo,
+    dueDate,
+    monthlyIncomeKobo,
+  };
 };
 
 export const buildCreateGoalPayload = (
   fields: GoalFormFields,
 ): CreateGoalRequest | null => {
-  if (goalFormValidationError(fields)) return null;
-
-  const payload: CreateGoalRequest = {
-    name: fields.name.trim(),
-    amountTotalKobo: Number(fields.amountKobo),
-    dueDate: fields.dueDate,
-  };
-  if (fields.monthlyIncomeKobo) {
-    payload.monthlyIncomeKobo = Number(fields.monthlyIncomeKobo);
-  }
-  return payload;
+  const parsed = buildGoalFields(fields);
+  if (!parsed) return null;
+  const { monthlyIncomeKobo, ...required } = parsed;
+  return monthlyIncomeKobo === undefined
+    ? required
+    : { ...required, monthlyIncomeKobo };
 };
+
+export const buildUpdateGoalPayload = (
+  fields: GoalFormFields,
+): UpdateGoalRequest | null => {
+  const parsed = buildGoalFields(fields);
+  return parsed
+    ? { ...parsed, monthlyIncomeKobo: parsed.monthlyIncomeKobo ?? null }
+    : null;
+};
+
+export const goalToFormFields = (goal: Goal): GoalFormFields => ({
+  name: goal.name,
+  amountNaira: koboToNairaInput(goal.amountTotalKobo),
+  dueOn: goal.dueDate.slice(0, 10),
+  monthlyIncomeNaira:
+    goal.monthlyIncomeKobo === null
+      ? ''
+      : koboToNairaInput(goal.monthlyIncomeKobo),
+});

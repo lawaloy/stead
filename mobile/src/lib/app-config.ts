@@ -13,6 +13,9 @@ export const appConfig = {
       goals: {
         active: '/goals/active',
         create: '/goals',
+        list: '/goals',
+        detail: (id: string) => `/goals/${id}`,
+        end: (id: string) => `/goals/${id}/end`,
       },
       transactions: {
         create: '/transactions',

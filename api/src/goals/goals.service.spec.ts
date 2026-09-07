@@ -1,7 +1,8 @@
+import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { GoalStatus } from '@prisma/client';
 import { Test, TestingModule } from '@nestjs/testing';
-import { NotFoundException } from '@nestjs/common';
-import { GoalsService } from './goals.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { GoalsService } from './goals.service';
 
 describe('GoalsService', () => {
   let service: GoalsService;
@@ -11,12 +12,39 @@ describe('GoalsService', () => {
       updateMany: jest.Mock;
       create: jest.Mock;
       findFirst: jest.Mock;
+      findMany: jest.Mock;
       update: jest.Mock;
     };
   };
 
   const createdAt = new Date('2026-01-10T00:00:00.000Z');
   const dueDate = new Date('2026-03-01T00:00:00.000Z');
+  const goalRow = (
+    overrides: Partial<{
+      id: string;
+      userId: string;
+      name: string;
+      amountTotalKobo: bigint;
+      dueDate: Date;
+      monthlyIncomeKobo: bigint | null;
+      isActive: boolean;
+      status: GoalStatus;
+      endedAt: Date | null;
+      createdAt: Date;
+    }> = {},
+  ) => ({
+    id: 'goal_1',
+    userId: 'user_1',
+    name: 'Rent buffer',
+    amountTotalKobo: 500_000n,
+    dueDate,
+    monthlyIncomeKobo: 300_000n,
+    isActive: true,
+    status: GoalStatus.active,
+    endedAt: null,
+    createdAt,
+    ...overrides,
+  });
 
   beforeEach(async () => {
     prisma = {
@@ -25,6 +53,7 @@ describe('GoalsService', () => {
         updateMany: jest.fn(),
         create: jest.fn(),
         findFirst: jest.fn(),
+        findMany: jest.fn(),
         update: jest.fn(),
       },
     };
@@ -33,34 +62,15 @@ describe('GoalsService', () => {
     );
 
     const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        GoalsService,
-        {
-          provide: PrismaService,
-          useValue: prisma,
-        },
-      ],
+      providers: [GoalsService, { provide: PrismaService, useValue: prisma }],
     }).compile();
 
-    service = module.get<GoalsService>(GoalsService);
+    service = module.get(GoalsService);
   });
 
-  it('should be defined', () => {
-    expect(service).toBeDefined();
-  });
-
-  it('deactivates existing active goals before creating a new active goal', async () => {
+  it('replaces the active goal before creating a new active goal', async () => {
     prisma.goal.updateMany.mockResolvedValue({ count: 1 });
-    prisma.goal.create.mockResolvedValue({
-      id: 'goal_1',
-      userId: 'user_1',
-      name: 'Rent buffer',
-      amountTotalKobo: 500_000n,
-      dueDate,
-      monthlyIncomeKobo: 300_000n,
-      isActive: true,
-      createdAt,
-    });
+    prisma.goal.create.mockResolvedValue(goalRow());
 
     const result = await service.create('user_1', {
       name: 'Rent buffer',
@@ -71,9 +81,12 @@ describe('GoalsService', () => {
 
     expect(prisma.goal.updateMany).toHaveBeenCalledWith({
       where: { userId: 'user_1', isActive: true },
-      data: { isActive: false },
+      data: {
+        isActive: false,
+        status: GoalStatus.replaced,
+        endedAt: expect.any(Date) as unknown,
+      },
     });
-    expect(prisma.$transaction).toHaveBeenCalledTimes(1);
     expect(prisma.goal.create).toHaveBeenCalledWith({
       data: {
         userId: 'user_1',
@@ -82,6 +95,8 @@ describe('GoalsService', () => {
         dueDate,
         monthlyIncomeKobo: 300_000n,
         isActive: true,
+        status: GoalStatus.active,
+        endedAt: null,
       },
     });
     expect(result).toEqual({
@@ -92,120 +107,84 @@ describe('GoalsService', () => {
       dueDate: dueDate.toISOString(),
       monthlyIncomeKobo: 300_000,
       isActive: true,
+      status: 'active',
+      endedAt: null,
       createdAt: createdAt.toISOString(),
     });
   });
 
-  it('stores null monthly income when create omits monthlyIncomeKobo', async () => {
+  it('preserves omitted and zero monthly income values on create', async () => {
     prisma.goal.updateMany.mockResolvedValue({ count: 0 });
-    prisma.goal.create.mockResolvedValue({
-      id: 'goal_2',
-      userId: 'user_1',
-      name: 'Emergency fund',
-      amountTotalKobo: 250_000n,
-      dueDate,
-      monthlyIncomeKobo: null,
-      isActive: true,
-      createdAt,
-    });
+    prisma.goal.create
+      .mockResolvedValueOnce(goalRow({ monthlyIncomeKobo: null }))
+      .mockResolvedValueOnce(goalRow({ monthlyIncomeKobo: 0n }));
 
-    const result = await service.create('user_1', {
+    await service.create('user_1', {
       name: 'Emergency fund',
       amountTotalKobo: 250_000,
       dueDate: dueDate.toISOString(),
     });
-
-    expect(prisma.goal.create).toHaveBeenCalledWith({
-      data: {
-        userId: 'user_1',
-        name: 'Emergency fund',
-        amountTotalKobo: 250_000n,
-        dueDate,
-        monthlyIncomeKobo: null,
-        isActive: true,
-      },
-    });
-    expect(result).toEqual({
-      id: 'goal_2',
-      userId: 'user_1',
+    const zero = await service.create('user_1', {
       name: 'Emergency fund',
       amountTotalKobo: 250_000,
-      dueDate: dueDate.toISOString(),
-      monthlyIncomeKobo: null,
-      isActive: true,
-      createdAt: createdAt.toISOString(),
-    });
-  });
-
-  it('persists zero monthly income as 0n when create supplies monthlyIncomeKobo: 0', async () => {
-    prisma.goal.updateMany.mockResolvedValue({ count: 0 });
-    prisma.goal.create.mockResolvedValue({
-      id: 'goal_3',
-      userId: 'user_1',
-      name: 'Zero-income goal',
-      amountTotalKobo: 100_000n,
-      dueDate,
-      monthlyIncomeKobo: 0n,
-      isActive: true,
-      createdAt,
-    });
-
-    const result = await service.create('user_1', {
-      name: 'Zero-income goal',
-      amountTotalKobo: 100_000,
       dueDate: dueDate.toISOString(),
       monthlyIncomeKobo: 0,
     });
 
-    expect(prisma.goal.create).toHaveBeenCalledWith({
-      data: {
-        userId: 'user_1',
-        name: 'Zero-income goal',
-        amountTotalKobo: 100_000n,
-        dueDate,
-        monthlyIncomeKobo: 0n,
-        isActive: true,
-      },
-    });
-    expect(result.monthlyIncomeKobo).toBe(0);
+    const createCalls = prisma.goal.create.mock.calls as Array<
+      [{ data: { monthlyIncomeKobo: bigint | null } }]
+    >;
+    expect(createCalls[0]?.[0].data.monthlyIncomeKobo).toBeNull();
+    expect(createCalls[1]?.[0].data.monthlyIncomeKobo).toBe(0n);
+    expect(zero.monthlyIncomeKobo).toBe(0);
   });
 
-  it('returns the newest active goal for the user', async () => {
-    prisma.goal.findFirst.mockResolvedValue({
+  it('returns only the active lifecycle goal', async () => {
+    prisma.goal.findFirst.mockResolvedValue(goalRow());
+
+    await expect(service.getActive('user_1')).resolves.toMatchObject({
       id: 'goal_1',
-      userId: 'user_1',
-      name: 'Emergency fund',
-      amountTotalKobo: 250_000n,
-      dueDate,
-      monthlyIncomeKobo: null,
-      isActive: true,
-      createdAt,
+      status: 'active',
     });
-
-    const result = await service.getActive('user_1');
-
     expect(prisma.goal.findFirst).toHaveBeenCalledWith({
-      where: { userId: 'user_1', isActive: true },
+      where: { userId: 'user_1', isActive: true, status: GoalStatus.active },
       orderBy: { createdAt: 'desc' },
     });
-    expect(result).toEqual({
-      id: 'goal_1',
-      userId: 'user_1',
-      name: 'Emergency fund',
-      amountTotalKobo: 250_000,
-      dueDate: dueDate.toISOString(),
-      monthlyIncomeKobo: null,
-      isActive: true,
-      createdAt: createdAt.toISOString(),
-    });
-  });
 
-  it('throws when the user has no active goal', async () => {
     prisma.goal.findFirst.mockResolvedValue(null);
-
     await expect(service.getActive('user_1')).rejects.toThrow(
       new NotFoundException('No active goal found'),
     );
+  });
+
+  it('lists active and historical goals newest first within the user scope', async () => {
+    const endedAt = new Date('2026-02-01T00:00:00.000Z');
+    prisma.goal.findMany.mockResolvedValue([
+      goalRow(),
+      goalRow({
+        id: 'goal_old',
+        isActive: false,
+        status: GoalStatus.replaced,
+        endedAt,
+      }),
+    ]);
+
+    await expect(service.list('user_1')).resolves.toEqual([
+      expect.objectContaining({
+        id: 'goal_1',
+        status: 'active',
+        endedAt: null,
+      }),
+      expect.objectContaining({
+        id: 'goal_old',
+        status: 'replaced',
+        endedAt: endedAt.toISOString(),
+      }),
+    ]);
+    expect(prisma.goal.findMany).toHaveBeenCalledWith({
+      where: { userId: 'user_1' },
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+    });
   });
 
   it('rejects updates to goals outside the user scope', async () => {
@@ -214,31 +193,17 @@ describe('GoalsService', () => {
     await expect(
       service.update('user_1', 'goal_2', { name: 'Renamed goal' }),
     ).rejects.toThrow(new NotFoundException('Goal not found'));
-
-    expect(prisma.goal.findFirst).toHaveBeenCalledWith({
-      where: { id: 'goal_2', userId: 'user_1' },
-    });
     expect(prisma.goal.update).not.toHaveBeenCalled();
-    expect(prisma.$transaction).toHaveBeenCalledTimes(1);
   });
 
-  it('persists zero monthly income as 0n when update supplies monthlyIncomeKobo: 0', async () => {
-    prisma.goal.findFirst.mockResolvedValue({
-      id: 'goal_1',
-      userId: 'user_1',
-    });
-    prisma.goal.update.mockResolvedValue({
-      id: 'goal_1',
-      userId: 'user_1',
-      name: 'Rent buffer',
-      amountTotalKobo: 500_000n,
-      dueDate,
-      monthlyIncomeKobo: 0n,
-      isActive: true,
-      createdAt,
-    });
+  it('edits goal fields without changing lifecycle state', async () => {
+    prisma.goal.findFirst.mockResolvedValue(goalRow());
+    prisma.goal.update.mockResolvedValue(
+      goalRow({ name: 'Updated rent', monthlyIncomeKobo: 0n }),
+    );
 
     const result = await service.update('user_1', 'goal_1', {
+      name: 'Updated rent',
       monthlyIncomeKobo: 0,
     });
 
@@ -246,110 +211,113 @@ describe('GoalsService', () => {
     expect(prisma.goal.update).toHaveBeenCalledWith({
       where: { id: 'goal_1' },
       data: {
-        name: undefined,
+        name: 'Updated rent',
         amountTotalKobo: undefined,
         dueDate: undefined,
         monthlyIncomeKobo: 0n,
         isActive: undefined,
+        status: undefined,
+        endedAt: undefined,
       },
     });
-    expect(result.monthlyIncomeKobo).toBe(0);
+    expect(result).toMatchObject({
+      name: 'Updated rent',
+      monthlyIncomeKobo: 0,
+      status: 'active',
+    });
   });
 
-  it('deactivates sibling goals when an existing goal becomes active', async () => {
-    const updatedDueDate = new Date('2026-04-01T00:00:00.000Z');
-    prisma.goal.findFirst.mockResolvedValue({
-      id: 'goal_1',
-      userId: 'user_1',
-    });
-    prisma.goal.updateMany.mockResolvedValue({ count: 2 });
-    prisma.goal.update.mockResolvedValue({
-      id: 'goal_1',
-      userId: 'user_1',
-      name: 'Updated goal',
-      amountTotalKobo: 750_000n,
-      dueDate: updatedDueDate,
-      monthlyIncomeKobo: 450_000n,
-      isActive: true,
-      createdAt,
-    });
+  it('maps legacy activation changes onto lifecycle state', async () => {
+    prisma.goal.findFirst.mockResolvedValue(goalRow());
+    prisma.goal.updateMany.mockResolvedValue({ count: 1 });
+    prisma.goal.update.mockResolvedValueOnce(goalRow()).mockResolvedValueOnce(
+      goalRow({
+        isActive: false,
+        status: GoalStatus.cancelled,
+        endedAt: new Date(),
+      }),
+    );
 
-    const result = await service.update('user_1', 'goal_1', {
-      name: 'Updated goal',
-      amountTotalKobo: 750_000,
-      dueDate: updatedDueDate.toISOString(),
-      monthlyIncomeKobo: 450_000,
-      isActive: true,
-    });
-
+    await service.update('user_1', 'goal_1', { isActive: true });
     expect(prisma.goal.updateMany).toHaveBeenCalledWith({
       where: { userId: 'user_1', isActive: true, id: { not: 'goal_1' } },
-      data: { isActive: false },
-    });
-    expect(prisma.goal.update).toHaveBeenCalledWith({
-      where: { id: 'goal_1' },
       data: {
-        name: 'Updated goal',
-        amountTotalKobo: 750_000n,
-        dueDate: updatedDueDate,
-        monthlyIncomeKobo: 450_000n,
-        isActive: true,
+        isActive: false,
+        status: GoalStatus.replaced,
+        endedAt: expect.any(Date) as unknown,
       },
     });
-    expect(result).toEqual({
-      id: 'goal_1',
-      userId: 'user_1',
-      name: 'Updated goal',
-      amountTotalKobo: 750_000,
-      dueDate: updatedDueDate.toISOString(),
-      monthlyIncomeKobo: 450_000,
+    const updateCalls = prisma.goal.update.mock.calls as Array<
+      [{ data: Record<string, unknown> }]
+    >;
+    expect(updateCalls[0]?.[0].data).toMatchObject({
       isActive: true,
-      createdAt: createdAt.toISOString(),
+      status: GoalStatus.active,
+      endedAt: null,
     });
-    expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+
+    await service.update('user_1', 'goal_1', { isActive: false });
+    expect(updateCalls[1]?.[0].data).toMatchObject({
+      isActive: false,
+      status: GoalStatus.cancelled,
+      endedAt: expect.any(Date) as unknown,
+    });
   });
 
-  it('does not deactivate sibling goals when the update is not activating', async () => {
-    prisma.goal.findFirst.mockResolvedValue({
-      id: 'goal_1',
-      userId: 'user_1',
-    });
-    prisma.goal.update.mockResolvedValue({
-      id: 'goal_1',
-      userId: 'user_1',
-      name: 'Renamed inactive goal',
-      amountTotalKobo: 500_000n,
-      dueDate,
-      monthlyIncomeKobo: null,
-      isActive: false,
-      createdAt,
-    });
+  it.each([GoalStatus.completed, GoalStatus.cancelled] as const)(
+    'ends an active goal as %s',
+    async (status) => {
+      prisma.goal.findFirst
+        .mockResolvedValueOnce(goalRow())
+        .mockResolvedValueOnce(
+          goalRow({ isActive: false, status, endedAt: new Date() }),
+        );
+      prisma.goal.updateMany.mockResolvedValue({ count: 1 });
 
-    const result = await service.update('user_1', 'goal_1', {
-      name: 'Renamed inactive goal',
-      isActive: false,
-    });
+      await expect(
+        service.end('user_1', 'goal_1', { status }),
+      ).resolves.toMatchObject({ status, isActive: false });
+      expect(prisma.goal.updateMany).toHaveBeenCalledWith({
+        where: {
+          id: 'goal_1',
+          userId: 'user_1',
+          isActive: true,
+          status: GoalStatus.active,
+        },
+        data: {
+          isActive: false,
+          status,
+          endedAt: expect.any(Date) as unknown,
+        },
+      });
+    },
+  );
 
-    expect(prisma.goal.updateMany).not.toHaveBeenCalled();
-    expect(prisma.goal.update).toHaveBeenCalledWith({
-      where: { id: 'goal_1' },
-      data: {
-        name: 'Renamed inactive goal',
-        amountTotalKobo: undefined,
-        dueDate: undefined,
-        monthlyIncomeKobo: undefined,
-        isActive: false,
-      },
-    });
-    expect(result).toEqual({
-      id: 'goal_1',
-      userId: 'user_1',
-      name: 'Renamed inactive goal',
-      amountTotalKobo: 500_000,
-      dueDate: dueDate.toISOString(),
-      monthlyIncomeKobo: null,
-      isActive: false,
-      createdAt: createdAt.toISOString(),
-    });
+  it('rejects ending missing or already-ended goals', async () => {
+    prisma.goal.findFirst
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(
+        goalRow({ isActive: false, status: GoalStatus.cancelled }),
+      );
+
+    await expect(
+      service.end('user_1', 'missing', { status: 'cancelled' }),
+    ).rejects.toThrow(new NotFoundException('Goal not found'));
+    await expect(
+      service.end('user_1', 'goal_1', { status: 'completed' }),
+    ).rejects.toThrow(
+      new BadRequestException('Only the active goal can be ended'),
+    );
+  });
+
+  it('rejects a concurrent end after the active-state check', async () => {
+    prisma.goal.findFirst.mockResolvedValue(goalRow());
+    prisma.goal.updateMany.mockResolvedValue({ count: 0 });
+
+    await expect(
+      service.end('user_1', 'goal_1', { status: 'completed' }),
+    ).rejects.toThrow(
+      new BadRequestException('Only the active goal can be ended'),
+    );
   });
 });

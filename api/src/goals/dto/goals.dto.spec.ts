@@ -3,6 +3,7 @@ import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
 import { CreateGoalDto } from './create-goal.dto';
 import { UpdateGoalDto } from './update-goal.dto';
+import { EndGoalDto } from './end-goal.dto';
 
 async function validationErrors(
   Dto: new () => object,
@@ -73,12 +74,15 @@ describe('Goals DTOs', () => {
   });
 
   describe('UpdateGoalDto', () => {
-    it('accepts partial updates including zero income and isActive', async () => {
+    it('accepts partial updates including zero or cleared income and isActive', async () => {
       await expect(
         validationErrors(UpdateGoalDto, {
           monthlyIncomeKobo: 0,
           isActive: true,
         }),
+      ).resolves.toHaveLength(0);
+      await expect(
+        validationErrors(UpdateGoalDto, { monthlyIncomeKobo: null }),
       ).resolves.toHaveLength(0);
     });
 
@@ -95,5 +99,21 @@ describe('Goals DTOs', () => {
       });
       expect(errors.some((e) => e.property === 'dueDate')).toBe(true);
     });
+  });
+
+  describe('EndGoalDto', () => {
+    it.each(['completed', 'cancelled'])('accepts %s', async (status) => {
+      await expect(
+        validationErrors(EndGoalDto, { status }),
+      ).resolves.toHaveLength(0);
+    });
+
+    it.each(['active', 'replaced', 'paused', ''])(
+      'rejects %s',
+      async (status) => {
+        const errors = await validationErrors(EndGoalDto, { status });
+        expect(errors.some((error) => error.property === 'status')).toBe(true);
+      },
+    );
   });
 });

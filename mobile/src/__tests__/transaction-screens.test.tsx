@@ -90,6 +90,8 @@ const activeGoal = {
   dueDate: '2027-08-20T12:00:00.000Z',
   monthlyIncomeKobo: 500_000,
   isActive: true,
+  status: 'active' as const,
+  endedAt: null,
   createdAt: '2026-08-20T12:00:00.000Z',
   updatedAt: '2026-08-20T12:00:00.000Z',
 };
@@ -117,11 +119,17 @@ describe('transaction screens', () => {
   it('covers the activity journey, filters, and accessible controls', async () => {
     await renderWithQueryClient(<TransactionsScreen />);
 
-    expect(await screen.findByRole('header', { name: 'Activity' })).toBeOnTheScreen();
+    expect(
+      await screen.findByRole('header', { name: 'Activity' }),
+    ).toBeOnTheScreen();
     expect(screen.getByLabelText('Visible net ₦2,000.00')).toBeOnTheScreen();
     expect(screen.getByRole('tab', { name: 'All' })).toBeSelected();
-    expect(screen.getByRole('button', { name: 'Edit Salary slice transaction' })).toBeOnTheScreen();
-    expect(screen.getByRole('button', { name: 'Delete Groceries transaction' })).toBeOnTheScreen();
+    expect(
+      screen.getByRole('button', { name: 'Edit Salary slice transaction' }),
+    ).toBeOnTheScreen();
+    expect(
+      screen.getByRole('button', { name: 'Delete Groceries transaction' }),
+    ).toBeOnTheScreen();
 
     await fireEvent.press(screen.getByRole('tab', { name: 'Expenses' }));
 
@@ -257,21 +265,30 @@ describe('transaction screens', () => {
 
     await renderWithQueryClient(<AddTransactionScreen />);
 
-    expect(await screen.findByRole('header', { name: 'Add Transaction' })).toBeOnTheScreen();
+    expect(
+      await screen.findByRole('header', { name: 'Add Transaction' }),
+    ).toBeOnTheScreen();
     expect(screen.getByRole('tab', { name: 'Income' })).toBeSelected();
-    await waitFor(() =>
-      expect(
-        screen.getByRole('alert', {
-          name: 'Your active goal is unavailable. Reconnect or turn off goal linking.',
-        }),
-      ).toBeOnTheScreen(),
+    await waitFor(
+      () =>
+        expect(
+          screen.getByRole('alert', {
+            name: 'Your active goal is unavailable. Reconnect or turn off goal linking.',
+          }),
+        ).toBeOnTheScreen(),
       { timeout: 3_000 },
     );
-    expect(screen.getByRole('button', { name: 'Add Transaction' })).toBeDisabled();
+    expect(
+      screen.getByRole('button', { name: 'Add Transaction' }),
+    ).toBeDisabled();
 
     await fireEvent.press(screen.getByRole('checkbox'));
-    expect(screen.getByRole('button', { name: 'Add Transaction' })).toBeEnabled();
-    await fireEvent.press(screen.getByRole('button', { name: 'Add Transaction' }));
+    expect(
+      screen.getByRole('button', { name: 'Add Transaction' }),
+    ).toBeEnabled();
+    await fireEvent.press(
+      screen.getByRole('button', { name: 'Add Transaction' }),
+    );
 
     expect(
       await screen.findByRole('alert', { name: 'Unexpected network error' }),
@@ -481,9 +498,9 @@ describe('transaction screens', () => {
 
     expect(screen.getByRole('button', { name: 'Saving...' })).toBeOnTheScreen();
     expect(screen.getByText('Saving...')).toBeOnTheScreen();
-    expect(screen.getByLabelText('Transaction amount in naira')).toHaveDisplayValue(
-      '6000',
-    );
+    expect(
+      screen.getByLabelText('Transaction amount in naira'),
+    ).toHaveDisplayValue('6000');
     expect(mockUpdateTransaction).toHaveBeenCalledTimes(1);
 
     const saved = {
@@ -551,9 +568,9 @@ describe('transaction screens', () => {
     await fireEvent.press(
       screen.getByRole('button', { name: 'Edit Salary slice transaction' }),
     );
-    expect(screen.getByLabelText('Transaction amount in naira')).toHaveDisplayValue(
-      '6000',
-    );
+    expect(
+      screen.getByLabelText('Transaction amount in naira'),
+    ).toHaveDisplayValue('6000');
 
     await fireEvent.changeText(
       screen.getByLabelText('Transaction note'),
@@ -616,7 +633,9 @@ describe('transaction screens', () => {
     );
 
     const actions = jest.mocked(Alert.alert).mock.calls[0][2];
-    const destructive = actions?.find((action) => action.style === 'destructive');
+    const destructive = actions?.find(
+      (action) => action.style === 'destructive',
+    );
     destructive?.onPress?.();
 
     await waitFor(() =>

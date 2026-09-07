@@ -61,6 +61,21 @@ paths:
         '429':
           $ref: '#/components/responses/TooManyRequests'
   /goals:
+    get:
+      operationId: listGoals
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Goals in descending creation order, including lifecycle history.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Goal'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
     post:
       operationId: createGoal
       security:
@@ -114,6 +129,32 @@ paths:
       responses:
         '200':
           description: Goal updated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Goal'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /goals/{id}/end:
+    post:
+      operationId: endGoal
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EndGoalRequest'
+      responses:
+        '200':
+          description: Goal completed or cancelled.
           content:
             application/json:
               schema:
@@ -404,8 +445,22 @@ components:
         monthlyIncomeKobo:
           type: integer
           minimum: 0
+          nullable: true
         isActive:
           type: boolean
+          deprecated: true
+          description: Legacy activation control. New clients should use goal lifecycle actions.
+    EndGoalRequest:
+      type: object
+      additionalProperties: false
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [completed, cancelled]
+    GoalStatus:
+      type: string
+      enum: [active, completed, cancelled, replaced]
     Goal:
       type: object
       additionalProperties: false
@@ -417,6 +472,8 @@ components:
         - dueDate
         - monthlyIncomeKobo
         - isActive
+        - status
+        - endedAt
         - createdAt
       properties:
         id:
@@ -437,6 +494,12 @@ components:
           nullable: true
         isActive:
           type: boolean
+        status:
+          $ref: '#/components/schemas/GoalStatus'
+        endedAt:
+          type: string
+          format: date-time
+          nullable: true
         createdAt:
           type: string
           format: date-time

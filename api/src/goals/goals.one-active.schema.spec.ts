@@ -32,4 +32,29 @@ describe('Goal one-active-per-user invariant', () => {
       /CREATE UNIQUE INDEX "Goal_one_active_per_user_idx"[\s\S]*WHERE "isActive" = true;/,
     );
   });
+
+  it('ships lifecycle state and history indexing with deterministic backfill rules', () => {
+    const schema = readFileSync(join(apiRoot, 'prisma/schema.prisma'), 'utf8');
+    const migration = readFileSync(
+      join(
+        apiRoot,
+        'prisma/migrations/20260907000100_goal_lifecycle_history/migration.sql',
+      ),
+      'utf8',
+    );
+
+    expect(schema).toContain('enum GoalStatus {');
+    expect(schema).toMatch(/status\s+GoalStatus\s+@default\(active\)/);
+    expect(schema).toMatch(/endedAt\s+DateTime\?/);
+    expect(schema).toContain('@@index([userId, createdAt])');
+    expect(migration).toContain('CREATE TYPE "GoalStatus"');
+    expect(migration).toMatch(/SET\s+"status" = CASE/);
+    expect(migration).toContain('THEN \'replaced\'::"GoalStatus"');
+    expect(
+      migration.match(/newer\."createdAt" = goal\."createdAt"/g),
+    ).toHaveLength(2);
+    expect(migration.match(/newer\."id" > goal\."id"/g)).toHaveLength(2);
+    expect(migration).toContain('ADD COLUMN "endedAt" TIMESTAMP(3)');
+    expect(migration).toContain('CREATE INDEX "Goal_userId_createdAt_idx"');
+  });
 });

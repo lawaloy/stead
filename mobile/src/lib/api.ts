@@ -16,8 +16,10 @@ import {
 import type {
   CreateGoalRequest,
   CreateTransactionRequest,
+  EndGoalRequest,
   RequestOtpRequest,
   UpdateTransactionRequest,
+  UpdateGoalRequest,
   VerifyOtpRequest,
 } from '../contracts/generated/types.gen';
 
@@ -119,6 +121,27 @@ export const getActiveGoal = async () => {
 export const createGoal = async (payload: CreateGoalRequest) => {
   const response = await apiClient.post(
     appConfig.api.routes.goals.create,
+    payload,
+  );
+  return GoalSchema.parse(response.data);
+};
+
+export const listGoals = async () => {
+  const response = await apiClient.get(appConfig.api.routes.goals.list);
+  return z.array(GoalSchema).parse(response.data);
+};
+
+export const updateGoal = async (id: string, payload: UpdateGoalRequest) => {
+  const response = await apiClient.patch(
+    appConfig.api.routes.goals.detail(id),
+    payload,
+  );
+  return GoalSchema.parse(response.data);
+};
+
+export const endGoal = async (id: string, payload: EndGoalRequest) => {
+  const response = await apiClient.post(
+    appConfig.api.routes.goals.end(id),
     payload,
   );
   return GoalSchema.parse(response.data);
