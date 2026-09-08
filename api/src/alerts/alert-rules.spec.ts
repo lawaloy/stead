@@ -1,4 +1,8 @@
-import { riskDecision, weeklySchedule } from './alert-rules';
+import {
+  alertOccurrenceKey,
+  riskDecision,
+  weeklySchedule,
+} from './alert-rules';
 
 describe('readiness alert rules', () => {
   const now = new Date('2026-09-07T10:00:00.000Z');
@@ -64,5 +68,23 @@ describe('readiness alert rules', () => {
       due: false,
       key: '2026-09-06',
     });
+  });
+
+  it('deduplicates concurrent evaluations without suppressing a later cycle', () => {
+    const key = (lastRecoveryAlertAt: Date | null) =>
+      alertOccurrenceKey({
+        type: 'risk.alert',
+        userId: 'user_1',
+        goalId: 'goal_1',
+        previousStatus: 'stable',
+        previousScore: 70,
+        currentStatus: 'warning',
+        currentScore: 55,
+        lastRiskAlertAt: new Date('2026-09-01T10:00:00.000Z'),
+        lastRecoveryAlertAt,
+      });
+
+    expect(key(null)).toBe(key(null));
+    expect(key(new Date('2026-09-08T10:00:00.000Z'))).not.toBe(key(null));
   });
 });

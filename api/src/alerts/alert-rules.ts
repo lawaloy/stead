@@ -41,6 +41,25 @@ export function riskDecision(
   return null;
 }
 
+export function alertOccurrenceKey(input: {
+  type: 'risk.alert' | 'risk.recovery';
+  userId: string;
+  goalId: string;
+  previousStatus: string | null;
+  previousScore: number | null;
+  currentStatus: StabilityStatus;
+  currentScore: number;
+  lastRiskAlertAt: Date | null;
+  lastRecoveryAlertAt: Date | null;
+}) {
+  const occurrence =
+    input.type === 'risk.alert'
+      ? (input.lastRecoveryAlertAt ?? input.lastRiskAlertAt)
+      : (input.lastRiskAlertAt ?? input.lastRecoveryAlertAt);
+  const anchor = occurrence?.toISOString() ?? 'initial';
+  return `${input.type}:${input.userId}:${input.goalId}:${anchor}:${input.previousStatus ?? 'none'}:${input.previousScore ?? 'none'}:${input.currentStatus}:${input.currentScore}`;
+}
+
 const weekdayIndex: Record<string, number> = {
   Sun: 0,
   Mon: 1,

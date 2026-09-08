@@ -7,7 +7,11 @@ import {
   type NotificationPublisher,
 } from '../notifications/notification-publisher';
 import { PrismaService } from '../prisma/prisma.service';
-import { riskDecision, weeklySchedule } from './alert-rules';
+import {
+  alertOccurrenceKey,
+  riskDecision,
+  weeklySchedule,
+} from './alert-rules';
 import type { UpdateAlertPreferencesDto } from './dto/update-alert-preferences.dto';
 
 const DEFAULT_PREFERENCES: AlertPreferences = {
@@ -108,12 +112,21 @@ export class AlertsService {
       );
       if (decision) {
         const type = decision === 'risk' ? 'risk.alert' : 'risk.recovery';
-        const baseline = `${state?.lastNotifiedStatus ?? 'none'}:${state?.lastNotifiedScore ?? 'none'}`;
         await this.notifications.publishReadinessAlert({
           type,
           userId,
           goalId: goal.id,
-          dedupeKey: `${type}:${userId}:${goal.id}:${baseline}:${metrics.status}:${metrics.stabilityScore}`,
+          dedupeKey: alertOccurrenceKey({
+            type,
+            userId,
+            goalId: goal.id,
+            previousStatus: state?.lastNotifiedStatus ?? null,
+            previousScore: state?.lastNotifiedScore ?? null,
+            currentStatus: metrics.status,
+            currentScore: metrics.stabilityScore,
+            lastRiskAlertAt: state?.lastRiskAlertAt ?? null,
+            lastRecoveryAlertAt: state?.lastRecoveryAlertAt ?? null,
+          }),
           payload: {
             phone: preference.user.phone,
             body:
