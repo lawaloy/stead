@@ -134,9 +134,7 @@ describe('goal lifecycle screen', () => {
   });
 
   it('offers goal creation when no active goal exists', async () => {
-    mockGetActiveGoal.mockRejectedValue(
-      new ApiError({ status: 404, message: 'No active goal found' }),
-    );
+    mockGetActiveGoal.mockResolvedValue(null);
     mockListGoals.mockResolvedValue([replacedGoal]);
     await renderScreen();
 
@@ -144,6 +142,28 @@ describe('goal lifecycle screen', () => {
     expect(
       screen.getByRole('header', { name: 'Create a goal' }),
     ).toBeOnTheScreen();
+  });
+
+  it('lets the user retry a failed active-goal lookup', async () => {
+    mockGetActiveGoal.mockRejectedValue(
+      new ApiError({ message: 'Unexpected network error' }),
+    );
+    await renderScreen();
+
+    expect(
+      await screen.findByRole(
+        'alert',
+        {
+          name: 'Could not load your current goal. Check your connection and retry.',
+        },
+        { timeout: 3_000 },
+      ),
+    ).toBeOnTheScreen();
+
+    mockGetActiveGoal.mockResolvedValue(activeGoal);
+    await press(screen.getByRole('button', { name: 'Retry' }));
+
+    expect(await screen.findByText('Annual rent')).toBeOnTheScreen();
   });
 
   it('shows history and guards edit, replacement, and completion actions', async () => {
@@ -198,9 +218,7 @@ describe('goal lifecycle screen', () => {
     const completion = actions?.find(
       (action) => action.text === 'Mark completed',
     );
-    mockGetActiveGoal.mockRejectedValue(
-      new ApiError({ status: 404, message: 'No active goal found' }),
-    );
+    mockGetActiveGoal.mockResolvedValue(null);
     completion?.onPress?.();
     await waitFor(() =>
       expect(mockEndGoal).toHaveBeenCalledWith('goal_active', {

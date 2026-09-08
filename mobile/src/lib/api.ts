@@ -114,8 +114,13 @@ export const verifyOtp = async (
 };
 
 export const getActiveGoal = async () => {
-  const response = await apiClient.get(appConfig.api.routes.goals.active);
-  return GoalSchema.parse(response.data);
+  try {
+    const response = await apiClient.get(appConfig.api.routes.goals.active);
+    return GoalSchema.parse(response.data);
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 404) return null;
+    throw error;
+  }
 };
 
 export const createGoal = async (payload: CreateGoalRequest) => {

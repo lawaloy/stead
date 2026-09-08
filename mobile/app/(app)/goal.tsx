@@ -57,15 +57,6 @@ const formatDate = (value: string) =>
     timeZone: 'UTC',
   });
 
-const loadActiveGoal = async (): Promise<Goal | null> => {
-  try {
-    return await getActiveGoal();
-  } catch (error) {
-    if (error instanceof ApiError && error.status === 404) return null;
-    throw error;
-  }
-};
-
 export default function GoalScreen() {
   const { token } = useAuth();
   const [mode, setMode] = useState<FormMode>('view');
@@ -74,7 +65,7 @@ export default function GoalScreen() {
 
   const activeGoalQuery = useQuery({
     queryKey: sessionQueryKeys.activeGoal(token),
-    queryFn: loadActiveGoal,
+    queryFn: getActiveGoal,
     enabled: Boolean(token),
     retry: 1,
   });
@@ -205,9 +196,21 @@ export default function GoalScreen() {
           <Text>Loading current goal...</Text>
         ) : null}
         {activeGoalQuery.error ? (
-          <Text accessibilityRole="alert" style={styles.error}>
-            Could not load your current goal. Check your connection and retry.
-          </Text>
+          <View>
+            <Text accessibilityRole="alert" style={styles.error}>
+              Could not load your current goal. Check your connection and retry.
+            </Text>
+            <Pressable
+              accessibilityRole="button"
+              disabled={activeGoalQuery.isFetching}
+              style={styles.secondaryButton}
+              onPress={() => void activeGoalQuery.refetch()}
+            >
+              <Text style={styles.secondaryButtonText}>
+                {activeGoalQuery.isFetching ? 'Retrying...' : 'Retry'}
+              </Text>
+            </Pressable>
+          </View>
         ) : null}
         {activeMissing ? <Text>No active goal yet.</Text> : null}
         {activeGoal ? (
