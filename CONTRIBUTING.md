@@ -71,6 +71,7 @@ gh pr create --title "feat: your change" --body-file .github/pull_request_templa
 
 Local verification (recommended before push):
 
+- New clone: `npm run setup` from the repository root
 - Repository root: `npm run format:check`, `npm run lint`
 - API: `npm run contracts:check`, `npm run test -- --runInBand`, `npm run test:e2e -- --runInBand`, `npm run build`
 - Mobile: `npm run typecheck`, `npm test -- --runInBand`, `npm run build`

@@ -5,6 +5,7 @@
     "node": "^22.18.0 || ^24.0.0"
   },
   "scripts": {
+    "setup": "npm ci && npm ci --prefix api && npm ci --prefix mobile",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "lint": "npm --prefix api run lint && npm --prefix mobile run lint",

@@ -40,22 +40,21 @@ compatibility layer can be removed safely.
 
 Get started
 
-Repository tooling (from the repository root):
+Install all repository, API, and mobile dependencies from the repository root:
 
 ```bash
-npm ci
-npm run format:check
+npm run setup
 ```
 
-Use `npm run format` and `npm run lint:fix` to apply automatic fixes. Formatting
-uses the pinned repository Prettier version and LF line endings on every
-platform.
+This is the recommended first command for a new clone. Use `npm run
+format:check` and `npm run lint` for non-mutating checks, or `npm run format`
+and `npm run lint:fix` to apply automatic fixes. Formatting uses the pinned
+repository Prettier version and LF line endings on every platform.
 
 API (from `api/`):
 
 ```bash
 cd api
-npm ci
 npx prisma generate
 npx prisma migrate dev
 npm run start:dev
@@ -67,7 +66,6 @@ Mobile (from `mobile/`):
 
 ```bash
 cd mobile
-npm ci
 npm run start
 ```
 
@@ -75,7 +73,7 @@ Copy `mobile/.env.example` to `mobile/.env` and set `EXPO_PUBLIC_API_URL` when t
 
 Useful checks:
 
-After installing the root, API, and mobile dependencies above:
+After running `npm run setup`:
 
 ```bash
 npm run format:check
