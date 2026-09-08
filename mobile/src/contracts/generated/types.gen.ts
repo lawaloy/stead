@@ -4,6 +4,30 @@ export type ClientOptions = {
   baseUrl: 'http://localhost:3000' | (string & {});
 };
 
+export type UpdateAlertPreferencesRequest = {
+  weeklySummaryEnabled?: boolean;
+  riskAlertsEnabled?: boolean;
+  /**
+   * IANA time zone used for weekly delivery.
+   */
+  timeZone?: string;
+  /**
+   * Local weekday, where Sunday is 0 and Saturday is 6.
+   */
+  weeklyDay?: number;
+  weeklyHourLocal?: number;
+};
+
+export type AlertPreferences = {
+  weeklySummaryEnabled: boolean;
+  riskAlertsEnabled: boolean;
+  channel: 'sms';
+  timeZone: string;
+  weeklyDay: number;
+  weeklyHourLocal: number;
+  updatedAt: string | null;
+};
+
 export type RequestOtpRequest = {
   countryIso: string;
   phone: string;
@@ -568,3 +592,61 @@ export type GetDashboardStabilityResponses = {
 
 export type GetDashboardStabilityResponse =
   GetDashboardStabilityResponses[keyof GetDashboardStabilityResponses];
+
+export type GetAlertPreferencesData = {
+  body?: never;
+  path?: never;
+  query?: never;
+  url: '/alerts/preferences';
+};
+
+export type GetAlertPreferencesErrors = {
+  /**
+   * Authentication is missing or invalid.
+   */
+  401: ErrorResponse;
+};
+
+export type GetAlertPreferencesError =
+  GetAlertPreferencesErrors[keyof GetAlertPreferencesErrors];
+
+export type GetAlertPreferencesResponses = {
+  /**
+   * Customer notification preferences. Defaults are returned before first save.
+   */
+  200: AlertPreferences;
+};
+
+export type GetAlertPreferencesResponse =
+  GetAlertPreferencesResponses[keyof GetAlertPreferencesResponses];
+
+export type UpdateAlertPreferencesData = {
+  body: UpdateAlertPreferencesRequest;
+  path?: never;
+  query?: never;
+  url: '/alerts/preferences';
+};
+
+export type UpdateAlertPreferencesErrors = {
+  /**
+   * Request validation or domain validation failed.
+   */
+  400: ErrorResponse;
+  /**
+   * Authentication is missing or invalid.
+   */
+  401: ErrorResponse;
+};
+
+export type UpdateAlertPreferencesError =
+  UpdateAlertPreferencesErrors[keyof UpdateAlertPreferencesErrors];
+
+export type UpdateAlertPreferencesResponses = {
+  /**
+   * Updated customer notification preferences.
+   */
+  200: AlertPreferences;
+};
+
+export type UpdateAlertPreferencesResponse =
+  UpdateAlertPreferencesResponses[keyof UpdateAlertPreferencesResponses];

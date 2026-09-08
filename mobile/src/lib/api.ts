@@ -8,6 +8,7 @@ import {
   AuthCountriesResponseSchema,
   AuthRequestOtpResponseSchema,
   AuthVerifyOtpResponseSchema,
+  AlertPreferencesSchema,
   DashboardStabilityResponseSchema,
   GoalSchema,
   OkResponseSchema,
@@ -21,6 +22,7 @@ import type {
   UpdateTransactionRequest,
   UpdateGoalRequest,
   VerifyOtpRequest,
+  UpdateAlertPreferencesRequest,
 } from '../contracts/generated/types.gen';
 
 export { ApiError } from './api-error';
@@ -193,6 +195,21 @@ export const getDashboardStability = async () => {
     appConfig.api.routes.dashboard.stability,
   );
   return DashboardStabilityResponseSchema.parse(response.data);
+};
+
+export const getAlertPreferences = async () => {
+  const response = await apiClient.get(appConfig.api.routes.alerts.preferences);
+  return AlertPreferencesSchema.parse(response.data);
+};
+
+export const updateAlertPreferences = async (
+  payload: UpdateAlertPreferencesRequest,
+) => {
+  const response = await apiClient.patch(
+    appConfig.api.routes.alerts.preferences,
+    payload,
+  );
+  return AlertPreferencesSchema.parse(response.data);
 };
 
 export const parseApiValidationErrors = (value: unknown) => {

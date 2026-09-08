@@ -28,6 +28,9 @@ export const appConfig = {
       notifications: {
         inspection: '/notifications/inspection',
       },
+      alerts: {
+        preferences: '/alerts/preferences',
+      },
     },
   },
 } as const;

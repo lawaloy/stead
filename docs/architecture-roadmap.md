@@ -133,12 +133,18 @@ This sequence is intentional. Stead should prioritize user-facing product surfac
   - Goal lifecycle and history are exposed end to end: edit, intentional
     replacement, completion/cancellation, historical state, and preserved
     transaction links.
+  - Weekly readiness and material risk/recovery alerts are exposed end to end
+    with explicit SMS opt-in, timezone-aware schedules, cooldown,
+    deduplication, and encrypted persisted delivery.
 - Product delivery priorities (customer value):
   - Completed: transaction history and management, including user-friendly
     naira and calendar-date entry.
   - Completed: goal editing, intentional replacement, completion/cancellation,
     and history in mobile.
-  - Next: define weekly readiness/risk-alert preferences and delivery behavior.
+  - Completed: weekly readiness/risk-alert preferences and SMS delivery
+    behavior.
+  - Next: define account and data self-service, including consent, export, and
+    deletion.
   - Detailed status and sequencing live in
     [Project Status](project-status.md#milestone-tracking).
 - Enabling and architecture priorities:

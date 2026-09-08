@@ -113,6 +113,8 @@ Implemented API modules:
    - Provider metadata capture for sent jobs
    - Authenticated inspection endpoints for auth events and notification queue state
    - Queue health diagnostics for retries, stale processing locks, recent attempt failures, dead letters, and the latest failure
+   - Opt-in weekly readiness summaries and material risk/recovery SMS alerts
+   - Timezone-aware schedules, 24-hour risk cooldown, and queue deduplication
 
 3. Obligation goals
    - Name
@@ -158,6 +160,7 @@ Implemented screens and flows:
 - Transaction activity history with income/expense filters, visible net,
   editing, explicit goal-link management, and confirmed deletion
 - Stability dashboard
+- SMS notification preferences for weekly summaries and risk/recovery alerts
 
 Mobile API responses are parsed with Zod schemas before the UI consumes them.
 
@@ -172,7 +175,7 @@ remain intentionally operator-only.
 - Mobile App (React Native)
 - API (NestJS)
 - Postgres (via Prisma)
-- SMS Provider (Twilio or Termii for OTP)
+- SMS Provider (Twilio or Termii for OTP and readiness alerts)
 - In-process notification worker backed by the database
 
 ### 5.2 Current Boundaries
@@ -194,12 +197,12 @@ gaps are:
 1. Real-provider OTP validation on native Android and iOS devices.
 2. Automated auth and dashboard screen coverage plus a full mobile-to-API
    journey; transaction and goal screens now have component journeys.
-3. Weekly readiness and risk alerts; the notification queue currently delivers
-   OTPs only.
-4. Production session lifecycle, operational monitoring, backup/restore,
+3. Production session lifecycle, operational monitoring, backup/restore,
    privacy, retention, and account-deletion procedures.
-5. Automatic financial-data ingestion, richer obligation planning, customer
+4. Automatic financial-data ingestion, richer obligation planning, customer
    profile/preferences, and internal operations tooling.
+5. Customer validation of stability thresholds and alert copy, plus live SMS
+   delivery validation on native devices.
 
 See [Project Status](project-status.md) for the full capability matrix, exact
 test boundaries, and recommended delivery ordering. See

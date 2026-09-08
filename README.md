@@ -4,18 +4,23 @@ Stead is a Financial Stability Layer that turns cashflow into decision intellige
 
 Current repository status:
 
-- API: the core auth, single-active-goal, manual-transaction, stability-dashboard,
-  and persisted OTP-notification boundaries are implemented.
+- API: the core auth, goal lifecycle/history, manual-transaction,
+  stability-dashboard, and persisted OTP/readiness-notification boundaries are
+  implemented.
 - Mobile: the core vertical slice supports OTP login, active-goal creation,
   manual transaction creation, transaction history/filtering/edit/delete, and
-  dashboard viewing. Goal maintenance and history remain notable API/mobile
-  capability gaps.
+  dashboard viewing, goal lifecycle/history, and SMS notification preferences.
 - Verification: auth/notification and finance have PostgreSQL-backed e2e
   coverage. Transaction screens have automated component journeys; the app
   still lacks a full mobile-to-API and native-device acceptance suite.
 - Production readiness: live SMS delivery on real devices, production session
   lifecycle, operations, automated critical mobile journeys, and several
   product workflows remain incomplete.
+
+Weekly summaries and material risk/recovery alerts are opt-in. Customers choose
+their local weekly schedule in the mobile app; delivery uses the same encrypted,
+retryable SMS queue as OTP. See [docs/readiness-alerts.md](docs/readiness-alerts.md)
+for the rules and operational boundaries.
 
 Quick links
 

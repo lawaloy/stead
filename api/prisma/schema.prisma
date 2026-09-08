@@ -8,14 +8,16 @@ datasource db {
 }
 
 model User {
-  id           String        @id @default(uuid())
-  phone        String        @unique
-  createdAt    DateTime      @default(now())
+  id        String   @id @default(uuid())
+  phone     String   @unique
+  createdAt DateTime @default(now())
 
-  authEvents   AuthEvent[]
-  otpCodes     OtpCode[]
-  goals        Goal[]
-  transactions Transaction[]
+  authEvents      AuthEvent[]
+  otpCodes        OtpCode[]
+  goals           Goal[]
+  transactions    Transaction[]
+  alertPreference AlertPreference?
+  alertStates     AlertState[]
 }
 
 enum AuthEventType {
@@ -42,21 +44,27 @@ enum GoalStatus {
   replaced
 }
 
+enum AlertStabilityStatus {
+  stable
+  warning
+  critical
+}
+
 model OtpCode {
-  id          String   @id @default(uuid())
-  userId      String
-  user        User     @relation(fields: [userId], references: [id])
+  id     String @id @default(uuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
 
-  codeHash    String
-  verifyAttempts Int   @default(0)
-  expiresAt   DateTime
-  consumedAt  DateTime?
-  createdAt   DateTime @default(now())
+  codeHash       String
+  verifyAttempts Int       @default(0)
+  expiresAt      DateTime
+  consumedAt     DateTime?
+  createdAt      DateTime  @default(now())
 
-  ip          String?
-  userAgent   String?
+  ip        String?
+  userAgent String?
 
-  authEvents  AuthEvent[]
+  authEvents AuthEvent[]
 }
 
 model AuthEvent {
@@ -71,10 +79,10 @@ model AuthEvent {
   metadataJson  String?
   createdAt     DateTime      @default(now())
 
-  userId        String?
-  user          User?         @relation(fields: [userId], references: [id])
-  otpCodeId     String?
-  otpCode       OtpCode?      @relation(fields: [otpCodeId], references: [id])
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id])
+  otpCodeId String?
+  otpCode   OtpCode? @relation(fields: [otpCodeId], references: [id])
 
   @@index([phone, createdAt])
   @@index([ip, createdAt])
@@ -100,63 +108,103 @@ model Country {
 }
 
 model Goal {
-  id              String        @id @default(uuid())
-  userId          String
-  user            User          @relation(fields: [userId], references: [id])
+  id     String @id @default(uuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
 
-  name            String        // e.g. "Rent", "School Fees"
-  amountTotalKobo BigInt
-  dueDate         DateTime
-  monthlyIncomeKobo BigInt?     // optional, improves forecasts
-  isActive        Boolean       @default(true)
-  status          GoalStatus    @default(active)
-  endedAt         DateTime?
-  createdAt       DateTime      @default(now())
+  name              String // e.g. "Rent", "School Fees"
+  amountTotalKobo   BigInt
+  dueDate           DateTime
+  monthlyIncomeKobo BigInt? // optional, improves forecasts
+  isActive          Boolean    @default(true)
+  status            GoalStatus @default(active)
+  endedAt           DateTime?
+  createdAt         DateTime   @default(now())
 
-  transactions    Transaction[]
+  transactions Transaction[]
+  alertStates  AlertState[]
 
   @@unique([userId], map: "Goal_one_active_per_user_idx", where: { isActive: true })
   @@index([userId, createdAt])
 }
 
 model Transaction {
-  id          String   @id @default(uuid())
-  userId      String
-  user        User     @relation(fields: [userId], references: [id])
+  id     String @id @default(uuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
 
-  goalId      String?
-  goal        Goal?    @relation(fields: [goalId], references: [id])
+  goalId String?
+  goal   Goal?   @relation(fields: [goalId], references: [id])
 
-  amountKobo  BigInt
-  direction   String   // 'in' or 'out'
-  occurredAt  DateTime
-  note        String?
-  createdAt   DateTime @default(now())
+  amountKobo BigInt
+  direction  String // 'in' or 'out'
+  occurredAt DateTime
+  note       String?
+  createdAt  DateTime @default(now())
 }
 
 model NotificationJob {
-  id                 String                @id @default(uuid())
-  type               String
-  payloadJson        String
-  status             NotificationJobStatus @default(pending)
-  attempts           Int                   @default(0)
-  maxAttempts        Int                   @default(3)
-  nextRunAt          DateTime              @default(now())
-  lockedAt           DateTime?
-  sentAt             DateTime?
-  failedAt           DateTime?
-  lastError          String?
-  provider           String?
-  providerMessageId  String?
-  createdAt          DateTime              @default(now())
-  updatedAt          DateTime              @updatedAt
+  id                String                @id @default(uuid())
+  type              String
+  payloadJson       String
+  status            NotificationJobStatus @default(pending)
+  attempts          Int                   @default(0)
+  maxAttempts       Int                   @default(3)
+  nextRunAt         DateTime              @default(now())
+  lockedAt          DateTime?
+  sentAt            DateTime?
+  failedAt          DateTime?
+  lastError         String?
+  provider          String?
+  providerMessageId String?
+  userId            String?
+  goalId            String?
+  dedupeKey         String?               @unique
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
 
-  failureAttempts    NotificationFailureAttempt[]
+  failureAttempts NotificationFailureAttempt[]
 
   @@index([status, nextRunAt])
   @@index([status, updatedAt])
   @@index([status, failedAt])
   @@index([failedAt])
+  @@index([userId, createdAt])
+  @@index([goalId, createdAt])
+}
+
+model AlertPreference {
+  id                   String   @id @default(uuid())
+  userId               String   @unique
+  user                 User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  weeklySummaryEnabled Boolean  @default(false)
+  riskAlertsEnabled    Boolean  @default(false)
+  timeZone             String   @default("UTC")
+  weeklyDay            Int      @default(1)
+  weeklyHourLocal      Int      @default(9)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+}
+
+model AlertState {
+  id                   String                @id @default(uuid())
+  userId               String
+  user                 User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  goalId               String
+  goal                 Goal                  @relation(fields: [goalId], references: [id], onDelete: Cascade)
+  lastObservedStatus   AlertStabilityStatus
+  lastObservedScore    Int
+  lastNotifiedStatus   AlertStabilityStatus?
+  lastNotifiedScore    Int?
+  lastRiskAlertAt      DateTime?
+  lastRecoveryAlertAt  DateTime?
+  lastWeeklySummaryAt  DateTime?
+  lastWeeklySummaryKey String?
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+
+  @@unique([userId, goalId])
+  @@index([userId, updatedAt])
 }
 
 model NotificationFailureAttempt {
