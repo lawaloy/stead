@@ -236,9 +236,7 @@ describe('transaction screens', () => {
   });
 
   it('prompts for a goal when the active-goal lookup settles with 404', async () => {
-    mockGetActiveGoal.mockRejectedValue(
-      new ApiError({ message: 'No active goal found', status: 404 }),
-    );
+    mockGetActiveGoal.mockResolvedValue(null);
 
     await renderWithQueryClient(<AddTransactionScreen />);
 
@@ -598,9 +596,7 @@ describe('transaction screens', () => {
   });
 
   it('blocks an explicit edit goal link when no active goal is available', async () => {
-    mockGetActiveGoal.mockRejectedValue(
-      new ApiError({ message: 'No active goal found', status: 404 }),
-    );
+    mockGetActiveGoal.mockResolvedValue(null);
 
     await renderWithQueryClient(<TransactionsScreen />);
     await screen.findByText('Groceries');

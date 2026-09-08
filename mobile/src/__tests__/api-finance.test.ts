@@ -60,6 +60,12 @@ describe('api finance client', () => {
     await expect(getActiveGoal()).resolves.toEqual(goalResponse);
   });
 
+  it('normalizes a missing active goal for shared query consumers', async () => {
+    mock.onGet('/goals/active').reply(404, { message: 'No active goal found' });
+
+    await expect(getActiveGoal()).resolves.toBeNull();
+  });
+
   it('posts createGoal payloads and parses the GoalSchema response', async () => {
     mock.onPost('/goals').reply((config) => {
       expect(JSON.parse(config.data as string)).toEqual({

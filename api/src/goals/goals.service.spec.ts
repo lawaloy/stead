@@ -264,6 +264,29 @@ describe('GoalsService', () => {
     });
   });
 
+  it('preserves lifecycle history on redundant legacy deactivation', async () => {
+    const endedAt = new Date('2026-08-20T12:00:00.000Z');
+    const completedGoal = goalRow({
+      isActive: false,
+      status: GoalStatus.completed,
+      endedAt,
+    });
+    prisma.goal.findFirst.mockResolvedValue(completedGoal);
+    prisma.goal.update.mockResolvedValue(completedGoal);
+
+    await expect(
+      service.update('user_1', 'goal_1', { isActive: false }),
+    ).resolves.toMatchObject({ status: GoalStatus.completed, isActive: false });
+    expect(prisma.goal.update).toHaveBeenCalledWith({
+      where: { id: 'goal_1' },
+      data: expect.objectContaining({
+        isActive: false,
+        status: undefined,
+        endedAt: undefined,
+      }) as unknown,
+    });
+  });
+
   it.each([GoalStatus.completed, GoalStatus.cancelled] as const)(
     'ends an active goal as %s',
     async (status) => {
