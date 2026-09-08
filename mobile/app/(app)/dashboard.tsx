@@ -1,6 +1,12 @@
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import {
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { getDashboardStability } from '../../src/lib/api';
 import { useAuth } from '../../src/lib/auth-state';
 import { sessionQueryKeys } from '../../src/lib/session-query-cache';
@@ -8,9 +14,17 @@ import { ScreenShell } from '../../src/components/screen-shell';
 
 const koboToNaira = (kobo: number) => `₦${(kobo / 100).toLocaleString()}`;
 
-const StatusBadge = ({ status }: { status: 'stable' | 'warning' | 'critical' }) => {
+const StatusBadge = ({
+  status,
+}: {
+  status: 'stable' | 'warning' | 'critical';
+}) => {
   const color =
-    status === 'stable' ? '#0a7d29' : status === 'warning' ? '#b97a00' : '#c02020';
+    status === 'stable'
+      ? '#0a7d29'
+      : status === 'warning'
+        ? '#b97a00'
+        : '#c02020';
   return (
     <View style={[styles.badge, { borderColor: color }]}>
       <Text style={[styles.badgeText, { color }]}>{status.toUpperCase()}</Text>
@@ -38,8 +52,17 @@ export default function DashboardScreen() {
   if (query.error) {
     return (
       <ScreenShell title="Stability Dashboard">
-        <Text style={styles.error}>Failed to load dashboard. Pull to retry.</Text>
-        <ScrollView refreshControl={<RefreshControl refreshing={query.isRefetching} onRefresh={query.refetch} />} />
+        <Text style={styles.error}>
+          Failed to load dashboard. Pull to retry.
+        </Text>
+        <ScrollView
+          refreshControl={
+            <RefreshControl
+              refreshing={query.isRefetching}
+              onRefresh={query.refetch}
+            />
+          }
+        />
       </ScreenShell>
     );
   }
@@ -55,7 +78,12 @@ export default function DashboardScreen() {
   return (
     <ScreenShell title="Stability Dashboard">
       <ScrollView
-        refreshControl={<RefreshControl refreshing={query.isRefetching} onRefresh={query.refetch} />}
+        refreshControl={
+          <RefreshControl
+            refreshing={query.isRefetching}
+            onRefresh={query.refetch}
+          />
+        }
       >
         <View style={styles.card}>
           <Text style={styles.cardTitle}>{query.data.goal.name}</Text>
@@ -67,15 +95,21 @@ export default function DashboardScreen() {
         <View style={styles.metricGrid}>
           <View style={styles.metricCard}>
             <Text style={styles.metricLabel}>Readiness</Text>
-            <Text style={styles.metricValue}>{query.data.metrics.readinessPct}%</Text>
+            <Text style={styles.metricValue}>
+              {query.data.metrics.readinessPct}%
+            </Text>
           </View>
           <View style={styles.metricCard}>
             <Text style={styles.metricLabel}>Score</Text>
-            <Text style={styles.metricValue}>{query.data.metrics.stabilityScore}</Text>
+            <Text style={styles.metricValue}>
+              {query.data.metrics.stabilityScore}
+            </Text>
           </View>
           <View style={styles.metricCard}>
             <Text style={styles.metricLabel}>Safe To Spend</Text>
-            <Text style={styles.metricValue}>{koboToNaira(query.data.metrics.safeToSpendKobo)}</Text>
+            <Text style={styles.metricValue}>
+              {koboToNaira(query.data.metrics.safeToSpendKobo)}
+            </Text>
           </View>
           <View style={styles.metricCard}>
             <Text style={styles.metricLabel}>Required Monthly Pace</Text>

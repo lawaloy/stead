@@ -21,8 +21,9 @@ import {
 
 export default function RequestOtpScreen() {
   const [phone, setPhone] = useState('');
-  const [countryIso, setCountryIso] =
-    useState<AuthCountryIso>(defaultAuthCountryIso);
+  const [countryIso, setCountryIso] = useState<AuthCountryIso>(
+    defaultAuthCountryIso,
+  );
   const [countryMenuOpen, setCountryMenuOpen] = useState(false);
   const router = useRouter();
   const {

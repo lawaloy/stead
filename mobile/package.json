@@ -28,6 +28,7 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "lint": "eslint . --ext .js,.jsx,.ts,.tsx",
+    "lint:fix": "eslint . --ext .js,.jsx,.ts,.tsx --fix",
     "test": "node --require ../tools/jest-resolver-fallback.cjs node_modules/jest/bin/jest.js",
     "typecheck": "node ./node_modules/@typescript/native/bin/tsc --noEmit -p tsconfig.json",
     "build": "expo export --platform web --output-dir dist"

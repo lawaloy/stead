@@ -7,6 +7,28 @@ on:
     branches: [main]
 
 jobs:
+  format:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Pin npm version
+        run: npm install --global npm@11.19.1
+
+      - name: Install formatting dependencies
+        run: npm ci
+
+      - name: Check repository formatting
+        run: npm run format:check
+
   lint:
     runs-on: ubuntu-latest
     defaults:
@@ -117,7 +139,7 @@ jobs:
 
   build:
     runs-on: ubuntu-latest
-    needs: [lint, test]
+    needs: [format, lint, test]
     defaults:
       run:
         working-directory: api

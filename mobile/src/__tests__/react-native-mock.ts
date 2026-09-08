@@ -5,7 +5,7 @@ type HostProps = Record<string, unknown> & { children?: React.ReactNode };
 const host = (name: string) => {
   const HostComponent = React.forwardRef<unknown, HostProps>(
     ({ children, ...props }, ref) =>
-    React.createElement(name, { ...props, ref }, children as React.ReactNode),
+      React.createElement(name, { ...props, ref }, children as React.ReactNode),
   );
   HostComponent.displayName = `Mock${name}`;
   return HostComponent;

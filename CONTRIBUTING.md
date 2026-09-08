@@ -44,11 +44,11 @@ Use the repo template format (see [`.github/pull_request_template.md`](.github/p
 
 ## Checks
 
-- [ ] `api`: `npm run lint -- --no-fix`
+- [ ] `root`: `npm run format:check`
+- [ ] `root`: `npm run lint`
 - [ ] `api`: `npm run build`
 - [ ] `api`: `npm run test -- --ci --runInBand`
 - [ ] `api`: `npm run test:e2e -- --ci --runInBand`
-- [ ] `mobile`: `npm run lint`
 - [ ] `mobile`: `npm run typecheck`
 - [ ] `mobile`: `npm test -- --runInBand`
 - [ ] `mobile`: `npm run build`
@@ -71,8 +71,14 @@ gh pr create --title "feat: your change" --body-file .github/pull_request_templa
 
 Local verification (recommended before push):
 
-- API: `npm run contracts:check`, `npm run lint -- --no-fix`, `npm run test -- --runInBand`, `npm run test:e2e -- --runInBand`, `npm run build`
-- Mobile: `npm run lint`, `npm run typecheck`, `npm test -- --runInBand`, `npm run build`
+- New clone: `npm run setup` from the repository root
+- Repository root: `npm run format:check`, `npm run lint`
+- API: `npm run contracts:check`, `npm run test -- --runInBand`, `npm run test:e2e -- --runInBand`, `npm run build`
+- Mobile: `npm run typecheck`, `npm test -- --runInBand`, `npm run build`
+
+Run `npm run format` or `npm run lint:fix` from the repository root to apply
+automatic formatting or lint corrections. CI runs the non-mutating checks and
+rejects formatting drift.
 
 API e2e tests require PostgreSQL and a dedicated `e2e` or test schema. The
 test harness refuses to clean the development `public` schema. See the root

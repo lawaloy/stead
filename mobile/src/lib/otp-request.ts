@@ -27,10 +27,7 @@ export function buildOtpRequestInput(
   selectedCountryIso: AuthCountryIso,
   countries: AuthCountry[],
 ): OtpRequestInput | null {
-  const countryIso = resolveEffectiveCountryIso(
-    selectedCountryIso,
-    countries,
-  );
+  const countryIso = resolveEffectiveCountryIso(selectedCountryIso, countries);
   const normalizedPhone = normalizePhoneForCountry(phone, countryIso);
 
   return normalizedPhone === null
