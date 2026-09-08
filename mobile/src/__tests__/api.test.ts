@@ -75,9 +75,7 @@ describe('api client', () => {
       return [200, { token: 'jwt-token' }];
     });
 
-    await expect(
-      verifyOtp('+442071838750', 'GB', '654321'),
-    ).resolves.toEqual({
+    await expect(verifyOtp('+442071838750', 'GB', '654321')).resolves.toEqual({
       token: 'jwt-token',
     });
   });
@@ -91,9 +89,7 @@ describe('api client', () => {
 
     mock.onPost('/auth/verify-otp').reply(401, { message: 'Unauthorized' });
 
-    await expect(
-      verifyOtp('08012345678', 'NG', '000000'),
-    ).rejects.toThrow(
+    await expect(verifyOtp('08012345678', 'NG', '000000')).rejects.toThrow(
       'Unauthorized',
     );
     expect(onUnauthorized).toHaveBeenCalledTimes(1);
@@ -147,7 +143,8 @@ describe('api client', () => {
     const details = { retryAfterMs: 60_000, scope: 'ip' };
 
     mock.onPost('/auth/verify-otp').reply(429, {
-      message: 'Too many invalid OTP attempts from this network. Try again later.',
+      message:
+        'Too many invalid OTP attempts from this network. Try again later.',
       details,
     });
 

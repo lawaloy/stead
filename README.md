@@ -40,11 +40,21 @@ compatibility layer can be removed safely.
 
 Get started
 
+Install all repository, API, and mobile dependencies from the repository root:
+
+```bash
+npm run setup
+```
+
+This is the recommended first command for a new clone. Use `npm run
+format:check` and `npm run lint` for non-mutating checks, or `npm run format`
+and `npm run lint:fix` to apply automatic fixes. Formatting uses the pinned
+repository Prettier version and LF line endings on every platform.
+
 API (from `api/`):
 
 ```bash
 cd api
-npm ci
 npx prisma generate
 npx prisma migrate dev
 npm run start:dev
@@ -56,7 +66,6 @@ Mobile (from `mobile/`):
 
 ```bash
 cd mobile
-npm ci
 npm run start
 ```
 
@@ -64,17 +73,18 @@ Copy `mobile/.env.example` to `mobile/.env` and set `EXPO_PUBLIC_API_URL` when t
 
 Useful checks:
 
-```bash
-cd api
-npm run lint -- --no-fix
-npm run test -- --runInBand
-npm run build
+After running `npm run setup`:
 
-cd ../mobile
+```bash
+npm run format:check
 npm run lint
-npm run typecheck
-npm test -- --runInBand
-npm run build
+
+npm --prefix api run test -- --runInBand
+npm --prefix api run build
+
+npm --prefix mobile run typecheck
+npm --prefix mobile test -- --runInBand
+npm --prefix mobile run build
 ```
 
 The API e2e suite uses PostgreSQL and deletes its own fixtures. It refuses to

@@ -44,9 +44,7 @@ export function normalizePhoneForCountry(
   countryIso: AuthCountryIso,
 ): string | null {
   const compact = phone.replace(/[\s\-().]/g, '');
-  const candidate = compact.startsWith('00')
-    ? `+${compact.slice(2)}`
-    : compact;
+  const candidate = compact.startsWith('00') ? `+${compact.slice(2)}` : compact;
   const parsed = candidate.startsWith('+')
     ? parsePhoneNumberFromString(candidate)
     : parsePhoneNumberFromString(candidate, countryIso as CountryCode);

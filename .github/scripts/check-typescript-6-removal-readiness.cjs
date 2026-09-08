@@ -18,9 +18,10 @@ function npmView(packageSpec, field) {
 
 function runNpm(args) {
   if (process.platform === 'win32') {
-    const command = [npmCommand, ...args.map((arg) => JSON.stringify(arg))].join(
-      ' ',
-    );
+    const command = [
+      npmCommand,
+      ...args.map((arg) => JSON.stringify(arg)),
+    ].join(' ');
     return execSync(command, {
       encoding: 'utf8',
       stdio: ['ignore', 'pipe', 'pipe'],

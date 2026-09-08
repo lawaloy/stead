@@ -8,10 +8,7 @@ import React, {
 } from 'react';
 import { tokenStore } from './token-store';
 import { configureApiAuth } from './api';
-import {
-  AuthCountryIso,
-  defaultAuthCountryIso,
-} from './countries';
+import { AuthCountryIso, defaultAuthCountryIso } from './countries';
 import { clearSessionQueryCache } from './session-query-cache';
 
 type AuthContextValue = {
@@ -36,11 +33,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [token, setToken] = useState<string | null>(null);
   const [bootstrapping, setBootstrapping] = useState(true);
   const [pendingPhone, setPendingPhone] = useState('');
-  const [pendingCountryIso, setPendingCountryIso] =
-    useState<AuthCountryIso>(defaultAuthCountryIso);
-  const [pendingOtpRequestedAt, setPendingOtpRequestedAt] = useState<number | null>(
-    null,
+  const [pendingCountryIso, setPendingCountryIso] = useState<AuthCountryIso>(
+    defaultAuthCountryIso,
   );
+  const [pendingOtpRequestedAt, setPendingOtpRequestedAt] = useState<
+    number | null
+  >(null);
   const [devOtpHint, setDevOtpHint] = useState('');
 
   const logout = useCallback(async () => {
@@ -58,12 +56,15 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     setDevOtpHint('');
   }, []);
 
-  const completeAuth = useCallback(async (jwt: string) => {
-    await clearSessionQueryCache();
-    setToken(jwt);
-    resetPendingAuth();
-    await tokenStore.setToken(jwt);
-  }, [resetPendingAuth]);
+  const completeAuth = useCallback(
+    async (jwt: string) => {
+      await clearSessionQueryCache();
+      setToken(jwt);
+      resetPendingAuth();
+      await tokenStore.setToken(jwt);
+    },
+    [resetPendingAuth],
+  );
 
   useEffect(() => {
     let mounted = true;

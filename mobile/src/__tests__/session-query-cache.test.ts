@@ -15,7 +15,9 @@ describe('session query cache', () => {
     const client = new QueryClient();
     client.setQueryData(sessionQueryKeys.dashboard('token-a'), userADashboard);
 
-    expect(client.getQueryData(sessionQueryKeys.dashboard('token-b'))).toBeUndefined();
+    expect(
+      client.getQueryData(sessionQueryKeys.dashboard('token-b')),
+    ).toBeUndefined();
     expect(client.getQueryData(sessionQueryKeys.dashboard('token-a'))).toEqual(
       userADashboard,
     );
@@ -36,12 +38,18 @@ describe('session query cache', () => {
 
     await clearSessionQueryCache(client);
 
-    expect(client.getQueryData(sessionQueryKeys.dashboard('token-a'))).toBeUndefined();
-    expect(client.getQueryData(sessionQueryKeys.activeGoal('token-a'))).toBeUndefined();
+    expect(
+      client.getQueryData(sessionQueryKeys.dashboard('token-a')),
+    ).toBeUndefined();
+    expect(
+      client.getQueryData(sessionQueryKeys.activeGoal('token-a')),
+    ).toBeUndefined();
     expect(
       client.getQueryData(sessionQueryKeys.transactions('token-a')),
     ).toBeUndefined();
-    expect(client.getQueryData(sessionQueryKeys.dashboard('token-b'))).toBeUndefined();
+    expect(
+      client.getQueryData(sessionQueryKeys.dashboard('token-b')),
+    ).toBeUndefined();
   });
 
   it('cancels in-flight fetches so they cannot repopulate the cache after logout', async () => {
@@ -64,7 +72,9 @@ describe('session query cache', () => {
     await clearSessionQueryCache(client);
 
     await expect(pending).rejects.toThrow();
-    expect(client.getQueryData(sessionQueryKeys.dashboard('token-a'))).toBeUndefined();
+    expect(
+      client.getQueryData(sessionQueryKeys.dashboard('token-a')),
+    ).toBeUndefined();
   });
 
   it('does not share finance cache between a session token and a logged-out key', () => {
@@ -94,23 +104,29 @@ describe('session query cache', () => {
       id: 'goal_a',
       name: 'User A rent',
     });
-    client.setQueryData(sessionQueryKeys.transactions('token-a'), [{ id: 'tx_a' }]);
+    client.setQueryData(sessionQueryKeys.transactions('token-a'), [
+      { id: 'tx_a' },
+    ]);
 
     await client.invalidateQueries({ queryKey: ['dashboard', 'stability'] });
     await client.invalidateQueries({ queryKey: ['goal', 'active'] });
     await client.invalidateQueries({ queryKey: ['transactions'] });
 
     expect(
-      client.getQueryState(sessionQueryKeys.dashboard('token-a'))?.isInvalidated,
+      client.getQueryState(sessionQueryKeys.dashboard('token-a'))
+        ?.isInvalidated,
     ).toBe(true);
     expect(
-      client.getQueryState(sessionQueryKeys.activeGoal('token-a'))?.isInvalidated,
+      client.getQueryState(sessionQueryKeys.activeGoal('token-a'))
+        ?.isInvalidated,
     ).toBe(true);
     expect(
-      client.getQueryState(sessionQueryKeys.transactions('token-a'))?.isInvalidated,
+      client.getQueryState(sessionQueryKeys.transactions('token-a'))
+        ?.isInvalidated,
     ).toBe(true);
     expect(
-      client.getQueryState(sessionQueryKeys.dashboard('token-b'))?.isInvalidated,
+      client.getQueryState(sessionQueryKeys.dashboard('token-b'))
+        ?.isInvalidated,
     ).toBeUndefined();
   });
 
@@ -119,7 +135,10 @@ describe('session query cache', () => {
       defaultOptions: { queries: { staleTime: 15_000, retry: false } },
     });
     client.setQueryData(['dashboard', 'stability'], userADashboard);
-    client.setQueryData(['goal', 'active'], { id: 'goal_a', name: 'User A rent' });
+    client.setQueryData(['goal', 'active'], {
+      id: 'goal_a',
+      name: 'User A rent',
+    });
 
     await clearSessionQueryCache(client);
 
@@ -149,7 +168,9 @@ describe('session query cache', () => {
     await settled;
     await Promise.resolve();
 
-    expect(client.getQueryData(sessionQueryKeys.dashboard('token-a'))).toBeUndefined();
+    expect(
+      client.getQueryData(sessionQueryKeys.dashboard('token-a')),
+    ).toBeUndefined();
   });
 
   it('invalidates only the matching session transaction list after a mutation', async () => {
@@ -166,13 +187,15 @@ describe('session query cache', () => {
     });
 
     expect(
-      client.getQueryState(sessionQueryKeys.transactions('token-a'))?.isInvalidated,
+      client.getQueryState(sessionQueryKeys.transactions('token-a'))
+        ?.isInvalidated,
     ).toBe(true);
     expect(
-      client.getQueryState(sessionQueryKeys.transactions('token-b'))?.isInvalidated,
+      client.getQueryState(sessionQueryKeys.transactions('token-b'))
+        ?.isInvalidated,
     ).toBe(false);
-    expect(client.getQueryData(sessionQueryKeys.transactions('token-b'))).toEqual(
-      rowsB,
-    );
+    expect(
+      client.getQueryData(sessionQueryKeys.transactions('token-b')),
+    ).toEqual(rowsB);
   });
 });

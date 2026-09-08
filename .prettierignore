@@ -1,0 +1,8 @@
+**/node_modules
+**/coverage
+**/dist
+**/.expo
+**/.tmp
+api/src/contracts/generated
+mobile/src/contracts/generated
+mobile/vendor
