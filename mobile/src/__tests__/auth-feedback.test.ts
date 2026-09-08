@@ -1,8 +1,5 @@
 import { ApiError } from '../lib/api-error';
-import {
-  formatCooldownLabel,
-  getAuthErrorMessage,
-} from '../lib/auth-feedback';
+import { formatCooldownLabel, getAuthErrorMessage } from '../lib/auth-feedback';
 
 describe('auth-feedback', () => {
   it('maps auth api errors to clearer request copy', () => {
@@ -52,7 +49,9 @@ describe('auth-feedback', () => {
         }),
         'request',
       ),
-    ).toBe('Too many code requests were made for this number. Try again later.');
+    ).toBe(
+      'Too many code requests were made for this number. Try again later.',
+    );
 
     expect(
       getAuthErrorMessage(
@@ -89,9 +88,7 @@ describe('auth-feedback', () => {
         }),
         'verify',
       ),
-    ).toBe(
-      'Too many incorrect codes came from this network. Try again later.',
-    );
+    ).toBe('Too many incorrect codes came from this network. Try again later.');
 
     expect(
       getAuthErrorMessage(

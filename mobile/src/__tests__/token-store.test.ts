@@ -16,7 +16,9 @@ const mockSecureStore: {
 
 jest.mock('expo-secure-store', () => mockSecureStore);
 
-const { tokenStore } = jest.requireActual('../lib/token-store') as typeof import('../lib/token-store');
+const { tokenStore } = jest.requireActual(
+  '../lib/token-store',
+) as typeof import('../lib/token-store');
 
 describe('tokenStore', () => {
   let originalLocalStorage: Storage | undefined;

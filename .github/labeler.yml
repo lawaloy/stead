@@ -1,23 +1,23 @@
 dependencies:
   - changed-files:
       - any-glob-to-any-file:
-          - "api/package.json"
-          - "api/package-lock.json"
-          - "mobile/package.json"
-          - "mobile/package-lock.json"
+          - 'api/package.json'
+          - 'api/package-lock.json'
+          - 'mobile/package.json'
+          - 'mobile/package-lock.json'
 
 security:
   - changed-files:
       - any-glob-to-any-file:
-          - ".github/workflows/deps-maintenance.yml"
-          - ".github/workflows/dependency-audit.yml"
-          - ".github/workflows/dependency-review.yml"
-          - "api/package.json"
-          - "api/package-lock.json"
-          - "mobile/package.json"
-          - "mobile/package-lock.json"
+          - '.github/workflows/deps-maintenance.yml'
+          - '.github/workflows/dependency-audit.yml'
+          - '.github/workflows/dependency-review.yml'
+          - 'api/package.json'
+          - 'api/package-lock.json'
+          - 'mobile/package.json'
+          - 'mobile/package-lock.json'
 
 ci:
   - changed-files:
       - any-glob-to-any-file:
-          - ".github/workflows/**"
+          - '.github/workflows/**'

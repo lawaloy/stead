@@ -1,9 +1,7 @@
 import type { AxiosInstance } from 'axios';
 import MockAdapter from 'axios-mock-adapter';
 
-type MockAdapterAxiosInstance = ConstructorParameters<
-  typeof MockAdapter
->[0];
+type MockAdapterAxiosInstance = ConstructorParameters<typeof MockAdapter>[0];
 
 /**
  * Axios 1.19 gives its ESM and CommonJS declarations distinct unique-symbol

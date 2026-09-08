@@ -5,28 +5,28 @@
 
 version: 2
 updates:
-  - package-ecosystem: "npm"
-    directory: "/api"
+  - package-ecosystem: 'npm'
+    directory: '/api'
     schedule:
-      interval: "cron"
-      cronjob: "0 13 * * *"
-    rebase-strategy: "auto"
+      interval: 'cron'
+      cronjob: '0 13 * * *'
+    rebase-strategy: 'auto'
     # Routine version updates are handled by the repository-owned API dependency
     # maintenance workflow, which safely exits when an update produces no diff.
     # A zero limit disables version PRs without disabling security updates.
     open-pull-requests-limit: 0
     groups:
       npm-security:
-        applies-to: "security-updates"
+        applies-to: 'security-updates'
         patterns:
-          - "*"
+          - '*'
 
-  - package-ecosystem: "npm"
-    directory: "/mobile"
+  - package-ecosystem: 'npm'
+    directory: '/mobile'
     schedule:
-      interval: "cron"
-      cronjob: "0 13 * * *"
-    rebase-strategy: "auto"
+      interval: 'cron'
+      cronjob: '0 13 * * *'
+    rebase-strategy: 'auto'
     # Routine version updates are handled by the repository-owned mobile
     # dependency maintenance workflow, which safely exits when an update
     # produces no diff. A zero limit disables version PRs without disabling
@@ -34,6 +34,6 @@ updates:
     open-pull-requests-limit: 0
     groups:
       npm-security:
-        applies-to: "security-updates"
+        applies-to: 'security-updates'
         patterns:
-          - "*"
+          - '*'

@@ -1,0 +1,17 @@
+{
+  "name": "stead-repository",
+  "private": true,
+  "engines": {
+    "node": "^22.18.0 || ^24.0.0"
+  },
+  "scripts": {
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "lint": "npm --prefix api run lint && npm --prefix mobile run lint",
+    "lint:fix": "npm --prefix api run lint:fix && npm --prefix mobile run lint:fix",
+    "check": "npm run format:check && npm run lint"
+  },
+  "devDependencies": {
+    "prettier": "3.9.6"
+  }
+}

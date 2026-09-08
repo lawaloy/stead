@@ -243,9 +243,7 @@ export default function TransactionsScreen() {
                 setEditing(null);
               }}
             >
-              <Text
-                style={[styles.linkText, editorLocked && styles.disabled]}
-              >
+              <Text style={[styles.linkText, editorLocked && styles.disabled]}>
                 Cancel
               </Text>
             </Pressable>
@@ -459,10 +457,7 @@ export default function TransactionsScreen() {
               accessibilityState={{ disabled: editorLocked }}
               disabled={editorLocked}
               onPress={() => beginEdit(transaction)}
-              style={[
-                styles.secondaryButton,
-                editorLocked && styles.disabled,
-              ]}
+              style={[styles.secondaryButton, editorLocked && styles.disabled]}
             >
               <Text style={styles.secondaryButtonText}>Edit</Text>
             </Pressable>
