@@ -45,7 +45,6 @@ Repository tooling (from the repository root):
 ```bash
 npm ci
 npm run format:check
-npm run lint
 ```
 
 Use `npm run format` and `npm run lint:fix` to apply automatic fixes. Formatting
@@ -75,6 +74,8 @@ npm run start
 Copy `mobile/.env.example` to `mobile/.env` and set `EXPO_PUBLIC_API_URL` when the API is not running on the default local URL.
 
 Useful checks:
+
+After installing the root, API, and mobile dependencies above:
 
 ```bash
 npm run format:check
