@@ -25,13 +25,10 @@ export default function AddTransactionScreen() {
     queryKey: sessionQueryKeys.activeGoal(token),
     queryFn: getActiveGoal,
     enabled: Boolean(token),
-    retry: (failureCount, error) =>
-      !(error instanceof ApiError && error.status === 404) && failureCount < 1,
+    retry: 1,
   });
   const goalLinkPending = tagGoal && activeGoalQuery.isPending;
-  const activeGoalMissing =
-    activeGoalQuery.error instanceof ApiError &&
-    activeGoalQuery.error.status === 404;
+  const activeGoalMissing = activeGoalQuery.data === null;
 
   const validation = useMemo(() => {
     if (nairaInputToKobo(amountNaira) === null) {
@@ -161,7 +158,9 @@ export default function AddTransactionScreen() {
       </Pressable>
 
       {goalLinkPending ? (
-        <Text accessibilityLiveRegion="polite">Checking your active goal...</Text>
+        <Text accessibilityLiveRegion="polite">
+          Checking your active goal...
+        </Text>
       ) : null}
       {validation ? (
         <Text

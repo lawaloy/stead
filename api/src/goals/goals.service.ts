@@ -108,13 +108,13 @@ export class GoalsService {
           status:
             dto.isActive === true
               ? PrismaGoalStatus.active
-              : dto.isActive === false
+              : dto.isActive === false && existing.isActive
                 ? PrismaGoalStatus.cancelled
                 : undefined,
           endedAt:
             dto.isActive === true
               ? null
-              : dto.isActive === false
+              : dto.isActive === false && existing.isActive
                 ? new Date()
                 : undefined,
         },
