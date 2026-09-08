@@ -34,6 +34,7 @@ const TopNav = () => (
     <Link href="/(app)/dashboard">Dashboard</Link>
     <Link href="/(app)/goal">Goal</Link>
     <Link href="/(app)/transactions">Activity</Link>
+    <Link href="/(app)/alerts">Alerts</Link>
   </View>
 );
 

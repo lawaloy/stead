@@ -98,6 +98,57 @@ describe('NotificationQueueService', () => {
     expect(prisma.notificationJob.create).toHaveBeenCalled();
   });
 
+  it('encrypts readiness jobs with customer metadata and a dedupe key', async () => {
+    prisma.notificationJob.create.mockResolvedValue({ id: 'job_alert' });
+
+    await expect(
+      queue.enqueueReadinessAlert({
+        type: 'weekly.summary',
+        userId: 'user_1',
+        goalId: 'goal_1',
+        dedupeKey: 'weekly:user_1:goal_1:2026-09-06',
+        payload: { phone: '+2348000000000', body: 'Weekly summary' },
+      }),
+    ).resolves.toBe(true);
+
+    const createCalls = prisma.notificationJob.create.mock.calls as Array<
+      [
+        {
+          data: {
+            type: string;
+            userId: string;
+            goalId: string;
+            dedupeKey: string;
+            payloadJson: string;
+          };
+        },
+      ]
+    >;
+    const data = createCalls[0]?.[0].data;
+    expect(data).toMatchObject({
+      type: 'weekly.summary',
+      userId: 'user_1',
+      goalId: 'goal_1',
+      dedupeKey: 'weekly:user_1:goal_1:2026-09-06',
+    });
+    expect(data.payloadJson).not.toContain('+2348000000000');
+    expect(data.payloadJson).not.toContain('Weekly summary');
+  });
+
+  it('treats a unique dedupe-key collision as an already queued alert', async () => {
+    prisma.notificationJob.create.mockRejectedValue({ code: 'P2002' });
+
+    await expect(
+      queue.enqueueReadinessAlert({
+        type: 'risk.alert',
+        userId: 'user_1',
+        goalId: 'goal_1',
+        dedupeKey: 'duplicate',
+        payload: { phone: '+2348000000000', body: 'Risk alert' },
+      }),
+    ).resolves.toBe(false);
+  });
+
   it('returns null when another worker claims the candidate first', async () => {
     prisma.notificationJob.findFirst.mockResolvedValue({ id: 'job_1' });
     prisma.notificationJob.updateMany.mockResolvedValue({ count: 0 });

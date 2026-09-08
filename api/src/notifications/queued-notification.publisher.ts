@@ -3,6 +3,7 @@ import { NotificationQueueService } from './notification-queue.service';
 import type {
   NotificationPublisher,
   OtpRequestedPayload,
+  ReadinessAlertInput,
 } from './notification-publisher';
 
 @Injectable()
@@ -11,5 +12,9 @@ export class QueuedNotificationPublisher implements NotificationPublisher {
 
   async publishOtpRequested(payload: OtpRequestedPayload): Promise<void> {
     await this.queue.enqueueOtpRequested(payload);
+  }
+
+  publishReadinessAlert(input: ReadinessAlertInput): Promise<boolean> {
+    return this.queue.enqueueReadinessAlert(input);
   }
 }

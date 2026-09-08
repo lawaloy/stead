@@ -274,6 +274,41 @@ paths:
                 $ref: '#/components/schemas/DashboardStabilityResponse'
         '401':
           $ref: '#/components/responses/Unauthorized'
+  /alerts/preferences:
+    get:
+      operationId: getAlertPreferences
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Customer notification preferences. Defaults are returned before first save.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AlertPreferences'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    patch:
+      operationId: updateAlertPreferences
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateAlertPreferencesRequest'
+      responses:
+        '200':
+          description: Updated customer notification preferences.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AlertPreferences'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
 components:
   securitySchemes:
     bearerAuth:
@@ -323,6 +358,62 @@ components:
           schema:
             $ref: '#/components/schemas/ErrorResponse'
   schemas:
+    UpdateAlertPreferencesRequest:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        weeklySummaryEnabled:
+          type: boolean
+        riskAlertsEnabled:
+          type: boolean
+        timeZone:
+          type: string
+          minLength: 1
+          maxLength: 100
+          description: IANA time zone used for weekly delivery.
+        weeklyDay:
+          type: integer
+          minimum: 0
+          maximum: 6
+          description: Local weekday, where Sunday is 0 and Saturday is 6.
+        weeklyHourLocal:
+          type: integer
+          minimum: 0
+          maximum: 23
+    AlertPreferences:
+      type: object
+      additionalProperties: false
+      required:
+        - weeklySummaryEnabled
+        - riskAlertsEnabled
+        - channel
+        - timeZone
+        - weeklyDay
+        - weeklyHourLocal
+        - updatedAt
+      properties:
+        weeklySummaryEnabled:
+          type: boolean
+        riskAlertsEnabled:
+          type: boolean
+        channel:
+          type: string
+          enum: [sms]
+        timeZone:
+          type: string
+        weeklyDay:
+          type: integer
+          minimum: 0
+          maximum: 6
+        weeklyHourLocal:
+          type: integer
+          minimum: 0
+          maximum: 23
+        updatedAt:
+          type: string
+          format: date-time
+          nullable: true
     RequestOtpRequest:
       type: object
       additionalProperties: false

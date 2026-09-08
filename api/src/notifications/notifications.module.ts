@@ -24,6 +24,6 @@ import { QueuedNotificationPublisher } from './queued-notification.publisher';
       useExisting: QueuedNotificationPublisher,
     },
   ],
-  exports: [NOTIFICATION_PUBLISHER],
+  exports: [NOTIFICATION_PUBLISHER, NotificationQueueService],
 })
 export class NotificationsModule {}

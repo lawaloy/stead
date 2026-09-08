@@ -81,6 +81,21 @@ export class NotificationConsumerService
           providerMessageId: this.extractProviderMessageId(result.response),
         };
       }
+      case 'weekly.summary':
+      case 'risk.alert':
+      case 'risk.recovery': {
+        if ('redacted' in job.payload) {
+          throw new Error('Readiness notification payload has been redacted');
+        }
+        const result = await this.sms.sendMessage(
+          job.payload.phone,
+          job.payload.body,
+        );
+        return {
+          provider: result.provider,
+          providerMessageId: this.extractProviderMessageId(result.response),
+        };
+      }
       default:
         throw new Error('Unsupported notification job type');
     }

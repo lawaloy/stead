@@ -12,6 +12,7 @@ describe('NotificationConsumerService', () => {
   };
   let sms: {
     sendOtp: jest.Mock;
+    sendMessage: jest.Mock;
   };
 
   const job: NotificationJob = {
@@ -51,6 +52,7 @@ describe('NotificationConsumerService', () => {
     };
     sms = {
       sendOtp: jest.fn(),
+      sendMessage: jest.fn(),
     };
     service = new NotificationConsumerService(queue as never, sms as never);
   });
@@ -75,6 +77,31 @@ describe('NotificationConsumerService', () => {
       providerMessageId: 'SM123',
     });
     expect(queue.markFailed).not.toHaveBeenCalled();
+  });
+
+  it('delivers readiness jobs through the generic SMS path', async () => {
+    const alertJob: NotificationJob = {
+      ...job,
+      type: 'risk.alert',
+      payload: { phone: '+2348012345678', body: 'Review your savings pace.' },
+    };
+    queue.claimReadyJob.mockResolvedValue(alertJob);
+    sms.sendMessage.mockResolvedValue({
+      ok: true,
+      provider: 'termii',
+      response: { message_id: 'msg-1' },
+    });
+
+    await tick();
+
+    expect(sms.sendMessage).toHaveBeenCalledWith(
+      '+2348012345678',
+      'Review your savings pace.',
+    );
+    expect(queue.markSucceeded).toHaveBeenCalledWith(alertJob, {
+      provider: 'termii',
+      providerMessageId: 'msg-1',
+    });
   });
 
   it('marks jobs failed when the sms provider rejects', async () => {

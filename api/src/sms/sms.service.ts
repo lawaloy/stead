@@ -31,10 +31,25 @@ export class SmsService implements OnModuleInit {
   }
 
   async sendOtp(phone: string, otp: string) {
+    return this.sendMessageInternal(
+      phone,
+      `Your Stead OTP is ${otp}. It expires in 10 minutes.`,
+      'OTP',
+    );
+  }
+
+  async sendMessage(phone: string, body: string) {
+    return this.sendMessageInternal(phone, body, 'notification');
+  }
+
+  private async sendMessageInternal(
+    phone: string,
+    body: string,
+    kind: 'OTP' | 'notification',
+  ) {
     const provider = this.getProviderName();
 
     const to = phone;
-    const body = `Your Stead OTP is ${otp}. It expires in 10 minutes.`;
 
     if (provider === 'dev') {
       const response = this.dev.sendMessage({ to, body });
@@ -63,7 +78,7 @@ export class SmsService implements OnModuleInit {
       } catch (error: unknown) {
         const details = this.extractErrorDetails(error);
         throw new HttpException(
-          { message: 'Failed to send OTP via Twilio', details },
+          { message: `Failed to send ${kind} via Twilio`, details },
           HttpStatus.BAD_GATEWAY,
         );
       }
@@ -88,7 +103,7 @@ export class SmsService implements OnModuleInit {
       } catch (error: unknown) {
         const details = this.extractErrorDetails(error);
         throw new HttpException(
-          { message: 'Failed to send OTP via Termii', details },
+          { message: `Failed to send ${kind} via Termii`, details },
           HttpStatus.BAD_GATEWAY,
         );
       }

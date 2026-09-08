@@ -1,6 +1,7 @@
 export {
   zAuthCountriesResponse as AuthCountriesResponseSchema,
   zAuthCountry as AuthCountrySchema,
+  zAlertPreferences as AlertPreferencesSchema,
   zDashboardMetrics as DashboardMetricsSchema,
   zDashboardStabilityEmptyResponse as DashboardStabilityEmptyResponseSchema,
   zDashboardStabilityOkResponse as DashboardStabilityOkResponseSchema,
@@ -15,6 +16,7 @@ export {
 export type {
   AuthCountriesResponse,
   AuthCountry,
+  AlertPreferences,
   DashboardStabilityResponse,
   Goal,
   OkResponse,

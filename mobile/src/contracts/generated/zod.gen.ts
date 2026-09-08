@@ -2,6 +2,24 @@
 
 import * as z from 'zod';
 
+export const zUpdateAlertPreferencesRequest = z.object({
+  weeklySummaryEnabled: z.boolean().optional(),
+  riskAlertsEnabled: z.boolean().optional(),
+  timeZone: z.string().min(1).max(100).optional(),
+  weeklyDay: z.int().gte(0).lte(6).optional(),
+  weeklyHourLocal: z.int().gte(0).lte(23).optional(),
+});
+
+export const zAlertPreferences = z.object({
+  weeklySummaryEnabled: z.boolean(),
+  riskAlertsEnabled: z.boolean(),
+  channel: z.enum(['sms']),
+  timeZone: z.string(),
+  weeklyDay: z.int().gte(0).lte(6),
+  weeklyHourLocal: z.int().gte(0).lte(23),
+  updatedAt: z.iso.datetime().nullable(),
+});
+
 export const zRequestOtpRequest = z.object({
   countryIso: z.string().regex(/^[A-Z]{2}$/),
   phone: z.string().regex(/^(?:\+?\d{6,15}|0\d{6,14}|00\d{6,15})$/),
@@ -282,3 +300,15 @@ export const zUpdateTransactionResponse = zTransaction;
  * Current stability metrics or the no-active-goal state.
  */
 export const zGetDashboardStabilityResponse = zDashboardStabilityResponse;
+
+/**
+ * Customer notification preferences. Defaults are returned before first save.
+ */
+export const zGetAlertPreferencesResponse = zAlertPreferences;
+
+export const zUpdateAlertPreferencesBody = zUpdateAlertPreferencesRequest;
+
+/**
+ * Updated customer notification preferences.
+ */
+export const zUpdateAlertPreferencesResponse = zAlertPreferences;

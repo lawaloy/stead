@@ -10,6 +10,8 @@ export const sessionQueryKeys = {
     ['goals', 'history', sessionId] as const,
   transactions: (sessionId: string | null) =>
     ['transactions', sessionId] as const,
+  alertPreferences: (sessionId: string | null) =>
+    ['alerts', 'preferences', sessionId] as const,
 };
 
 export async function clearSessionQueryCache(

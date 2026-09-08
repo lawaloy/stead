@@ -10,15 +10,16 @@ import { PrismaService } from '../prisma/prisma.service';
 import {
   NotificationJob,
   OtpRequestedPayload,
-  RedactedOtpRequestedPayload,
+  ReadinessAlertPayload,
 } from './notification.types';
+import type { ReadinessAlertInput } from './notification-publisher';
 
 const JOB_LOCK_TIMEOUT_MS = 5 * 60 * 1000;
 const REDACTED_PAYLOAD_JSON = JSON.stringify({ redacted: true });
-const REDACTED_OTP_PAYLOAD: RedactedOtpRequestedPayload = {
+const REDACTED_PAYLOAD = {
   phone: '<redacted>',
   redacted: true,
-};
+} as const;
 
 type EncryptedPayloadEnvelope = {
   v: 1;
@@ -41,6 +42,9 @@ type StoredNotificationJob = {
   lastError: string | null;
   provider: string | null;
   providerMessageId: string | null;
+  userId?: string | null;
+  goalId?: string | null;
+  dedupeKey?: string | null;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -67,6 +71,35 @@ export class NotificationQueueService {
     });
 
     return job.id;
+  }
+
+  async enqueueReadinessAlert(input: ReadinessAlertInput): Promise<boolean> {
+    try {
+      await this.prisma.notificationJob.create({
+        data: {
+          type: input.type,
+          payloadJson: this.encryptPayload(input.payload),
+          userId: input.userId,
+          goalId: input.goalId,
+          dedupeKey: input.dedupeKey,
+          status: 'pending',
+          attempts: 0,
+          maxAttempts: 3,
+          nextRunAt: new Date(),
+        },
+      });
+      return true;
+    } catch (error: unknown) {
+      if (
+        error &&
+        typeof error === 'object' &&
+        'code' in error &&
+        error.code === 'P2002'
+      ) {
+        return false;
+      }
+      throw error;
+    }
   }
 
   async claimReadyJob(): Promise<NotificationJob | null> {
@@ -282,7 +315,7 @@ export class NotificationQueueService {
   private mapJobMetadata(job: StoredNotificationJob) {
     return {
       id: job.id,
-      type: 'otp.requested' as const,
+      type: this.normalizeType(job.type),
       status: job.status,
       attempts: job.attempts,
       maxAttempts: job.maxAttempts,
@@ -293,6 +326,9 @@ export class NotificationQueueService {
       lastError: job.lastError,
       provider: job.provider,
       providerMessageId: job.providerMessageId,
+      userId: job.userId ?? null,
+      goalId: job.goalId ?? null,
+      dedupeKey: job.dedupeKey ?? null,
       createdAt: job.createdAt,
       updatedAt: job.updatedAt,
     };
@@ -302,13 +338,13 @@ export class NotificationQueueService {
     return {
       ...this.mapJobMetadata(job),
       payload: this.decryptPayload(job.payloadJson),
-    };
+    } as NotificationJob;
   }
 
   private mapUndecryptableJob(job: StoredNotificationJob): NotificationJob {
     return {
       ...this.mapJobMetadata(job),
-      payload: REDACTED_OTP_PAYLOAD,
+      payload: REDACTED_PAYLOAD,
     };
   }
 
@@ -316,7 +352,9 @@ export class NotificationQueueService {
     return Math.min(30_000, 1_000 * 2 ** attempt);
   }
 
-  private encryptPayload(payload: OtpRequestedPayload): string {
+  private encryptPayload(
+    payload: OtpRequestedPayload | ReadinessAlertPayload,
+  ): string {
     const iv = randomBytes(12);
     const cipher = createCipheriv('aes-256-gcm', this.encryptionKey(), iv);
     const ciphertext = Buffer.concat([
@@ -335,13 +373,13 @@ export class NotificationQueueService {
 
   private decryptPayload(
     payloadJson: string,
-  ): OtpRequestedPayload | RedactedOtpRequestedPayload {
+  ): OtpRequestedPayload | ReadinessAlertPayload | typeof REDACTED_PAYLOAD {
     const stored = JSON.parse(payloadJson) as Record<string, unknown>;
     if (stored.redacted === true) {
-      return REDACTED_OTP_PAYLOAD;
+      return REDACTED_PAYLOAD;
     }
 
-    if (this.isOtpPayload(stored)) {
+    if (this.isNotificationPayload(stored)) {
       return stored;
     }
 
@@ -361,7 +399,7 @@ export class NotificationQueueService {
         decipher.final(),
       ]).toString('utf8');
       const payload = JSON.parse(plaintext) as Record<string, unknown>;
-      if (!this.isOtpPayload(payload)) {
+      if (!this.isNotificationPayload(payload)) {
         throw new Error('Invalid decrypted notification payload');
       }
       return payload;
@@ -384,6 +422,32 @@ export class NotificationQueueService {
     value: Record<string, unknown>,
   ): value is Record<string, unknown> & OtpRequestedPayload {
     return typeof value.phone === 'string' && typeof value.otp === 'string';
+  }
+
+  private isReadinessPayload(
+    value: Record<string, unknown>,
+  ): value is Record<string, unknown> & ReadinessAlertPayload {
+    return typeof value.phone === 'string' && typeof value.body === 'string';
+  }
+
+  private isNotificationPayload(
+    value: Record<string, unknown>,
+  ): value is Record<string, unknown> &
+    (OtpRequestedPayload | ReadinessAlertPayload) {
+    return this.isOtpPayload(value) || this.isReadinessPayload(value);
+  }
+
+  private normalizeType(
+    type: string,
+  ): 'otp.requested' | 'weekly.summary' | 'risk.alert' | 'risk.recovery' {
+    if (
+      type === 'weekly.summary' ||
+      type === 'risk.alert' ||
+      type === 'risk.recovery'
+    ) {
+      return type;
+    }
+    return 'otp.requested' as const;
   }
 
   private isEncryptedEnvelope(

@@ -7,7 +7,10 @@ import type { DashboardStabilityResponse } from '../contracts/generated/types.ge
 export class DashboardService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async getStability(userId: string): Promise<DashboardStabilityResponse> {
+  async getStability(
+    userId: string,
+    today = new Date(),
+  ): Promise<DashboardStabilityResponse> {
     const goal = await this.prisma.goal.findFirst({
       where: { userId, isActive: true },
       orderBy: { createdAt: 'desc' },
@@ -39,7 +42,7 @@ export class DashboardService {
       goalTotalKobo: Number(goal.amountTotalKobo),
       goalSavedKobo,
       dueDate: goal.dueDate,
-      today: new Date(),
+      today,
       estimatedBalanceKobo,
       monthlyIncomeKobo: goal.monthlyIncomeKobo
         ? Number(goal.monthlyIncomeKobo)
