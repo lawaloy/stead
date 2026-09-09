@@ -1,6 +1,20 @@
 name: Dependency Audit
 
 on:
+  pull_request:
+    paths:
+      - 'api/package.json'
+      - 'api/package-lock.json'
+      - 'mobile/package.json'
+      - 'mobile/package-lock.json'
+  push:
+    branches:
+      - main
+    paths:
+      - 'api/package.json'
+      - 'api/package-lock.json'
+      - 'mobile/package.json'
+      - 'mobile/package-lock.json'
   schedule:
     - cron: '30 13 * * *'
   workflow_dispatch:
@@ -40,6 +54,7 @@ jobs:
         run: npm audit --omit=dev --audit-level=high
 
       - name: Report moderate-or-higher full-tree vulnerabilities
+        if: always()
         continue-on-error: true
         run: npm audit --audit-level=moderate
 
@@ -70,5 +85,6 @@ jobs:
         run: npm audit --omit=dev --audit-level=high
 
       - name: Report moderate-or-higher full-tree vulnerabilities
+        if: always()
         continue-on-error: true
         run: npm audit --audit-level=moderate

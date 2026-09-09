@@ -16,8 +16,23 @@ type PackageLock = {
 const auditRemediationPins = [
   {
     packageName: 'js-yaml',
-    version: '4.3.1',
+    version: '4.3.2',
     lockfilePath: 'node_modules/js-yaml',
+  },
+  {
+    packageName: 'deepmerge-ts',
+    version: '8.0.1',
+    lockfilePath: 'node_modules/deepmerge-ts',
+  },
+  {
+    packageName: 'mysql2',
+    version: '3.24.3',
+    lockfilePath: 'node_modules/mysql2',
+  },
+  {
+    packageName: 'multer',
+    version: '2.3.0',
+    lockfilePath: 'node_modules/multer',
   },
 ] as const;
 

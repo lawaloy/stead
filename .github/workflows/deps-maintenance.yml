@@ -56,11 +56,16 @@ jobs:
             --reject "typescript,@typescript/native,@hey-api/openapi-ts"
           npm install
 
+      - name: Apply compatible vulnerability fixes
+        working-directory: api
+        run: npm audit fix --audit-level=none
+
       - name: Block high-severity production vulnerabilities
         working-directory: api
         run: npm audit --omit=dev --audit-level=high
 
       - name: API full-tree audit report
+        if: always()
         continue-on-error: true
         working-directory: api
         run: npm audit --audit-level=moderate
@@ -107,7 +112,7 @@ jobs:
             - Advances direct API dependencies only within their declared semver ranges using pinned `npm-check-updates@22.2.9` and a three-day release cooldown.
             - Leaves the TypeScript 7 CLI, its TypeScript 6 compatibility alias, and exact OpenAPI codegen pins as deliberate engineering work.
             - Installs the updated lockfile with scripts enabled (including Prisma generate) using the CI-pinned npm version.
-            - Leaves vulnerability remediation to native Dependabot, blocks high-severity production findings, and records moderate-or-higher full-tree findings.
+            - Applies compatible non-breaking vulnerability fixes, blocks remaining high-severity production findings, and records moderate-or-higher full-tree findings.
             - Passes API lint, build, and unit tests before this PR is created or updated.
             - Exits successfully with no PR when the update produces no dependency diff.
 
@@ -163,11 +168,16 @@ jobs:
           # versions so daily runs do not fail on patch drift that ncu rejects.
           npx expo install --fix
 
+      - name: Apply compatible vulnerability fixes
+        working-directory: mobile
+        run: npm audit fix --audit-level=none
+
       - name: Block high-severity production vulnerabilities
         working-directory: mobile
         run: npm audit --omit=dev --audit-level=high
 
       - name: Mobile full-tree audit report
+        if: always()
         continue-on-error: true
         working-directory: mobile
         run: npm audit --audit-level=moderate
@@ -225,7 +235,7 @@ jobs:
             - Excludes the Expo/React Native platform stack, Jest baseline, exact pins, the TypeScript 7 CLI, and its TypeScript 6 compatibility alias so those upgrades remain deliberate engineering work.
             - Aligns non-excluded Expo SDK packages with `expo install --fix`, then verifies the accepted baseline with Expo CLI and pinned `expo-doctor@1.20.1`.
             - Installs the updated lockfile with the CI-pinned npm version before Expo checks and app gates.
-            - Leaves vulnerability remediation to native Dependabot, blocks high-severity production findings, and records moderate-or-higher full-tree findings.
+            - Applies compatible non-breaking vulnerability fixes, blocks remaining high-severity production findings, and records moderate-or-higher full-tree findings.
             - Passes mobile lint, typecheck, tests, and build before this PR is created or updated.
             - Exits successfully with no PR when the update produces no dependency diff.
 
