@@ -12,6 +12,7 @@ on:
         default: 0
 
 permissions:
+  actions: read
   contents: write
   pull-requests: write
   issues: write
@@ -42,6 +43,13 @@ jobs:
             const { owner, repo } = context.repo;
             const maxAttempts = 10;
             const delayMs = 15000;
+            const requiredWorkflowNames = [
+              'ci',
+              'mobile-ci',
+              'CodeQL Advanced',
+              'Dependency review',
+              'Dependency Audit',
+            ];
             const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
             if (!pull_number) {
@@ -124,6 +132,55 @@ jobs:
 
               if (labels.includes('automerge-blocked')) {
                 core.info('Skipping because automerge-blocked label is present.');
+                return;
+              }
+
+              const workflowRuns = await github.paginate(
+                github.rest.actions.listWorkflowRunsForRepo,
+                {
+                  owner,
+                  repo,
+                  event: 'pull_request',
+                  head_sha: pullRequest.head.sha,
+                  per_page: 100,
+                },
+              );
+              const latestRunsByName = new Map();
+
+              for (const run of workflowRuns) {
+                if (
+                  requiredWorkflowNames.includes(run.name) &&
+                  !latestRunsByName.has(run.name)
+                ) {
+                  latestRunsByName.set(run.name, run);
+                }
+              }
+
+              const missingWorkflows = requiredWorkflowNames.filter(
+                (name) => !latestRunsByName.has(name),
+              );
+              const incompleteWorkflows = requiredWorkflowNames.filter(
+                (name) => latestRunsByName.get(name)?.status !== 'completed',
+              );
+              const unsuccessfulWorkflows = requiredWorkflowNames.filter(
+                (name) => {
+                  const run = latestRunsByName.get(name);
+                  return run?.status === 'completed' && run.conclusion !== 'success';
+                },
+              );
+
+              if (
+                missingWorkflows.length > 0 ||
+                incompleteWorkflows.length > 0 ||
+                unsuccessfulWorkflows.length > 0
+              ) {
+                core.info(
+                  `Required workflow state for ${pullRequest.head.sha}: ${JSON.stringify({
+                    missing: missingWorkflows,
+                    incomplete: incompleteWorkflows,
+                    unsuccessful: unsuccessfulWorkflows,
+                  })}`,
+                );
                 return;
               }
 

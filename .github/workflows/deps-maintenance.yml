@@ -58,7 +58,7 @@ jobs:
 
       - name: Apply compatible vulnerability fixes
         working-directory: api
-        run: npm audit fix --audit-level=critical
+        run: npm audit fix --audit-level=none
 
       - name: Block high-severity production vulnerabilities
         working-directory: api
@@ -170,7 +170,7 @@ jobs:
 
       - name: Apply compatible vulnerability fixes
         working-directory: mobile
-        run: npm audit fix --audit-level=critical
+        run: npm audit fix --audit-level=none
 
       - name: Block high-severity production vulnerabilities
         working-directory: mobile
