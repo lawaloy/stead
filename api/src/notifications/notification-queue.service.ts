@@ -139,12 +139,20 @@ export class NotificationQueueService {
     return ids;
   }
 
-  canDeliver(job: NotificationJob): boolean {
-    return (
-      !this.deletingNotificationIds.has(job.id) &&
-      (!job.userId || !this.deletingAccountIds.has(job.userId)) &&
-      !this.discoveringAccountPhones.has(job.payload.phone)
-    );
+  async canDeliver(job: NotificationJob): Promise<boolean> {
+    if (
+      this.deletingNotificationIds.has(job.id) ||
+      (job.userId && this.deletingAccountIds.has(job.userId)) ||
+      this.discoveringAccountPhones.has(job.payload.phone)
+    ) {
+      return false;
+    }
+
+    const persistedJob = await this.prisma.notificationJob.findUnique({
+      where: { id: job.id },
+      select: { id: true },
+    });
+    return persistedJob !== null;
   }
 
   restoreForAccount(userId: string): void {

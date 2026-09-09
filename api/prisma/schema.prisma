@@ -22,6 +22,7 @@ model User {
   alertStates       AlertState[]
   consentPreference ConsentPreference?
   consentRecords    ConsentRecord[]
+  notificationJobs  NotificationJob[]
 }
 
 enum ConsentCategory {
@@ -188,6 +189,7 @@ model NotificationJob {
   provider          String?
   providerMessageId String?
   userId            String?
+  user              User?                 @relation(fields: [userId], references: [id], onDelete: Cascade)
   goalId            String?
   dedupeKey         String?               @unique
   createdAt         DateTime              @default(now())

@@ -1,12 +1,12 @@
-import { IsBoolean, IsOptional } from 'class-validator';
+import { IsBoolean, ValidateIf } from 'class-validator';
 import type { UpdateAccountConsentsRequest } from '../../contracts/generated/types.gen';
 
 export class UpdateConsentsDto implements UpdateAccountConsentsRequest {
-  @IsOptional()
+  @ValidateIf((_object, value) => value !== undefined)
   @IsBoolean()
   analyticsEnabled?: boolean;
 
-  @IsOptional()
+  @ValidateIf((_object, value) => value !== undefined)
   @IsBoolean()
   productResearchEnabled?: boolean;
 }

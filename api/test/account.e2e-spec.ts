@@ -79,6 +79,11 @@ describe('Account self-service (e2e)', () => {
     await request(app.getHttpServer())
       .put('/account/consents')
       .set(auth)
+      .send({ analyticsEnabled: null })
+      .expect(400);
+    await request(app.getHttpServer())
+      .put('/account/consents')
+      .set(auth)
       .send({ analyticsEnabled: true, productResearchEnabled: false })
       .expect(200)
       .expect((response) => {

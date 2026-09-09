@@ -10,6 +10,7 @@ describe('NotificationQueueService', () => {
       create: jest.Mock;
       findFirst: jest.Mock;
       updateMany: jest.Mock;
+      findUnique: jest.Mock;
       findUniqueOrThrow: jest.Mock;
       update: jest.Mock;
       count: jest.Mock;
@@ -29,6 +30,7 @@ describe('NotificationQueueService', () => {
         create: jest.fn(),
         findFirst: jest.fn(),
         updateMany: jest.fn(),
+        findUnique: jest.fn().mockResolvedValue({ id: 'persisted_job' }),
         findUniqueOrThrow: jest.fn(),
         update: jest.fn(),
         count: jest.fn(),
@@ -121,44 +123,44 @@ describe('NotificationQueueService', () => {
     await expect(
       queue.beginAccountDeletion('user_1', '+2348000000000'),
     ).resolves.toEqual(['linked_job', 'legacy_job']);
-    expect(
+    await expect(
       queue.canDeliver({
         id: 'linked_job',
         userId: 'user_1',
         payload: { phone: '+2348000000000', otp: '123456' },
       } as never),
-    ).toBe(false);
-    expect(
+    ).resolves.toBe(false);
+    await expect(
       queue.canDeliver({
         id: 'legacy_job',
         userId: null,
         payload: { phone: '+2348000000000', otp: '123456' },
       } as never),
-    ).toBe(false);
-    expect(
+    ).resolves.toBe(false);
+    await expect(
       queue.canDeliver({
         id: 'other_job',
         userId: null,
         payload: { phone: '<redacted>', redacted: true },
       } as never),
-    ).toBe(true);
+    ).resolves.toBe(true);
 
     queue.restoreForAccount('user_1');
 
-    expect(
+    await expect(
       queue.canDeliver({
         id: 'linked_job',
         userId: 'user_1',
         payload: { phone: '+2348000000000', otp: '123456' },
       } as never),
-    ).toBe(true);
-    expect(
+    ).resolves.toBe(true);
+    await expect(
       queue.canDeliver({
         id: 'legacy_job',
         userId: null,
         payload: { phone: '+2348000000000', otp: '123456' },
       } as never),
-    ).toBe(true);
+    ).resolves.toBe(true);
   });
 
   it('blocks a legacy job while deletion is discovering account jobs', async () => {
@@ -172,16 +174,32 @@ describe('NotificationQueueService', () => {
 
     const deletion = queue.beginAccountDeletion('user_1', '+2348000000000');
 
-    expect(
+    await expect(
       queue.canDeliver({
         id: 'legacy_job',
         userId: null,
         payload: { phone: '+2348000000000', otp: '123456' },
       } as never),
-    ).toBe(false);
+    ).resolves.toBe(false);
 
     finishDiscovery?.([]);
     await deletion;
+  });
+
+  it('rechecks persisted state before a worker delivers a claimed job', async () => {
+    prisma.notificationJob.findUnique.mockResolvedValue(null);
+
+    await expect(
+      queue.canDeliver({
+        id: 'deleted_job',
+        userId: 'user_1',
+        payload: { phone: '+2348000000000', otp: '123456' },
+      } as never),
+    ).resolves.toBe(false);
+    expect(prisma.notificationJob.findUnique).toHaveBeenCalledWith({
+      where: { id: 'deleted_job' },
+      select: { id: true },
+    });
   });
 
   it('encrypts readiness jobs with customer metadata and a dedupe key', async () => {
