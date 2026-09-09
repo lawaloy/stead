@@ -143,8 +143,10 @@ This sequence is intentional. Stead should prioritize user-facing product surfac
     and history in mobile.
   - Completed: weekly readiness/risk-alert preferences and SMS delivery
     behavior.
-  - Next: define account and data self-service, including consent, export, and
-    deletion.
+  - Completed: account profile, optional consent history, sanitized export,
+    configured support, and guarded permanent deletion.
+  - Next discovery: select an automatic financial-data ingestion approach and
+    define its consent, reconciliation, and failure boundaries.
   - Detailed status and sequencing live in
     [Project Status](project-status.md#milestone-tracking).
 - Enabling and architecture priorities:

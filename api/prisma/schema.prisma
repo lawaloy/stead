@@ -8,16 +8,47 @@ datasource db {
 }
 
 model User {
-  id        String   @id @default(uuid())
-  phone     String   @unique
-  createdAt DateTime @default(now())
+  id          String   @id @default(uuid())
+  phone       String   @unique
+  displayName String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @default(now()) @updatedAt
 
-  authEvents      AuthEvent[]
-  otpCodes        OtpCode[]
-  goals           Goal[]
-  transactions    Transaction[]
-  alertPreference AlertPreference?
-  alertStates     AlertState[]
+  authEvents        AuthEvent[]
+  otpCodes          OtpCode[]
+  goals             Goal[]
+  transactions      Transaction[]
+  alertPreference   AlertPreference?
+  alertStates       AlertState[]
+  consentPreference ConsentPreference?
+  consentRecords    ConsentRecord[]
+  notificationJobs  NotificationJob[]
+}
+
+enum ConsentCategory {
+  analytics
+  product_research
+}
+
+model ConsentRecord {
+  id        String          @id @default(uuid())
+  userId    String
+  user      User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category  ConsentCategory
+  granted   Boolean
+  createdAt DateTime        @default(now())
+
+  @@index([userId, category, createdAt])
+}
+
+model ConsentPreference {
+  id                     String   @id @default(uuid())
+  userId                 String   @unique
+  user                   User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  analyticsEnabled       Boolean  @default(false)
+  productResearchEnabled Boolean  @default(false)
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
 }
 
 enum AuthEventType {
@@ -158,6 +189,7 @@ model NotificationJob {
   provider          String?
   providerMessageId String?
   userId            String?
+  user              User?                 @relation(fields: [userId], references: [id], onDelete: Cascade)
   goalId            String?
   dedupeKey         String?               @unique
   createdAt         DateTime              @default(now())

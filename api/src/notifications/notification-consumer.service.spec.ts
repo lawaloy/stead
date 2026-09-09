@@ -9,6 +9,7 @@ describe('NotificationConsumerService', () => {
     markSucceeded: jest.Mock;
     markFailed: jest.Mock;
     redactTerminalPayloads: jest.Mock;
+    canDeliver: jest.Mock;
   };
   let sms: {
     sendOtp: jest.Mock;
@@ -49,6 +50,7 @@ describe('NotificationConsumerService', () => {
       markSucceeded: jest.fn(),
       markFailed: jest.fn(),
       redactTerminalPayloads: jest.fn().mockResolvedValue(undefined),
+      canDeliver: jest.fn().mockReturnValue(true),
     };
     sms = {
       sendOtp: jest.fn(),
@@ -76,6 +78,17 @@ describe('NotificationConsumerService', () => {
       provider: 'twilio',
       providerMessageId: 'SM123',
     });
+    expect(queue.markFailed).not.toHaveBeenCalled();
+  });
+
+  it('does not deliver a claimed job once account deletion starts', async () => {
+    queue.claimReadyJob.mockResolvedValue({ ...job, userId: 'user_1' });
+    queue.canDeliver.mockReturnValue(false);
+
+    await tick();
+
+    expect(sms.sendOtp).not.toHaveBeenCalled();
+    expect(queue.markSucceeded).not.toHaveBeenCalled();
     expect(queue.markFailed).not.toHaveBeenCalled();
   });
 

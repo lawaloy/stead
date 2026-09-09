@@ -114,8 +114,8 @@ describe('AuthService OTP crypto padding', () => {
       expect(randomInt).toHaveBeenCalledWith(0, 1_000_000);
       expect(response).toEqual({ ok: true, otp: expectedOtp });
       expect(notificationPublisher.publishOtpRequested).toHaveBeenCalledWith({
-        phone: '+2348012345678',
-        otp: expectedOtp,
+        userId: 'user_1',
+        payload: { phone: '+2348012345678', otp: expectedOtp },
       });
     },
   );

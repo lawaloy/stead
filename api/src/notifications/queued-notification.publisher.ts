@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { NotificationQueueService } from './notification-queue.service';
 import type {
   NotificationPublisher,
-  OtpRequestedPayload,
+  OtpRequestedInput,
   ReadinessAlertInput,
 } from './notification-publisher';
 
@@ -10,8 +10,8 @@ import type {
 export class QueuedNotificationPublisher implements NotificationPublisher {
   constructor(private readonly queue: NotificationQueueService) {}
 
-  async publishOtpRequested(payload: OtpRequestedPayload): Promise<void> {
-    await this.queue.enqueueOtpRequested(payload);
+  async publishOtpRequested(input: OtpRequestedInput): Promise<void> {
+    await this.queue.enqueueOtpRequested(input.payload, input.userId);
   }
 
   publishReadinessAlert(input: ReadinessAlertInput): Promise<boolean> {

@@ -2,6 +2,77 @@
 
 import * as z from 'zod';
 
+export const zAccountProfile = z.object({
+  id: z.string().min(1),
+  phone: z.string().min(1),
+  displayName: z.string().nullable(),
+  createdAt: z.iso.datetime(),
+  updatedAt: z.iso.datetime(),
+});
+
+export const zAccountConsents = z.object({
+  analyticsEnabled: z.boolean(),
+  productResearchEnabled: z.boolean(),
+  updatedAt: z.iso.datetime().nullable(),
+});
+
+export const zAccountResponse = z.object({
+  profile: zAccountProfile,
+  consents: zAccountConsents,
+});
+
+export const zUpdateAccountProfileRequest = z.object({
+  displayName: z.string().min(1).max(100).nullish(),
+});
+
+export const zUpdateAccountConsentsRequest = z.object({
+  analyticsEnabled: z.boolean().optional(),
+  productResearchEnabled: z.boolean().optional(),
+});
+
+export const zDeleteAccountRequest = z.object({
+  confirmation: z.enum(['DELETE']),
+});
+
+export const zDeleteAccountResponse = z.object({
+  ok: z.literal(true),
+  deletedAt: z.iso.datetime(),
+});
+
+export const zConsentCategory = z.enum(['analytics', 'product_research']);
+
+export const zConsentHistoryRecord = z.object({
+  category: zConsentCategory,
+  granted: z.boolean(),
+  createdAt: z.iso.datetime(),
+});
+
+export const zExportAlertPreferences = z.object({
+  weeklySummaryEnabled: z.boolean(),
+  riskAlertsEnabled: z.boolean(),
+  timeZone: z.string(),
+  weeklyDay: z.int(),
+  weeklyHourLocal: z.int(),
+  updatedAt: z.iso.datetime(),
+});
+
+export const zExportAuthEvent = z.object({
+  type: z.string(),
+  countryIso: z.string(),
+  createdAt: z.iso.datetime(),
+});
+
+export const zExportNotification = z.object({
+  id: z.string(),
+  type: z.string(),
+  status: z.string(),
+  provider: z.string().nullable(),
+  providerMessageId: z.string().nullable(),
+  createdAt: z.iso.datetime(),
+  sentAt: z.iso.datetime().nullable(),
+  failedAt: z.iso.datetime().nullable(),
+});
+
 export const zUpdateAlertPreferencesRequest = z.object({
   weeklySummaryEnabled: z.boolean().optional(),
   riskAlertsEnabled: z.boolean().optional(),
@@ -84,6 +155,18 @@ export const zGoalStatus = z.enum([
   'replaced',
 ]);
 
+export const zExportGoal = z.object({
+  id: z.string(),
+  name: z.string(),
+  amountTotalKobo: z.int(),
+  dueDate: z.iso.datetime(),
+  monthlyIncomeKobo: z.int().nullable(),
+  isActive: z.boolean(),
+  status: zGoalStatus,
+  endedAt: z.iso.datetime().nullable(),
+  createdAt: z.iso.datetime(),
+});
+
 export const zGoal = z.object({
   id: z.string().min(1),
   userId: z.string().min(1),
@@ -98,6 +181,29 @@ export const zGoal = z.object({
 });
 
 export const zTransactionDirection = z.enum(['in', 'out']);
+
+export const zExportTransaction = z.object({
+  id: z.string(),
+  goalId: z.string().nullable(),
+  amountKobo: z.int(),
+  direction: zTransactionDirection,
+  occurredAt: z.iso.datetime(),
+  note: z.string().nullable(),
+  createdAt: z.iso.datetime(),
+});
+
+export const zAccountDataExport = z.object({
+  schemaVersion: z.literal(1),
+  exportedAt: z.iso.datetime(),
+  profile: zAccountProfile,
+  consents: zAccountConsents,
+  consentHistory: z.array(zConsentHistoryRecord),
+  goals: z.array(zExportGoal),
+  transactions: z.array(zExportTransaction),
+  alertPreferences: zExportAlertPreferences.nullable(),
+  authHistory: z.array(zExportAuthEvent),
+  notificationHistory: z.array(zExportNotification),
+});
 
 export const zCreateTransactionRequest = z.object({
   direction: zTransactionDirection,
@@ -312,3 +418,34 @@ export const zUpdateAlertPreferencesBody = zUpdateAlertPreferencesRequest;
  * Updated customer notification preferences.
  */
 export const zUpdateAlertPreferencesResponse = zAlertPreferences;
+
+export const zDeleteAccountBody = zDeleteAccountRequest;
+
+/**
+ * Account and associated customer data permanently deleted.
+ */
+export const zDeleteAccountResponse2 = zDeleteAccountResponse;
+
+/**
+ * Customer profile and current optional-consent choices.
+ */
+export const zGetAccountResponse = zAccountResponse;
+
+export const zUpdateAccountProfileBody = zUpdateAccountProfileRequest;
+
+/**
+ * Updated customer account.
+ */
+export const zUpdateAccountProfileResponse = zAccountResponse;
+
+export const zUpdateAccountConsentsBody = zUpdateAccountConsentsRequest;
+
+/**
+ * Updated optional-consent choices with an auditable change record.
+ */
+export const zUpdateAccountConsentsResponse = zAccountResponse;
+
+/**
+ * Portable JSON export of customer-visible and account activity data.
+ */
+export const zExportAccountDataResponse = zAccountDataExport;

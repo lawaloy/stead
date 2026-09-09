@@ -10,11 +10,13 @@ describe('NotificationQueueService', () => {
       create: jest.Mock;
       findFirst: jest.Mock;
       updateMany: jest.Mock;
+      findUnique: jest.Mock;
       findUniqueOrThrow: jest.Mock;
       update: jest.Mock;
       count: jest.Mock;
       groupBy: jest.Mock;
       findMany: jest.Mock;
+      deleteMany: jest.Mock;
     };
     notificationFailureAttempt: {
       count: jest.Mock;
@@ -28,11 +30,13 @@ describe('NotificationQueueService', () => {
         create: jest.fn(),
         findFirst: jest.fn(),
         updateMany: jest.fn(),
+        findUnique: jest.fn().mockResolvedValue({ id: 'persisted_job' }),
         findUniqueOrThrow: jest.fn(),
         update: jest.fn(),
         count: jest.fn(),
         groupBy: jest.fn(),
         findMany: jest.fn(),
+        deleteMany: jest.fn(),
       },
       notificationFailureAttempt: {
         count: jest.fn(),
@@ -96,6 +100,106 @@ describe('NotificationQueueService', () => {
       otp: '123456',
     });
     expect(prisma.notificationJob.create).toHaveBeenCalled();
+  });
+
+  it('deletes linked and legacy queued jobs for an account phone', async () => {
+    let legacyPayload = '';
+    prisma.notificationJob.create.mockImplementation(
+      (input: { data: { payloadJson: string } }) => {
+        legacyPayload = input.data.payloadJson;
+        return Promise.resolve({ id: 'legacy_job' });
+      },
+    );
+    await queue.enqueueOtpRequested({
+      phone: '+2348000000000',
+      otp: '123456',
+    });
+    prisma.notificationJob.findMany.mockResolvedValue([
+      { id: 'linked_job', userId: 'user_1', payloadJson: '{}' },
+      { id: 'legacy_job', userId: null, payloadJson: legacyPayload },
+      { id: 'other_job', userId: null, payloadJson: redactedPayloadJson },
+    ]);
+
+    await expect(
+      queue.beginAccountDeletion('user_1', '+2348000000000'),
+    ).resolves.toEqual(['linked_job', 'legacy_job']);
+    await expect(
+      queue.canDeliver({
+        id: 'linked_job',
+        userId: 'user_1',
+        payload: { phone: '+2348000000000', otp: '123456' },
+      } as never),
+    ).resolves.toBe(false);
+    await expect(
+      queue.canDeliver({
+        id: 'legacy_job',
+        userId: null,
+        payload: { phone: '+2348000000000', otp: '123456' },
+      } as never),
+    ).resolves.toBe(false);
+    await expect(
+      queue.canDeliver({
+        id: 'other_job',
+        userId: null,
+        payload: { phone: '<redacted>', redacted: true },
+      } as never),
+    ).resolves.toBe(true);
+
+    queue.restoreForAccount('user_1');
+
+    await expect(
+      queue.canDeliver({
+        id: 'linked_job',
+        userId: 'user_1',
+        payload: { phone: '+2348000000000', otp: '123456' },
+      } as never),
+    ).resolves.toBe(true);
+    await expect(
+      queue.canDeliver({
+        id: 'legacy_job',
+        userId: null,
+        payload: { phone: '+2348000000000', otp: '123456' },
+      } as never),
+    ).resolves.toBe(true);
+  });
+
+  it('blocks a legacy job while deletion is discovering account jobs', async () => {
+    let finishDiscovery: ((jobs: never[]) => void) | undefined;
+    prisma.notificationJob.findMany.mockImplementation(
+      () =>
+        new Promise<never[]>((resolve) => {
+          finishDiscovery = resolve;
+        }),
+    );
+
+    const deletion = queue.beginAccountDeletion('user_1', '+2348000000000');
+
+    await expect(
+      queue.canDeliver({
+        id: 'legacy_job',
+        userId: null,
+        payload: { phone: '+2348000000000', otp: '123456' },
+      } as never),
+    ).resolves.toBe(false);
+
+    finishDiscovery?.([]);
+    await deletion;
+  });
+
+  it('rechecks persisted state before a worker delivers a claimed job', async () => {
+    prisma.notificationJob.findUnique.mockResolvedValue(null);
+
+    await expect(
+      queue.canDeliver({
+        id: 'deleted_job',
+        userId: 'user_1',
+        payload: { phone: '+2348000000000', otp: '123456' },
+      } as never),
+    ).resolves.toBe(false);
+    expect(prisma.notificationJob.findUnique).toHaveBeenCalledWith({
+      where: { id: 'deleted_job' },
+      select: { id: true },
+    });
   });
 
   it('encrypts readiness jobs with customer metadata and a dedupe key', async () => {

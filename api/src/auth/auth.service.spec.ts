@@ -178,8 +178,11 @@ describe('AuthService', () => {
       },
     });
     expect(notificationPublisher.publishOtpRequested).toHaveBeenCalledWith({
-      phone: '+2348012345678',
-      otp: expect.any(String) as unknown,
+      userId: 'user_1',
+      payload: {
+        phone: '+2348012345678',
+        otp: expect.any(String) as unknown,
+      },
     });
     expect(telemetry.recordEvent).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -207,8 +210,11 @@ describe('AuthService', () => {
     expect(response).toEqual({ ok: true });
     expect(response).not.toHaveProperty('otp');
     expect(notificationPublisher.publishOtpRequested).toHaveBeenCalledWith({
-      phone: '+2348012345678',
-      otp: expect.any(String) as unknown,
+      userId: 'user_1',
+      payload: {
+        phone: '+2348012345678',
+        otp: expect.any(String) as unknown,
+      },
     });
   });
 
@@ -235,8 +241,8 @@ describe('AuthService', () => {
       otp: expect.stringMatching(/^\d{6}$/) as unknown,
     });
     expect(notificationPublisher.publishOtpRequested).toHaveBeenCalledWith({
-      phone: '+2348012345678',
-      otp: response.otp,
+      userId: 'user_1',
+      payload: { phone: '+2348012345678', otp: response.otp },
     });
     expect(insecureRandom).not.toHaveBeenCalled();
   });

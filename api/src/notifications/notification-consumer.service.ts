@@ -42,6 +42,12 @@ export class NotificationConsumerService
     try {
       const job = await this.queue.claimReadyJob();
       if (!job) return;
+      if (!(await this.queue.canDeliver(job))) {
+        this.logger.log(
+          `Notification job cancelled during account deletion id=${job.id}`,
+        );
+        return;
+      }
 
       try {
         const result = await this.processJob(job);

@@ -1,4 +1,7 @@
 export {
+  zAccountDataExport as AccountDataExportSchema,
+  zAccountResponse as AccountResponseSchema,
+  zDeleteAccountResponse as DeleteAccountResponseSchema,
   zAuthCountriesResponse as AuthCountriesResponseSchema,
   zAuthCountry as AuthCountrySchema,
   zAlertPreferences as AlertPreferencesSchema,
@@ -14,6 +17,8 @@ export {
 } from '../contracts/generated/zod.gen';
 
 export type {
+  AccountDataExport,
+  AccountResponse,
   AuthCountriesResponse,
   AuthCountry,
   AlertPreferences,

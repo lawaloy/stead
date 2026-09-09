@@ -256,8 +256,8 @@ export class AuthService {
     });
 
     await this.notificationPublisher.publishOtpRequested({
-      phone: normalizedPhone,
-      otp,
+      userId: user.id,
+      payload: { phone: normalizedPhone, otp },
     });
 
     if (this.config.get<string>('DEV_EXPOSE_OTP') === 'true') {

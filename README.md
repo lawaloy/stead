@@ -5,11 +5,13 @@ Stead is a Financial Stability Layer that turns cashflow into decision intellige
 Current repository status:
 
 - API: the core auth, goal lifecycle/history, manual-transaction,
-  stability-dashboard, and persisted OTP/readiness-notification boundaries are
-  implemented.
+  stability-dashboard, account/data self-service, and persisted
+  OTP/readiness-notification boundaries are implemented.
 - Mobile: the core vertical slice supports OTP login, active-goal creation,
   manual transaction creation, transaction history/filtering/edit/delete, and
   dashboard viewing, goal lifecycle/history, and SMS notification preferences.
+  Customers can also manage their profile and optional consents, export their
+  data, contact configured support, and permanently delete their account.
 - Verification: auth/notification and finance have PostgreSQL-backed e2e
   coverage. Transaction screens have automated component journeys; the app
   still lacks a full mobile-to-API and native-device acceptance suite.
@@ -21,6 +23,10 @@ Weekly summaries and material risk/recovery alerts are opt-in. Customers choose
 their local weekly schedule in the mobile app; delivery uses the same encrypted,
 retryable SMS queue as OTP. See [docs/readiness-alerts.md](docs/readiness-alerts.md)
 for the rules and operational boundaries.
+
+Account export, optional-consent history, deletion behavior, retention policy,
+and support configuration are documented in
+[docs/account-data-self-service.md](docs/account-data-self-service.md).
 
 Quick links
 
@@ -74,7 +80,10 @@ cd mobile
 npm run start
 ```
 
-Copy `mobile/.env.example` to `mobile/.env` and set `EXPO_PUBLIC_API_URL` when the API is not running on the default local URL.
+Copy `mobile/.env.example` to `mobile/.env` and set `EXPO_PUBLIC_API_URL` when
+the API is not running on the default local URL. Set
+`EXPO_PUBLIC_SUPPORT_EMAIL` to the staffed customer-support address for the
+target environment.
 
 Useful checks:
 

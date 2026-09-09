@@ -180,7 +180,8 @@ remain intentionally operator-only.
 
 ### 5.2 Current Boundaries
 
-- Identity and access: users, OTP lifecycle, JWT sessions, auth telemetry
+- Identity and access: users, profiles, optional consent history, data export,
+  account deletion, OTP lifecycle, JWT sessions, auth telemetry
 - Financial inputs: goals, transactions, goal contribution tagging
 - Planning and scoring: readiness, monthly pace, safe-to-spend, stability score/status
 - Messaging: notification jobs, SMS provider abstraction, retry/dead-letter state
@@ -197,10 +198,10 @@ gaps are:
 1. Real-provider OTP validation on native Android and iOS devices.
 2. Automated auth and dashboard screen coverage plus a full mobile-to-API
    journey; transaction and goal screens now have component journeys.
-3. Production session lifecycle, operational monitoring, backup/restore,
-   privacy, retention, and account-deletion procedures.
-4. Automatic financial-data ingestion, richer obligation planning, customer
-   profile/preferences, and internal operations tooling.
+3. Production session lifecycle, operational monitoring, backup/restore, and
+   enforcement of documented privacy/retention/account-deletion procedures.
+4. Automatic financial-data ingestion, richer obligation planning, and
+   internal operations tooling.
 5. Customer validation of stability thresholds and alert copy, plus live SMS
    delivery validation on native devices.
 

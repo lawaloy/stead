@@ -128,8 +128,11 @@ describe('AuthService device header edges', () => {
 
     expect(telemetry.countRecentEvents).not.toHaveBeenCalled();
     expect(notificationPublisher.publishOtpRequested).toHaveBeenCalledWith({
-      phone: '+2348012345678',
-      otp: expect.any(String) as unknown,
+      userId: 'user_1',
+      payload: {
+        phone: '+2348012345678',
+        otp: expect.any(String) as unknown,
+      },
     });
     expect(telemetry.recordEvent).toHaveBeenCalledWith(
       expect.objectContaining({

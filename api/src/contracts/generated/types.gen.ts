@@ -4,6 +4,112 @@ export type ClientOptions = {
   baseUrl: 'http://localhost:3000' | (string & {});
 };
 
+export type AccountProfile = {
+  id: string;
+  phone: string;
+  displayName: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type AccountConsents = {
+  analyticsEnabled: boolean;
+  productResearchEnabled: boolean;
+  updatedAt: string | null;
+};
+
+export type AccountResponse = {
+  profile: AccountProfile;
+  consents: AccountConsents;
+};
+
+export type UpdateAccountProfileRequest = {
+  displayName?: string | null;
+};
+
+export type UpdateAccountConsentsRequest = {
+  analyticsEnabled?: boolean;
+  productResearchEnabled?: boolean;
+};
+
+export type DeleteAccountRequest = {
+  confirmation: 'DELETE';
+};
+
+export type DeleteAccountResponse = {
+  ok: true;
+  deletedAt: string;
+};
+
+export type ConsentCategory = 'analytics' | 'product_research';
+
+export type ConsentHistoryRecord = {
+  category: ConsentCategory;
+  granted: boolean;
+  createdAt: string;
+};
+
+export type ExportGoal = {
+  id: string;
+  name: string;
+  amountTotalKobo: number;
+  dueDate: string;
+  monthlyIncomeKobo: number | null;
+  isActive: boolean;
+  status: GoalStatus;
+  endedAt: string | null;
+  createdAt: string;
+};
+
+export type ExportTransaction = {
+  id: string;
+  goalId: string | null;
+  amountKobo: number;
+  direction: TransactionDirection;
+  occurredAt: string;
+  note: string | null;
+  createdAt: string;
+};
+
+export type ExportAlertPreferences = {
+  weeklySummaryEnabled: boolean;
+  riskAlertsEnabled: boolean;
+  timeZone: string;
+  weeklyDay: number;
+  weeklyHourLocal: number;
+  updatedAt: string;
+};
+
+export type ExportAuthEvent = {
+  type: string;
+  countryIso: string;
+  createdAt: string;
+};
+
+export type ExportNotification = {
+  id: string;
+  type: string;
+  status: string;
+  provider: string | null;
+  providerMessageId: string | null;
+  createdAt: string;
+  sentAt: string | null;
+  failedAt: string | null;
+};
+
+export type AccountDataExport = {
+  schemaVersion: 1;
+  exportedAt: string;
+  profile: AccountProfile;
+  consents: AccountConsents;
+  consentHistory: Array<ConsentHistoryRecord>;
+  goals: Array<ExportGoal>;
+  transactions: Array<ExportTransaction>;
+  alertPreferences: ExportAlertPreferences | null;
+  authHistory: Array<ExportAuthEvent>;
+  notificationHistory: Array<ExportNotification>;
+};
+
 export type UpdateAlertPreferencesRequest = {
   weeklySummaryEnabled?: boolean;
   riskAlertsEnabled?: boolean;
@@ -650,3 +756,167 @@ export type UpdateAlertPreferencesResponses = {
 
 export type UpdateAlertPreferencesResponse =
   UpdateAlertPreferencesResponses[keyof UpdateAlertPreferencesResponses];
+
+export type DeleteAccountData = {
+  body: DeleteAccountRequest;
+  path?: never;
+  query?: never;
+  url: '/account';
+};
+
+export type DeleteAccountErrors = {
+  /**
+   * Request validation or domain validation failed.
+   */
+  400: ErrorResponse;
+  /**
+   * Authentication is missing or invalid.
+   */
+  401: ErrorResponse;
+  /**
+   * Resource not found.
+   */
+  404: ErrorResponse;
+};
+
+export type DeleteAccountError = DeleteAccountErrors[keyof DeleteAccountErrors];
+
+export type DeleteAccountResponses = {
+  /**
+   * Account and associated customer data permanently deleted.
+   */
+  200: DeleteAccountResponse;
+};
+
+export type DeleteAccountResponse2 =
+  DeleteAccountResponses[keyof DeleteAccountResponses];
+
+export type GetAccountData = {
+  body?: never;
+  path?: never;
+  query?: never;
+  url: '/account';
+};
+
+export type GetAccountErrors = {
+  /**
+   * Authentication is missing or invalid.
+   */
+  401: ErrorResponse;
+  /**
+   * Resource not found.
+   */
+  404: ErrorResponse;
+};
+
+export type GetAccountError = GetAccountErrors[keyof GetAccountErrors];
+
+export type GetAccountResponses = {
+  /**
+   * Customer profile and current optional-consent choices.
+   */
+  200: AccountResponse;
+};
+
+export type GetAccountResponse = GetAccountResponses[keyof GetAccountResponses];
+
+export type UpdateAccountProfileData = {
+  body: UpdateAccountProfileRequest;
+  path?: never;
+  query?: never;
+  url: '/account/profile';
+};
+
+export type UpdateAccountProfileErrors = {
+  /**
+   * Request validation or domain validation failed.
+   */
+  400: ErrorResponse;
+  /**
+   * Authentication is missing or invalid.
+   */
+  401: ErrorResponse;
+  /**
+   * Resource not found.
+   */
+  404: ErrorResponse;
+};
+
+export type UpdateAccountProfileError =
+  UpdateAccountProfileErrors[keyof UpdateAccountProfileErrors];
+
+export type UpdateAccountProfileResponses = {
+  /**
+   * Updated customer account.
+   */
+  200: AccountResponse;
+};
+
+export type UpdateAccountProfileResponse =
+  UpdateAccountProfileResponses[keyof UpdateAccountProfileResponses];
+
+export type UpdateAccountConsentsData = {
+  body: UpdateAccountConsentsRequest;
+  path?: never;
+  query?: never;
+  url: '/account/consents';
+};
+
+export type UpdateAccountConsentsErrors = {
+  /**
+   * Request validation or domain validation failed.
+   */
+  400: ErrorResponse;
+  /**
+   * Authentication is missing or invalid.
+   */
+  401: ErrorResponse;
+  /**
+   * Resource not found.
+   */
+  404: ErrorResponse;
+};
+
+export type UpdateAccountConsentsError =
+  UpdateAccountConsentsErrors[keyof UpdateAccountConsentsErrors];
+
+export type UpdateAccountConsentsResponses = {
+  /**
+   * Updated optional-consent choices with an auditable change record.
+   */
+  200: AccountResponse;
+};
+
+export type UpdateAccountConsentsResponse =
+  UpdateAccountConsentsResponses[keyof UpdateAccountConsentsResponses];
+
+export type ExportAccountDataData = {
+  body?: never;
+  path?: never;
+  query?: never;
+  url: '/account/export';
+};
+
+export type ExportAccountDataErrors = {
+  /**
+   * Authentication is missing or invalid.
+   */
+  401: ErrorResponse;
+  /**
+   * Resource not found.
+   */
+  404: ErrorResponse;
+};
+
+export type ExportAccountDataError =
+  ExportAccountDataErrors[keyof ExportAccountDataErrors];
+
+export type ExportAccountDataResponses = {
+  /**
+   * Portable JSON export of customer-visible and account activity data.
+   */
+  200: AccountDataExport;
+};
+
+export type ExportAccountDataResponse =
+  ExportAccountDataResponses[keyof ExportAccountDataResponses];
