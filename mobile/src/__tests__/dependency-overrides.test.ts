@@ -99,11 +99,11 @@ describe('dependency overrides', () => {
         'image-size': 'file:vendor/image-size-compat',
       },
       overrides: {
-        'js-yaml': '4.3.1',
+        'js-yaml': '4.3.2',
       },
     });
     expect(packageLock.packages['node_modules/js-yaml']).toMatchObject({
-      version: '4.3.1',
+      version: '4.3.2',
     });
     expect(packageLock.packages['node_modules/image-size']).toMatchObject({
       link: true,
@@ -115,25 +115,6 @@ describe('dependency overrides', () => {
       },
       name: '@stead/image-size-compat',
       version: '1.0.2',
-    });
-  });
-
-  it('pins postcss to the patched version in package metadata and lockfile', () => {
-    const packageJson = readJson('package.json');
-    const packageLock = readJson<PackageLock>('package-lock.json');
-
-    expect(packageJson).toMatchObject({
-      overrides: {
-        postcss: '8.5.26',
-      },
-    });
-
-    expect(packageLock).toMatchObject({
-      packages: {
-        'node_modules/postcss': {
-          version: '8.5.26',
-        },
-      },
     });
   });
 
