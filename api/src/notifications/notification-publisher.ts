@@ -5,6 +5,11 @@ export interface OtpRequestedPayload {
   otp: string;
 }
 
+export interface OtpRequestedInput {
+  userId: string;
+  payload: OtpRequestedPayload;
+}
+
 export type ReadinessAlertType =
   'weekly.summary' | 'risk.alert' | 'risk.recovery';
 
@@ -22,6 +27,6 @@ export interface ReadinessAlertInput {
 }
 
 export interface NotificationPublisher {
-  publishOtpRequested(payload: OtpRequestedPayload): Promise<void>;
+  publishOtpRequested(input: OtpRequestedInput): Promise<void>;
   publishReadinessAlert(input: ReadinessAlertInput): Promise<boolean>;
 }

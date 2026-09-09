@@ -309,6 +309,109 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
+  /account:
+    get:
+      operationId: getAccount
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Customer profile and current optional-consent choices.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccountResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      operationId: deleteAccount
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeleteAccountRequest'
+      responses:
+        '200':
+          description: Account and associated customer data permanently deleted.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeleteAccountResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /account/profile:
+    patch:
+      operationId: updateAccountProfile
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateAccountProfileRequest'
+      responses:
+        '200':
+          description: Updated customer account.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccountResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /account/consents:
+    put:
+      operationId: updateAccountConsents
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateAccountConsentsRequest'
+      responses:
+        '200':
+          description: Updated optional-consent choices with an auditable change record.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccountResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /account/export:
+    get:
+      operationId: exportAccountData
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Portable JSON export of customer-visible and account activity data.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccountDataExport'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
 components:
   securitySchemes:
     bearerAuth:
@@ -358,6 +461,290 @@ components:
           schema:
             $ref: '#/components/schemas/ErrorResponse'
   schemas:
+    AccountProfile:
+      type: object
+      additionalProperties: false
+      required: [id, phone, displayName, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+          minLength: 1
+        phone:
+          type: string
+          minLength: 1
+        displayName:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    AccountConsents:
+      type: object
+      additionalProperties: false
+      required: [analyticsEnabled, productResearchEnabled, updatedAt]
+      properties:
+        analyticsEnabled:
+          type: boolean
+        productResearchEnabled:
+          type: boolean
+        updatedAt:
+          type: string
+          format: date-time
+          nullable: true
+    AccountResponse:
+      type: object
+      additionalProperties: false
+      required: [profile, consents]
+      properties:
+        profile:
+          $ref: '#/components/schemas/AccountProfile'
+        consents:
+          $ref: '#/components/schemas/AccountConsents'
+    UpdateAccountProfileRequest:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        displayName:
+          type: string
+          minLength: 1
+          maxLength: 100
+          nullable: true
+    UpdateAccountConsentsRequest:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        analyticsEnabled:
+          type: boolean
+        productResearchEnabled:
+          type: boolean
+    DeleteAccountRequest:
+      type: object
+      additionalProperties: false
+      required: [confirmation]
+      properties:
+        confirmation:
+          type: string
+          enum: [DELETE]
+    DeleteAccountResponse:
+      type: object
+      additionalProperties: false
+      required: [ok, deletedAt]
+      properties:
+        ok:
+          type: boolean
+          enum: [true]
+        deletedAt:
+          type: string
+          format: date-time
+    ConsentCategory:
+      type: string
+      enum: [analytics, product_research]
+    ConsentHistoryRecord:
+      type: object
+      additionalProperties: false
+      required: [category, granted, createdAt]
+      properties:
+        category:
+          $ref: '#/components/schemas/ConsentCategory'
+        granted:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+    ExportGoal:
+      type: object
+      additionalProperties: false
+      required:
+        [
+          id,
+          name,
+          amountTotalKobo,
+          dueDate,
+          monthlyIncomeKobo,
+          isActive,
+          status,
+          endedAt,
+          createdAt,
+        ]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        amountTotalKobo:
+          type: integer
+        dueDate:
+          type: string
+          format: date-time
+        monthlyIncomeKobo:
+          type: integer
+          nullable: true
+        isActive:
+          type: boolean
+        status:
+          $ref: '#/components/schemas/GoalStatus'
+        endedAt:
+          type: string
+          format: date-time
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+    ExportTransaction:
+      type: object
+      additionalProperties: false
+      required: [id, goalId, amountKobo, direction, occurredAt, note, createdAt]
+      properties:
+        id:
+          type: string
+        goalId:
+          type: string
+          nullable: true
+        amountKobo:
+          type: integer
+        direction:
+          $ref: '#/components/schemas/TransactionDirection'
+        occurredAt:
+          type: string
+          format: date-time
+        note:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+    ExportAlertPreferences:
+      type: object
+      additionalProperties: false
+      required:
+        [
+          weeklySummaryEnabled,
+          riskAlertsEnabled,
+          timeZone,
+          weeklyDay,
+          weeklyHourLocal,
+          updatedAt,
+        ]
+      properties:
+        weeklySummaryEnabled:
+          type: boolean
+        riskAlertsEnabled:
+          type: boolean
+        timeZone:
+          type: string
+        weeklyDay:
+          type: integer
+        weeklyHourLocal:
+          type: integer
+        updatedAt:
+          type: string
+          format: date-time
+    ExportAuthEvent:
+      type: object
+      additionalProperties: false
+      required: [type, countryIso, createdAt]
+      properties:
+        type:
+          type: string
+        countryIso:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+    ExportNotification:
+      type: object
+      additionalProperties: false
+      required:
+        [
+          id,
+          type,
+          status,
+          provider,
+          providerMessageId,
+          createdAt,
+          sentAt,
+          failedAt,
+        ]
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+        status:
+          type: string
+        provider:
+          type: string
+          nullable: true
+        providerMessageId:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        sentAt:
+          type: string
+          format: date-time
+          nullable: true
+        failedAt:
+          type: string
+          format: date-time
+          nullable: true
+    AccountDataExport:
+      type: object
+      additionalProperties: false
+      required:
+        [
+          schemaVersion,
+          exportedAt,
+          profile,
+          consents,
+          consentHistory,
+          goals,
+          transactions,
+          alertPreferences,
+          authHistory,
+          notificationHistory,
+        ]
+      properties:
+        schemaVersion:
+          type: integer
+          enum: [1]
+        exportedAt:
+          type: string
+          format: date-time
+        profile:
+          $ref: '#/components/schemas/AccountProfile'
+        consents:
+          $ref: '#/components/schemas/AccountConsents'
+        consentHistory:
+          type: array
+          items:
+            $ref: '#/components/schemas/ConsentHistoryRecord'
+        goals:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExportGoal'
+        transactions:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExportTransaction'
+        alertPreferences:
+          allOf:
+            - $ref: '#/components/schemas/ExportAlertPreferences'
+          nullable: true
+        authHistory:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExportAuthEvent'
+        notificationHistory:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExportNotification'
     UpdateAlertPreferencesRequest:
       type: object
       additionalProperties: false

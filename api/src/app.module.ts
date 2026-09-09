@@ -12,6 +12,7 @@ import { GoalsModule } from './goals/goals.module';
 import { TransactionsModule } from './transactions/transactions.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { AlertsModule } from './alerts/alerts.module';
+import { AccountModule } from './account/account.module';
 
 @Module({
   controllers: [AppController],
@@ -38,6 +39,7 @@ import { AlertsModule } from './alerts/alerts.module';
     TransactionsModule,
     DashboardModule,
     AlertsModule,
+    AccountModule,
   ],
 })
 export class AppModule {}

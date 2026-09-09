@@ -12,6 +12,7 @@ export const sessionQueryKeys = {
     ['transactions', sessionId] as const,
   alertPreferences: (sessionId: string | null) =>
     ['alerts', 'preferences', sessionId] as const,
+  account: (sessionId: string | null) => ['account', sessionId] as const,
 };
 
 export async function clearSessionQueryCache(

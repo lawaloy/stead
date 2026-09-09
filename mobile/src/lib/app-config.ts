@@ -31,6 +31,15 @@ export const appConfig = {
       alerts: {
         preferences: '/alerts/preferences',
       },
+      account: {
+        root: '/account',
+        profile: '/account/profile',
+        consents: '/account/consents',
+        export: '/account/export',
+      },
     },
+  },
+  support: {
+    email: process.env.EXPO_PUBLIC_SUPPORT_EMAIL?.trim() || null,
   },
 } as const;

@@ -52,17 +52,28 @@ type StoredNotificationJob = {
 @Injectable()
 export class NotificationQueueService {
   private readonly logger = new Logger(NotificationQueueService.name);
+  private readonly deletingAccountIds = new Set<string>();
+  private readonly discoveringAccountPhones = new Set<string>();
+  private readonly deletingNotificationIds = new Set<string>();
+  private readonly deletingNotificationIdsByAccount = new Map<
+    string,
+    string[]
+  >();
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
   ) {}
 
-  async enqueueOtpRequested(payload: OtpRequestedPayload): Promise<string> {
+  async enqueueOtpRequested(
+    payload: OtpRequestedPayload,
+    userId?: string,
+  ): Promise<string> {
     const job = await this.prisma.notificationJob.create({
       data: {
         type: 'otp.requested',
         payloadJson: this.encryptPayload(payload),
+        userId,
         status: 'pending',
         attempts: 0,
         maxAttempts: 3,
@@ -100,6 +111,60 @@ export class NotificationQueueService {
       }
       throw error;
     }
+  }
+
+  async beginAccountDeletion(userId: string, phone: string): Promise<string[]> {
+    this.deletingAccountIds.add(userId);
+    this.discoveringAccountPhones.add(phone);
+    const candidates = await this.prisma.notificationJob
+      .findMany({
+        where: { OR: [{ userId }, { userId: null }] },
+      })
+      .catch((error: unknown) => {
+        this.discoveringAccountPhones.delete(phone);
+        throw error;
+      });
+    const ids = candidates.flatMap((job) => {
+      if (job.userId === userId) return [job.id];
+      try {
+        const payload = this.decryptPayload(job.payloadJson);
+        return payload.phone === phone ? [job.id] : [];
+      } catch {
+        return [];
+      }
+    });
+    this.deletingNotificationIdsByAccount.set(userId, ids);
+    ids.forEach((id) => this.deletingNotificationIds.add(id));
+    this.discoveringAccountPhones.delete(phone);
+    return ids;
+  }
+
+  canDeliver(job: NotificationJob): boolean {
+    return (
+      !this.deletingNotificationIds.has(job.id) &&
+      (!job.userId || !this.deletingAccountIds.has(job.userId)) &&
+      !this.discoveringAccountPhones.has(job.payload.phone)
+    );
+  }
+
+  restoreForAccount(userId: string): void {
+    this.clearAccountDeletionBlock(userId);
+  }
+
+  finalizeAccountDeletion(userId: string): void {
+    const timer = setTimeout(
+      () => this.clearAccountDeletionBlock(userId),
+      JOB_LOCK_TIMEOUT_MS,
+    );
+    timer.unref();
+  }
+
+  private clearAccountDeletionBlock(userId: string): void {
+    this.deletingAccountIds.delete(userId);
+    const notificationIds =
+      this.deletingNotificationIdsByAccount.get(userId) ?? [];
+    notificationIds.forEach((id) => this.deletingNotificationIds.delete(id));
+    this.deletingNotificationIdsByAccount.delete(userId);
   }
 
   async claimReadyJob(): Promise<NotificationJob | null> {
@@ -156,19 +221,23 @@ export class NotificationQueueService {
     job: NotificationJob,
     input?: { provider?: string | null; providerMessageId?: string | null },
   ): Promise<void> {
-    await this.prisma.notificationJob.update({
-      where: { id: job.id },
-      data: {
-        payloadJson: REDACTED_PAYLOAD_JSON,
-        status: 'sent',
-        sentAt: new Date(),
-        provider: input?.provider || undefined,
-        providerMessageId: input?.providerMessageId || undefined,
-        lastError: null,
-        failedAt: null,
-        lockedAt: null,
-      },
-    });
+    try {
+      await this.prisma.notificationJob.update({
+        where: { id: job.id },
+        data: {
+          payloadJson: REDACTED_PAYLOAD_JSON,
+          status: 'sent',
+          sentAt: new Date(),
+          provider: input?.provider || undefined,
+          providerMessageId: input?.providerMessageId || undefined,
+          lastError: null,
+          failedAt: null,
+          lockedAt: null,
+        },
+      });
+    } catch (error: unknown) {
+      if (!this.isMissingRecord(error)) throw error;
+    }
   }
 
   async markFailed(job: NotificationJob, error: unknown): Promise<void> {
@@ -178,27 +247,31 @@ export class NotificationQueueService {
     const errorMessage =
       error instanceof Error ? error.message : 'Unknown notification error';
 
-    await this.prisma.notificationJob.update({
-      where: { id: job.id },
-      data: {
-        payloadJson: terminal ? REDACTED_PAYLOAD_JSON : undefined,
-        attempts,
-        status: terminal ? 'dead_letter' : 'pending',
-        nextRunAt: terminal
-          ? job.nextRunAt
-          : new Date(Date.now() + this.backoffMs(attempts)),
-        failedAt: now,
-        lastError: errorMessage,
-        lockedAt: null,
-        failureAttempts: {
-          create: {
-            attemptNumber: attempts,
-            terminal,
-            failedAt: now,
+    try {
+      await this.prisma.notificationJob.update({
+        where: { id: job.id },
+        data: {
+          payloadJson: terminal ? REDACTED_PAYLOAD_JSON : undefined,
+          attempts,
+          status: terminal ? 'dead_letter' : 'pending',
+          nextRunAt: terminal
+            ? job.nextRunAt
+            : new Date(Date.now() + this.backoffMs(attempts)),
+          failedAt: now,
+          lastError: errorMessage,
+          lockedAt: null,
+          failureAttempts: {
+            create: {
+              attemptNumber: attempts,
+              terminal,
+              failedAt: now,
+            },
           },
         },
-      },
-    });
+      });
+    } catch (updateError: unknown) {
+      if (!this.isMissingRecord(updateError)) throw updateError;
+    }
   }
 
   async getQueueDepth(): Promise<number> {
@@ -350,6 +423,15 @@ export class NotificationQueueService {
 
   private backoffMs(attempt: number): number {
     return Math.min(30_000, 1_000 * 2 ** attempt);
+  }
+
+  private isMissingRecord(error: unknown): boolean {
+    return (
+      error !== null &&
+      typeof error === 'object' &&
+      'code' in error &&
+      error.code === 'P2025'
+    );
   }
 
   private encryptPayload(

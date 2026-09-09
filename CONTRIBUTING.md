@@ -116,6 +116,8 @@ npm run start
 - Do not commit secrets.
 - Generate independent random values for `JWT_SECRET`, `NOTIFICATION_PAYLOAD_ENCRYPTION_KEY`, and `AUTH_DEVICE_IDENTIFIER_SECRET`; do not reuse secrets or use the example placeholders.
 - Leave `AUTH_INSPECTION_OPERATOR_USER_IDS` empty unless specific authenticated user IDs need operator access.
+- Set `EXPO_PUBLIC_SUPPORT_EMAIL` to a monitored address for release builds so
+  customers can reach support from the account screen.
 - Add new required env vars to the matching `.env.example`.
 
 ## Definition of Done

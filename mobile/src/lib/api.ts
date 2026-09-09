@@ -9,6 +9,9 @@ import {
   AuthRequestOtpResponseSchema,
   AuthVerifyOtpResponseSchema,
   AlertPreferencesSchema,
+  AccountDataExportSchema,
+  AccountResponseSchema,
+  DeleteAccountResponseSchema,
   DashboardStabilityResponseSchema,
   GoalSchema,
   OkResponseSchema,
@@ -23,6 +26,8 @@ import type {
   UpdateGoalRequest,
   VerifyOtpRequest,
   UpdateAlertPreferencesRequest,
+  UpdateAccountConsentsRequest,
+  UpdateAccountProfileRequest,
 } from '../contracts/generated/types.gen';
 
 export { ApiError } from './api-error';
@@ -210,6 +215,43 @@ export const updateAlertPreferences = async (
     payload,
   );
   return AlertPreferencesSchema.parse(response.data);
+};
+
+export const getAccount = async () => {
+  const response = await apiClient.get(appConfig.api.routes.account.root);
+  return AccountResponseSchema.parse(response.data);
+};
+
+export const updateAccountProfile = async (
+  payload: UpdateAccountProfileRequest,
+) => {
+  const response = await apiClient.patch(
+    appConfig.api.routes.account.profile,
+    payload,
+  );
+  return AccountResponseSchema.parse(response.data);
+};
+
+export const updateAccountConsents = async (
+  payload: UpdateAccountConsentsRequest,
+) => {
+  const response = await apiClient.put(
+    appConfig.api.routes.account.consents,
+    payload,
+  );
+  return AccountResponseSchema.parse(response.data);
+};
+
+export const exportAccountData = async () => {
+  const response = await apiClient.get(appConfig.api.routes.account.export);
+  return AccountDataExportSchema.parse(response.data);
+};
+
+export const deleteAccount = async () => {
+  const response = await apiClient.delete(appConfig.api.routes.account.root, {
+    data: { confirmation: 'DELETE' },
+  });
+  return DeleteAccountResponseSchema.parse(response.data);
 };
 
 export const parseApiValidationErrors = (value: unknown) => {

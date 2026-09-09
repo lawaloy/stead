@@ -105,8 +105,11 @@ describe('AuthService IP omit branches', () => {
     expect(telemetry.countRecentEvents).not.toHaveBeenCalled();
     expect(prisma.otpCode.count).toHaveBeenCalled();
     expect(notificationPublisher.publishOtpRequested).toHaveBeenCalledWith({
-      phone: '+2348012345678',
-      otp: expect.any(String) as unknown,
+      userId: 'user_1',
+      payload: {
+        phone: '+2348012345678',
+        otp: expect.any(String) as unknown,
+      },
     });
     expect(prisma.otpCode.create).toHaveBeenCalledWith({
       data: {

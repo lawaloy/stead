@@ -14,15 +14,15 @@ describe('QueuedNotificationPublisher', () => {
 
     await expect(
       publisher.publishOtpRequested({
-        phone: '+2348012345678',
-        otp: '123456',
+        userId: 'user_1',
+        payload: { phone: '+2348012345678', otp: '123456' },
       }),
     ).resolves.toBeUndefined();
 
-    expect(queue.enqueueOtpRequested).toHaveBeenCalledWith({
-      phone: '+2348012345678',
-      otp: '123456',
-    });
+    expect(queue.enqueueOtpRequested).toHaveBeenCalledWith(
+      { phone: '+2348012345678', otp: '123456' },
+      'user_1',
+    );
   });
 
   it('surfaces notification job persistence failures', async () => {
@@ -30,8 +30,8 @@ describe('QueuedNotificationPublisher', () => {
 
     await expect(
       publisher.publishOtpRequested({
-        phone: '+2348012345678',
-        otp: '123456',
+        userId: 'user_1',
+        payload: { phone: '+2348012345678', otp: '123456' },
       }),
     ).rejects.toThrow('database down');
   });

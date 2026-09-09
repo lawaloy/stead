@@ -43,3 +43,11 @@ export const StyleSheet = {
 export const Alert = {
   alert: jest.fn(),
 };
+
+export const Share = {
+  share: jest.fn().mockResolvedValue({ action: 'sharedAction' }),
+};
+
+export const Linking = {
+  openURL: jest.fn().mockResolvedValue(undefined),
+};
