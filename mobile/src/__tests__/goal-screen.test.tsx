@@ -88,11 +88,8 @@ const renderScreen = () =>
     </QueryClientProvider>,
   );
 
-const press = async (element: Parameters<typeof fireEvent.press>[0]) => {
-  await act(async () => {
-    fireEvent.press(element);
-  });
-};
+const press = (element: Parameters<typeof fireEvent.press>[0]) =>
+  fireEvent.press(element);
 
 describe('goal lifecycle screen', () => {
   beforeEach(() => {
@@ -184,19 +181,27 @@ describe('goal lifecycle screen', () => {
     await press(screen.getByRole('button', { name: 'Close form' }));
 
     await press(screen.getByRole('button', { name: 'Replace goal' }));
-    fireEvent.changeText(screen.getByLabelText('Goal name'), 'School fees');
-    fireEvent.changeText(
+    await fireEvent.changeText(
+      screen.getByLabelText('Goal name'),
+      'School fees',
+    );
+    await fireEvent.changeText(
       screen.getByLabelText('Goal target amount in naira'),
       '750000',
     );
-    fireEvent.changeText(screen.getByLabelText('Goal due date'), '2027-09-01');
+    await fireEvent.changeText(
+      screen.getByLabelText('Goal due date'),
+      '2027-09-01',
+    );
     await waitFor(() =>
       expect(screen.getByLabelText('Goal name')).toHaveProp(
         'value',
         'School fees',
       ),
     );
-    fireEvent.press(screen.getByRole('button', { name: 'Create replacement' }));
+    await fireEvent.press(
+      screen.getByRole('button', { name: 'Create replacement' }),
+    );
     expect(Alert.alert).toHaveBeenCalledWith(
       'Replace active goal?',
       expect.any(String),
@@ -218,18 +223,19 @@ describe('goal lifecycle screen', () => {
     const completion = actions?.find(
       (action) => action.text === 'Mark completed',
     );
+    expect(completion).toBeDefined();
     mockGetActiveGoal.mockResolvedValue(null);
-    completion?.onPress?.();
-    await waitFor(() =>
-      expect(mockEndGoal).toHaveBeenCalledWith('goal_active', {
-        status: 'completed',
-      }),
-    );
-    await waitFor(() =>
-      expect(
-        queryClient.getQueryData(['goal', 'active', 'session-token']),
-      ).toBeNull(),
-    );
+    await act(async () => {
+      completion?.onPress?.();
+    });
+    await waitFor(() => expect(queryClient.isMutating()).toBe(0));
+    await waitFor(() => expect(queryClient.isFetching()).toBe(0));
+    expect(mockEndGoal).toHaveBeenCalledWith('goal_active', {
+      status: 'completed',
+    });
+    expect(
+      queryClient.getQueryData(['goal', 'active', 'session-token']),
+    ).toBeNull();
     expect(
       await screen.findByRole('header', { name: 'Create a goal' }),
     ).toBeOnTheScreen();
