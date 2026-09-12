@@ -172,6 +172,10 @@ jobs:
         working-directory: mobile
         run: npm audit fix --audit-level=none
 
+      - name: Deduplicate mobile dependencies
+        working-directory: mobile
+        run: npm dedupe
+
       - name: Block high-severity production vulnerabilities
         working-directory: mobile
         run: npm audit --omit=dev --audit-level=high
