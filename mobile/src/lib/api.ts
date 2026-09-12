@@ -1,4 +1,4 @@
-import * as Axios from 'axios';
+import axios, { AxiosHeaders, isAxiosError } from 'axios';
 import { z } from 'zod';
 import { appConfig } from './app-config';
 import { resolveApiBaseUrl } from './base-url';
@@ -32,9 +32,6 @@ import type {
 
 export { ApiError } from './api-error';
 
-const axios = Axios as unknown as typeof import('axios');
-const isAxiosError = Axios.isAxiosError;
-
 type AuthConfig = {
   getToken: () => Promise<string | null>;
   onUnauthorized: () => Promise<void> | void;
@@ -53,7 +50,7 @@ apiClient.interceptors.request.use(async (config) => {
     getTokenFn(),
     installationIdStore.getOrCreateId(),
   ]);
-  if (!config.headers) config.headers = new (Axios as any).AxiosHeaders();
+  if (!config.headers) config.headers = new AxiosHeaders();
   if (token) config.headers.Authorization = `Bearer ${token}`;
   config.headers['X-Stead-Device-Id'] = installationId;
   return config;

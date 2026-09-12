@@ -86,6 +86,10 @@ README for the local migration command.
 
 ## Local Setup
 
+Use Node.js 24.15+ on the 24.x line for the complete repository. See
+[dependency maintenance](docs/dependency-policy.md) for supported version
+baselines and the overrides that still require upstream fixes.
+
 API and mobile scripts invoke the TypeScript 7 CLI through
 `@typescript/native`. Keep the `typescript` dependency mapped to
 `@typescript/typescript6` until the TypeScript 6 Removal Readiness workflow

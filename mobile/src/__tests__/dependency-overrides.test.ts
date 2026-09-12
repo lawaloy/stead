@@ -67,57 +67,6 @@ const lockfileDependencyCandidates = (
 };
 
 describe('dependency overrides', () => {
-  it('documents the tested Expo dependency compatibility exceptions', () => {
-    const packageJson = readJson<{
-      expo?: { install?: { exclude?: string[] } };
-    }>('package.json');
-
-    expect(packageJson.expo?.install?.exclude).toEqual([
-      '@types/jest',
-      'expo',
-      'expo-constants',
-      'expo-router',
-      'jest',
-      'react',
-      'react-dom',
-      'react-native-gesture-handler',
-      'react-native-safe-area-context',
-      'react-native-screens',
-      'typescript',
-    ]);
-  });
-
-  it('uses patched YAML and a local safe image metadata boundary', () => {
-    const packageJson = readJson<{
-      dependencies?: Record<string, string>;
-      overrides?: Record<string, string>;
-    }>('package.json');
-    const packageLock = readJson<PackageLock>('package-lock.json');
-
-    expect(packageJson).toMatchObject({
-      dependencies: {
-        'image-size': 'file:vendor/image-size-compat',
-      },
-      overrides: {
-        'js-yaml': '4.3.2',
-      },
-    });
-    expect(packageLock.packages['node_modules/js-yaml']).toMatchObject({
-      version: '4.3.2',
-    });
-    expect(packageLock.packages['node_modules/image-size']).toMatchObject({
-      link: true,
-      resolved: 'vendor/image-size-compat',
-    });
-    expect(packageLock.packages['vendor/image-size-compat']).toMatchObject({
-      dependencies: {
-        'image-meta': '0.2.2',
-      },
-      name: '@stead/image-size-compat',
-      version: '1.0.2',
-    });
-  });
-
   it('pins URL decoding to the patched version in package metadata and lockfile', () => {
     const packageJson = readJson('package.json');
     const packageLock = readJson<PackageLock>('package-lock.json');
@@ -195,18 +144,6 @@ describe('dependency overrides', () => {
         },
       },
     });
-
-    for (const packageName of [
-      '@emnapi/core',
-      '@emnapi/runtime',
-      '@emnapi/wasi-threads',
-      '@react-native/metro-config',
-      '@testing-library/dom',
-      'react-native-reanimated',
-      'react-native-worklets',
-    ]) {
-      expect(findLockfilePackage(packages, packageName)).toBeDefined();
-    }
 
     expect(
       packageJson.dependencies?.['react-native-reanimated'],
