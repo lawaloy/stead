@@ -9,15 +9,7 @@
     "install": {
       "exclude": [
         "@types/jest",
-        "expo",
-        "expo-constants",
-        "expo-router",
         "jest",
-        "react",
-        "react-dom",
-        "react-native-gesture-handler",
-        "react-native-safe-area-context",
-        "react-native-screens",
         "typescript"
       ]
     }
@@ -29,53 +21,51 @@
     "web": "expo start --web",
     "lint": "eslint . --ext .js,.jsx,.ts,.tsx",
     "lint:fix": "eslint . --ext .js,.jsx,.ts,.tsx --fix",
-    "test": "node --require ../tools/jest-resolver-fallback.cjs node_modules/jest/bin/jest.js",
+    "test": "node node_modules/jest/bin/jest.js",
     "typecheck": "node ./node_modules/@typescript/native/bin/tsc --noEmit -p tsconfig.json",
     "build": "expo export --platform web --output-dir dist"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.102.8",
-    "axios": "1.19.0",
-    "expo": "~57.0.8",
-    "expo-constants": "~57.0.2",
-    "expo-crypto": "~57.0.2",
-    "expo-linking": "~57.0.9",
-    "expo-router": "~57.0.8",
-    "expo-secure-store": "~57.0.3",
-    "expo-splash-screen": "~57.0.8",
+    "axios": "^1.20.0",
+    "expo": "~57.0.22",
+    "expo-constants": "~57.0.18",
+    "expo-crypto": "~57.0.3",
+    "expo-linking": "~57.0.10",
+    "expo-router": "~57.0.21",
+    "expo-secure-store": "~57.0.4",
+    "expo-splash-screen": "~57.0.9",
     "expo-status-bar": "~57.0.1",
-    "image-size": "file:vendor/image-size-compat",
-    "libphonenumber-js": "^1.13.12",
-    "react": "19.2.8",
-    "react-dom": "19.2.8",
+    "libphonenumber-js": "^1.13.13",
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
     "react-native": "0.86.3",
-    "react-native-gesture-handler": "~3.1.0",
-    "react-native-safe-area-context": "~5.8.0",
-    "react-native-screens": "~4.27.0",
+    "react-native-gesture-handler": "~2.32.0",
+    "react-native-safe-area-context": "~5.7.0",
+    "react-native-screens": "~4.26.0",
     "react-native-web": "^0.21.2",
-    "zod": "^4.5.4"
+    "zod": "^4.6.2"
   },
   "devDependencies": {
     "@eslint/compat": "^2.1.1",
     "@testing-library/react-native": "^14.0.1",
-    "@types/jest": "30.0.0",
-    "@types/react": "~19.2.17",
-    "@typescript-eslint/parser": "^8.69.0",
+    "@types/jest": "^30.0.0",
+    "@types/react": "~19.2.18",
+    "@typescript-eslint/parser": "^8.70.0",
     "@typescript/native": "npm:typescript@~7.0.2",
     "axios-mock-adapter": "^2.1.0",
-    "babel-preset-expo": "~57.0.1",
+    "babel-preset-expo": "~57.0.11",
     "eslint": "^10.10.0",
     "eslint-config-expo": "~57.0.2",
-    "jest": "~30.4.2",
-    "jest-util": "^30.4.1",
+    "eslint-import-resolver-typescript": "^4.4.5",
+    "jest": "^30.5.1",
     "test-renderer": "^1.2.0",
     "ts-jest": "^29.4.12",
     "typescript": "npm:@typescript/typescript6@^6.0.2"
   },
+  "private": true,
   "overrides": {
     "decode-uri-component": "0.5.0",
-    "js-yaml": "4.3.2",
     "uuid": "14.0.1"
-  },
-  "private": true
+  }
 }

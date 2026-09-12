@@ -2,7 +2,7 @@
   "name": "stead-repository",
   "private": true,
   "engines": {
-    "node": "^22.18.0 || ^24.0.0"
+    "node": "^24.15.0"
   },
   "scripts": {
     "setup": "npm ci && npm ci --prefix api && npm ci --prefix mobile",
