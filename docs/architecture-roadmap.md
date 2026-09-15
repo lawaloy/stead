@@ -136,6 +136,9 @@ This sequence is intentional. Stead should prioritize user-facing product surfac
   - Weekly readiness and material risk/recovery alerts are exposed end to end
     with explicit SMS opt-in, timezone-aware schedules, cooldown,
     deduplication, and encrypted persisted delivery.
+  - Canonical transaction CSV ingestion is exposed end to end with preview,
+    row-level validation, customer selection, optional goal linking, and
+    database-enforced retry deduplication.
 - Product delivery priorities (customer value):
   - Completed: transaction history and management, including user-friendly
     naira and calendar-date entry.
@@ -145,8 +148,10 @@ This sequence is intentional. Stead should prioritize user-facing product surfac
     behavior.
   - Completed: account profile, optional consent history, sanitized export,
     configured support, and guarded permanent deletion.
-  - Next discovery: select an automatic financial-data ingestion approach and
-    define its consent, reconciliation, and failure boundaries.
+  - In progress: automatic financial-data ingestion. The provider-independent
+    canonical CSV slice is implemented; customer format validation and the
+    first agreed Nigerian bank-export adapter are next. Direct connectivity
+    remains a separate consent and reconciliation decision.
   - Detailed status and sequencing live in
     [Project Status](project-status.md#milestone-tracking).
 - Enabling and architecture priorities:

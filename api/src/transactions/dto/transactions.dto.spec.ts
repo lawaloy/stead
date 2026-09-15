@@ -4,6 +4,10 @@ import { validate } from 'class-validator';
 import { CreateTransactionDto } from './create-transaction.dto';
 import { ListTransactionsQueryDto } from './list-transactions.dto';
 import { UpdateTransactionDto } from './update-transaction.dto';
+import {
+  ConfirmTransactionImportDto,
+  PreviewTransactionImportDto,
+} from './transaction-import.dto';
 
 async function validationErrors(
   Dto: new () => object,
@@ -94,6 +98,48 @@ describe('Transactions DTOs', () => {
         from: 'not-a-date',
       });
       expect(errors.some((e) => e.property === 'from')).toBe(true);
+    });
+  });
+
+  describe('transaction import DTOs', () => {
+    it('accepts a bounded preview and unique integer confirmation rows', async () => {
+      await expect(
+        validationErrors(PreviewTransactionImportDto, { csv: 'x' }),
+      ).resolves.toHaveLength(0);
+      await expect(
+        validationErrors(ConfirmTransactionImportDto, {
+          csv: 'x',
+          rowNumbers: [2, 3],
+          goalId: 'goal_1',
+        }),
+      ).resolves.toHaveLength(0);
+    });
+
+    it('rejects oversized CSV and duplicate, empty, or header row selections', async () => {
+      const oversized = await validationErrors(PreviewTransactionImportDto, {
+        csv: 'x'.repeat(200_001),
+      });
+      const duplicate = await validationErrors(ConfirmTransactionImportDto, {
+        csv: 'x',
+        rowNumbers: [2, 2],
+      });
+      const empty = await validationErrors(ConfirmTransactionImportDto, {
+        csv: 'x',
+        rowNumbers: [],
+      });
+      const header = await validationErrors(ConfirmTransactionImportDto, {
+        csv: 'x',
+        rowNumbers: [1],
+      });
+
+      expect(oversized.some((error) => error.property === 'csv')).toBe(true);
+      expect(duplicate.some((error) => error.property === 'rowNumbers')).toBe(
+        true,
+      );
+      expect(empty.some((error) => error.property === 'rowNumbers')).toBe(true);
+      expect(header.some((error) => error.property === 'rowNumbers')).toBe(
+        true,
+      );
     });
   });
 });

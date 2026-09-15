@@ -204,6 +204,11 @@ export default function TransactionsScreen() {
             <Text style={styles.primaryButtonText}>Add transaction</Text>
           </Pressable>
         </Link>
+        <Link href="/(app)/import-transactions" asChild>
+          <Pressable style={styles.importButton} accessibilityRole="button">
+            <Text style={styles.importButtonText}>Import CSV statement</Text>
+          </Pressable>
+        </Link>
       </View>
 
       <View style={styles.filters} accessibilityRole="tablist">
@@ -511,6 +516,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   primaryButtonText: { color: '#ffffff', fontWeight: '700' },
+  importButton: {
+    borderWidth: 1,
+    borderColor: '#a9bddb',
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+    alignItems: 'center',
+  },
+  importButtonText: { color: '#ffffff', fontWeight: '700' },
   filters: { flexDirection: 'row', gap: 8 },
   filterButton: {
     flex: 1,

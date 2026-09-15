@@ -3,6 +3,10 @@ import { randomUUID } from 'crypto';
 import type { NextFunction, Request, Response } from 'express';
 
 export function configureApp(app: INestApplication) {
+  const expressApp = app as INestApplication & {
+    useBodyParser: (type: 'json', options: { limit: string }) => void;
+  };
+  expressApp.useBodyParser('json', { limit: '1mb' });
   app.enableCors({
     origin: true,
   });

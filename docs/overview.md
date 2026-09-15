@@ -130,6 +130,8 @@ Implemented API modules:
    - Expense entry
    - Optional goal tagging
    - List, update, and delete support
+   - Canonical CSV preview and confirmed batch import
+   - Row-level validation and database-enforced retry deduplication
 
 5. Stability dashboard
 
@@ -159,6 +161,8 @@ Implemented screens and flows:
   active-goal tagging
 - Transaction activity history with income/expense filters, visible net,
   editing, explicit goal-link management, and confirmed deletion
+- CSV transaction-file selection, preview, row selection, optional active-goal
+  linking, and explicit import confirmation
 - Stability dashboard
 - SMS notification preferences for weekly summaries and risk/recovery alerts
 
@@ -200,8 +204,9 @@ gaps are:
    journey; transaction and goal screens now have component journeys.
 3. Production session lifecycle, operational monitoring, backup/restore, and
    enforcement of documented privacy/retention/account-deletion procedures.
-4. Automatic financial-data ingestion, richer obligation planning, and
-   internal operations tooling.
+4. Customer validation and bank-export adapters for the canonical CSV ingestion
+   slice, followed by a separate decision on direct bank connectivity; richer
+   obligation planning and internal operations tooling remain later work.
 5. Customer validation of stability thresholds and alert copy, plus live SMS
    delivery validation on native devices.
 

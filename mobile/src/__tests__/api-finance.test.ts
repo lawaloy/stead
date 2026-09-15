@@ -5,12 +5,14 @@ import {
   configureApiAuth,
   createGoal,
   createTransaction,
+  confirmTransactionImport,
   deleteTransaction,
   endGoal,
   getActiveGoal,
   getDashboardStability,
   listGoals,
   listTransactions,
+  previewTransactionImport,
   updateTransaction,
   updateGoal,
 } from '../lib/api';
@@ -225,6 +227,64 @@ describe('api finance client', () => {
 
     mock.onDelete('/transactions/tx_1').replyOnce(200, { ok: false });
     await expect(deleteTransaction('tx_1')).rejects.toThrow();
+  });
+
+  it('previews and confirms CSV transaction imports through typed contracts', async () => {
+    const csv = [
+      'date,description,amount,type',
+      '2026-09-01,Salary,1000,income',
+    ].join('\n');
+    const preview = {
+      rows: [
+        {
+          rowNumber: 2,
+          occurredAt: '2026-09-01T12:00:00.000Z',
+          direction: 'in' as const,
+          amountKobo: 100_000,
+          note: 'Salary',
+          fingerprint: 'a'.repeat(64),
+          duplicate: false,
+          error: null,
+        },
+      ],
+      readyCount: 1,
+      duplicateCount: 0,
+      invalidCount: 0,
+    };
+    mock.onPost('/transactions/import/preview').reply((config) => {
+      expect(JSON.parse(config.data as string)).toEqual({ csv });
+      return [201, preview];
+    });
+    await expect(previewTransactionImport({ csv })).resolves.toEqual(preview);
+
+    mock.onPost('/transactions/import').reply((config) => {
+      expect(JSON.parse(config.data as string)).toEqual({
+        csv,
+        rowNumbers: [2],
+        goalId: 'goal_1',
+      });
+      return [201, { importedCount: 1, duplicateCount: 0 }];
+    });
+    await expect(
+      confirmTransactionImport({ csv, rowNumbers: [2], goalId: 'goal_1' }),
+    ).resolves.toEqual({ importedCount: 1, duplicateCount: 0 });
+  });
+
+  it('rejects malformed transaction import responses', async () => {
+    mock.onPost('/transactions/import/preview').reply(201, {
+      rows: [],
+      readyCount: 'one',
+      duplicateCount: 0,
+      invalidCount: 0,
+    });
+    await expect(
+      previewTransactionImport({ csv: 'date,description,amount,type' }),
+    ).rejects.toThrow();
+
+    mock.onPost('/transactions/import').reply(201, { importedCount: -1 });
+    await expect(
+      confirmTransactionImport({ csv: 'x', rowNumbers: [2] }),
+    ).rejects.toThrow();
   });
 
   it('parses dashboard stability responses for active and missing goals', async () => {

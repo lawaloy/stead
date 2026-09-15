@@ -13,6 +13,8 @@ export {
   zOkResponse as OkResponseSchema,
   zRequestOtpResponse as AuthRequestOtpResponseSchema,
   zTransaction as TransactionSchema,
+  zTransactionImportPreview as TransactionImportPreviewSchema,
+  zTransactionImportResult as TransactionImportResultSchema,
   zVerifyOtpResponse as AuthVerifyOtpResponseSchema,
 } from '../contracts/generated/zod.gen';
 
@@ -27,5 +29,7 @@ export type {
   OkResponse,
   RequestOtpResponse as AuthRequestOtpResponse,
   Transaction,
+  TransactionImportPreview,
+  TransactionImportResult,
   VerifyOtpResponse as AuthVerifyOtpResponse,
 } from '../contracts/generated/types.gen';

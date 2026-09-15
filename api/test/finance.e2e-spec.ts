@@ -6,6 +6,7 @@ import { App } from 'supertest/types';
 import { AppModule } from './../src/app.module';
 import { configureApp } from './../src/app.setup';
 import { PrismaService } from './../src/prisma/prisma.service';
+import type { TransactionImportPreview } from './../src/contracts/generated/types.gen';
 
 type GoalBody = {
   id: string;
@@ -142,6 +143,14 @@ describe('Finance flows (e2e)', () => {
         amountKobo: 1_000,
         occurredAt: '2026-01-01T00:00:00.000Z',
       })
+      .expect(401);
+    await request(app.getHttpServer())
+      .post('/transactions/import/preview')
+      .send({ csv: 'date,description,amount,type' })
+      .expect(401);
+    await request(app.getHttpServer())
+      .post('/transactions/import')
+      .send({ csv: 'date,description,amount,type', rowNumbers: [2] })
       .expect(401);
     await request(app.getHttpServer())
       .delete('/transactions/tx_unauth')
@@ -724,6 +733,134 @@ describe('Finance flows (e2e)', () => {
     expect((toOnly.body as TransactionBody[]).map((row) => row.note)).toEqual([
       'jan',
     ]);
+  });
+
+  it('previews and idempotently imports selected CSV rows for one user', async () => {
+    const owner = await createAuthedUser();
+    const other = await createAuthedUser();
+    const goal = (
+      await authed('post', '/goals', owner.token)
+        .send({
+          name: 'Rent',
+          amountTotalKobo: 500_000,
+          dueDate: '2027-01-01T00:00:00.000Z',
+        })
+        .expect(201)
+    ).body as GoalBody;
+    const csv = [
+      'description,type,amount,date',
+      'Salary,credit,"NGN 2,500.50",2026-09-01',
+      'Salary,credit,"NGN 2,500.50",2026-09-01',
+      'Broken,transfer,0,09/02/2026',
+    ].join('\n');
+
+    const preview = await authed(
+      'post',
+      '/transactions/import/preview',
+      owner.token,
+    )
+      .send({ csv, goalId: goal.id })
+      .expect(201);
+    expect(preview.body).toMatchObject({
+      readyCount: 2,
+      duplicateCount: 0,
+      invalidCount: 1,
+      rows: [
+        {
+          rowNumber: 2,
+          amountKobo: 250_050,
+          direction: 'in',
+          duplicate: false,
+          error: null,
+        },
+        {
+          rowNumber: 3,
+          amountKobo: 250_050,
+          direction: 'in',
+          duplicate: false,
+          error: null,
+        },
+        { rowNumber: 4, fingerprint: null, duplicate: false },
+      ],
+    });
+    const previewBody = preview.body as TransactionImportPreview;
+    expect(previewBody.rows[0].fingerprint).not.toBe(
+      previewBody.rows[1].fingerprint,
+    );
+
+    await authed('post', '/transactions/import', owner.token)
+      .send({ csv, rowNumbers: [2, 3], goalId: goal.id })
+      .expect(201)
+      .expect({ importedCount: 2, duplicateCount: 0 });
+    await authed('post', '/transactions/import', owner.token)
+      .send({ csv, rowNumbers: [2, 3], goalId: goal.id })
+      .expect(201)
+      .expect({ importedCount: 0, duplicateCount: 2 });
+
+    const repeatedPreview = await authed(
+      'post',
+      '/transactions/import/preview',
+      owner.token,
+    )
+      .send({ csv })
+      .expect(201);
+    expect(repeatedPreview.body).toMatchObject({
+      readyCount: 0,
+      duplicateCount: 2,
+      invalidCount: 1,
+    });
+    const ownerRows = await authed('get', '/transactions', owner.token).expect(
+      200,
+    );
+    expect(ownerRows.body as TransactionBody[]).toHaveLength(2);
+    expect(
+      (ownerRows.body as TransactionBody[]).every(
+        (transaction) => transaction.goalId === goal.id,
+      ),
+    ).toBe(true);
+
+    const otherPreview = await authed(
+      'post',
+      '/transactions/import/preview',
+      other.token,
+    )
+      .send({ csv })
+      .expect(201);
+    expect(otherPreview.body).toMatchObject({
+      readyCount: 2,
+      duplicateCount: 0,
+    });
+    await authed('post', '/transactions/import', other.token)
+      .send({ csv, rowNumbers: [2], goalId: goal.id })
+      .expect(404);
+  });
+
+  it('accepts the maximum multibyte CSV contract size and rejects one character more', async () => {
+    const { token } = await createAuthedUser();
+    const prefix = [
+      'date,description,amount,type,ignored',
+      '2026-09-01,Salary,1000,income,',
+    ].join('\n');
+    const maximumCsv = `${prefix}${'é'.repeat(200_000 - prefix.length)}`;
+
+    expect(maximumCsv.length).toBe(200_000);
+    expect(
+      Buffer.byteLength(JSON.stringify({ csv: maximumCsv }), 'utf8'),
+    ).toBeGreaterThan(256 * 1024);
+    await authed('post', '/transactions/import/preview', token)
+      .send({ csv: maximumCsv })
+      .expect(201)
+      .expect((response) => {
+        expect(response.body).toMatchObject({
+          readyCount: 1,
+          duplicateCount: 0,
+          invalidCount: 0,
+        });
+      });
+
+    await authed('post', '/transactions/import/preview', token)
+      .send({ csv: `${maximumCsv}x` })
+      .expect(400);
   });
 
   it('unlinks a transaction from its goal over HTTP and drops it from goal saved totals', async () => {

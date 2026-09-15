@@ -219,6 +219,40 @@ export type CreateTransactionRequest = {
   note?: string;
 };
 
+export type PreviewTransactionImportRequest = {
+  csv: string;
+  goalId?: string;
+};
+
+export type ConfirmTransactionImportRequest = {
+  csv: string;
+  rowNumbers: Array<number>;
+  goalId?: string;
+};
+
+export type TransactionImportRow = {
+  rowNumber: number;
+  occurredAt: string | null;
+  direction: TransactionDirection | null;
+  amountKobo: number | null;
+  note: string | null;
+  fingerprint: string | null;
+  duplicate: boolean;
+  error: string | null;
+};
+
+export type TransactionImportPreview = {
+  rows: Array<TransactionImportRow>;
+  readyCount: number;
+  duplicateCount: number;
+  invalidCount: number;
+};
+
+export type TransactionImportResult = {
+  importedCount: number;
+  duplicateCount: number;
+};
+
 export type UpdateTransactionRequest = {
   direction?: TransactionDirection;
   amountKobo?: number;
@@ -601,6 +635,76 @@ export type CreateTransactionResponses = {
 
 export type CreateTransactionResponse =
   CreateTransactionResponses[keyof CreateTransactionResponses];
+
+export type PreviewTransactionImportData = {
+  body: PreviewTransactionImportRequest;
+  path?: never;
+  query?: never;
+  url: '/transactions/import/preview';
+};
+
+export type PreviewTransactionImportErrors = {
+  /**
+   * Request validation or domain validation failed.
+   */
+  400: ErrorResponse;
+  /**
+   * Authentication is missing or invalid.
+   */
+  401: ErrorResponse;
+  /**
+   * Resource not found.
+   */
+  404: ErrorResponse;
+};
+
+export type PreviewTransactionImportError =
+  PreviewTransactionImportErrors[keyof PreviewTransactionImportErrors];
+
+export type PreviewTransactionImportResponses = {
+  /**
+   * Parsed transaction rows with validation and duplicate status.
+   */
+  201: TransactionImportPreview;
+};
+
+export type PreviewTransactionImportResponse =
+  PreviewTransactionImportResponses[keyof PreviewTransactionImportResponses];
+
+export type ConfirmTransactionImportData = {
+  body: ConfirmTransactionImportRequest;
+  path?: never;
+  query?: never;
+  url: '/transactions/import';
+};
+
+export type ConfirmTransactionImportErrors = {
+  /**
+   * Request validation or domain validation failed.
+   */
+  400: ErrorResponse;
+  /**
+   * Authentication is missing or invalid.
+   */
+  401: ErrorResponse;
+  /**
+   * Resource not found.
+   */
+  404: ErrorResponse;
+};
+
+export type ConfirmTransactionImportError =
+  ConfirmTransactionImportErrors[keyof ConfirmTransactionImportErrors];
+
+export type ConfirmTransactionImportResponses = {
+  /**
+   * Selected valid rows imported idempotently.
+   */
+  201: TransactionImportResult;
+};
+
+export type ConfirmTransactionImportResponse =
+  ConfirmTransactionImportResponses[keyof ConfirmTransactionImportResponses];
 
 export type DeleteTransactionData = {
   body?: never;

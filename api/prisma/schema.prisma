@@ -167,11 +167,14 @@ model Transaction {
   goalId String?
   goal   Goal?   @relation(fields: [goalId], references: [id])
 
-  amountKobo BigInt
-  direction  String // 'in' or 'out'
-  occurredAt DateTime
-  note       String?
-  createdAt  DateTime @default(now())
+  amountKobo        BigInt
+  direction         String // 'in' or 'out'
+  occurredAt        DateTime
+  note              String?
+  importFingerprint String?
+  createdAt         DateTime @default(now())
+
+  @@unique([userId, importFingerprint])
 }
 
 model NotificationJob {

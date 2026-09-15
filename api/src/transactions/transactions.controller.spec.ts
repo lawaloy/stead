@@ -10,6 +10,8 @@ describe('TransactionsController', () => {
     list: jest.fn(),
     update: jest.fn(),
     remove: jest.fn(),
+    previewImport: jest.fn(),
+    confirmImport: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -57,6 +59,18 @@ describe('TransactionsController', () => {
     void controller.list(req as never, query as never);
 
     expect(transactions.list).toHaveBeenCalledWith('user_1', query);
+  });
+
+  it('scopes preview and confirmation imports to the authenticated user', () => {
+    const req = { user: { userId: 'user_1' } };
+    const preview = { csv: 'date,description,amount,type' };
+    const confirm = { ...preview, rowNumbers: [2] };
+
+    void controller.previewImport(req as never, preview);
+    void controller.confirmImport(req as never, confirm);
+
+    expect(transactions.previewImport).toHaveBeenCalledWith('user_1', preview);
+    expect(transactions.confirmImport).toHaveBeenCalledWith('user_1', confirm);
   });
 
   it('scopes update to the authenticated user id and transaction id', () => {

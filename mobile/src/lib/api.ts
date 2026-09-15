@@ -16,6 +16,8 @@ import {
   GoalSchema,
   OkResponseSchema,
   TransactionSchema,
+  TransactionImportPreviewSchema,
+  TransactionImportResultSchema,
 } from '../types/api';
 import type {
   CreateGoalRequest,
@@ -28,6 +30,8 @@ import type {
   UpdateAlertPreferencesRequest,
   UpdateAccountConsentsRequest,
   UpdateAccountProfileRequest,
+  ConfirmTransactionImportRequest,
+  PreviewTransactionImportRequest,
 } from '../contracts/generated/types.gen';
 
 export { ApiError } from './api-error';
@@ -190,6 +194,26 @@ export const deleteTransaction = async (id: string) => {
     appConfig.api.routes.transactions.detail(id),
   );
   return OkResponseSchema.parse(response.data);
+};
+
+export const previewTransactionImport = async (
+  payload: PreviewTransactionImportRequest,
+) => {
+  const response = await apiClient.post(
+    appConfig.api.routes.transactions.importPreview,
+    payload,
+  );
+  return TransactionImportPreviewSchema.parse(response.data);
+};
+
+export const confirmTransactionImport = async (
+  payload: ConfirmTransactionImportRequest,
+) => {
+  const response = await apiClient.post(
+    appConfig.api.routes.transactions.importConfirm,
+    payload,
+  );
+  return TransactionImportResultSchema.parse(response.data);
 };
 
 export const getDashboardStability = async () => {
