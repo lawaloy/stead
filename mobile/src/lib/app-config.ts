@@ -20,6 +20,8 @@ export const appConfig = {
       transactions: {
         create: '/transactions',
         list: '/transactions',
+        importPreview: '/transactions/import/preview',
+        importConfirm: '/transactions/import',
         detail: (id: string) => `/transactions/${id}`,
       },
       dashboard: {

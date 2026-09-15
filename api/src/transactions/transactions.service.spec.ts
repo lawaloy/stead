@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { NotFoundException } from '@nestjs/common';
 import { TransactionsService } from './transactions.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { parseTransactionImport } from './transaction-import.parser';
 
 describe('TransactionsService', () => {
   let service: TransactionsService;
@@ -12,6 +13,7 @@ describe('TransactionsService', () => {
       findFirst: jest.Mock;
       update: jest.Mock;
       delete: jest.Mock;
+      createMany: jest.Mock;
     };
     goal: {
       findFirst: jest.Mock;
@@ -44,6 +46,7 @@ describe('TransactionsService', () => {
         findFirst: jest.fn(),
         update: jest.fn(),
         delete: jest.fn(),
+        createMany: jest.fn(),
       },
       goal: {
         findFirst: jest.fn(),
@@ -186,6 +189,91 @@ describe('TransactionsService', () => {
       },
       orderBy: { occurredAt: 'desc' },
     });
+  });
+
+  it('previews valid, duplicate, and invalid imported rows', async () => {
+    const csv = [
+      'date,description,amount,type',
+      '2026-09-01,Salary,1000,income',
+      'bad,Invalid,20,expense',
+      '2026-09-02,Food,50,debit',
+    ].join('\n');
+    const parsed = parseTransactionImport(csv);
+    prisma.transaction.findMany.mockResolvedValue([
+      { importFingerprint: parsed[0].fingerprint },
+    ]);
+
+    const preview = await service.previewImport('user_1', { csv });
+    expect(preview).toMatchObject({
+      readyCount: 1,
+      duplicateCount: 1,
+      invalidCount: 1,
+      rows: [
+        { rowNumber: 2, duplicate: true, error: null },
+        { rowNumber: 3, duplicate: false },
+        { rowNumber: 4, duplicate: false, error: null },
+      ],
+    });
+    expect(typeof preview.rows[1].error).toBe('string');
+    expect(prisma.transaction.findMany).toHaveBeenCalledWith({
+      where: {
+        userId: 'user_1',
+        importFingerprint: {
+          in: [parsed[0].fingerprint, parsed[2].fingerprint],
+        },
+      },
+      select: { importFingerprint: true },
+    });
+  });
+
+  it('imports selected rows with owned goal linkage and database deduplication', async () => {
+    prisma.goal.findFirst.mockResolvedValue({ id: 'goal_1' });
+    prisma.transaction.createMany.mockResolvedValue({ count: 1 });
+    const csv = [
+      'date,description,amount,type',
+      '2026-09-01,Salary,1000,income',
+      '2026-09-02,Food,50.25,expense',
+    ].join('\n');
+    const parsed = parseTransactionImport(csv);
+
+    await expect(
+      service.confirmImport('user_1', {
+        csv,
+        rowNumbers: [2, 3],
+        goalId: 'goal_1',
+      }),
+    ).resolves.toEqual({ importedCount: 1, duplicateCount: 1 });
+    expect(prisma.transaction.createMany).toHaveBeenCalledWith({
+      data: [
+        expect.objectContaining({
+          userId: 'user_1',
+          goalId: 'goal_1',
+          direction: 'in',
+          amountKobo: 100_000n,
+          note: 'Salary',
+          importFingerprint: parsed[0].fingerprint,
+        }),
+        expect.objectContaining({
+          direction: 'out',
+          amountKobo: 5_025n,
+          note: 'Food',
+        }),
+      ],
+      skipDuplicates: true,
+    });
+  });
+
+  it('rejects invalid or nonexistent selected import rows before writing', async () => {
+    const csv = ['date,description,amount,type', 'bad,Invalid,20,expense'].join(
+      '\n',
+    );
+
+    await expect(
+      service.confirmImport('user_1', { csv, rowNumbers: [2, 8] }),
+    ).rejects.toThrow(
+      'Only valid rows from the current preview can be imported',
+    );
+    expect(prisma.transaction.createMany).not.toHaveBeenCalled();
   });
 
   it('rejects updating another user transaction before writing changes', async () => {

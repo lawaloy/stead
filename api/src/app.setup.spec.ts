@@ -7,6 +7,7 @@ describe('configureApp', () => {
   let enableCors: jest.Mock;
   let useGlobalPipes: jest.Mock;
   let use: jest.Mock;
+  let useBodyParser: jest.Mock;
   let middleware: (req: Request, res: Response, next: NextFunction) => void;
   let app: INestApplication;
 
@@ -25,16 +26,19 @@ describe('configureApp', () => {
     use = jest.fn((handler: typeof middleware) => {
       middleware = handler;
     });
+    useBodyParser = jest.fn();
     app = {
       enableCors,
       useGlobalPipes,
       use,
+      useBodyParser,
     } as unknown as INestApplication;
 
     configureApp(app);
   });
 
-  it('enables CORS reflection, a validation pipe, and request middleware', () => {
+  it('sets a bounded JSON limit, CORS, validation, and request middleware', () => {
+    expect(useBodyParser).toHaveBeenCalledWith('json', { limit: '1mb' });
     expect(enableCors).toHaveBeenCalledWith({ origin: true });
     expect(useGlobalPipes).toHaveBeenCalledWith(expect.any(ValidationPipe));
     expect(use).toHaveBeenCalledTimes(1);

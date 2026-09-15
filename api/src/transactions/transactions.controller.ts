@@ -16,6 +16,10 @@ import type { JwtUser } from '../auth/jwt-user.interface';
 import { CreateTransactionDto } from './dto/create-transaction.dto';
 import { ListTransactionsQueryDto } from './dto/list-transactions.dto';
 import { UpdateTransactionDto } from './dto/update-transaction.dto';
+import {
+  ConfirmTransactionImportDto,
+  PreviewTransactionImportDto,
+} from './dto/transaction-import.dto';
 import { TransactionsService } from './transactions.service';
 
 @UseGuards(JwtAuthGuard)
@@ -29,6 +33,22 @@ export class TransactionsController {
     @Body() dto: CreateTransactionDto,
   ) {
     return this.transactions.create(req.user.userId, dto);
+  }
+
+  @Post('import/preview')
+  previewImport(
+    @Req() req: Request & { user: JwtUser },
+    @Body() dto: PreviewTransactionImportDto,
+  ) {
+    return this.transactions.previewImport(req.user.userId, dto);
+  }
+
+  @Post('import')
+  confirmImport(
+    @Req() req: Request & { user: JwtUser },
+    @Body() dto: ConfirmTransactionImportDto,
+  ) {
+    return this.transactions.confirmImport(req.user.userId, dto);
   }
 
   @Get()

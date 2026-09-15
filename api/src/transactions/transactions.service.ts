@@ -1,12 +1,23 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateTransactionDto } from './dto/create-transaction.dto';
 import { ListTransactionsQueryDto } from './dto/list-transactions.dto';
 import { UpdateTransactionDto } from './dto/update-transaction.dto';
+import {
+  ConfirmTransactionImportDto,
+  PreviewTransactionImportDto,
+} from './dto/transaction-import.dto';
+import { parseTransactionImport } from './transaction-import.parser';
 import type {
   OkResponse,
   Transaction,
   TransactionDirection,
+  TransactionImportPreview,
+  TransactionImportResult,
 } from '../contracts/generated/types.gen';
 
 @Injectable()
@@ -54,6 +65,91 @@ export class TransactionsService {
     return transactions.map((transaction) =>
       this.serializeTransaction(transaction),
     );
+  }
+
+  async previewImport(
+    userId: string,
+    dto: PreviewTransactionImportDto,
+  ): Promise<TransactionImportPreview> {
+    if (dto.goalId) await this.ensureGoalBelongsToUser(dto.goalId, userId);
+    const rows = parseTransactionImport(dto.csv);
+    const fingerprints = rows.flatMap((row) =>
+      row.fingerprint ? [row.fingerprint] : [],
+    );
+    const duplicates = new Set(
+      (
+        await this.prisma.transaction.findMany({
+          where: { userId, importFingerprint: { in: fingerprints } },
+          select: { importFingerprint: true },
+        })
+      ).flatMap((row) =>
+        row.importFingerprint ? [row.importFingerprint] : [],
+      ),
+    );
+    const previewRows = rows.map((row) => ({
+      ...row,
+      duplicate: row.fingerprint ? duplicates.has(row.fingerprint) : false,
+    }));
+
+    return {
+      rows: previewRows,
+      readyCount: previewRows.filter((row) => !row.error && !row.duplicate)
+        .length,
+      duplicateCount: previewRows.filter((row) => row.duplicate).length,
+      invalidCount: previewRows.filter((row) => Boolean(row.error)).length,
+    };
+  }
+
+  async confirmImport(
+    userId: string,
+    dto: ConfirmTransactionImportDto,
+  ): Promise<TransactionImportResult> {
+    if (dto.goalId) await this.ensureGoalBelongsToUser(dto.goalId, userId);
+    const selected = new Set(dto.rowNumbers);
+    const rows = parseTransactionImport(dto.csv).filter((row) =>
+      selected.has(row.rowNumber),
+    );
+    const found = new Set(rows.map((row) => row.rowNumber));
+    const missingRows = dto.rowNumbers.filter(
+      (rowNumber) => !found.has(rowNumber),
+    );
+    const invalidRows = rows.filter(
+      (row) =>
+        row.error ||
+        !row.fingerprint ||
+        !row.occurredAt ||
+        !row.direction ||
+        row.amountKobo === null,
+    );
+    if (missingRows.length > 0 || invalidRows.length > 0) {
+      throw new BadRequestException({
+        message: 'Only valid rows from the current preview can be imported',
+        details: {
+          rowNumbers: [
+            ...missingRows,
+            ...invalidRows.map((row) => row.rowNumber),
+          ],
+        },
+      });
+    }
+
+    const result = await this.prisma.transaction.createMany({
+      data: rows.map((row) => ({
+        userId,
+        goalId: dto.goalId ?? null,
+        direction: row.direction as TransactionDirection,
+        amountKobo: BigInt(row.amountKobo as number),
+        occurredAt: new Date(row.occurredAt as string),
+        note: row.note,
+        importFingerprint: row.fingerprint,
+      })),
+      skipDuplicates: true,
+    });
+
+    return {
+      importedCount: result.count,
+      duplicateCount: rows.length - result.count,
+    };
   }
 
   async update(
@@ -111,6 +207,7 @@ export class TransactionsService {
     occurredAt: Date;
     note: string | null;
     createdAt: Date;
+    importFingerprint?: string | null;
   }): Transaction {
     if (transaction.direction !== 'in' && transaction.direction !== 'out') {
       throw new Error(

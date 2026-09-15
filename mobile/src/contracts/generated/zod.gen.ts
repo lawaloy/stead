@@ -180,6 +180,22 @@ export const zGoal = z.object({
   createdAt: z.iso.datetime(),
 });
 
+export const zPreviewTransactionImportRequest = z.object({
+  csv: z.string().min(1).max(200000),
+  goalId: z.string().min(1).optional(),
+});
+
+export const zConfirmTransactionImportRequest = z.object({
+  csv: z.string().min(1).max(200000),
+  rowNumbers: z.array(z.int().gte(2)).min(1).max(500),
+  goalId: z.string().min(1).optional(),
+});
+
+export const zTransactionImportResult = z.object({
+  importedCount: z.int().gte(0),
+  duplicateCount: z.int().gte(0),
+});
+
 export const zTransactionDirection = z.enum(['in', 'out']);
 
 export const zExportTransaction = z.object({
@@ -211,6 +227,24 @@ export const zCreateTransactionRequest = z.object({
   occurredAt: z.iso.datetime(),
   goalId: z.string().min(1).optional(),
   note: z.string().max(280).optional(),
+});
+
+export const zTransactionImportRow = z.object({
+  rowNumber: z.int().gte(2),
+  occurredAt: z.iso.datetime().nullable(),
+  direction: zTransactionDirection.nullable(),
+  amountKobo: z.int().gte(1).nullable(),
+  note: z.string().nullable(),
+  fingerprint: z.string().length(64).nullable(),
+  duplicate: z.boolean(),
+  error: z.string().nullable(),
+});
+
+export const zTransactionImportPreview = z.object({
+  rows: z.array(zTransactionImportRow),
+  readyCount: z.int().gte(0),
+  duplicateCount: z.int().gte(0),
+  invalidCount: z.int().gte(0),
 });
 
 export const zUpdateTransactionRequest = z.object({
@@ -381,6 +415,20 @@ export const zCreateTransactionBody = zCreateTransactionRequest;
  * Transaction created.
  */
 export const zCreateTransactionResponse = zTransaction;
+
+export const zPreviewTransactionImportBody = zPreviewTransactionImportRequest;
+
+/**
+ * Parsed transaction rows with validation and duplicate status.
+ */
+export const zPreviewTransactionImportResponse = zTransactionImportPreview;
+
+export const zConfirmTransactionImportBody = zConfirmTransactionImportRequest;
+
+/**
+ * Selected valid rows imported idempotently.
+ */
+export const zConfirmTransactionImportResponse = zTransactionImportResult;
 
 export const zDeleteTransactionPath = z.object({
   id: z.string().min(1),
