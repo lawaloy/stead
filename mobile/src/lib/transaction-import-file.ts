@@ -21,16 +21,12 @@ export const pickTransactionCsv =
     if (!asset.name.toLowerCase().endsWith('.csv')) {
       throw new Error('Choose a file with a .csv extension.');
     }
-    if (asset.size !== undefined && asset.size > MAX_CSV_CHARACTERS) {
-      throw new Error('The CSV file must be 200 KB or smaller.');
-    }
-
     const csv = asset.file
       ? await asset.file.text()
       : await new ExpoFile(asset.uri).text();
     if (!csv.trim()) throw new Error('The selected CSV file is empty.');
     if (csv.length > MAX_CSV_CHARACTERS) {
-      throw new Error('The CSV file must be 200 KB or smaller.');
+      throw new Error('The CSV file must be 200,000 characters or fewer.');
     }
 
     return { name: asset.name, csv };

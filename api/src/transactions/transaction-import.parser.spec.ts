@@ -66,6 +66,21 @@ describe('parseTransactionImport', () => {
     expect(rows[1]).toMatchObject({ error: null, amountKobo: 10_025 });
   });
 
+  it.each(['1,2', '12,34', '1,00,000', '1234,567'])(
+    'rejects malformed comma grouping in an amount: %s',
+    (amount) => {
+      const [row] = parseTransactionImport(
+        [
+          'date,description,amount,type',
+          `2026-09-01,Malformed,"${amount}",expense`,
+        ].join('\n'),
+      );
+
+      expect(row.amountKobo).toBeNull();
+      expect(row.error).toContain('Amount must be a positive naira value');
+    },
+  );
+
   it.each([
     ['missing headers', 'date,amount\n2026-09-01,100'],
     ['duplicate headers', 'date,date,description,amount,type'],

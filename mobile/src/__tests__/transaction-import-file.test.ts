@@ -71,7 +71,6 @@ describe('pickTransactionCsv', () => {
 
   it.each([
     ['statement.pdf', 20, 'content', 'Choose a file with a .csv extension.'],
-    ['statement.csv', 200_001, 'content', '200 KB or smaller'],
     ['statement.csv', 0, '   ', 'empty'],
   ])('rejects unsafe file %s', async (name, size, contents, message) => {
     mockPicker.mockResolvedValue(
@@ -109,6 +108,31 @@ describe('pickTransactionCsv', () => {
       }),
     );
 
-    await expect(pickTransactionCsv()).rejects.toThrow('200 KB or smaller');
+    await expect(pickTransactionCsv()).rejects.toThrow(
+      '200,000 characters or fewer',
+    );
+  });
+
+  it('accepts contract-sized multibyte content regardless of encoded byte size', async () => {
+    const csv = '\u00e9'.repeat(200_000);
+    mockPicker.mockResolvedValue(
+      pickerResult({
+        canceled: false,
+        assets: [
+          {
+            name: 'statement.csv',
+            uri: 'file:///cache/statement.csv',
+            mimeType: 'text/csv',
+            size: 400_000,
+            file: { text: jest.fn().mockResolvedValue(csv) } as never,
+          },
+        ],
+      }),
+    );
+
+    await expect(pickTransactionCsv()).resolves.toEqual({
+      name: 'statement.csv',
+      csv,
+    });
   });
 });

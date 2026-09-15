@@ -101,11 +101,11 @@ const parseDirection = (value: string): TransactionDirection | null => {
 };
 
 const parseAmountKobo = (value: string) => {
-  const normalized = value
-    .trim()
-    .replace(/^(?:NGN|₦)\s*/i, '')
-    .replace(/,/g, '');
-  if (!/^\d+(?:\.\d{1,2})?$/.test(normalized)) return null;
+  const displayAmount = value.trim().replace(/^(?:NGN|₦)\s*/i, '');
+  if (!/^(?:\d+|\d{1,3}(?:,\d{3})+)(?:\.\d{1,2})?$/.test(displayAmount)) {
+    return null;
+  }
+  const normalized = displayAmount.replace(/,/g, '');
 
   const [whole, fraction = ''] = normalized.split('.');
   const kobo = BigInt(whole) * 100n + BigInt(fraction.padEnd(2, '0'));

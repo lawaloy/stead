@@ -184,4 +184,69 @@ describe('transaction import screen', () => {
     ).toBeDisabled();
     expect(mockConfirm).not.toHaveBeenCalled();
   });
+
+  it('clears an old preview while a replacement file is being previewed', async () => {
+    await render(
+      <QueryClientProvider client={queryClient}>
+        <ImportTransactionsScreen />
+      </QueryClientProvider>,
+    );
+    await fireEvent.press(
+      screen.getByRole('button', { name: 'Choose transaction CSV file' }),
+    );
+    expect(
+      await screen.findByRole('button', { name: 'Import 1 selected' }),
+    ).toBeEnabled();
+
+    const replacementCsv = [
+      'date,description,amount,type',
+      '2026-09-02,Replacement,25,expense',
+    ].join('\n');
+    mockPick.mockResolvedValueOnce({
+      name: 'replacement.csv',
+      csv: replacementCsv,
+    });
+    let finishPreview!: (
+      value: Awaited<ReturnType<typeof mockPreview>>,
+    ) => void;
+    mockPreview.mockReturnValueOnce(
+      new Promise((resolve) => {
+        finishPreview = resolve;
+      }),
+    );
+
+    await fireEvent.press(
+      screen.getByRole('button', { name: 'Choose transaction CSV file' }),
+    );
+    await waitFor(() =>
+      expect(screen.queryByText('Review before importing')).toBeNull(),
+    );
+    expect(
+      screen.queryByRole('button', { name: 'Import 1 selected' }),
+    ).toBeNull();
+    expect(mockConfirm).not.toHaveBeenCalled();
+
+    finishPreview({
+      readyCount: 1,
+      duplicateCount: 0,
+      invalidCount: 0,
+      rows: [
+        {
+          rowNumber: 2,
+          occurredAt: '2026-09-02T12:00:00.000Z',
+          direction: 'out',
+          amountKobo: 2_500,
+          note: 'Replacement',
+          fingerprint: 'c'.repeat(64),
+          duplicate: false,
+          error: null,
+        },
+      ],
+    });
+    expect(
+      await screen.findByRole('checkbox', {
+        name: 'CSV row 2 Replacement',
+      }),
+    ).toBeChecked();
+  });
 });

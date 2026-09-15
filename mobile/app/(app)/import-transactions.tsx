@@ -90,6 +90,8 @@ export default function ImportTransactionsScreen() {
     try {
       const picked = await pickTransactionCsv();
       if (!picked) return;
+      setPreview(null);
+      setSelectedRows(new Set());
       setFileName(picked.name);
       setCsv(picked.csv);
       previewMutation.mutate({ csv: picked.csv });
@@ -247,13 +249,22 @@ export default function ImportTransactionsScreen() {
           <Pressable
             accessibilityRole="button"
             accessibilityState={{
-              disabled: selectedCount === 0 || confirmMutation.isPending,
+              disabled:
+                selectedCount === 0 ||
+                previewMutation.isPending ||
+                confirmMutation.isPending,
             }}
-            disabled={selectedCount === 0 || confirmMutation.isPending}
+            disabled={
+              selectedCount === 0 ||
+              previewMutation.isPending ||
+              confirmMutation.isPending
+            }
             onPress={confirmImport}
             style={[
               styles.primaryButton,
-              (selectedCount === 0 || confirmMutation.isPending) &&
+              (selectedCount === 0 ||
+                previewMutation.isPending ||
+                confirmMutation.isPending) &&
                 styles.disabled,
             ]}
           >
