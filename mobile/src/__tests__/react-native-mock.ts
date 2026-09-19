@@ -25,6 +25,7 @@ export const Pressable = React.forwardRef<unknown, HostProps>(
 );
 Pressable.displayName = 'MockPressable';
 export const ActivityIndicator = host('View');
+export const RefreshControl = host('RefreshControl');
 
 const flattenStyle = (style: unknown): Record<string, unknown> => {
   if (Array.isArray(style)) {

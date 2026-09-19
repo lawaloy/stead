@@ -81,6 +81,7 @@ export default function VerifyOtpScreen() {
           No phone found. Start from Request OTP.
         </Text>
         <Pressable
+          accessibilityRole="button"
           style={styles.button}
           onPress={() => router.replace('/(auth)/request-otp')}
         >
@@ -98,6 +99,7 @@ export default function VerifyOtpScreen() {
         <Text style={styles.hint}>Dev OTP: {devOtpHint}</Text>
       ) : null}
       <TextInput
+        accessibilityLabel="One-time code"
         value={otp || devOtpHint || ''}
         onChangeText={setOtp}
         placeholder="123456"
@@ -120,6 +122,8 @@ export default function VerifyOtpScreen() {
         <Text style={styles.success}>A fresh code is on the way.</Text>
       ) : null}
       <Pressable
+        accessibilityRole="button"
+        accessibilityState={{ disabled: !canVerify || mutation.isPending }}
         style={[
           styles.button,
           (!canVerify || mutation.isPending) && styles.buttonDisabled,
@@ -133,6 +137,11 @@ export default function VerifyOtpScreen() {
       </Pressable>
       <View style={styles.secondaryActions}>
         <Pressable
+          accessibilityRole="button"
+          accessibilityState={{
+            disabled:
+              !canResend || resendMutation.isPending || mutation.isPending,
+          }}
           style={[
             styles.secondaryButton,
             (!canResend || resendMutation.isPending || mutation.isPending) &&
@@ -157,6 +166,7 @@ export default function VerifyOtpScreen() {
           </Text>
         ) : null}
         <Pressable
+          accessibilityRole="button"
           style={styles.linkButton}
           onPress={() => {
             resetPendingAuth();

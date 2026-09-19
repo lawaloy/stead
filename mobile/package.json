@@ -22,6 +22,7 @@
     "lint": "eslint . --ext .js,.jsx,.ts,.tsx",
     "lint:fix": "eslint . --ext .js,.jsx,.ts,.tsx --fix",
     "test": "node node_modules/jest/bin/jest.js",
+    "test:live-api": "node node_modules/jest/bin/jest.js --config jest.live.config.js --runInBand",
     "typecheck": "node ./node_modules/@typescript/native/bin/tsc --noEmit -p tsconfig.json",
     "build": "expo export --platform web --output-dir dist"
   },

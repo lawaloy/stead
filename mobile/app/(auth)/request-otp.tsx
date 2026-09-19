@@ -70,6 +70,9 @@ export default function RequestOtpScreen() {
       <View style={styles.countrySelect}>
         <Pressable
           style={styles.countrySelectButton}
+          accessibilityRole="button"
+          accessibilityLabel="Choose country"
+          accessibilityState={{ disabled: mutation.isPending }}
           disabled={mutation.isPending}
           onPress={() => setCountryMenuOpen((open) => !open)}
         >
@@ -85,6 +88,8 @@ export default function RequestOtpScreen() {
             {countries.map((country) => (
               <Pressable
                 key={country.iso}
+                accessibilityRole="button"
+                accessibilityState={{ disabled: mutation.isPending }}
                 style={[
                   styles.countryOption,
                   country.iso === effectiveCountryIso &&
@@ -106,6 +111,7 @@ export default function RequestOtpScreen() {
       </View>
       <Text style={styles.label}>Phone Number</Text>
       <TextInput
+        accessibilityLabel="Phone number"
         value={phone}
         onChangeText={(value) =>
           setPhone(formatPhoneForDisplay(value, effectiveCountryIso))
@@ -127,6 +133,8 @@ export default function RequestOtpScreen() {
         </Text>
       ) : null}
       <Pressable
+        accessibilityRole="button"
+        accessibilityState={{ disabled: !requestInput || mutation.isPending }}
         style={[
           styles.button,
           (!requestInput || mutation.isPending) && styles.buttonDisabled,
