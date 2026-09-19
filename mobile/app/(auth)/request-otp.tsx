@@ -111,6 +111,7 @@ export default function RequestOtpScreen() {
       </View>
       <Text style={styles.label}>Phone Number</Text>
       <TextInput
+        testID="auth-phone"
         accessibilityLabel="Phone number"
         value={phone}
         onChangeText={(value) =>
@@ -133,6 +134,7 @@ export default function RequestOtpScreen() {
         </Text>
       ) : null}
       <Pressable
+        testID="auth-request-otp"
         accessibilityRole="button"
         accessibilityState={{ disabled: !requestInput || mutation.isPending }}
         style={[

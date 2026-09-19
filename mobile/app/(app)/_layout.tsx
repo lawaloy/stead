@@ -9,6 +9,7 @@ const LogoutButton = () => {
 
   return (
     <Pressable
+      testID="app-logout"
       onPress={async () => {
         await logout();
         router.replace('/(auth)/request-otp');
@@ -31,9 +32,15 @@ const TopNav = () => (
       borderBottomColor: '#e5eaf4',
     }}
   >
-    <Link href="/(app)/dashboard">Dashboard</Link>
-    <Link href="/(app)/goal">Goal</Link>
-    <Link href="/(app)/transactions">Activity</Link>
+    <Link href="/(app)/dashboard" testID="nav-dashboard">
+      Dashboard
+    </Link>
+    <Link href="/(app)/goal" testID="nav-goal">
+      Goal
+    </Link>
+    <Link href="/(app)/transactions" testID="nav-activity">
+      Activity
+    </Link>
     <Link href="/(app)/alerts">Alerts</Link>
     <Link href="/(app)/account">Account</Link>
   </View>

@@ -99,6 +99,7 @@ export default function VerifyOtpScreen() {
         <Text style={styles.hint}>Dev OTP: {devOtpHint}</Text>
       ) : null}
       <TextInput
+        testID="auth-otp"
         accessibilityLabel="One-time code"
         value={otp || devOtpHint || ''}
         onChangeText={setOtp}
@@ -122,6 +123,7 @@ export default function VerifyOtpScreen() {
         <Text style={styles.success}>A fresh code is on the way.</Text>
       ) : null}
       <Pressable
+        testID="auth-verify-otp"
         accessibilityRole="button"
         accessibilityState={{ disabled: !canVerify || mutation.isPending }}
         style={[

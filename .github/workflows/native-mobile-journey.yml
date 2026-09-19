@@ -1,0 +1,176 @@
+name: Native mobile journey
+
+on:
+  pull_request:
+    paths:
+      - 'mobile/**'
+      - 'api/**'
+      - '.github/workflows/native-mobile-journey.yml'
+  workflow_dispatch:
+
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: stead
+          POSTGRES_PASSWORD: stead
+          POSTGRES_DB: stead
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U stead -d stead"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql://stead:stead@127.0.0.1:5432/stead?schema=e2e_native
+      JWT_SECRET: stead-native-ci-jwt-secret
+      NOTIFICATION_PAYLOAD_ENCRYPTION_KEY: stead-native-ci-notification-key-1234567890
+      AUTH_DEVICE_IDENTIFIER_SECRET: stead-native-ci-device-key-1234567890
+      SMS_PROVIDER: dev
+      DEV_EXPOSE_OTP: 'true'
+      EXPO_PUBLIC_API_URL: http://127.0.0.1:3000
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: |
+            api/package-lock.json
+            mobile/package-lock.json
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Enable KVM for Android emulator
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Install dependencies and prepare API
+        run: |
+          npm install --global npm@11.19.1
+          npm ci --prefix api
+          npm ci --prefix mobile
+          cd api
+          npx prisma migrate deploy
+          npm run build
+      - name: Start API and Metro
+        run: |
+          NODE_ENV=test node api/dist/src/main.js > "$RUNNER_TEMP/stead-api.log" 2>&1 &
+          for attempt in $(seq 1 60); do
+            if curl --fail --silent http://127.0.0.1:3000/auth/countries > /dev/null; then break; fi
+            sleep 2
+          done
+          curl --fail http://127.0.0.1:3000/auth/countries > /dev/null
+          (cd mobile && npx expo start --localhost) > "$RUNNER_TEMP/stead-metro.log" 2>&1 &
+          for attempt in $(seq 1 90); do
+            if curl --fail --silent http://127.0.0.1:8081/status | grep -q 'packager-status:running'; then break; fi
+            sleep 2
+          done
+          curl --fail http://127.0.0.1:8081/status | grep -q 'packager-status:running'
+      - name: Install Maestro
+        run: |
+          curl -fsSL https://get.maestro.mobile.dev | bash
+          echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
+      - name: Run Android native journey
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          arch: x86_64
+          script: |
+            adb reverse tcp:8081 tcp:8081
+            adb reverse tcp:3000 tcp:3000
+            cd mobile
+            CI=1 npx expo run:android --no-bundler
+            maestro test -e TEST_PHONE=08030000001 .maestro/critical-native-journey.yaml
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: android-native-journey-logs
+          path: |
+            ${{ runner.temp }}/stead-api.log
+            ${{ runner.temp }}/stead-metro.log
+            mobile/.expo
+
+  ios:
+    runs-on: macos-26
+    timeout-minutes: 90
+    env:
+      DATABASE_URL: postgresql://stead:stead@127.0.0.1:5432/stead?schema=e2e_native
+      JWT_SECRET: stead-native-ci-jwt-secret
+      NOTIFICATION_PAYLOAD_ENCRYPTION_KEY: stead-native-ci-notification-key-1234567890
+      AUTH_DEVICE_IDENTIFIER_SECRET: stead-native-ci-device-key-1234567890
+      SMS_PROVIDER: dev
+      DEV_EXPOSE_OTP: 'true'
+      EXPO_PUBLIC_API_URL: http://127.0.0.1:3000
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: |
+            api/package-lock.json
+            mobile/package-lock.json
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Start isolated PostgreSQL 16
+        run: |
+          brew install postgresql@16
+          PG_BIN="$(brew --prefix postgresql@16)/bin"
+          echo "$PG_BIN" >> "$GITHUB_PATH"
+          "$PG_BIN/initdb" -D "$RUNNER_TEMP/stead-pg" -U stead --auth-local=trust --auth-host=trust
+          "$PG_BIN/pg_ctl" -D "$RUNNER_TEMP/stead-pg" -l "$RUNNER_TEMP/stead-pg.log" -o '-h 127.0.0.1 -p 5432' start
+          "$PG_BIN/createdb" -h 127.0.0.1 -U stead stead
+      - name: Install dependencies and prepare API
+        run: |
+          npm install --global npm@11.19.1
+          npm ci --prefix api
+          npm ci --prefix mobile
+          cd api
+          npx prisma migrate deploy
+          npm run build
+      - name: Start API and Metro
+        run: |
+          NODE_ENV=test node api/dist/src/main.js > "$RUNNER_TEMP/stead-api.log" 2>&1 &
+          for attempt in $(seq 1 60); do
+            if curl --fail --silent http://127.0.0.1:3000/auth/countries > /dev/null; then break; fi
+            sleep 2
+          done
+          curl --fail http://127.0.0.1:3000/auth/countries > /dev/null
+          (cd mobile && npx expo start --localhost) > "$RUNNER_TEMP/stead-metro.log" 2>&1 &
+          for attempt in $(seq 1 90); do
+            if curl --fail --silent http://127.0.0.1:8081/status | grep -q 'packager-status:running'; then break; fi
+            sleep 2
+          done
+          curl --fail http://127.0.0.1:8081/status | grep -q 'packager-status:running'
+      - name: Install Maestro
+        run: |
+          curl -fsSL https://get.maestro.mobile.dev | bash
+          echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
+      - name: Run iOS native journey
+        run: |
+          DEVICE_ID="$(xcrun simctl list devices available -j | jq -r '[.devices[] | .[] | select(.name == "iPhone 17")] | last | .udid')"
+          test -n "$DEVICE_ID" && test "$DEVICE_ID" != null
+          xcrun simctl boot "$DEVICE_ID"
+          xcrun simctl bootstatus "$DEVICE_ID" -b
+          cd mobile
+          CI=1 npx expo run:ios --no-bundler --device "$DEVICE_ID"
+          maestro test -e TEST_PHONE=08030000001 .maestro/critical-native-journey.yaml
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: ios-native-journey-logs
+          path: |
+            ${{ runner.temp }}/stead-api.log
+            ${{ runner.temp }}/stead-metro.log
+            ${{ runner.temp }}/stead-pg.log
+            mobile/.expo

@@ -1,0 +1,84 @@
+appId: com.lawaloy.stead
+---
+# Run only against an isolated API schema with SMS_PROVIDER=dev and
+# DEV_EXPOSE_OTP=true. TEST_PHONE must be a unique disposable NG number.
+- launchApp:
+    clearState: true
+- assertVisible: Stead Login
+- tapOn:
+    id: auth-phone
+- inputText: ${TEST_PHONE}
+- tapOn:
+    id: auth-request-otp
+- assertVisible: Verify OTP
+- assertVisible: 'Dev OTP:.*'
+- tapOn:
+    id: auth-verify-otp
+- assertVisible: Stability Dashboard
+- assertVisible: No active goal found
+
+- tapOn:
+    id: nav-goal
+- assertVisible: Create a goal
+- tapOn:
+    id: goal-name
+- inputText: Native journey goal
+- tapOn:
+    id: goal-target
+- inputText: '1200000'
+- hideKeyboard
+- tapOn:
+    id: goal-save
+- assertVisible: Goal created
+- tapOn:
+    id: nav-dashboard
+- assertVisible: Native journey goal
+
+- tapOn:
+    id: nav-activity
+- tapOn:
+    id: transaction-add
+- assertVisible: Add Transaction
+- tapOn:
+    id: transaction-note
+- eraseText: 100
+- inputText: Native journey income
+- hideKeyboard
+- tapOn:
+    id: transaction-create
+- assertVisible: Transaction added
+- tapOn:
+    id: nav-activity
+- assertVisible: Native journey income
+- tapOn: Edit Native journey income transaction
+- tapOn:
+    id: transaction-edit-note
+- eraseText: 100
+- inputText: Native journey income corrected
+- hideKeyboard
+- tapOn:
+    id: transaction-save
+- assertVisible: Native journey income corrected
+- tapOn: Delete Native journey income corrected transaction
+- tapOn: Delete
+- assertVisible: No transactions yet
+
+- tapOn:
+    id: nav-dashboard
+- assertVisible: Native journey goal
+- swipe:
+    start: 50%, 35%
+    end: 50%, 80%
+    duration: 600
+- assertVisible: Safe To Spend
+
+# Relaunch without clearing native secure storage to check session restore.
+- stopApp
+- launchApp
+- assertVisible: Native journey goal
+- tapOn:
+    id: app-logout
+- assertVisible: Stead Login
+- stopApp
+- launchApp
+- assertVisible: Stead Login

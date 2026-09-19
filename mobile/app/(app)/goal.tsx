@@ -279,6 +279,7 @@ export default function GoalScreen() {
           </Text>
           <Text style={styles.label}>Name</Text>
           <TextInput
+            testID="goal-name"
             accessibilityLabel="Goal name"
             style={styles.input}
             value={form.name}
@@ -286,6 +287,7 @@ export default function GoalScreen() {
           />
           <Text style={styles.label}>Target amount (naira)</Text>
           <TextInput
+            testID="goal-target"
             accessibilityLabel="Goal target amount in naira"
             style={styles.input}
             value={form.amountNaira}
@@ -294,6 +296,7 @@ export default function GoalScreen() {
           />
           <Text style={styles.label}>Due date (YYYY-MM-DD)</Text>
           <TextInput
+            testID="goal-due-date"
             accessibilityLabel="Goal due date"
             style={styles.input}
             value={form.dueOn}
@@ -314,6 +317,7 @@ export default function GoalScreen() {
           ) : null}
           <View style={styles.actionRow}>
             <Pressable
+              testID="goal-save"
               accessibilityRole="button"
               style={[
                 styles.button,

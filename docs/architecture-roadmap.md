@@ -168,8 +168,9 @@ This sequence is intentional. Stead should prioritize user-facing product surfac
     they are introduced.
   - P1: validate real-provider OTP delivery and the operator response playbook
     when a paid or verified sender account is available.
-  - P1: add an automated critical mobile journey before treating the vertical
-    slice as production-ready.
+  - P1: complete the native Android/iOS UI journey and real-device acceptance
+    before treating the vertical slice as production-ready. Screen and live
+    mobile-client/API boundaries are already covered separately.
   - Next extraction step: define the cross-process command envelope,
     correlation/idempotency strategy, and queue selection criteria before
     moving the worker out of the API deployment.

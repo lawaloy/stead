@@ -114,6 +114,7 @@ export default function AddTransactionScreen() {
 
       <Text style={styles.label}>Amount (naira)</Text>
       <TextInput
+        testID="transaction-amount"
         accessibilityLabel="Transaction amount in naira"
         style={styles.input}
         value={amountNaira}
@@ -132,6 +133,7 @@ export default function AddTransactionScreen() {
 
       <Text style={styles.label}>Note</Text>
       <TextInput
+        testID="transaction-note"
         accessibilityLabel="Transaction note"
         style={styles.input}
         value={note}
@@ -191,6 +193,7 @@ export default function AddTransactionScreen() {
       ) : null}
 
       <Pressable
+        testID="transaction-create"
         accessibilityRole="button"
         accessibilityState={{
           disabled:
