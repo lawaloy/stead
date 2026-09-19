@@ -7,7 +7,9 @@ interceptors, and bearer handling. It requests and verifies an OTP through the
 development SMS provider, creates an active goal, creates/edits/deletes linked
 transactions, verifies dashboard recalculation, restores bearer access, and
 verifies that local logout causes an unauthenticated request. It removes its
-test account at the end.
+test account after the case, including when an assertion fails after OTP
+verification. Each run uses a fresh installation ID so a failure before
+verification cannot exhaust the device OTP limit on later reruns.
 
 The companion React Native component tests cover the auth and dashboard
 screens, while an AuthProvider test covers token persistence, restoration, and

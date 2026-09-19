@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import {
   apiClient,
   configureApiAuth,
@@ -19,7 +20,7 @@ jest.mock('../src/lib/base-url', () => ({
 }));
 jest.mock('../src/lib/installation-id-store', () => ({
   installationIdStore: {
-    getOrCreateId: async () => '0f81c2a7-1e6d-4f05-9a1c-03de8a5f6b77',
+    getOrCreateId: async () => process.env.STEAD_TEST_INSTALLATION_ID,
   },
 }));
 
@@ -40,6 +41,9 @@ describe('critical mobile client to live API journey', () => {
   const unauthorized = jest.fn();
 
   beforeAll(() => {
+    // A failed run may not reach verification and thus cannot delete its user.
+    // Keep its device telemetry from rate-limiting a later local rerun.
+    process.env.STEAD_TEST_INSTALLATION_ID = randomUUID();
     apiClient.defaults.baseURL = endpoint;
     configureApiAuth({
       getToken: async () => sessionToken,
@@ -47,7 +51,21 @@ describe('critical mobile client to live API journey', () => {
     });
   });
 
+  afterEach(async () => {
+    if (!sessionToken) return;
+    configureApiAuth({
+      getToken: async () => sessionToken,
+      onUnauthorized: unauthorized,
+    });
+    try {
+      await expect(deleteAccount()).resolves.toMatchObject({ ok: true });
+    } finally {
+      sessionToken = null;
+    }
+  });
+
   afterAll(() => {
+    delete process.env.STEAD_TEST_INSTALLATION_ID;
     configureApiAuth({
       getToken: async () => null,
       onUnauthorized: () => undefined,
@@ -157,12 +175,7 @@ describe('critical mobile client to live API journey', () => {
     });
     expect(unauthorized).toHaveBeenCalledTimes(1);
 
-    // Clean the test account while its original JWT is still available.
-    configureApiAuth({
-      getToken: async () => savedToken,
-      onUnauthorized: unauthorized,
-    });
-    await expect(deleteAccount()).resolves.toMatchObject({ ok: true });
-    sessionToken = null;
+    // afterEach retains the authenticated token for account cleanup, even
+    // when an assertion above fails.
   });
 });
