@@ -13,11 +13,12 @@ Current repository status:
   Customers can also manage their profile and optional consents, export their
   data, contact configured support, and permanently delete their account.
 - Verification: auth/notification and finance have PostgreSQL-backed e2e
-  coverage. Transaction screens have automated component journeys; the app
-  still lacks a full mobile-to-API and native-device acceptance suite.
+  coverage. Auth, goal, transaction, and dashboard screens have component
+  journeys, and CI exercises the real mobile API client against a running API
+  and PostgreSQL. A full native UI acceptance suite is still missing.
 - Production readiness: live SMS delivery on real devices, production session
-  lifecycle, operations, automated critical mobile journeys, and several
-  product workflows remain incomplete.
+  lifecycle, operations, native UI acceptance, and several product workflows
+  remain incomplete.
 
 Weekly summaries and material risk/recovery alerts are opt-in. Customers choose
 their local weekly schedule in the mobile app; delivery uses the same encrypted,

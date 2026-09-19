@@ -1,6 +1,6 @@
 # Project Status
 
-Last reviewed against the repository: 2026-09-14.
+Last reviewed against the repository: 2026-09-19.
 
 This document separates four states that should not be treated as equivalent:
 
@@ -19,13 +19,13 @@ unit coverage is not the same as a full mobile-to-database acceptance test.
 | Capability                         | API                                                                                                                                                         | Mobile                                                                                                         | Current verification                                                                                                                                                                       | Remaining work                                                                                                                                                                            |
 | ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Authentication countries           | Implemented                                                                                                                                                 | Country selector with offline NG/US/GB fallback                                                                | API and mobile unit tests; generated response schema                                                                                                                                       | Validate country configuration and copy for each launch market                                                                                                                            |
-| OTP request and verification       | Implemented with normalized phones, hashed OTPs, resend cooldown, attempt limits, and JWT issuance                                                          | Implemented                                                                                                    | API unit tests; PostgreSQL e2e for the dev provider; manual Expo web flow                                                                                                                  | Complete a real-provider pass on native Android and iOS                                                                                                                                   |
-| Session persistence and logout     | JWT verification implemented                                                                                                                                | Token persistence, restore, 401 clearing, and local logout implemented                                         | Mobile storage/API-client unit tests; manual Expo web restore/401 pass                                                                                                                     | Add automated route/screen coverage; define refresh, expiry UX, revocation, and rotation strategy                                                                                         |
+| OTP request and verification       | Implemented with normalized phones, hashed OTPs, resend cooldown, attempt limits, and JWT issuance                                                          | Implemented                                                                                                    | API unit tests; PostgreSQL e2e for the dev provider; auth screen tests; live mobile API-client journey; manual Expo web flow                                                               | Complete a real-provider pass on native Android and iOS                                                                                                                                   |
+| Session persistence and logout     | JWT verification implemented                                                                                                                                | Token persistence, restore, 401 clearing, and local logout implemented                                         | Mobile storage/API-client and AuthProvider lifecycle tests; live mobile API-client bearer restore/logout behavior; manual Expo web restore/401 pass                                        | Add full route-level journey coverage; define refresh, expiry UX, revocation, and rotation strategy                                                                                       |
 | OTP abuse controls                 | Per-phone, IP, and pseudonymous device limits implemented                                                                                                   | Stable installation UUID is sent                                                                               | API unit and PostgreSQL e2e coverage                                                                                                                                                       | Decide whether native attestation or an edge risk service is required                                                                                                                     |
 | Auth and queue inspection          | Allowlisted API endpoints implemented                                                                                                                       | No operator UI                                                                                                 | API unit and PostgreSQL e2e coverage                                                                                                                                                       | Build an operations surface and production alerting/runbooks                                                                                                                              |
 | Goals                              | Create, read active/history, update, complete, and cancel implemented; replacement preserves prior state and the database enforces one active goal per user | Create, read, edit, intentionally replace, complete, cancel, and review history                                | API service/controller/DTO and schema-invariant tests; PostgreSQL lifecycle e2e; mobile form, API-client, contract-shape, and screen-journey tests                                         | Run native TalkBack/VoiceOver and mobile-to-API acceptance passes                                                                                                                         |
 | Transactions                       | Create, list, update, and delete implemented                                                                                                                | Create, list, filter, edit, relink/unlink, and delete                                                          | API service/controller unit tests; PostgreSQL finance e2e; mobile API-client, presentation-helper, and screen-journey tests covering cached-read failure/retry and accessibility semantics | Run a native TalkBack/VoiceOver pass; decide separately whether durable cold-start history or queued offline writes justify persistence and conflict-resolution complexity                |
-| Stability dashboard                | Implemented for an active goal                                                                                                                              | Implemented                                                                                                    | Scoring/service/controller unit tests; populated PostgreSQL finance e2e; mobile response parsing                                                                                           | Add screen/journey tests; validate the scoring model with users                                                                                                                           |
+| Stability dashboard                | Implemented for an active goal                                                                                                                              | Implemented                                                                                                    | Scoring/service/controller unit tests; populated PostgreSQL finance e2e; mobile response and screen tests; live client-to-API recalculation journey                                        | Validate the scoring model with users and run native-device acceptance                                                                                                                    |
 | OTP notification queue             | Encrypted persisted jobs, leases, retry, and dead-letter behavior implemented                                                                               | Not directly user-facing                                                                                       | Extensive unit tests and PostgreSQL e2e coverage                                                                                                                                           | Move the serial in-process worker only when an independent deployment is justified                                                                                                        |
 | SMS providers                      | Dev, Twilio, and Termii adapters implemented                                                                                                                | OTP UI is provider-agnostic                                                                                    | Mocked provider unit tests; dev-provider e2e                                                                                                                                               | Live Twilio or Termii delivery has not been production-validated                                                                                                                          |
 | Weekly readiness and risk alerts   | Opt-in preferences, timezone-aware weekly generation, material risk/recovery detection, cooldown, encrypted queueing, and SMS delivery implemented          | Preference and schedule controls implemented                                                                   | API rule/service/queue/consumer tests; generated request/response contracts; mobile API-client and screen tests                                                                            | Validate templates and timing with customers; complete live-provider/native-device delivery validation                                                                                    |
@@ -48,9 +48,10 @@ unit coverage is not the same as a full mobile-to-database acceptance test.
   and populated dashboard recalculation against the real Prisma/PostgreSQL
   boundary.
 - Mobile unit tests cover phone/OTP helpers, auth feedback, environment and base
-  URL selection, session and installation-ID storage, API-client behavior,
-  session-scoped finance caches, transaction money/date/goal-link behavior,
-  finance request/response parsing, generated contract shapes, and dependency
+  URL selection, session and installation-ID storage, AuthProvider
+  login/restore/logout and cache clearing, API-client behavior, session-scoped
+  finance caches, transaction money/date/goal-link behavior, finance
+  request/response parsing, generated contract shapes, and dependency
   compatibility safeguards.
 - React Native transaction-screen tests cover create, list/filter, edit, delete
   confirmation, validation, cached activity during refresh failure, retry,
@@ -59,18 +60,27 @@ unit coverage is not the same as a full mobile-to-database acceptance test.
 - React Native goal-screen tests cover empty and populated states, lifecycle
   history, customer-friendly edit values, and confirmation gates for replacing
   or completing an active goal.
+- React Native auth-screen tests cover phone validation, OTP request/verify,
+  session handoff, and the missing-phone recovery path. Dashboard-screen tests
+  cover loading, empty, populated, refresh, and failed-read/retry states.
+- A separate CI job runs the actual mobile API client against a running NestJS
+  API and PostgreSQL in a dedicated `e2e_mobile` schema. It covers dev OTP,
+  goal setup, transaction create/edit/delete, dashboard recalculation, bearer
+  restore, and unauthenticated access after local logout. See
+  [Critical Mobile Journey](critical-mobile-journey.md).
 - Readiness-alert tests cover preference defaults and validation, timezone-aware
   weekly buckets, risk/recovery thresholds, cooldown, deduplicated encrypted
   queueing, generic SMS delivery, mobile response parsing, and accessible
   preference controls.
 - CI checks API/mobile lint and builds, API unit/e2e tests, mobile typecheck/unit
-  tests, contract drift, dependency review, dependency audit, and CodeQL.
+  tests, the live mobile API-client journey, contract drift, dependency review,
+  dependency audit, and CodeQL.
 
 ### Not automated today
 
-- There are no React Native screen/component tests yet for the auth or dashboard
-  screens; transaction and goal screens have automated component journeys.
-- There is no automated mobile-to-API journey test.
+- There is no single automated native UI navigation journey that drives the
+  entire app from OTP through logout. Screen tests and the live API-client
+  journey exercise complementary boundaries, not that full device boundary.
 - There is no native Android or iOS acceptance suite.
 - There is no live Twilio or Termii integration test.
 - There are no load, soak, failover, broad accessibility-audit, or
@@ -130,14 +140,18 @@ before the score or alerts are treated as financial guidance.
 - Goal lifecycle coverage across unit, contract, screen, and PostgreSQL e2e
   boundaries, including replacement history and preservation of transaction
   links to ended goals.
+- Auth/dashboard screen coverage and a live mobile API-client journey against
+  PostgreSQL, including goal setup, transaction management, dashboard refresh,
+  bearer restore, and unauthenticated access after local logout.
 
 #### Before a production pilot
 
 1. Validate OTP delivery and verification with the chosen live SMS provider on
    real Android and iOS devices.
-2. Add an automated critical mobile journey covering authentication, goal
-   setup, transaction entry and management, dashboard refresh, session restore,
-   and logout.
+2. Extend the automated client/API journey to a full native UI navigation pass
+   covering authentication, goal setup, transaction management, dashboard
+   refresh, session restore, and logout. The client/API and screen boundaries
+   are covered separately today.
 3. Define production session behavior: token expiry UX, revocation, rotation,
    and incident response.
 4. Establish deployment, monitoring, alerting, and backup/restore; configure
@@ -149,9 +163,11 @@ before the score or alerts are treated as financial guidance.
 
 ### Later platform expansion
 
-- Automatic transaction ingestion or bank connectivity.
+- Bank-specific export adapters and a separate direct-connectivity decision
+  after customer validation of the implemented canonical CSV import.
 - Multiple concurrent obligations and richer planning scenarios.
-- Customer profile, preferences, consent, export, and support tooling.
+- Internal support tooling; customer profile, preferences, consent, export,
+  and configured support access are already implemented.
 - Marketing website, web product, internal admin tools, and the service
   extractions described in the [Architecture Roadmap](architecture-roadmap.md).
 

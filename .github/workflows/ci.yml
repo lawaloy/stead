@@ -137,6 +137,77 @@ jobs:
       - name: End-to-end tests
         run: npm run test:e2e -- --ci --runInBand
 
+  mobile-api-journey:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: stead
+          POSTGRES_PASSWORD: stead
+          POSTGRES_DB: stead
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U stead -d stead"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql://stead:stead@localhost:5432/stead?schema=e2e_mobile
+      NODE_ENV: test
+      JWT_SECRET: stead-ci-jwt-secret
+      NOTIFICATION_PAYLOAD_ENCRYPTION_KEY: stead-ci-notification-key-1234567890
+      AUTH_DEVICE_IDENTIFIER_SECRET: stead-ci-device-identifier-key-1234567890
+      SMS_PROVIDER: dev
+      DEV_EXPOSE_OTP: 'true'
+      STEAD_TEST_API_URL: http://127.0.0.1:3000
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: |
+            api/package-lock.json
+            mobile/package-lock.json
+
+      - name: Pin npm version
+        run: npm install --global npm@11.19.1
+
+      - name: Install API and mobile dependencies
+        run: |
+          npm --prefix api ci
+          npm --prefix mobile ci
+
+      - name: Migrate and build API
+        working-directory: api
+        run: |
+          npx prisma migrate deploy
+          npm run build
+
+      - name: Exercise live mobile API client journey
+        run: |
+          node api/dist/src/main.js > "$RUNNER_TEMP/stead-api.log" 2>&1 &
+          api_pid=$!
+          trap 'kill "$api_pid" 2>/dev/null || true' EXIT
+          ready=0
+          for attempt in {1..30}; do
+            if curl --fail --silent "$STEAD_TEST_API_URL/auth/countries" > /dev/null; then
+              ready=1
+              break
+            fi
+            sleep 1
+          done
+          if [ "$ready" -ne 1 ]; then
+            cat "$RUNNER_TEMP/stead-api.log"
+            exit 1
+          fi
+          npm --prefix mobile run test:live-api
+
   build:
     runs-on: ubuntu-latest
     needs: [format, lint, test]

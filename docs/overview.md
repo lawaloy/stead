@@ -200,8 +200,9 @@ Product milestones and enabling delivery work are tracked separately in
 gaps are:
 
 1. Real-provider OTP validation on native Android and iOS devices.
-2. Automated auth and dashboard screen coverage plus a full mobile-to-API
-   journey; transaction and goal screens now have component journeys.
+2. A full native UI navigation journey; auth, dashboard, transaction, and goal
+   screens have component coverage, while a separate live mobile API-client
+   journey exercises the running API and PostgreSQL.
 3. Production session lifecycle, operational monitoring, backup/restore, and
    enforcement of documented privacy/retention/account-deletion procedures.
 4. Customer validation and bank-export adapters for the canonical CSV ingestion

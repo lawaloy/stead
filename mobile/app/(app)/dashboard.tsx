@@ -56,6 +56,7 @@ export default function DashboardScreen() {
           Failed to load dashboard. Pull to retry.
         </Text>
         <ScrollView
+          testID="dashboard-refresh"
           refreshControl={
             <RefreshControl
               refreshing={query.isRefetching}
@@ -78,6 +79,7 @@ export default function DashboardScreen() {
   return (
     <ScreenShell title="Stability Dashboard">
       <ScrollView
+        testID="dashboard-refresh"
         refreshControl={
           <RefreshControl
             refreshing={query.isRefetching}
