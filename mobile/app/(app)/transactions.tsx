@@ -279,6 +279,7 @@ export default function TransactionsScreen() {
 
           <Text style={styles.label}>Amount (naira)</Text>
           <TextInput
+            testID="transaction-edit-amount"
             accessibilityLabel="Transaction amount in naira"
             style={styles.input}
             value={amountNaira}

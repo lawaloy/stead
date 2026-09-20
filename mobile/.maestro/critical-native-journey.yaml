@@ -33,12 +33,17 @@ appId: com.lawaloy.stead
 - tapOn:
     id: nav-dashboard
 - assertVisible: Native journey goal
+- assertVisible: '0%'
 
 - tapOn:
     id: nav-activity
 - tapOn:
     id: transaction-add
 - assertVisible: Add Transaction
+- tapOn:
+    id: transaction-amount
+- eraseText: 100
+- inputText: '120000'
 - tapOn:
     id: transaction-note
 - eraseText: 100
@@ -50,7 +55,16 @@ appId: com.lawaloy.stead
 - tapOn:
     id: nav-activity
 - assertVisible: Native journey income
+- tapOn:
+    id: nav-dashboard
+- assertVisible: '10%'
+- tapOn:
+    id: nav-activity
 - tapOn: Edit Native journey income transaction
+- tapOn:
+    id: transaction-edit-amount
+- eraseText: 100
+- inputText: '240000'
 - tapOn:
     id: transaction-edit-note
 - eraseText: 100
@@ -59,6 +73,11 @@ appId: com.lawaloy.stead
 - tapOn:
     id: transaction-save
 - assertVisible: Native journey income corrected
+- tapOn:
+    id: nav-dashboard
+- assertVisible: '20%'
+- tapOn:
+    id: nav-activity
 - tapOn: Delete Native journey income corrected transaction
 - tapOn: Delete
 - assertVisible: No transactions yet
@@ -66,6 +85,7 @@ appId: com.lawaloy.stead
 - tapOn:
     id: nav-dashboard
 - assertVisible: Native journey goal
+- assertVisible: '0%'
 - swipe:
     start: 50%, 35%
     end: 50%, 80%
