@@ -143,9 +143,8 @@ jobs:
           script: |
             adb reverse tcp:8081 tcp:8081
             adb reverse tcp:3000 tcp:3000
-            cd mobile
-            CI=1 npx expo run:android --no-bundler
-            maestro test -e TEST_PHONE=08030000001 .maestro/critical-native-journey.yaml
+            cd mobile && CI=1 npx expo run:android --no-bundler
+            cd mobile && maestro test -e TEST_PHONE=08030000001 .maestro/critical-native-journey.yaml
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
