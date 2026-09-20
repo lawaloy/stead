@@ -10,7 +10,11 @@ export const ScreenShell = ({
   children: React.ReactNode;
 }) => (
   <SafeAreaView style={styles.safe}>
-    <ScrollView contentContainerStyle={styles.wrap}>
+    <ScrollView
+      testID="screen-shell-scroll"
+      contentContainerStyle={styles.wrap}
+      keyboardShouldPersistTaps="handled"
+    >
       <Text style={styles.title} accessibilityRole="header">
         {title}
       </Text>
