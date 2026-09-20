@@ -26,10 +26,17 @@ appId: com.lawaloy.stead
 - tapOn:
     id: goal-name
 - inputText: Native journey goal
+- hideKeyboard
+- scrollUntilVisible:
+    element:
+      id: goal-target
 - tapOn:
     id: goal-target
 - inputText: '1200000'
 - hideKeyboard
+- scrollUntilVisible:
+    element:
+      id: goal-save
 - tapOn:
     id: goal-save
 - assertVisible: Goal created
@@ -47,11 +54,15 @@ appId: com.lawaloy.stead
     id: transaction-amount
 - eraseText: 100
 - inputText: '120000'
+- hideKeyboard
 - tapOn:
     id: transaction-note
 - eraseText: 100
 - inputText: Native journey income
 - hideKeyboard
+- scrollUntilVisible:
+    element:
+      id: transaction-create
 - tapOn:
     id: transaction-create
 - assertVisible: Transaction added
@@ -68,11 +79,15 @@ appId: com.lawaloy.stead
     id: transaction-edit-amount
 - eraseText: 100
 - inputText: '240000'
+- hideKeyboard
 - tapOn:
     id: transaction-edit-note
 - eraseText: 100
 - inputText: Native journey income corrected
 - hideKeyboard
+- scrollUntilVisible:
+    element:
+      id: transaction-save
 - tapOn:
     id: transaction-save
 - assertVisible: Native journey income corrected
