@@ -8,6 +8,7 @@ appId: com.lawaloy.stead
 - tapOn:
     id: auth-phone
 - inputText: ${TEST_PHONE}
+- hideKeyboard
 - tapOn:
     id: auth-request-otp
 - assertVisible: Verify OTP

@@ -5,9 +5,36 @@ on:
     branches: [main]
   push:
     branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
 
 jobs:
+  config:
+    runs-on: ubuntu-latest
+    outputs:
+      node_version: ${{ steps.versions.outputs.node_version }}
+      npm_version: ${{ steps.versions.outputs.npm_version }}
+      android_api_level: ${{ steps.versions.outputs.android_api_level }}
+      ios_runner: ${{ steps.versions.outputs.ios_runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: versions
+        run: |
+          set -eu
+          source .github/ci.env
+          echo "node_version=$NODE_VERSION" >> "$GITHUB_OUTPUT"
+          echo "npm_version=$NPM_VERSION" >> "$GITHUB_OUTPUT"
+          echo "android_api_level=$ANDROID_API_LEVEL" >> "$GITHUB_OUTPUT"
+          echo "ios_runner=$IOS_RUNNER" >> "$GITHUB_OUTPUT"
+
   format:
+    needs: config
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -16,12 +43,12 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 24
+          node-version: ${{ needs.config.outputs.node_version }}
           cache: npm
           cache-dependency-path: package-lock.json
 
       - name: Pin npm version
-        run: npm install --global npm@11.19.1
+        run: npm install --global npm@${{ needs.config.outputs.npm_version }}
 
       - name: Install formatting dependencies
         run: npm ci
@@ -30,6 +57,7 @@ jobs:
         run: npm run format:check
 
   lint:
+    needs: config
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -43,12 +71,12 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 24
+          node-version: ${{ needs.config.outputs.node_version }}
           cache: npm
           cache-dependency-path: api/package-lock.json
 
       - name: Pin npm version
-        run: npm install --global npm@11.19.1
+        run: npm install --global npm@${{ needs.config.outputs.npm_version }}
 
       - name: Install dependencies
         run: npm ci
@@ -65,12 +93,12 @@ jobs:
       - name: Setup Node for mobile lint
         uses: actions/setup-node@v4
         with:
-          node-version: 24
+          node-version: ${{ needs.config.outputs.node_version }}
           cache: npm
           cache-dependency-path: mobile/package-lock.json
 
       - name: Pin npm version for mobile lint
-        run: npm install --global npm@11.19.1
+        run: npm install --global npm@${{ needs.config.outputs.npm_version }}
 
       - name: Install mobile dependencies
         working-directory: mobile
@@ -82,6 +110,7 @@ jobs:
 
   test:
     name: api-test
+    needs: config
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -115,12 +144,12 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 24
+          node-version: ${{ needs.config.outputs.node_version }}
           cache: npm
           cache-dependency-path: api/package-lock.json
 
       - name: Pin npm version
-        run: npm install --global npm@11.19.1
+        run: npm install --global npm@${{ needs.config.outputs.npm_version }}
 
       - name: Install dependencies
         run: npm ci
@@ -138,6 +167,7 @@ jobs:
         run: npm run test:e2e -- --ci --runInBand
 
   mobile-api-journey:
+    needs: config
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -169,14 +199,14 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 24
+          node-version: ${{ needs.config.outputs.node_version }}
           cache: npm
           cache-dependency-path: |
             api/package-lock.json
             mobile/package-lock.json
 
       - name: Pin npm version
-        run: npm install --global npm@11.19.1
+        run: npm install --global npm@${{ needs.config.outputs.npm_version }}
 
       - name: Install API and mobile dependencies
         run: |
@@ -210,7 +240,7 @@ jobs:
 
   build:
     runs-on: ubuntu-latest
-    needs: [format, lint, test]
+    needs: config
     defaults:
       run:
         working-directory: api
@@ -223,12 +253,12 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 24
+          node-version: ${{ needs.config.outputs.node_version }}
           cache: npm
           cache-dependency-path: api/package-lock.json
 
       - name: Pin npm version
-        run: npm install --global npm@11.19.1
+        run: npm install --global npm@${{ needs.config.outputs.npm_version }}
 
       - name: Install dependencies
         run: npm ci
@@ -242,12 +272,12 @@ jobs:
       - name: Setup Node for mobile build
         uses: actions/setup-node@v4
         with:
-          node-version: 24
+          node-version: ${{ needs.config.outputs.node_version }}
           cache: npm
           cache-dependency-path: mobile/package-lock.json
 
       - name: Pin npm version for mobile build
-        run: npm install --global npm@11.19.1
+        run: npm install --global npm@${{ needs.config.outputs.npm_version }}
 
       - name: Install mobile dependencies
         working-directory: mobile
@@ -256,3 +286,256 @@ jobs:
       - name: Build mobile
         working-directory: mobile
         run: npm run build
+
+  mobile-test:
+    needs: config
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ needs.config.outputs.node_version }}
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+
+      - name: Pin npm version
+        run: npm install --global npm@${{ needs.config.outputs.npm_version }}
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type check
+        run: npm run typecheck
+
+      - name: Unit tests
+        run: npm test -- --runInBand
+
+  native-scope:
+    runs-on: ubuntu-latest
+    outputs:
+      run: ${{ steps.paths.outputs.run }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: paths
+        shell: bash
+        run: |
+          if [[ "$GITHUB_EVENT_NAME" == workflow_dispatch ]]; then
+            echo 'run=true' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if [[ "$GITHUB_EVENT_NAME" == pull_request ]]; then
+            base='${{ github.event.pull_request.base.sha }}'
+            head='${{ github.event.pull_request.head.sha }}'
+          else
+            base='${{ github.event.before }}'
+            head="$GITHUB_SHA"
+          fi
+          if git diff --name-only "$base" "$head" | grep -Eq '^(api/|mobile/|\.github/workflows/ci\.yml$|\.github/ci\.env$)'; then
+            echo 'run=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'run=false' >> "$GITHUB_OUTPUT"
+          fi
+
+  native-android:
+    needs: [config, native-scope]
+    if: needs.native-scope.outputs.run == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: stead
+          POSTGRES_PASSWORD: stead
+          POSTGRES_DB: stead
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U stead -d stead"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql://stead:stead@127.0.0.1:5432/stead?schema=e2e_native
+      JWT_SECRET: stead-native-ci-jwt-secret
+      NOTIFICATION_PAYLOAD_ENCRYPTION_KEY: stead-native-ci-notification-key-1234567890
+      AUTH_DEVICE_IDENTIFIER_SECRET: stead-native-ci-device-key-1234567890
+      SMS_PROVIDER: dev
+      DEV_EXPOSE_OTP: 'true'
+      EXPO_PUBLIC_API_URL: http://127.0.0.1:3000
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ needs.config.outputs.node_version }}
+          cache: npm
+          cache-dependency-path: |
+            api/package-lock.json
+            mobile/package-lock.json
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Cache Gradle dependencies and build outputs
+        uses: gradle/actions/setup-gradle@v5
+        with:
+          cache-read-only: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
+      - name: Enable KVM for Android emulator
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Install dependencies and prepare API
+        run: |
+          npm install --global npm@${{ needs.config.outputs.npm_version }}
+          npm ci --prefix api
+          npm ci --prefix mobile
+          cd api
+          npx prisma migrate deploy
+          npm run build
+      - name: Start API and Metro
+        run: |
+          NODE_ENV=test node api/dist/src/main.js > "$RUNNER_TEMP/stead-api.log" 2>&1 &
+          for attempt in $(seq 1 60); do
+            if curl --fail --silent http://127.0.0.1:3000/auth/countries > /dev/null; then break; fi
+            sleep 2
+          done
+          curl --fail http://127.0.0.1:3000/auth/countries > /dev/null
+          (cd mobile && NODE_OPTIONS=--dns-result-order=ipv4first npx expo start --localhost) > "$RUNNER_TEMP/stead-metro.log" 2>&1 &
+          for attempt in $(seq 1 90); do
+            if curl --fail --silent http://127.0.0.1:8081/status | grep -q 'packager-status:running'; then break; fi
+            sleep 2
+          done
+          curl --fail http://127.0.0.1:8081/status | grep -q 'packager-status:running'
+      - name: Install Maestro
+        run: |
+          curl -fsSL https://get.maestro.mobile.dev | bash
+          echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
+      - name: Run Android native journey
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: ${{ needs.config.outputs.android_api_level }}
+          arch: x86_64
+          working-directory: mobile
+          script: |
+            adb reverse tcp:8081 tcp:8081
+            adb reverse tcp:3000 tcp:3000
+            CI=1 npx expo run:android --no-bundler
+            maestro test -e TEST_PHONE=08030000001 .maestro/critical-native-journey.yaml
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: android-native-journey-logs
+          path: |
+            ${{ runner.temp }}/stead-api.log
+            ${{ runner.temp }}/stead-metro.log
+            ~/.maestro/tests
+            mobile/.expo
+          retention-days: 7
+
+  native-ios:
+    needs: [config, native-scope]
+    if: needs.native-scope.outputs.run == 'true'
+    runs-on: ${{ needs.config.outputs.ios_runner }}
+    timeout-minutes: 90
+    env:
+      DATABASE_URL: postgresql://stead:stead@127.0.0.1:5432/stead?schema=e2e_native
+      JWT_SECRET: stead-native-ci-jwt-secret
+      NOTIFICATION_PAYLOAD_ENCRYPTION_KEY: stead-native-ci-notification-key-1234567890
+      AUTH_DEVICE_IDENTIFIER_SECRET: stead-native-ci-device-key-1234567890
+      SMS_PROVIDER: dev
+      DEV_EXPOSE_OTP: 'true'
+      EXPO_PUBLIC_API_URL: http://127.0.0.1:3000
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ needs.config.outputs.node_version }}
+          cache: npm
+          cache-dependency-path: |
+            api/package-lock.json
+            mobile/package-lock.json
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Restore iOS native build caches
+        id: ios-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            ~/Library/Caches/CocoaPods
+            ~/Library/Developer/Xcode/DerivedData
+          key: ios-native-${{ hashFiles('mobile/package-lock.json', 'mobile/app.json') }}
+      - name: Start isolated PostgreSQL 16
+        run: |
+          brew install postgresql@16
+          PG_BIN="$(brew --prefix postgresql@16)/bin"
+          echo "$PG_BIN" >> "$GITHUB_PATH"
+          "$PG_BIN/initdb" -D "$RUNNER_TEMP/stead-pg" -U stead --auth-local=trust --auth-host=trust
+          "$PG_BIN/pg_ctl" -D "$RUNNER_TEMP/stead-pg" -l "$RUNNER_TEMP/stead-pg.log" -o '-h 127.0.0.1 -p 5432' start
+          "$PG_BIN/createdb" -h 127.0.0.1 -U stead stead
+      - name: Install dependencies and prepare API
+        run: |
+          npm install --global npm@${{ needs.config.outputs.npm_version }}
+          npm ci --prefix api
+          npm ci --prefix mobile
+          cd api
+          npx prisma migrate deploy
+          npm run build
+      - name: Start API and Metro
+        run: |
+          NODE_ENV=test node api/dist/src/main.js > "$RUNNER_TEMP/stead-api.log" 2>&1 &
+          for attempt in $(seq 1 60); do
+            if curl --fail --silent http://127.0.0.1:3000/auth/countries > /dev/null; then break; fi
+            sleep 2
+          done
+          curl --fail http://127.0.0.1:3000/auth/countries > /dev/null
+          (cd mobile && NODE_OPTIONS=--dns-result-order=ipv4first npx expo start --localhost) > "$RUNNER_TEMP/stead-metro.log" 2>&1 &
+          for attempt in $(seq 1 90); do
+            if curl --fail --silent http://127.0.0.1:8081/status | grep -q 'packager-status:running'; then break; fi
+            sleep 2
+          done
+          curl --fail http://127.0.0.1:8081/status | grep -q 'packager-status:running'
+      - name: Install Maestro
+        run: |
+          curl -fsSL https://get.maestro.mobile.dev | bash
+          echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
+      - name: Build and install iOS app
+        run: |
+          DEVICE_ID="$(xcrun simctl list devices available -j | jq -r '[.devices[] | .[] | select(.name == "iPhone 17")] | last | .udid')"
+          test -n "$DEVICE_ID" && test "$DEVICE_ID" != null
+          xcrun simctl boot "$DEVICE_ID"
+          xcrun simctl bootstatus "$DEVICE_ID" -b
+          cd mobile
+          CI=1 npx expo run:ios --no-bundler --device "$DEVICE_ID"
+      - name: Save iOS native build caches
+        if: steps.ios-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            ~/Library/Caches/CocoaPods
+            ~/Library/Developer/Xcode/DerivedData
+          key: ${{ steps.ios-cache.outputs.cache-primary-key }}
+      - name: Run iOS native journey
+        working-directory: mobile
+        run: maestro test -e TEST_PHONE=08030000001 .maestro/critical-native-journey.yaml
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: ios-native-journey-logs
+          path: |
+            ${{ runner.temp }}/stead-api.log
+            ${{ runner.temp }}/stead-metro.log
+            ${{ runner.temp }}/stead-pg.log
+            ~/.maestro/tests
+            mobile/.expo
+          retention-days: 7

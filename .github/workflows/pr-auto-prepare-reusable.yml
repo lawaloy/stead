@@ -99,15 +99,25 @@ jobs:
           token: ${{ steps.app-token.outputs.token }}
           fetch-depth: 0
 
+      - name: Load shared tool versions
+        id: versions
+        if: steps.pr.outputs.trusted == 'true' && steps.pr.outputs.changed-workspaces != '[]'
+        shell: bash
+        run: |
+          set -eu
+          source "$GITHUB_WORKSPACE/.github/ci.env"
+          echo "node_version=$NODE_VERSION" >> "$GITHUB_OUTPUT"
+          echo "npm_version=$NPM_VERSION" >> "$GITHUB_OUTPUT"
+
       - name: Setup Node
         if: steps.pr.outputs.trusted == 'true' && steps.pr.outputs.changed-workspaces != '[]'
         uses: actions/setup-node@v4
         with:
-          node-version: 24
+          node-version: ${{ steps.versions.outputs.node_version }}
 
       - name: Pin npm to CI version
         if: steps.pr.outputs.trusted == 'true' && steps.pr.outputs.changed-workspaces != '[]'
-        run: npm install --global npm@11.19.1
+        run: npm install --global "npm@${{ steps.versions.outputs.npm_version }}"
 
       - name: Normalize npm lockfiles
         if: steps.pr.outputs.trusted == 'true' && steps.pr.outputs.changed-workspaces != '[]'

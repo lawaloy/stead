@@ -45,7 +45,7 @@ Twilio or Termii account. It requires a disposable API database schema and
 `SMS_PROVIDER=dev`, `DEV_EXPOSE_OTP=true`; never use a real customer account or
 production API. The flow clears the app's local state at the beginning and
 uses a dedicated test phone (`TEST_PHONE`) supplied by the runner. The
-`mobile-ci` runs the same flow in separate Android and iOS simulator jobs when
+The single `ci` workflow runs the same flow in parallel Android and iOS simulator jobs when
 API or mobile paths change, with isolated PostgreSQL 16 databases. It does not prove physical
 device behavior, carrier SMS delivery, TalkBack, or VoiceOver.
 

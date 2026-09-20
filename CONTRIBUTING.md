@@ -80,6 +80,14 @@ Run `npm run format` or `npm run lint:fix` from the repository root to apply
 automatic formatting or lint corrections. CI runs the non-mutating checks and
 rejects formatting drift.
 
+The single `.github/workflows/ci.yml` build/test workflow runs independent
+format, lint, API, mobile, and native Android/iOS jobs in parallel. Native jobs
+are gated to API, mobile, or CI-configuration changes. Shared non-secret CI
+toolchain versions are kept in `.github/ci.env`; update that file when changing
+Node, npm, the Android API level, or the macOS runner. Native jobs cache Gradle
+and iOS build dependencies, but a cold native build can still take several
+minutes. New pushes cancel superseded CI runs.
+
 API e2e tests require PostgreSQL and a dedicated `e2e` or test schema. The
 test harness refuses to clean the development `public` schema. See the root
 README for the local migration command.

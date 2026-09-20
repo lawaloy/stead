@@ -3,13 +3,7 @@ name: Dependency Maintenance Auto Finish
 on:
   workflow_run:
     workflows:
-      [
-        'ci',
-        'mobile-ci',
-        'CodeQL Advanced',
-        'Dependency review',
-        'Dependency Audit',
-      ]
+      ['ci', 'CodeQL Advanced', 'Dependency review', 'Dependency Audit']
     types: [completed]
 
 permissions:
