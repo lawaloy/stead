@@ -152,7 +152,9 @@ jobs:
           path: |
             ${{ runner.temp }}/stead-api.log
             ${{ runner.temp }}/stead-metro.log
+            ~/.maestro/tests
             mobile/.expo
+          retention-days: 7
 
   native-ios:
     needs: native-scope
@@ -231,4 +233,6 @@ jobs:
             ${{ runner.temp }}/stead-api.log
             ${{ runner.temp }}/stead-metro.log
             ${{ runner.temp }}/stead-pg.log
+            ~/.maestro/tests
             mobile/.expo
+          retention-days: 7
