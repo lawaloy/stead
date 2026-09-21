@@ -106,6 +106,9 @@ appId: com.lawaloy.stead
       platform: Android
     commands:
       - hideKeyboard
+- scrollUntilVisible:
+    element:
+      id: transaction-edit-note
 - tapOn:
     id: transaction-edit-note
 - eraseText: 100

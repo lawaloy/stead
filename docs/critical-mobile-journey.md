@@ -45,9 +45,12 @@ Twilio or Termii account. It requires a disposable API database schema and
 `SMS_PROVIDER=dev`, `DEV_EXPOSE_OTP=true`; never use a real customer account or
 production API. The flow clears the app's local state at the beginning and
 uses a dedicated test phone (`TEST_PHONE`) supplied by the runner. The
-The single `ci` workflow runs the same flow in parallel Android and iOS simulator jobs when
-API or mobile paths change, with isolated PostgreSQL 16 databases. It does not prove physical
-device behavior, carrier SMS delivery, TalkBack, or VoiceOver.
+single `ci` workflow runs the same flow in parallel Android and iOS simulator
+jobs when API or mobile paths change, with isolated PostgreSQL 16 databases.
+Installable native binaries are cached by native dependencies and app
+configuration, so JavaScript and journey-only changes do not trigger another
+native compilation. It does not prove physical device behavior, carrier SMS
+delivery, TalkBack, or VoiceOver.
 
 To run locally, start the API against a dedicated disposable schema as above,
 install and start a native debug build (`npx expo run:android` on a configured
