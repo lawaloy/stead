@@ -22,5 +22,8 @@ describe('ScreenShell', () => {
     expect(
       view.getByTestId('screen-shell-scroll').props.keyboardShouldPersistTaps,
     ).toBe('handled');
+    expect(
+      view.getByTestId('screen-shell-scroll').props.keyboardDismissMode,
+    ).toBe('on-drag');
   });
 });

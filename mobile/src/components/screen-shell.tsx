@@ -13,6 +13,7 @@ export const ScreenShell = ({
     <ScrollView
       testID="screen-shell-scroll"
       contentContainerStyle={styles.wrap}
+      keyboardDismissMode="on-drag"
       keyboardShouldPersistTaps="handled"
     >
       <Text style={styles.title} accessibilityRole="header">

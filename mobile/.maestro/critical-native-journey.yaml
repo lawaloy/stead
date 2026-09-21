@@ -46,6 +46,11 @@ appId: com.lawaloy.stead
       platform: Android
     commands:
       - hideKeyboard
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - tapOn: Create a goal
 - scrollUntilVisible:
     element:
       id: goal-save
@@ -80,6 +85,11 @@ appId: com.lawaloy.stead
       platform: Android
     commands:
       - hideKeyboard
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - tapOn: Add Transaction
 - scrollUntilVisible:
     element:
       id: transaction-create
@@ -109,15 +119,21 @@ appId: com.lawaloy.stead
 - scrollUntilVisible:
     element:
       id: transaction-edit-note
-- tapOn:
+- longPressOn:
     id: transaction-edit-note
-- eraseText: 100
+- tapOn: 'Select [Aa]ll'
+- eraseText: 1
 - inputText: Native journey income corrected
 - runFlow:
     when:
       platform: Android
     commands:
       - hideKeyboard
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - tapOn: Edit transaction
 - scrollUntilVisible:
     element:
       id: transaction-save
