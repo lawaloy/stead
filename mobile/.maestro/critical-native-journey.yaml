@@ -10,7 +10,11 @@ appId: com.lawaloy.stead
 - tapOn:
     id: auth-phone
 - inputText: ${TEST_PHONE}
-- hideKeyboard
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - hideKeyboard
 - tapOn:
     id: auth-request-otp
 - assertVisible: Verify OTP
@@ -26,14 +30,22 @@ appId: com.lawaloy.stead
 - tapOn:
     id: goal-name
 - inputText: Native journey goal
-- hideKeyboard
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - hideKeyboard
 - scrollUntilVisible:
     element:
       id: goal-target
 - tapOn:
     id: goal-target
 - inputText: '1200000'
-- hideKeyboard
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - hideKeyboard
 - scrollUntilVisible:
     element:
       id: goal-save
@@ -54,12 +66,20 @@ appId: com.lawaloy.stead
     id: transaction-amount
 - eraseText: 100
 - inputText: '120000'
-- hideKeyboard
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - hideKeyboard
 - tapOn:
     id: transaction-note
 - eraseText: 100
 - inputText: Native journey income
-- hideKeyboard
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - hideKeyboard
 - scrollUntilVisible:
     element:
       id: transaction-create
@@ -74,17 +94,27 @@ appId: com.lawaloy.stead
 - assertVisible: '10%'
 - tapOn:
     id: nav-activity
+- scrollUntilVisible:
+    element: Edit Native journey income transaction
 - tapOn: Edit Native journey income transaction
 - tapOn:
     id: transaction-edit-amount
 - eraseText: 100
 - inputText: '240000'
-- hideKeyboard
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - hideKeyboard
 - tapOn:
     id: transaction-edit-note
 - eraseText: 100
 - inputText: Native journey income corrected
-- hideKeyboard
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - hideKeyboard
 - scrollUntilVisible:
     element:
       id: transaction-save
@@ -96,6 +126,8 @@ appId: com.lawaloy.stead
 - assertVisible: '20%'
 - tapOn:
     id: nav-activity
+- scrollUntilVisible:
+    element: Delete Native journey income corrected transaction
 - tapOn: Delete Native journey income corrected transaction
 - tapOn: Delete
 - assertVisible: No transactions yet
