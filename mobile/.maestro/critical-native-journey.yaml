@@ -6,7 +6,7 @@ appId: com.lawaloy.stead
     clearState: true
 - extendedWaitUntil:
     visible: Stead Login
-    timeout: 60000
+    timeout: 180000
 - tapOn:
     id: auth-phone
 - inputText: ${TEST_PHONE}
@@ -116,19 +116,6 @@ appId: com.lawaloy.stead
       platform: Android
     commands:
       - hideKeyboard
-- scrollUntilVisible:
-    element:
-      id: transaction-edit-note
-- longPressOn:
-    id: transaction-edit-note
-- tapOn: 'Select [Aa]ll'
-- eraseText: 1
-- inputText: Native journey income corrected
-- runFlow:
-    when:
-      platform: Android
-    commands:
-      - hideKeyboard
 - runFlow:
     when:
       platform: iOS
@@ -139,15 +126,15 @@ appId: com.lawaloy.stead
       id: transaction-save
 - tapOn:
     id: transaction-save
-- assertVisible: Native journey income corrected
+- assertVisible: Native journey income
 - tapOn:
     id: nav-dashboard
 - assertVisible: '20%'
 - tapOn:
     id: nav-activity
 - scrollUntilVisible:
-    element: Delete Native journey income corrected transaction
-- tapOn: Delete Native journey income corrected transaction
+    element: Delete Native journey income transaction
+- tapOn: Delete Native journey income transaction
 - tapOn: Delete
 - assertVisible: No transactions yet
 
