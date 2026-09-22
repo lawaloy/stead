@@ -58,7 +58,7 @@
     "@typescript/native": "npm:typescript@~7.0.2",
     "axios-mock-adapter": "^2.1.0",
     "babel-preset-expo": "~57.0.11",
-    "eslint": "^10.10.0",
+    "eslint": "^10.11.0",
     "eslint-config-expo": "~57.0.2",
     "eslint-import-resolver-typescript": "^4.4.5",
     "jest": "^30.5.2",
