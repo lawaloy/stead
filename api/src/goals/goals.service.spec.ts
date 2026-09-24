@@ -227,6 +227,50 @@ describe('GoalsService', () => {
     });
   });
 
+  it('re-activating an inactive goal replaces the current active goal', async () => {
+    const endedAt = new Date('2026-02-01T00:00:00.000Z');
+    const inactive = goalRow({
+      id: 'goal_old',
+      isActive: false,
+      status: GoalStatus.replaced,
+      endedAt,
+    });
+    const reactivated = goalRow({
+      id: 'goal_old',
+      isActive: true,
+      status: GoalStatus.active,
+      endedAt: null,
+    });
+    prisma.goal.findFirst.mockResolvedValue(inactive);
+    prisma.goal.updateMany.mockResolvedValue({ count: 1 });
+    prisma.goal.update.mockResolvedValue(reactivated);
+
+    await expect(
+      service.update('user_1', 'goal_old', { isActive: true }),
+    ).resolves.toMatchObject({
+      id: 'goal_old',
+      isActive: true,
+      status: 'active',
+      endedAt: null,
+    });
+    expect(prisma.goal.updateMany).toHaveBeenCalledWith({
+      where: { userId: 'user_1', isActive: true, id: { not: 'goal_old' } },
+      data: {
+        isActive: false,
+        status: GoalStatus.replaced,
+        endedAt: expect.any(Date) as unknown,
+      },
+    });
+    expect(prisma.goal.update).toHaveBeenCalledWith({
+      where: { id: 'goal_old' },
+      data: expect.objectContaining({
+        isActive: true,
+        status: GoalStatus.active,
+        endedAt: null,
+      }) as unknown,
+    });
+  });
+
   it('maps legacy activation changes onto lifecycle state', async () => {
     prisma.goal.findFirst.mockResolvedValue(goalRow());
     prisma.goal.updateMany.mockResolvedValue({ count: 1 });
