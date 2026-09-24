@@ -31,12 +31,12 @@
     "mobile:typecheck": "npm --prefix ../mobile run typecheck"
   },
   "dependencies": {
-    "@nestjs/common": "^12.0.3",
+    "@nestjs/common": "^12.0.4",
     "@nestjs/config": "^12.0.0",
-    "@nestjs/core": "^12.0.3",
+    "@nestjs/core": "^12.0.4",
     "@nestjs/jwt": "^12.0.2",
     "@nestjs/passport": "^12.0.0",
-    "@nestjs/platform-express": "^12.0.3",
+    "@nestjs/platform-express": "^12.0.4",
     "@prisma/adapter-pg": "^7.10.0",
     "@prisma/client": "^7.10.0",
     "@types/ms": "^2.1.0",
@@ -58,8 +58,8 @@
     "@eslint/js": "^10.0.1",
     "@hey-api/openapi-ts": "^0.99.0",
     "@nestjs/cli": "^12.0.3",
-    "@nestjs/schematics": "^12.0.3",
-    "@nestjs/testing": "^12.0.3",
+    "@nestjs/schematics": "^12.0.4",
+    "@nestjs/testing": "^12.0.4",
     "@types/bcrypt": "^6.0.0",
     "@types/express": "^5.0.6",
     "@types/jest": "^30.0.0",
@@ -79,7 +79,7 @@
     "ts-node": "^10.9.2",
     "tsconfig-paths": "^4.2.0",
     "typescript": "npm:@typescript/typescript6@^6.0.2",
-    "typescript-eslint": "^8.70.0"
+    "typescript-eslint": "^8.70.1"
   },
   "jest": {
     "moduleFileExtensions": [
