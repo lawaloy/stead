@@ -171,6 +171,39 @@ describe('AccountService', () => {
     });
   });
 
+  it('deletes linked and legacy notification jobs discovered during account deletion', async () => {
+    prisma.user.findUnique.mockResolvedValue({ phone: user.phone });
+    notifications.beginAccountDeletion.mockResolvedValue([
+      'linked_job',
+      'legacy_job',
+    ]);
+    prisma.$transaction.mockImplementation(
+      (callback: (transaction: typeof prisma) => Promise<unknown>) => {
+        prisma.user.deleteMany.mockResolvedValue({ count: 1 });
+        return callback(prisma);
+      },
+    );
+
+    await expect(
+      service.deleteAccount('user_1', { confirmation: 'DELETE' }),
+    ).resolves.toMatchObject({ ok: true });
+    expect(notifications.beginAccountDeletion).toHaveBeenCalledWith(
+      'user_1',
+      user.phone,
+    );
+    expect(prisma.notificationJob.deleteMany).toHaveBeenCalledWith({
+      where: {
+        OR: [
+          { userId: 'user_1' },
+          { id: { in: ['linked_job', 'legacy_job'] } },
+        ],
+      },
+    });
+    expect(notifications.finalizeAccountDeletion).toHaveBeenCalledWith(
+      'user_1',
+    );
+  });
+
   it('releases the delivery block when account deletion rolls back', async () => {
     prisma.user.findUnique.mockResolvedValue({ phone: user.phone });
     prisma.$transaction.mockRejectedValue(new Error('database unavailable'));
