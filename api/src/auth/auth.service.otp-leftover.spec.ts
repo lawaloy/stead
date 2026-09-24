@@ -133,6 +133,35 @@ describe('AuthService leftover OTP consume', () => {
     expect(jwt.signAsync).toHaveBeenCalledTimes(1);
   });
 
+  it('does not retire leftover OTPs when the latest code is already locked', async () => {
+    prisma.user.findUnique.mockResolvedValue({
+      id: 'user_1',
+      phone: '+2348012345678',
+    });
+    prisma.otpCode.findFirst.mockResolvedValue({
+      id: 'otp_latest',
+      codeHash: await bcrypt.hash('123456', 1),
+      verifyAttempts: 5,
+      expiresAt: new Date(Date.now() + 60_000),
+      consumedAt: null,
+    });
+
+    await expect(
+      service.verifyOtp('08012345678', 'NG', '123456'),
+    ).rejects.toMatchObject({
+      message: 'Too many invalid OTP attempts. Request a new code.',
+    });
+
+    expect(prisma.otpCode.update).not.toHaveBeenCalled();
+    expect(prisma.otpCode.updateMany).not.toHaveBeenCalled();
+    expect(telemetry.recordEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'otp_verify_locked',
+        metadata: { reason: 'already_locked' },
+      }),
+    );
+  });
+
   it('retires leftover OTPs when the latest code is locked after max attempts', async () => {
     prisma.user.findUnique.mockResolvedValue({
       id: 'user_1',

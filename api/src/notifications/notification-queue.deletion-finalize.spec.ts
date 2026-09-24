@@ -39,6 +39,23 @@ describe('NotificationQueueService account-deletion finalize + mid-flight delete
     jest.useRealTimers();
   });
 
+  it('clears the discovery block when listing deletion candidates fails', async () => {
+    prisma.notificationJob.findMany.mockRejectedValue(
+      new Error('database unavailable'),
+    );
+
+    await expect(
+      queue.beginAccountDeletion('user_1', '+2348000000000'),
+    ).rejects.toThrow('database unavailable');
+    await expect(
+      queue.canDeliver({
+        id: 'legacy_job',
+        userId: null,
+        payload: { phone: '+2348000000000', otp: '123456' },
+      } as never),
+    ).resolves.toBe(true);
+  });
+
   it('keeps delivery blocked after finalize until the lock timeout elapses', async () => {
     jest.useFakeTimers();
     prisma.notificationJob.findMany.mockResolvedValue([
