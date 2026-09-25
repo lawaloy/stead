@@ -16,7 +16,7 @@ export const ScreenShell = ({
     {scroll ? (
       <ScrollView
         testID="screen-shell-scroll"
-        contentContainerStyle={styles.wrap}
+        contentContainerStyle={styles.scrollContent}
         keyboardDismissMode="on-drag"
         keyboardShouldPersistTaps="handled"
       >
@@ -26,7 +26,7 @@ export const ScreenShell = ({
         <View style={styles.body}>{children}</View>
       </ScrollView>
     ) : (
-      <View testID="screen-shell-static" style={styles.wrap}>
+      <View testID="screen-shell-static" style={styles.staticWrap}>
         <Text style={styles.title} accessibilityRole="header">
           {title}
         </Text>
@@ -38,7 +38,9 @@ export const ScreenShell = ({
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: '#f6f8fb' },
-  wrap: { flex: 1, padding: 18, gap: 16 },
+  // Do not put flex:1 on ScrollView content — that prevents scrolling past the viewport.
+  scrollContent: { padding: 18, gap: 16 },
+  staticWrap: { flex: 1, padding: 18, gap: 16 },
   title: { fontSize: 28, fontWeight: '800', color: '#0f1c2f' },
   body: { gap: 12 },
   bodyFlex: { flex: 1 },

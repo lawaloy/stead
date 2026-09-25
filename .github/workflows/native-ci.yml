@@ -90,7 +90,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: mobile/.ci/android/stead-debug.apk
-          key: android-simulator-app-v1-${{ hashFiles('mobile/package-lock.json', 'mobile/app.json', 'mobile/assets/**') }}
+          key: android-simulator-app-v2-${{ hashFiles('mobile/package-lock.json', 'mobile/app.json', 'mobile/assets/**', 'mobile/app/**', 'mobile/src/**') }}
       - name: Build Android simulator app
         if: steps.android-app-cache.outputs.cache-hit != 'true'
         run: |
@@ -133,7 +133,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: mobile/.ci/ios/mobile.app
-          key: ios-simulator-app-${{ needs.config.outputs.ios_runner }}-v1-${{ hashFiles('mobile/package-lock.json', 'mobile/app.json', 'mobile/assets/**') }}
+          key: ios-simulator-app-${{ needs.config.outputs.ios_runner }}-v2-${{ hashFiles('mobile/package-lock.json', 'mobile/app.json', 'mobile/assets/**', 'mobile/app/**', 'mobile/src/**') }}
       - name: Restore source mtimes for incremental Xcode
         if: steps.ios-app-cache.outputs.cache-hit != 'true'
         uses: chetan/git-restore-mtime-action@v2
