@@ -118,9 +118,9 @@ export default function RequestOtpScreen() {
           setPhone(formatPhoneForDisplay(value, effectiveCountryIso))
         }
         placeholder={selectedCountry.phoneExample}
-        // default (not phone-pad): Maestro/XCTest inputText reliably updates RN
-        // controlled state on iOS; phone-pad often accepts the command but leaves value empty.
-        keyboardType="default"
+        // number-pad (not phone-pad): still digits-only UX; phone-pad often lets
+        // Maestro/XCTest inputText "succeed" on iOS without updating RN controlled state.
+        keyboardType="number-pad"
         textContentType="telephoneNumber"
         autoCapitalize="none"
         autoCorrect={false}
