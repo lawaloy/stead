@@ -191,6 +191,44 @@ describe('TransactionsService', () => {
     });
   });
 
+  it('applies only the supplied from bound when to is omitted', async () => {
+    prisma.transaction.findMany.mockResolvedValue([transactionRecord]);
+
+    await expect(
+      service.list('user_1', { from: '2026-01-01T00:00:00.000Z' }),
+    ).resolves.toEqual([serializedTransactionRecord]);
+
+    expect(prisma.transaction.findMany).toHaveBeenCalledWith({
+      where: {
+        userId: 'user_1',
+        occurredAt: {
+          gte: new Date('2026-01-01T00:00:00.000Z'),
+          lte: undefined,
+        },
+      },
+      orderBy: { occurredAt: 'desc' },
+    });
+  });
+
+  it('applies only the supplied to bound when from is omitted', async () => {
+    prisma.transaction.findMany.mockResolvedValue([transactionRecord]);
+
+    await expect(
+      service.list('user_1', { to: '2026-01-31T23:59:59.000Z' }),
+    ).resolves.toEqual([serializedTransactionRecord]);
+
+    expect(prisma.transaction.findMany).toHaveBeenCalledWith({
+      where: {
+        userId: 'user_1',
+        occurredAt: {
+          gte: undefined,
+          lte: new Date('2026-01-31T23:59:59.000Z'),
+        },
+      },
+      orderBy: { occurredAt: 'desc' },
+    });
+  });
+
   it('previews valid, duplicate, and invalid imported rows', async () => {
     const csv = [
       'date,description,amount,type',
@@ -261,6 +299,22 @@ describe('TransactionsService', () => {
       ],
       skipDuplicates: true,
     });
+  });
+
+  it('reports no imports when every selected row is already stored', async () => {
+    prisma.transaction.createMany.mockResolvedValue({ count: 0 });
+    const csv = [
+      'date,description,amount,type',
+      '2026-09-01,Salary,1000,income',
+      '2026-09-02,Food,50.25,expense',
+    ].join('\n');
+
+    await expect(
+      service.confirmImport('user_1', { csv, rowNumbers: [2, 3] }),
+    ).resolves.toEqual({ importedCount: 0, duplicateCount: 2 });
+    expect(prisma.transaction.createMany).toHaveBeenCalledWith(
+      expect.objectContaining({ skipDuplicates: true }),
+    );
   });
 
   it('rejects invalid or nonexistent selected import rows before writing', async () => {

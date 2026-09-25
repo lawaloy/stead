@@ -13,6 +13,34 @@ describe('readiness alert rules', () => {
     );
   });
 
+  it('alerts when a seeded stable baseline deteriorates to warning', () => {
+    expect(
+      riskDecision(
+        { status: 'warning', score: 55 },
+        {
+          lastNotifiedStatus: 'stable',
+          lastNotifiedScore: 80,
+          lastRiskAlertAt: null,
+        },
+        now,
+      ),
+    ).toBe('risk');
+  });
+
+  it('treats a status-only baseline without a notified score as first-time risk', () => {
+    expect(
+      riskDecision(
+        { status: 'warning', score: 55 },
+        {
+          lastNotifiedStatus: 'stable',
+          lastNotifiedScore: null,
+          lastRiskAlertAt: null,
+        },
+        now,
+      ),
+    ).toBe('risk');
+  });
+
   it('alerts on status worsening or a 15-point score drop', () => {
     const baseline = {
       lastNotifiedStatus: 'warning',
@@ -56,6 +84,17 @@ describe('readiness alert rules', () => {
         now,
       ),
     ).toBe('recovery');
+    expect(
+      riskDecision(
+        { status: 'stable', score: 72 },
+        {
+          lastNotifiedStatus: 'warning',
+          lastNotifiedScore: 55,
+          lastRiskAlertAt: now,
+        },
+        now,
+      ),
+    ).toBe('recovery');
     expect(riskDecision({ status: 'stable', score: 90 }, null, now)).toBeNull();
   });
 
@@ -68,6 +107,33 @@ describe('readiness alert rules', () => {
       due: false,
       key: '2026-09-06',
     });
+  });
+
+  it('becomes due at the scheduled local hour on the scheduled weekday', () => {
+    expect(
+      weeklySchedule(
+        new Date('2026-09-07T07:00:00.000Z'),
+        'Africa/Lagos',
+        1,
+        9,
+      ),
+    ).toEqual({ due: false, key: '2026-09-06' });
+    expect(
+      weeklySchedule(
+        new Date('2026-09-07T08:00:00.000Z'),
+        'Africa/Lagos',
+        1,
+        9,
+      ),
+    ).toEqual({ due: true, key: '2026-09-06' });
+    expect(
+      weeklySchedule(
+        new Date('2026-09-07T23:00:00.000Z'),
+        'Africa/Lagos',
+        1,
+        9,
+      ),
+    ).toEqual({ due: true, key: '2026-09-06' });
   });
 
   it('deduplicates concurrent evaluations without suppressing a later cycle', () => {
@@ -86,5 +152,38 @@ describe('readiness alert rules', () => {
 
     expect(key(null)).toBe(key(null));
     expect(key(new Date('2026-09-08T10:00:00.000Z'))).not.toBe(key(null));
+  });
+
+  it('anchors recovery dedupe keys on the last risk alert when both timestamps exist', () => {
+    const lastRiskAlertAt = new Date('2026-09-01T10:00:00.000Z');
+    const lastRecoveryAlertAt = new Date('2026-09-08T10:00:00.000Z');
+    const key = (riskAt: Date | null, recoveryAt: Date | null) =>
+      alertOccurrenceKey({
+        type: 'risk.recovery',
+        userId: 'user_1',
+        goalId: 'goal_1',
+        previousStatus: 'critical',
+        previousScore: 30,
+        currentStatus: 'stable',
+        currentScore: 72,
+        lastRiskAlertAt: riskAt,
+        lastRecoveryAlertAt: recoveryAt,
+      });
+
+    expect(key(lastRiskAlertAt, lastRecoveryAlertAt)).toBe(
+      key(lastRiskAlertAt, new Date('2026-09-09T10:00:00.000Z')),
+    );
+    expect(key(lastRiskAlertAt, lastRecoveryAlertAt)).not.toBe(
+      key(new Date('2026-09-02T10:00:00.000Z'), lastRecoveryAlertAt),
+    );
+    expect(key(lastRiskAlertAt, lastRecoveryAlertAt)).toContain(
+      lastRiskAlertAt.toISOString(),
+    );
+    expect(key(lastRiskAlertAt, lastRecoveryAlertAt)).not.toContain(
+      lastRecoveryAlertAt.toISOString(),
+    );
+    expect(key(null, lastRecoveryAlertAt)).toContain(
+      lastRecoveryAlertAt.toISOString(),
+    );
   });
 });

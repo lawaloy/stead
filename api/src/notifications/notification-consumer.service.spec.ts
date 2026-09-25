@@ -117,6 +117,35 @@ describe('NotificationConsumerService', () => {
     });
   });
 
+  it.each([
+    ['risk.recovery', 'Rent has recovered to stable (score 72).'],
+    ['weekly.summary', 'Stead weekly: Rent is 40% ready.'],
+  ] as const)(
+    'delivers %s jobs through the generic SMS path',
+    async (type, body) => {
+      const readinessJob: NotificationJob = {
+        ...job,
+        type,
+        payload: { phone: '+2348012345678', body },
+      };
+      queue.claimReadyJob.mockResolvedValue(readinessJob);
+      sms.sendMessage.mockResolvedValue({
+        ok: true,
+        provider: 'termii',
+        response: { message_id: `msg-${type}` },
+      });
+
+      await tick();
+
+      expect(sms.sendMessage).toHaveBeenCalledWith('+2348012345678', body);
+      expect(queue.markSucceeded).toHaveBeenCalledWith(readinessJob, {
+        provider: 'termii',
+        providerMessageId: `msg-${type}`,
+      });
+      expect(sms.sendOtp).not.toHaveBeenCalled();
+    },
+  );
+
   it('marks jobs failed when the sms provider rejects', async () => {
     const error = new Error('provider down');
     queue.claimReadyJob.mockResolvedValue(job);

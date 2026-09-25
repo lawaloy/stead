@@ -391,6 +391,63 @@ describe('SmsService', () => {
     expect(termii.sendMessage).not.toHaveBeenCalled();
   });
 
+  it('wraps Twilio notification failures as BAD_GATEWAY with notification copy', async () => {
+    useConfig({
+      SMS_PROVIDER: 'twilio',
+      TWILIO_ACCOUNT_SID: 'ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
+      TWILIO_AUTH_TOKEN: 'twilio-token',
+      TWILIO_FROM: '+14155550100',
+      DEV_EXPOSE_OTP: 'false',
+    });
+    process.env.TWILIO_FROM = '+14155550100';
+    const providerError = Object.assign(new Error('Twilio API error 400'), {
+      response: { code: 21211, message: 'Invalid To phone number' },
+    });
+    twilio.sendMessage.mockRejectedValue(providerError);
+
+    await expect(
+      service.sendMessage('+14155552671', 'Review your savings pace.'),
+    ).rejects.toMatchObject({
+      response: {
+        message: 'Failed to send notification via Twilio',
+        details: { code: 21211, message: 'Invalid To phone number' },
+      },
+      status: HttpStatus.BAD_GATEWAY,
+    });
+  });
+
+  it('wraps Termii notification failures as BAD_GATEWAY with notification copy', async () => {
+    useConfig({
+      SMS_PROVIDER: 'termii',
+      TERMII_API_KEY: 'termii-key',
+      TERMII_SENDER_ID: 'STEAD',
+      TERMII_CHANNEL: 'dnd',
+      DEV_EXPOSE_OTP: 'false',
+    });
+    process.env.TERMII_SENDER_ID = 'STEAD';
+    process.env.TERMII_CHANNEL = 'dnd';
+    const providerError = Object.assign(new Error('Termii API error 400'), {
+      response: { message: 'Insufficient balance' },
+    });
+    termii.sendMessage.mockRejectedValue(providerError);
+
+    await expect(
+      service.sendMessage('+2348012345678', 'Review your savings pace.'),
+    ).rejects.toMatchObject({
+      response: {
+        message: 'Failed to send notification via Termii',
+        details: { message: 'Insufficient balance' },
+      },
+      status: HttpStatus.BAD_GATEWAY,
+    });
+    expect(termii.sendMessage).toHaveBeenCalledWith({
+      to: '+2348012345678',
+      from: 'STEAD',
+      sms: 'Review your savings pace.',
+      channel: 'dnd',
+    });
+  });
+
   it('wraps Termii provider failures as BAD_GATEWAY with details', async () => {
     useConfig({
       SMS_PROVIDER: 'termii',
