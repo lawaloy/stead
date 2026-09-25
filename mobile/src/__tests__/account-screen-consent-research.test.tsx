@@ -7,7 +7,6 @@ import {
   screen,
   waitFor,
 } from '@testing-library/react-native';
-import { Alert } from 'react-native';
 import AccountScreen from '../../app/(app)/account';
 import {
   deleteAccount,
@@ -57,7 +56,7 @@ const account = {
   },
 };
 
-const mockDelete = jest.mocked(deleteAccount);
+const mockConsents = jest.mocked(updateAccountConsents);
 const mockGet = jest.mocked(getAccount);
 
 const renderScreen = () =>
@@ -67,13 +66,12 @@ const renderScreen = () =>
     </QueryClientProvider>,
   );
 
-describe('account screen delete busy guard', () => {
+describe('account screen product-research consent', () => {
   beforeEach(() => {
     queryClient.clear();
     jest.clearAllMocks();
     mockGet.mockResolvedValue(account);
     jest.mocked(updateAccountProfile).mockResolvedValue(account);
-    jest.mocked(updateAccountConsents).mockResolvedValue(account);
     jest.mocked(exportAccountData).mockResolvedValue({
       schemaVersion: 1,
       exportedAt: '2026-09-08T12:00:00.000Z',
@@ -86,72 +84,38 @@ describe('account screen delete busy guard', () => {
       authHistory: [],
       notificationHistory: [],
     });
-    logout.mockResolvedValue(undefined);
+    jest.mocked(deleteAccount).mockResolvedValue({
+      ok: true,
+      deletedAt: '2026-09-08T12:01:00.000Z',
+    });
+    mockConsents.mockResolvedValue({
+      ...account,
+      consents: { ...account.consents, productResearchEnabled: true },
+    });
   });
 
-  it('locks profile, consent, and export while permanent deletion is in flight', async () => {
-    let resolveDelete:
-      ((value: { ok: true; deletedAt: string }) => void) | undefined;
-    mockDelete.mockImplementation(
-      () =>
-        new Promise<{ ok: true; deletedAt: string }>((resolve) => {
-          resolveDelete = resolve;
-        }),
-    );
-
+  it('saves product research on without flipping analytics', async () => {
     await renderScreen();
     await screen.findByText('+2348012345678');
-    fireEvent.changeText(
-      screen.getByLabelText('Delete account confirmation'),
-      'DELETE',
+
+    await fireEvent.press(
+      screen.getByRole('switch', { name: 'Product research' }),
     );
+    await act(async () => {
+      fireEvent.press(
+        screen.getByRole('button', { name: 'Save consent choices' }),
+      );
+    });
+
     await waitFor(() =>
-      expect(
-        screen.getByLabelText('Delete account confirmation').props.value,
-      ).toBe('DELETE'),
+      expect(mockConsents).toHaveBeenCalledWith({
+        analyticsEnabled: false,
+        productResearchEnabled: true,
+      }),
     );
-
-    const deleteButton = screen.getByRole('button', {
-      name: 'Delete account permanently',
-    });
-    await waitFor(() => expect(deleteButton).not.toBeDisabled());
-    fireEvent.press(deleteButton);
-
-    const actions = jest.mocked(Alert.alert).mock.calls.at(-1)?.[2];
-    await act(async () => {
-      actions
-        ?.find((action) => action.text === 'Delete permanently')
-        ?.onPress?.();
-    });
-
-    await waitFor(() => {
-      expect(mockDelete).toHaveBeenCalledTimes(1);
-      expect(queryClient.isMutating()).toBeGreaterThan(0);
-      expect(
-        screen.getByRole('button', { name: 'Save profile' }),
-      ).toBeDisabled();
-    });
-    expect(
-      screen.getByRole('button', { name: 'Save consent choices' }),
-    ).toBeDisabled();
-    expect(
-      screen.getByRole('button', { name: 'Export and share my data' }),
-    ).toBeDisabled();
-    expect(
-      screen.getByRole('button', { name: 'Delete account permanently' }),
-    ).toBeDisabled();
-    expect(jest.mocked(updateAccountProfile)).not.toHaveBeenCalled();
-    expect(jest.mocked(updateAccountConsents)).not.toHaveBeenCalled();
-    expect(jest.mocked(exportAccountData)).not.toHaveBeenCalled();
-
-    await act(async () => {
-      resolveDelete?.({
-        ok: true,
-        deletedAt: '2026-09-08T12:01:00.000Z',
-      });
-    });
+    expect(mockConsents).not.toHaveBeenCalledWith(
+      expect.objectContaining({ analyticsEnabled: true }),
+    );
     await waitFor(() => expect(queryClient.isMutating()).toBe(0));
-    expect(logout).toHaveBeenCalledTimes(1);
-    expect(replace).toHaveBeenCalledWith('/(auth)/request-otp');
   });
 });
