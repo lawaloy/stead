@@ -1,6 +1,12 @@
 import React from 'react';
 import { QueryClientProvider } from '@tanstack/react-query';
-import { act, fireEvent, render, screen } from '@testing-library/react-native';
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react-native';
 import { Alert } from 'react-native';
 import TransactionsScreen from '../../app/(app)/transactions';
 import type { Transaction } from '../contracts/generated/types.gen';
@@ -102,7 +108,7 @@ describe('transactions screen delete success', () => {
     });
 
     expect(mockDeleteTransaction).toHaveBeenCalledWith('tx_expense');
-    expect(await screen.findByText('Salary slice')).toBeOnTheScreen();
-    expect(screen.queryByText('Groceries')).toBeNull();
+    await waitFor(() => expect(screen.queryByText('Groceries')).toBeNull());
+    expect(screen.getByText('Salary slice')).toBeOnTheScreen();
   });
 });
