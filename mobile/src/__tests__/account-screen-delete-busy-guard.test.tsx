@@ -124,8 +124,13 @@ describe('account screen delete busy guard', () => {
         ?.onPress?.();
     });
 
-    await waitFor(() => expect(mockDelete).toHaveBeenCalledTimes(1));
-    expect(screen.getByRole('button', { name: 'Save profile' })).toBeDisabled();
+    await waitFor(() => {
+      expect(mockDelete).toHaveBeenCalledTimes(1);
+      expect(queryClient.isMutating()).toBeGreaterThan(0);
+      expect(
+        screen.getByRole('button', { name: 'Save profile' }),
+      ).toBeDisabled();
+    });
     expect(
       screen.getByRole('button', { name: 'Save consent choices' }),
     ).toBeDisabled();
