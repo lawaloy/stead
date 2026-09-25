@@ -106,26 +106,9 @@ appId: com.lawaloy.stead
 - tapOn:
     id: nav-dashboard
 - assertVisible: '10%'
-# Avoid editing amount/note text on iOS: Maestro cannot reliably replace RN
-# controlled TextInput values. Exercise edit/save via direction toggle, then
-# reach 20% with a second empty-field income create (same path as the first).
-- tapOn:
-    id: nav-activity
-- scrollUntilVisible:
-    element: Edit Native journey income transaction
-    timeout: 40000
-    visibilityPercentage: 50
-- tapOn: Edit Native journey income transaction
-- tapOn: Expense
-- tapOn: Income
-- scrollUntilVisible:
-    element:
-      id: transaction-save
-    timeout: 40000
-    visibilityPercentage: 50
-- tapOn:
-    id: transaction-save
-- assertVisible: Native journey income
+# Do not automate editing a pre-filled amount (Maestro/RN iOS replace is unreliable)
+# and do not tap bare "Income"/"Expense" labels (they collide with list filters).
+# Reach 20% with a second empty-field income create instead.
 - tapOn:
     id: transaction-add
 - assertVisible: Add Transaction
@@ -160,6 +143,9 @@ appId: com.lawaloy.stead
 - tapOn:
     id: transaction-create
 - assertVisible: Transaction added
+- tapOn:
+    id: nav-activity
+- assertVisible: Native journey topup
 - tapOn:
     id: nav-dashboard
 - tapOn:
