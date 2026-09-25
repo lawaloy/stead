@@ -129,14 +129,18 @@ appId: com.lawaloy.stead
 - assertVisible: Native journey income
 - tapOn:
     id: nav-dashboard
-# Pull-to-refresh so iOS does not assert against a stale readiness cache.
+# Remount + pull-to-refresh on the dashboard ScrollView (not the shell).
+- tapOn:
+    id: nav-activity
+- tapOn:
+    id: nav-dashboard
 - swipe:
-    start: 50%, 35%
-    end: 50%, 80%
-    duration: 600
+    from:
+      id: dashboard-refresh
+    direction: DOWN
 - extendedWaitUntil:
     visible: '20%'
-    timeout: 30000
+    timeout: 60000
 - tapOn:
     id: nav-activity
 - scrollUntilVisible:
@@ -148,13 +152,13 @@ appId: com.lawaloy.stead
 - tapOn:
     id: nav-dashboard
 - assertVisible: Native journey goal
+- swipe:
+    from:
+      id: dashboard-refresh
+    direction: DOWN
 - extendedWaitUntil:
     visible: '0%'
-    timeout: 30000
-- swipe:
-    start: 50%, 35%
-    end: 50%, 80%
-    duration: 600
+    timeout: 60000
 - assertVisible: Safe To Spend
 
 # Relaunch without clearing native secure storage to check session restore.

@@ -26,4 +26,15 @@ describe('ScreenShell', () => {
       view.getByTestId('screen-shell-scroll').props.keyboardDismissMode,
     ).toBe('on-drag');
   });
+
+  it('can skip the outer scroll shell for screens with their own refresh', async () => {
+    const view = await render(
+      <ScreenShell title="Example" scroll={false}>
+        <Text>Content</Text>
+      </ScreenShell>,
+    );
+
+    expect(view.getByTestId('screen-shell-static')).toBeTruthy();
+    expect(view.queryByTestId('screen-shell-scroll')).toBeNull();
+  });
 });
