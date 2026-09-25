@@ -27,6 +27,20 @@ describe('readiness alert rules', () => {
     ).toBe('risk');
   });
 
+  it('treats a status-only baseline without a notified score as first-time risk', () => {
+    expect(
+      riskDecision(
+        { status: 'warning', score: 55 },
+        {
+          lastNotifiedStatus: 'stable',
+          lastNotifiedScore: null,
+          lastRiskAlertAt: null,
+        },
+        now,
+      ),
+    ).toBe('risk');
+  });
+
   it('alerts on status worsening or a 15-point score drop', () => {
     const baseline = {
       lastNotifiedStatus: 'warning',
@@ -138,5 +152,38 @@ describe('readiness alert rules', () => {
 
     expect(key(null)).toBe(key(null));
     expect(key(new Date('2026-09-08T10:00:00.000Z'))).not.toBe(key(null));
+  });
+
+  it('anchors recovery dedupe keys on the last risk alert when both timestamps exist', () => {
+    const lastRiskAlertAt = new Date('2026-09-01T10:00:00.000Z');
+    const lastRecoveryAlertAt = new Date('2026-09-08T10:00:00.000Z');
+    const key = (riskAt: Date | null, recoveryAt: Date | null) =>
+      alertOccurrenceKey({
+        type: 'risk.recovery',
+        userId: 'user_1',
+        goalId: 'goal_1',
+        previousStatus: 'critical',
+        previousScore: 30,
+        currentStatus: 'stable',
+        currentScore: 72,
+        lastRiskAlertAt: riskAt,
+        lastRecoveryAlertAt: recoveryAt,
+      });
+
+    expect(key(lastRiskAlertAt, lastRecoveryAlertAt)).toBe(
+      key(lastRiskAlertAt, new Date('2026-09-09T10:00:00.000Z')),
+    );
+    expect(key(lastRiskAlertAt, lastRecoveryAlertAt)).not.toBe(
+      key(new Date('2026-09-02T10:00:00.000Z'), lastRecoveryAlertAt),
+    );
+    expect(key(lastRiskAlertAt, lastRecoveryAlertAt)).toContain(
+      lastRiskAlertAt.toISOString(),
+    );
+    expect(key(lastRiskAlertAt, lastRecoveryAlertAt)).not.toContain(
+      lastRecoveryAlertAt.toISOString(),
+    );
+    expect(key(null, lastRecoveryAlertAt)).toContain(
+      lastRecoveryAlertAt.toISOString(),
+    );
   });
 });

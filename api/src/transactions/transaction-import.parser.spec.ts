@@ -97,6 +97,16 @@ describe('parseTransactionImport', () => {
     expect(() => parseTransactionImport(csv)).toThrow(BadRequestException);
   });
 
+  it('rejects a quote appearing inside an unquoted field', () => {
+    expect(() =>
+      parseTransactionImport(
+        ['date,description,amount,type', '2026-09-01,foo"bar,100,expense'].join(
+          '\n',
+        ),
+      ),
+    ).toThrow('Malformed CSV quoting');
+  });
+
   it('rejects more than 500 data rows', () => {
     const csv = [
       'date,description,amount,type',
