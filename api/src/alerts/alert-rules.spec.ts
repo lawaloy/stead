@@ -56,6 +56,17 @@ describe('readiness alert rules', () => {
         now,
       ),
     ).toBe('recovery');
+    expect(
+      riskDecision(
+        { status: 'stable', score: 72 },
+        {
+          lastNotifiedStatus: 'warning',
+          lastNotifiedScore: 55,
+          lastRiskAlertAt: now,
+        },
+        now,
+      ),
+    ).toBe('recovery');
     expect(riskDecision({ status: 'stable', score: 90 }, null, now)).toBeNull();
   });
 
