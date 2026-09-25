@@ -124,4 +124,28 @@ describe('add transaction client validation', () => {
     ).toBeDisabled();
     expect(mockCreateTransaction).not.toHaveBeenCalled();
   });
+
+  it('blocks a note longer than 280 characters before calling the API', async () => {
+    await renderScreen();
+    await waitFor(() =>
+      expect(
+        screen.getByRole('button', { name: 'Add Transaction' }),
+      ).toBeEnabled(),
+    );
+
+    await fireEvent.changeText(
+      screen.getByLabelText('Transaction note'),
+      'x'.repeat(281),
+    );
+
+    expect(
+      screen.getByRole('alert', {
+        name: 'Note must be 280 characters or fewer.',
+      }),
+    ).toBeOnTheScreen();
+    expect(
+      screen.getByRole('button', { name: 'Add Transaction' }),
+    ).toBeDisabled();
+    expect(mockCreateTransaction).not.toHaveBeenCalled();
+  });
 });
