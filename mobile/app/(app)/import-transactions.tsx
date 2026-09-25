@@ -137,6 +137,9 @@ export default function ImportTransactionsScreen() {
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Choose transaction CSV file"
+          accessibilityState={{
+            disabled: previewMutation.isPending || confirmMutation.isPending,
+          }}
           disabled={previewMutation.isPending || confirmMutation.isPending}
           onPress={() => void chooseFile()}
           style={styles.primaryButton}
@@ -204,7 +207,7 @@ export default function ImportTransactionsScreen() {
                 accessibilityRole="checkbox"
                 accessibilityState={{
                   checked: selectedRows.has(row.rowNumber),
-                  disabled: unavailable,
+                  disabled: unavailable || confirmMutation.isPending,
                 }}
                 accessibilityLabel={`CSV row ${row.rowNumber}${
                   row.note ? ` ${row.note}` : ''
