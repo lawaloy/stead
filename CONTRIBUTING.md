@@ -82,15 +82,14 @@ rejects formatting drift.
 
 The single `.github/workflows/ci.yml` build/test workflow runs independent
 format, lint, API, and mobile jobs in parallel on pull requests. Native
-Android/iOS simulator journeys live in `.github/workflows/native-ci.yml` and
-run after merge to `main`, on a daily schedule, and on demand — not on every
-PR — because cold simulator builds regularly exceed 20 minutes. PR coverage for
-the critical journey stays on `mobile-api-journey` plus unit tests. Shared
-non-secret CI toolchain versions are kept in `.github/ci.env`; update that file
-when changing Node, npm, the Android API level, or the macOS runner. Native
-jobs cache Gradle and iOS build dependencies plus installable simulator
-binaries keyed by native dependencies and app configuration. New pushes cancel
-superseded CI runs.
+simulator journeys live in `.github/workflows/native-ci.yml`. Android Maestro
+runs on path-filtered pull requests (mobile UI, Maestro, packaging, API, or
+native CI wiring) plus after merge, on a daily schedule, and on demand. iOS
+Maestro stays off pull requests and runs after merge / schedule / on demand.
+Warm Android runs rely on cached AVD boot snapshots, installable APKs, Gradle,
+and Metro transforms. Shared non-secret CI toolchain versions are kept in
+`.github/ci.env`; update that file when changing Node, npm, the Android API
+level, or the macOS runner. New pushes cancel superseded CI runs.
 
 API e2e tests require PostgreSQL and a dedicated `e2e` or test schema. The
 test harness refuses to clean the development `public` schema. See the root

@@ -1,13 +1,27 @@
 name: native-ci
 
-# Simulator journeys are too expensive for pull-request CI. They run after
-# merge, on a schedule, and on demand. PR coverage stays on mobile-api-journey
-# plus unit tests.
+# Android Maestro runs on path-filtered PRs (with AVD snapshot + APK caches so
+# warm runs stay tolerable). iOS stays off PRs and runs after merge, on the
+# daily schedule, and on demand.
 
 on:
   workflow_dispatch:
   schedule:
     - cron: '30 14 * * *'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'mobile/.maestro/**'
+      - 'mobile/app/**'
+      - 'mobile/src/components/**'
+      - 'mobile/app.json'
+      - 'mobile/metro.config.js'
+      - 'mobile/package.json'
+      - 'mobile/package-lock.json'
+      - 'api/**'
+      - '.github/workflows/native-ci.yml'
+      - '.github/scripts/run-android-native-journey.sh'
+      - '.github/ci.env'
   push:
     branches: [main]
     paths:
@@ -24,7 +38,7 @@ on:
       - '.github/ci.env'
 
 concurrency:
-  group: native-ci-${{ github.ref }}
+  group: native-ci-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 permissions:
@@ -151,11 +165,32 @@ jobs:
         with:
           path: mobile/.ci/android/stead-debug.apk
           key: ${{ steps.android-app-cache.outputs.cache-primary-key }}
+      - name: AVD cache
+        uses: actions/cache@v4
+        id: avd-cache
+        with:
+          path: |
+            ~/.android/avd/*
+            ~/.android/adb*
+          key: avd-${{ needs.config.outputs.android_api_level }}-x86_64-v1
+      - name: Create AVD and generate snapshot
+        if: steps.avd-cache.outputs.cache-hit != 'true'
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: ${{ needs.config.outputs.android_api_level }}
+          arch: x86_64
+          force-avd-creation: false
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          disable-animations: false
+          script: echo "Generated AVD snapshot for caching."
       - name: Run Android native journey
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: ${{ needs.config.outputs.android_api_level }}
           arch: x86_64
+          force-avd-creation: false
+          emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          disable-animations: true
           working-directory: mobile
           script: bash ../.github/scripts/run-android-native-journey.sh
       - uses: actions/upload-artifact@v4
@@ -171,6 +206,7 @@ jobs:
           retention-days: 7
 
   native-ios:
+    if: github.event_name != 'pull_request'
     needs: config
     runs-on: ${{ needs.config.outputs.ios_runner }}
     timeout-minutes: 45
