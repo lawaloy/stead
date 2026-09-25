@@ -44,16 +44,18 @@ second restart. It uses visible development OTP, so it does **not** require a
 Twilio or Termii account. It requires a disposable API database schema and
 `SMS_PROVIDER=dev`, `DEV_EXPOSE_OTP=true`; never use a real customer account or
 production API. The flow clears the app's local state at the beginning and
-uses a dedicated test phone (`TEST_PHONE`) supplied by the runner. The
-single `ci` workflow runs the same flow in parallel Android and iOS simulator
-jobs when mobile UI, Maestro, native packaging, or the CI wiring for those jobs
-changes. API-only changes stay on the faster `mobile-api-journey` path instead
-of paying for native simulators. Installable native binaries are cached by
-native dependencies and app configuration, so JavaScript and journey-only
-changes do not trigger another native compilation. Metro transforms are cached
-per platform and bundle generation starts while the simulator is being
-prepared. It does not prove physical device behavior, carrier SMS delivery,
-TalkBack, or VoiceOver.
+uses a dedicated test phone (`TEST_PHONE`) supplied by the runner.
+
+Native simulator jobs live in `.github/workflows/native-ci.yml` and run after
+merge to `main` (when mobile UI, Maestro, packaging, API, or native CI wiring
+changes), on a daily schedule, and via `workflow_dispatch`. They are intentionally
+kept off pull-request CI because cold Android/iOS builds regularly take 20+
+minutes. Pull requests still cover the same business journey through
+`mobile-api-journey` and unit tests. Installable native binaries are cached by
+native dependencies and app configuration; Metro transforms are cached per
+platform and bundle generation starts while the simulator is prepared. It does
+not prove physical device behavior, carrier SMS delivery, TalkBack, or
+VoiceOver.
 
 To run locally, start the API against a dedicated disposable schema as above,
 install and start a native debug build (`npx expo run:android` on a configured
