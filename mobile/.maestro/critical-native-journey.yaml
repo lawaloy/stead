@@ -129,7 +129,14 @@ appId: com.lawaloy.stead
 - assertVisible: Native journey income
 - tapOn:
     id: nav-dashboard
-- assertVisible: '20%'
+# Pull-to-refresh so iOS does not assert against a stale readiness cache.
+- swipe:
+    start: 50%, 35%
+    end: 50%, 80%
+    duration: 600
+- extendedWaitUntil:
+    visible: '20%'
+    timeout: 30000
 - tapOn:
     id: nav-activity
 - scrollUntilVisible:
@@ -141,7 +148,9 @@ appId: com.lawaloy.stead
 - tapOn:
     id: nav-dashboard
 - assertVisible: Native journey goal
-- assertVisible: '0%'
+- extendedWaitUntil:
+    visible: '0%'
+    timeout: 30000
 - swipe:
     start: 50%, 35%
     end: 50%, 80%

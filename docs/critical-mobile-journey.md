@@ -46,12 +46,14 @@ Twilio or Termii account. It requires a disposable API database schema and
 production API. The flow clears the app's local state at the beginning and
 uses a dedicated test phone (`TEST_PHONE`) supplied by the runner. The
 single `ci` workflow runs the same flow in parallel Android and iOS simulator
-jobs when API or mobile paths change, with isolated PostgreSQL 16 databases.
-Installable native binaries are cached by native dependencies and app
-configuration, so JavaScript and journey-only changes do not trigger another
-native compilation. Metro transforms are cached per platform and bundle
-generation starts while the simulator is being prepared. It does not prove
-physical device behavior, carrier SMS delivery, TalkBack, or VoiceOver.
+jobs when mobile UI, Maestro, native packaging, or the CI wiring for those jobs
+changes. API-only changes stay on the faster `mobile-api-journey` path instead
+of paying for native simulators. Installable native binaries are cached by
+native dependencies and app configuration, so JavaScript and journey-only
+changes do not trigger another native compilation. Metro transforms are cached
+per platform and bundle generation starts while the simulator is being
+prepared. It does not prove physical device behavior, carrier SMS delivery,
+TalkBack, or VoiceOver.
 
 To run locally, start the API against a dedicated disposable schema as above,
 install and start a native debug build (`npx expo run:android` on a configured

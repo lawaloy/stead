@@ -110,4 +110,90 @@ describe('parseTransactionImport', () => {
       'CSV cannot contain more than 500 rows',
     );
   });
+
+  it.each(['', '\n\n  \n'])(
+    'rejects an empty or whitespace-only CSV',
+    (csv) => {
+      expect(() => parseTransactionImport(csv)).toThrow('CSV is empty');
+    },
+  );
+
+  it('accepts naira symbols, in/out aliases, and quoted multiline notes', () => {
+    const [row] = parseTransactionImport(
+      [
+        'date,description,amount,type',
+        '2026-09-01,"Rent\n  buffer","₦ 1,250.00",out',
+      ].join('\n'),
+    );
+
+    expect(row).toMatchObject({
+      occurredAt: '2026-09-01T12:00:00.000Z',
+      direction: 'out',
+      amountKobo: 125_000,
+      note: 'Rent buffer',
+      error: null,
+    });
+  });
+
+  it('treats description case as the same fingerprint occurrence sequence', () => {
+    const mixed = parseTransactionImport(
+      [
+        'date,description,amount,type',
+        '2026-09-01,Salary,100,income',
+        '2026-09-01,salary,100,IN',
+      ].join('\n'),
+    );
+    const [single] = parseTransactionImport(
+      ['date,description,amount,type', '2026-09-01,SALARY,100,in'].join('\n'),
+    );
+
+    expect(mixed[0].fingerprint).toBe(single.fingerprint);
+    expect(mixed[1].fingerprint).not.toBe(mixed[0].fingerprint);
+    expect(mixed.every((row) => row.error === null)).toBe(true);
+  });
+
+  it.each([
+    ['2026-02-30', 'Date must use YYYY-MM-DD'],
+    ['2025-02-29', 'Date must use YYYY-MM-DD'],
+    ['2026-04-31', 'Date must use YYYY-MM-DD'],
+  ])('rejects impossible calendar date %s', (date, message) => {
+    const [row] = parseTransactionImport(
+      ['date,description,amount,type', `${date},Rent,100,expense`].join('\n'),
+    );
+
+    expect(row.occurredAt).toBeNull();
+    expect(row.fingerprint).toBeNull();
+    expect(row.error).toContain(message);
+  });
+
+  it.each([
+    ['0', 'Amount must be a positive naira value'],
+    ['0.00', 'Amount must be a positive naira value'],
+    ['-10', 'Amount must be a positive naira value'],
+    ['90071992547410', 'Amount must be a positive naira value'],
+    ['1.234', 'Amount must be a positive naira value'],
+  ])('rejects unsafe amount %s', (amount, message) => {
+    const [row] = parseTransactionImport(
+      [
+        'date,description,amount,type',
+        `2026-09-01,Overflow,${amount},expense`,
+      ].join('\n'),
+    );
+
+    expect(row.amountKobo).toBeNull();
+    expect(row.fingerprint).toBeNull();
+    expect(row.error).toContain(message);
+  });
+
+  it('rejects descriptions longer than 280 characters', () => {
+    const [row] = parseTransactionImport(
+      [
+        'date,description,amount,type',
+        `2026-09-01,"${'x'.repeat(281)}",100,expense`,
+      ].join('\n'),
+    );
+
+    expect(row.error).toContain('Description cannot exceed 280 characters');
+    expect(row.fingerprint).toBeNull();
+  });
 });

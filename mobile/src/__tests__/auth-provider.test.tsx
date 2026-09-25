@@ -106,4 +106,39 @@ describe('AuthProvider session lifecycle', () => {
     ).toBeUndefined();
     expect(mockConfigureApiAuth).toHaveBeenCalled();
   });
+
+  it('clears the session when the API reports unauthorized', async () => {
+    await render(
+      <AuthProvider>
+        <SessionProbe />
+      </AuthProvider>,
+    );
+    expect(await screen.findByText('signed out')).toBeOnTheScreen();
+
+    await act(async () => {
+      fireEvent.press(screen.getByRole('button', { name: 'Complete login' }));
+    });
+    await waitFor(() =>
+      expect(screen.getByText('new-token')).toBeOnTheScreen(),
+    );
+    queryClient.setQueryData(['dashboard', 'stability', 'new-token'], {
+      ok: true,
+    });
+
+    const authConfig = mockConfigureApiAuth.mock.calls.at(-1)?.[0] as {
+      onUnauthorized: () => Promise<void>;
+    };
+    await act(async () => {
+      await authConfig.onUnauthorized();
+    });
+
+    await waitFor(() =>
+      expect(screen.getByText('signed out')).toBeOnTheScreen(),
+    );
+    expect(mockClearToken).toHaveBeenCalledTimes(1);
+    expect(storedToken).toBeNull();
+    expect(
+      queryClient.getQueryData(['dashboard', 'stability', 'new-token']),
+    ).toBeUndefined();
+  });
 });

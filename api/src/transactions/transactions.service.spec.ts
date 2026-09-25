@@ -276,6 +276,32 @@ describe('TransactionsService', () => {
     expect(prisma.transaction.createMany).not.toHaveBeenCalled();
   });
 
+  it('rejects preview and confirmation imports onto a goal the user does not own', async () => {
+    prisma.goal.findFirst.mockResolvedValue(null);
+    const csv = [
+      'date,description,amount,type',
+      '2026-09-01,Salary,1000,income',
+    ].join('\n');
+
+    await expect(
+      service.previewImport('user_1', { csv, goalId: 'goal_other' }),
+    ).rejects.toThrow(new NotFoundException('Goal not found'));
+    await expect(
+      service.confirmImport('user_1', {
+        csv,
+        rowNumbers: [2],
+        goalId: 'goal_other',
+      }),
+    ).rejects.toThrow(new NotFoundException('Goal not found'));
+
+    expect(prisma.goal.findFirst).toHaveBeenCalledWith({
+      where: { id: 'goal_other', userId: 'user_1' },
+      select: { id: true },
+    });
+    expect(prisma.transaction.findMany).not.toHaveBeenCalled();
+    expect(prisma.transaction.createMany).not.toHaveBeenCalled();
+  });
+
   it('rejects updating another user transaction before writing changes', async () => {
     prisma.transaction.findFirst.mockResolvedValue(null);
 
