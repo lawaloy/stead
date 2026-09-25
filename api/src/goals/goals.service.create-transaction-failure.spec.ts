@@ -1,0 +1,70 @@
+import { GoalStatus } from '@prisma/client';
+import { Test, TestingModule } from '@nestjs/testing';
+import { PrismaService } from '../prisma/prisma.service';
+import { GoalsService } from './goals.service';
+
+describe('GoalsService create transaction failure', () => {
+  let service: GoalsService;
+  let prisma: {
+    $transaction: jest.Mock;
+    goal: {
+      updateMany: jest.Mock;
+      create: jest.Mock;
+    };
+  };
+
+  beforeEach(async () => {
+    prisma = {
+      $transaction: jest.fn(),
+      goal: {
+        updateMany: jest.fn(),
+        create: jest.fn(),
+      },
+    };
+    prisma.$transaction.mockImplementation(
+      (callback: (transaction: typeof prisma) => unknown) => callback(prisma),
+    );
+
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [GoalsService, { provide: PrismaService, useValue: prisma }],
+    }).compile();
+
+    service = module.get(GoalsService);
+  });
+
+  it('rejects create when the replacement insert fails after deactivating prior actives', async () => {
+    prisma.goal.updateMany.mockResolvedValue({ count: 1 });
+    prisma.goal.create.mockRejectedValue(new Error('goal create unavailable'));
+
+    await expect(
+      service.create('user_1', {
+        name: 'Rent buffer',
+        amountTotalKobo: 500_000,
+        dueDate: '2026-03-01T00:00:00.000Z',
+        monthlyIncomeKobo: 300_000,
+      }),
+    ).rejects.toThrow('goal create unavailable');
+
+    expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+    expect(prisma.goal.updateMany).toHaveBeenCalledWith({
+      where: { userId: 'user_1', isActive: true },
+      data: {
+        isActive: false,
+        status: GoalStatus.replaced,
+        endedAt: expect.any(Date) as unknown,
+      },
+    });
+    expect(prisma.goal.create).toHaveBeenCalledWith({
+      data: {
+        userId: 'user_1',
+        name: 'Rent buffer',
+        amountTotalKobo: 500_000n,
+        dueDate: new Date('2026-03-01T00:00:00.000Z'),
+        monthlyIncomeKobo: 300_000n,
+        isActive: true,
+        status: GoalStatus.active,
+        endedAt: null,
+      },
+    });
+  });
+});
