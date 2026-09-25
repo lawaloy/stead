@@ -387,4 +387,15 @@ describe('GoalsService', () => {
       new BadRequestException('Only the active goal can be ended'),
     );
   });
+
+  it('rejects an end when the updated goal row disappears after the write', async () => {
+    prisma.goal.findFirst
+      .mockResolvedValueOnce(goalRow())
+      .mockResolvedValueOnce(null);
+    prisma.goal.updateMany.mockResolvedValue({ count: 1 });
+
+    await expect(
+      service.end('user_1', 'goal_1', { status: 'completed' }),
+    ).rejects.toThrow(new NotFoundException('Goal not found'));
+  });
 });
