@@ -96,9 +96,10 @@ describe('transactions screen edit cancel discard', () => {
       'Abandoned draft',
     );
     await waitFor(() =>
-      expect(
-        screen.getByLabelText('Transaction amount in naira'),
-      ).toHaveProp('value', '9999'),
+      expect(screen.getByLabelText('Transaction amount in naira')).toHaveProp(
+        'value',
+        '9999',
+      ),
     );
     await waitFor(() =>
       expect(screen.getByLabelText('Transaction note')).toHaveProp(
