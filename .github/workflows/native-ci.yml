@@ -229,6 +229,7 @@ jobs:
       SMS_PROVIDER: dev
       DEV_EXPOSE_OTP: 'true'
       EXPO_PUBLIC_API_URL: http://127.0.0.1:3000
+      EXPO_PUBLIC_E2E_PHONE: '08030000001'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -338,6 +339,7 @@ jobs:
       SMS_PROVIDER: dev
       DEV_EXPOSE_OTP: 'true'
       EXPO_PUBLIC_API_URL: http://127.0.0.1:3000
+      EXPO_PUBLIC_E2E_PHONE: '08030000001'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

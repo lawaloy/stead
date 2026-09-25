@@ -1,35 +1,16 @@
 appId: com.lawaloy.stead
 ---
-# Run only against an isolated API schema with SMS_PROVIDER=dev and
-# DEV_EXPOSE_OTP=true. TEST_PHONE must be a unique disposable NG number.
+# Run only against an isolated API schema with SMS_PROVIDER=dev,
+# DEV_EXPOSE_OTP=true, and EXPO_PUBLIC_E2E_PHONE set to a unique disposable
+# NG number (Maestro cannot reliably type into the RN phone field on iOS).
 - launchApp:
     clearState: true
 - extendedWaitUntil:
     visible: Stead Login
     timeout: 240000
-- tapOn:
-    id: auth-phone
-- inputText: ${TEST_PHONE}
-- runFlow:
-    when:
-      platform: Android
-    commands:
-      - hideKeyboard
-- runFlow:
-    when:
-      platform: iOS
-    commands:
-      # If inputText still did not stick, paste from Maestro clipboard into the focused field.
-      - runFlow:
-          when:
-            notVisible: '0803 000 0001'
-          commands:
-            - evalScript: ${maestro.copiedText = '08030000001'}
-            - tapOn:
-                id: auth-phone
-            - pasteText
-      - tapOn: Stead Login
-- assertVisible: '0803 000 0001'
+- extendedWaitUntil:
+    visible: '0803 000 0001'
+    timeout: 30000
 - tapOn:
     id: auth-request-otp
 - extendedWaitUntil:
