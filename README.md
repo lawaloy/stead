@@ -15,8 +15,8 @@ Current repository status:
 - Verification: auth/notification and finance have PostgreSQL-backed e2e
   coverage. Auth, goal, transaction, and dashboard screens have component
   journeys, and CI exercises the real mobile API client against a running API
-  and PostgreSQL. Android/iOS simulator UI jobs are configured in the single CI workflow;
-  their passing status must be confirmed before counting native coverage.
+  and PostgreSQL. Android/iOS simulator UI journeys run in a separate
+  `native-ci` workflow after merge / on schedule / on demand, not on every PR.
 - Production readiness: live SMS delivery on real devices, production session
   lifecycle, operations, native UI acceptance, and several product workflows
   remain incomplete.
