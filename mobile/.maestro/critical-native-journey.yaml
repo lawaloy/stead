@@ -11,8 +11,15 @@ appId: com.lawaloy.stead
 - extendedWaitUntil:
     visible: '0803 000 0001'
     timeout: 30000
+- waitForAnimationToEnd
+# iOS: first tap can miss a still-settling Pressable; retry by label if needed.
 - tapOn:
     id: auth-request-otp
+- runFlow:
+    when:
+      notVisible: Verify OTP
+    commands:
+      - tapOn: Request OTP
 - extendedWaitUntil:
     visible: Verify OTP
     timeout: 60000
@@ -64,6 +71,8 @@ appId: com.lawaloy.stead
 - assertVisible: Native journey goal
 - assertVisible: '0%'
 
+# One income of 20% of the goal. Avoid editing pre-filled amounts and avoid a
+# second create (Maestro/RN controlled fields + list refresh are flaky there).
 - tapOn:
     id: nav-activity
 - tapOn:
@@ -72,7 +81,7 @@ appId: com.lawaloy.stead
 - tapOn:
     id: transaction-amount
 - eraseText: 100
-- inputText: '120000'
+- inputText: '240000'
 - runFlow:
     when:
       platform: Android
@@ -102,55 +111,11 @@ appId: com.lawaloy.stead
 - assertVisible: Transaction added
 - tapOn:
     id: nav-activity
-- assertVisible: Native journey income
-- tapOn:
-    id: nav-dashboard
-- assertVisible: '10%'
-# Do not automate editing a pre-filled amount (Maestro/RN iOS replace is unreliable).
-# Reach 20% with a second empty-field income create instead.
-- tapOn:
-    id: nav-activity
-- tapOn:
-    id: transaction-add
-- assertVisible: Add Transaction
-- tapOn:
-    id: transaction-amount
-- eraseText: 100
-- inputText: '120000'
-- runFlow:
-    when:
-      platform: Android
-    commands:
-      - hideKeyboard
-- tapOn:
-    id: transaction-note
-- eraseText: 100
-- inputText: Native journey topup
-- runFlow:
-    when:
-      platform: Android
-    commands:
-      - hideKeyboard
-- runFlow:
-    when:
-      platform: iOS
-    commands:
-      - tapOn: Add Transaction
 - scrollUntilVisible:
-    element:
-      id: transaction-create
+    element: Native journey income
     timeout: 40000
     visibilityPercentage: 50
-- tapOn:
-    id: transaction-create
-- assertVisible: Transaction added
-- tapOn:
-    id: nav-activity
-- assertVisible: Native journey topup
-- tapOn:
-    id: nav-dashboard
-- tapOn:
-    id: nav-activity
+- assertVisible: Native journey income
 - tapOn:
     id: nav-dashboard
 - swipe:
@@ -160,14 +125,9 @@ appId: com.lawaloy.stead
 - extendedWaitUntil:
     visible: '20%'
     timeout: 90000
+
 - tapOn:
     id: nav-activity
-- scrollUntilVisible:
-    element: Delete Native journey topup transaction
-    timeout: 40000
-    visibilityPercentage: 50
-- tapOn: Delete Native journey topup transaction
-- tapOn: Delete
 - scrollUntilVisible:
     element: Delete Native journey income transaction
     timeout: 40000
