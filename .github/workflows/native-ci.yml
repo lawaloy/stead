@@ -1,8 +1,9 @@
 name: native-ci
 
-# Android Maestro runs on path-filtered PRs (with AVD snapshot + APK caches so
-# warm runs stay tolerable). iOS stays off PRs and runs after merge, on the
-# daily schedule, and on demand.
+# Android and iOS Maestro run on path-filtered PRs (mobile UI, Maestro,
+# packaging, API, or native CI wiring), after merge to main, on a daily
+# schedule, and on demand. Warm Android boots use a cached AVD snapshot;
+# both platforms cache installable binaries and Metro transforms.
 
 on:
   workflow_dispatch:
@@ -206,7 +207,6 @@ jobs:
           retention-days: 7
 
   native-ios:
-    if: github.event_name != 'pull_request'
     needs: config
     runs-on: ${{ needs.config.outputs.ios_runner }}
     timeout-minutes: 45

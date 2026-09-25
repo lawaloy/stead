@@ -46,15 +46,14 @@ Twilio or Termii account. It requires a disposable API database schema and
 production API. The flow clears the app's local state at the beginning and
 uses a dedicated test phone (`TEST_PHONE`) supplied by the runner.
 
-Native simulator jobs live in `.github/workflows/native-ci.yml`. Android Maestro
-runs on path-filtered pull requests and after merge to `main` (when mobile UI,
-Maestro, packaging, API, or native CI wiring changes), on a daily schedule, and
-via `workflow_dispatch`. iOS Maestro skips pull requests and runs after merge /
-schedule / on demand. Android warm boots use a cached AVD snapshot; installable
-binaries and Metro transforms are cached per platform, and bundle generation
-starts while the simulator is prepared. Pull requests also keep
-`mobile-api-journey` and unit coverage for the same business journey. It does
-not prove physical device behavior, carrier SMS delivery, TalkBack, or
+Native simulator jobs live in `.github/workflows/native-ci.yml`. Android and
+iOS Maestro run on path-filtered pull requests and after merge to `main` (when
+mobile UI, Maestro, packaging, API, or native CI wiring changes), on a daily
+schedule, and via `workflow_dispatch`. Android warm boots use a cached AVD
+snapshot; installable binaries and Metro transforms are cached per platform,
+and bundle generation starts while the simulator is prepared. Pull requests
+also keep `mobile-api-journey` and unit coverage for the same business journey.
+It does not prove physical device behavior, carrier SMS delivery, TalkBack, or
 VoiceOver.
 
 To run locally, start the API against a dedicated disposable schema as above,
