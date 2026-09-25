@@ -1,13 +1,11 @@
 import React from 'react';
 import { QueryClientProvider } from '@tanstack/react-query';
 import {
-  act,
   fireEvent,
   render,
   screen,
   waitFor,
 } from '@testing-library/react-native';
-import { Alert } from 'react-native';
 import TransactionsScreen from '../../app/(app)/transactions';
 import type { Transaction } from '../contracts/generated/types.gen';
 import {
@@ -49,30 +47,19 @@ jest.mock('../lib/api', () => {
   };
 });
 
-const mockDeleteTransaction = jest.mocked(deleteTransaction);
+const mockUpdateTransaction = jest.mocked(updateTransaction);
 const mockGetActiveGoal = jest.mocked(getActiveGoal);
 const mockListTransactions = jest.mocked(listTransactions);
 
-const salary: Transaction = {
+const noted: Transaction = {
   id: 'tx_income',
   userId: 'user_1',
-  goalId: null,
+  goalId: 'goal_1',
   amountKobo: 250_000,
   direction: 'in',
   occurredAt: '2026-08-20T12:00:00.000Z',
   note: 'Salary slice',
   createdAt: '2026-08-20T12:00:00.000Z',
-};
-
-const groceries: Transaction = {
-  id: 'tx_expense',
-  userId: 'user_1',
-  goalId: null,
-  amountKobo: 50_000,
-  direction: 'out',
-  occurredAt: '2026-08-21T12:00:00.000Z',
-  note: 'Groceries',
-  createdAt: '2026-08-21T12:00:00.000Z',
 };
 
 const renderScreen = () =>
@@ -82,33 +69,49 @@ const renderScreen = () =>
     </QueryClientProvider>,
   );
 
-describe('transactions screen delete success', () => {
+describe('transactions screen edit empty note', () => {
   beforeEach(() => {
     queryClient.clear();
     jest.clearAllMocks();
-    mockListTransactions.mockResolvedValue([salary, groceries]);
-    mockGetActiveGoal.mockResolvedValue(null);
-    jest.mocked(updateTransaction).mockResolvedValue(groceries);
-    mockDeleteTransaction.mockResolvedValue({ ok: true });
+    mockListTransactions.mockResolvedValue([noted]);
+    mockGetActiveGoal.mockResolvedValue({
+      id: 'goal_1',
+      userId: 'user_1',
+      name: 'Emergency fund',
+      amountTotalKobo: 1_000_000,
+      dueDate: '2027-08-20T12:00:00.000Z',
+      monthlyIncomeKobo: 500_000,
+      isActive: true,
+      status: 'active',
+      endedAt: null,
+      createdAt: '2026-08-20T12:00:00.000Z',
+    });
+    mockUpdateTransaction.mockResolvedValue({ ...noted, note: null });
+    jest.mocked(deleteTransaction).mockResolvedValue({ ok: true });
   });
 
-  it('removes the confirmed row after a successful delete refetch', async () => {
+  it('sends note null when the customer clears an existing activity note', async () => {
     await renderScreen();
-    expect(await screen.findByText('Groceries')).toBeOnTheScreen();
-    expect(screen.getByText('Salary slice')).toBeOnTheScreen();
+    await screen.findByText('Salary slice');
 
-    fireEvent.press(
-      screen.getByRole('button', { name: 'Delete Groceries transaction' }),
+    await fireEvent.press(
+      screen.getByRole('button', { name: 'Edit Salary slice transaction' }),
     );
+    await fireEvent.changeText(screen.getByLabelText('Transaction note'), '');
+    await fireEvent.press(screen.getByRole('button', { name: 'Save changes' }));
 
-    const actions = jest.mocked(Alert.alert).mock.calls.at(-1)?.[2];
-    mockListTransactions.mockResolvedValue([salary]);
-    await act(async () => {
-      actions?.find((action) => action.style === 'destructive')?.onPress?.();
-    });
-
-    expect(mockDeleteTransaction).toHaveBeenCalledWith('tx_expense');
-    await waitFor(() => expect(screen.queryByText('Groceries')).toBeNull());
-    expect(screen.getByText('Salary slice')).toBeOnTheScreen();
+    await waitFor(() =>
+      expect(mockUpdateTransaction).toHaveBeenCalledWith('tx_income', {
+        direction: 'in',
+        amountKobo: 250_000,
+        occurredAt: '2026-08-20T12:00:00.000Z',
+        note: null,
+      }),
+    );
+    expect(mockUpdateTransaction).not.toHaveBeenCalledWith(
+      'tx_income',
+      expect.objectContaining({ note: '' }),
+    );
+    await waitFor(() => expect(queryClient.isMutating()).toBe(0));
   });
 });

@@ -1,13 +1,11 @@
 import React from 'react';
 import { QueryClientProvider } from '@tanstack/react-query';
 import {
-  act,
   fireEvent,
   render,
   screen,
   waitFor,
 } from '@testing-library/react-native';
-import { Alert } from 'react-native';
 import TransactionsScreen from '../../app/(app)/transactions';
 import type { Transaction } from '../contracts/generated/types.gen';
 import {
@@ -16,6 +14,7 @@ import {
   listTransactions,
   updateTransaction,
 } from '../lib/api';
+import { dateInputToIso } from '../lib/transactions';
 import { queryClient } from '../lib/query-client';
 
 jest.mock('expo-router', () => {
@@ -49,14 +48,14 @@ jest.mock('../lib/api', () => {
   };
 });
 
-const mockDeleteTransaction = jest.mocked(deleteTransaction);
+const mockUpdateTransaction = jest.mocked(updateTransaction);
 const mockGetActiveGoal = jest.mocked(getActiveGoal);
 const mockListTransactions = jest.mocked(listTransactions);
 
-const salary: Transaction = {
+const row: Transaction = {
   id: 'tx_income',
   userId: 'user_1',
-  goalId: null,
+  goalId: 'goal_1',
   amountKobo: 250_000,
   direction: 'in',
   occurredAt: '2026-08-20T12:00:00.000Z',
@@ -64,16 +63,7 @@ const salary: Transaction = {
   createdAt: '2026-08-20T12:00:00.000Z',
 };
 
-const groceries: Transaction = {
-  id: 'tx_expense',
-  userId: 'user_1',
-  goalId: null,
-  amountKobo: 50_000,
-  direction: 'out',
-  occurredAt: '2026-08-21T12:00:00.000Z',
-  note: 'Groceries',
-  createdAt: '2026-08-21T12:00:00.000Z',
-};
+const nextOccurredOn = '2026-09-15';
 
 const renderScreen = () =>
   render(
@@ -82,33 +72,64 @@ const renderScreen = () =>
     </QueryClientProvider>,
   );
 
-describe('transactions screen delete success', () => {
+describe('transactions screen edit date change', () => {
   beforeEach(() => {
     queryClient.clear();
     jest.clearAllMocks();
-    mockListTransactions.mockResolvedValue([salary, groceries]);
-    mockGetActiveGoal.mockResolvedValue(null);
-    jest.mocked(updateTransaction).mockResolvedValue(groceries);
-    mockDeleteTransaction.mockResolvedValue({ ok: true });
+    mockListTransactions.mockResolvedValue([row]);
+    mockGetActiveGoal.mockResolvedValue({
+      id: 'goal_1',
+      userId: 'user_1',
+      name: 'Emergency fund',
+      amountTotalKobo: 1_000_000,
+      dueDate: '2027-08-20T12:00:00.000Z',
+      monthlyIncomeKobo: 500_000,
+      isActive: true,
+      status: 'active',
+      endedAt: null,
+      createdAt: '2026-08-20T12:00:00.000Z',
+    });
+    mockUpdateTransaction.mockResolvedValue({
+      ...row,
+      occurredAt: dateInputToIso(nextOccurredOn) as string,
+    });
+    jest.mocked(deleteTransaction).mockResolvedValue({ ok: true });
   });
 
-  it('removes the confirmed row after a successful delete refetch', async () => {
+  it('sends the edited calendar day as occurredAt instead of the original timestamp', async () => {
     await renderScreen();
-    expect(await screen.findByText('Groceries')).toBeOnTheScreen();
-    expect(screen.getByText('Salary slice')).toBeOnTheScreen();
+    await screen.findByText('Salary slice');
 
-    fireEvent.press(
-      screen.getByRole('button', { name: 'Delete Groceries transaction' }),
+    await fireEvent.press(
+      screen.getByRole('button', { name: 'Edit Salary slice transaction' }),
+    );
+    expect(screen.getByLabelText('Transaction date')).toHaveProp(
+      'value',
+      '2026-08-20',
     );
 
-    const actions = jest.mocked(Alert.alert).mock.calls.at(-1)?.[2];
-    mockListTransactions.mockResolvedValue([salary]);
-    await act(async () => {
-      actions?.find((action) => action.style === 'destructive')?.onPress?.();
-    });
+    await fireEvent.changeText(
+      screen.getByLabelText('Transaction date'),
+      nextOccurredOn,
+    );
+    await waitFor(() =>
+      expect(screen.getByLabelText('Transaction date')).toHaveProp(
+        'value',
+        nextOccurredOn,
+      ),
+    );
+    expect(screen.getByRole('button', { name: 'Save changes' })).toBeEnabled();
 
-    expect(mockDeleteTransaction).toHaveBeenCalledWith('tx_expense');
-    await waitFor(() => expect(screen.queryByText('Groceries')).toBeNull());
-    expect(screen.getByText('Salary slice')).toBeOnTheScreen();
+    await fireEvent.press(screen.getByRole('button', { name: 'Save changes' }));
+
+    await waitFor(() =>
+      expect(mockUpdateTransaction).toHaveBeenCalledWith('tx_income', {
+        direction: 'in',
+        amountKobo: 250_000,
+        occurredAt: dateInputToIso(nextOccurredOn),
+        note: 'Salary slice',
+      }),
+    );
+    await waitFor(() => expect(queryClient.isMutating()).toBe(0));
   });
 });

@@ -1,13 +1,11 @@
 import React from 'react';
 import { QueryClientProvider } from '@tanstack/react-query';
 import {
-  act,
   fireEvent,
   render,
   screen,
   waitFor,
 } from '@testing-library/react-native';
-import { Alert } from 'react-native';
 import TransactionsScreen from '../../app/(app)/transactions';
 import type { Transaction } from '../contracts/generated/types.gen';
 import {
@@ -49,11 +47,11 @@ jest.mock('../lib/api', () => {
   };
 });
 
-const mockDeleteTransaction = jest.mocked(deleteTransaction);
+const mockUpdateTransaction = jest.mocked(updateTransaction);
 const mockGetActiveGoal = jest.mocked(getActiveGoal);
 const mockListTransactions = jest.mocked(listTransactions);
 
-const salary: Transaction = {
+const income: Transaction = {
   id: 'tx_income',
   userId: 'user_1',
   goalId: null,
@@ -64,17 +62,6 @@ const salary: Transaction = {
   createdAt: '2026-08-20T12:00:00.000Z',
 };
 
-const groceries: Transaction = {
-  id: 'tx_expense',
-  userId: 'user_1',
-  goalId: null,
-  amountKobo: 50_000,
-  direction: 'out',
-  occurredAt: '2026-08-21T12:00:00.000Z',
-  note: 'Groceries',
-  createdAt: '2026-08-21T12:00:00.000Z',
-};
-
 const renderScreen = () =>
   render(
     <QueryClientProvider client={queryClient}>
@@ -82,33 +69,59 @@ const renderScreen = () =>
     </QueryClientProvider>,
   );
 
-describe('transactions screen delete success', () => {
+describe('transactions screen edit cancel discard', () => {
   beforeEach(() => {
     queryClient.clear();
     jest.clearAllMocks();
-    mockListTransactions.mockResolvedValue([salary, groceries]);
+    mockListTransactions.mockResolvedValue([income]);
     mockGetActiveGoal.mockResolvedValue(null);
-    jest.mocked(updateTransaction).mockResolvedValue(groceries);
-    mockDeleteTransaction.mockResolvedValue({ ok: true });
+    mockUpdateTransaction.mockResolvedValue(income);
+    jest.mocked(deleteTransaction).mockResolvedValue({ ok: true });
   });
 
-  it('removes the confirmed row after a successful delete refetch', async () => {
+  it('reloads the list row after Cancel so an abandoned draft cannot be saved later', async () => {
     await renderScreen();
-    expect(await screen.findByText('Groceries')).toBeOnTheScreen();
-    expect(screen.getByText('Salary slice')).toBeOnTheScreen();
+    await screen.findByText('Salary slice');
 
-    fireEvent.press(
-      screen.getByRole('button', { name: 'Delete Groceries transaction' }),
+    await fireEvent.press(
+      screen.getByRole('button', { name: 'Edit Salary slice transaction' }),
+    );
+    expect(screen.getByText('Edit transaction')).toBeOnTheScreen();
+    await fireEvent.changeText(
+      screen.getByLabelText('Transaction amount in naira'),
+      '9999',
+    );
+    await fireEvent.changeText(
+      screen.getByLabelText('Transaction note'),
+      'Abandoned draft',
+    );
+    await waitFor(() =>
+      expect(
+        screen.getByLabelText('Transaction amount in naira'),
+      ).toHaveProp('value', '9999'),
+    );
+    await waitFor(() =>
+      expect(screen.getByLabelText('Transaction note')).toHaveProp(
+        'value',
+        'Abandoned draft',
+      ),
     );
 
-    const actions = jest.mocked(Alert.alert).mock.calls.at(-1)?.[2];
-    mockListTransactions.mockResolvedValue([salary]);
-    await act(async () => {
-      actions?.find((action) => action.style === 'destructive')?.onPress?.();
-    });
+    await fireEvent.press(screen.getByRole('button', { name: 'Cancel' }));
+    expect(screen.queryByText('Edit transaction')).toBeNull();
+    expect(mockUpdateTransaction).not.toHaveBeenCalled();
 
-    expect(mockDeleteTransaction).toHaveBeenCalledWith('tx_expense');
-    await waitFor(() => expect(screen.queryByText('Groceries')).toBeNull());
-    expect(screen.getByText('Salary slice')).toBeOnTheScreen();
+    await fireEvent.press(
+      screen.getByRole('button', { name: 'Edit Salary slice transaction' }),
+    );
+    expect(screen.getByLabelText('Transaction amount in naira')).toHaveProp(
+      'value',
+      '2500',
+    );
+    expect(screen.getByLabelText('Transaction note')).toHaveProp(
+      'value',
+      'Salary slice',
+    );
+    expect(mockUpdateTransaction).not.toHaveBeenCalled();
   });
 });
