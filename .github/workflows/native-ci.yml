@@ -185,10 +185,21 @@ jobs:
         with:
           path: mobile/.ci/ios/mobile.app
           key: ${{ steps.ios-app-cache.outputs.cache-primary-key }}
+      - name: Package iOS app zip for artifact transfer
+        run: |
+          set -eu
+          test -d mobile/.ci/ios/mobile.app
+          test -f mobile/.ci/ios/mobile.app/Info.plist
+          rm -f mobile/.ci/ios/mobile.app.zip
+          # Zip preserves .app layout across Actions artifact upload/download.
+          ditto -c -k --sequesterRsrc --keepParent \
+            mobile/.ci/ios/mobile.app \
+            mobile/.ci/ios/mobile.app.zip
+          ls -lh mobile/.ci/ios/mobile.app.zip
       - uses: actions/upload-artifact@v4
         with:
           name: ios-simulator-app
-          path: mobile/.ci/ios/mobile.app
+          path: mobile/.ci/ios/mobile.app.zip
           if-no-files-found: error
           retention-days: 1
 
@@ -341,6 +352,23 @@ jobs:
         with:
           name: ios-simulator-app
           path: mobile/.ci/ios
+      - name: Unpack iOS simulator app
+        run: |
+          set -eu
+          cd mobile/.ci/ios
+          test -f mobile.app.zip
+          rm -rf mobile.app
+          ditto -x -k mobile.app.zip .
+          APP_PATH="$(find "$PWD" -path '*/mobile.app/Info.plist' -print -quit | sed 's#/Info.plist$##')"
+          test -n "$APP_PATH"
+          test -d "$APP_PATH"
+          # Normalize to a stable path for later steps.
+          if [[ "$APP_PATH" != "$PWD/mobile.app" ]]; then
+            rm -rf "$PWD/mobile.app"
+            ditto "$APP_PATH" "$PWD/mobile.app"
+          fi
+          test -f "$PWD/mobile.app/Info.plist"
+          echo "Unpacked $PWD/mobile.app"
       - name: Restore iOS Metro transforms
         uses: actions/cache@v4
         with:
@@ -380,29 +408,40 @@ jobs:
             sleep 2
           done
           curl --fail http://127.0.0.1:8081/status | grep -q 'packager-status:running'
-          nohup curl --fail --silent --show-error --retry 3 \
-            'http://127.0.0.1:8081/node_modules/expo-router/entry.bundle?platform=ios&dev=true&hot=false&lazy=true&transform.engine=hermes&transform.bytecode=1&unstable_transformProfile=hermes-stable' \
-            --output "$RUNNER_TEMP/stead-ios.bundle" \
-            > "$RUNNER_TEMP/stead-metro-prewarm.log" 2>&1 &
       - name: Install Maestro
         run: bash .github/scripts/install-maestro.sh
       - name: Install app on simulator
         run: |
+          set -eu
           DEVICE_ID="$(xcrun simctl list devices available -j | jq -r '[.devices[] | .[] | select(.name == "iPhone 17")] | last | .udid')"
           test -n "$DEVICE_ID" && test "$DEVICE_ID" != null
-          xcrun simctl boot "$DEVICE_ID"
+          xcrun simctl boot "$DEVICE_ID" || true
           xcrun simctl bootstatus "$DEVICE_ID" -b
           APP_PATH=mobile/.ci/ios/mobile.app
-          if [[ ! -d "$APP_PATH" && -d mobile/.ci/ios/mobile.app/mobile.app ]]; then
-            APP_PATH=mobile/.ci/ios/mobile.app/mobile.app
-          fi
           test -d "$APP_PATH"
-          xcrun simctl install "$DEVICE_ID" "$APP_PATH"
-          for attempt in $(seq 1 180); do
-            if test -s "$RUNNER_TEMP/stead-ios.bundle"; then break; fi
-            sleep 1
+          test -f "$APP_PATH/Info.plist"
+          # Cold simulator boots can need a beat before install succeeds.
+          for attempt in 1 2 3 4 5; do
+            if xcrun simctl install "$DEVICE_ID" "$APP_PATH"; then
+              break
+            fi
+            if [[ "$attempt" -eq 5 ]]; then
+              echo "simctl install failed after retries" >&2
+              ls -la "$APP_PATH" >&2 || true
+              exit 1
+            fi
+            sleep 5
           done
-          test -s "$RUNNER_TEMP/stead-ios.bundle" || cat "$RUNNER_TEMP/stead-metro-prewarm.log"
+          # Ensure Metro has produced the iOS bundle before Maestro launches.
+          curl --fail --silent --show-error --retry 5 --retry-delay 2 \
+            'http://127.0.0.1:8081/node_modules/expo-router/entry.bundle?platform=ios&dev=true&hot=false&lazy=true&transform.engine=hermes&transform.bytecode=1&unstable_transformProfile=hermes-stable' \
+            --output "$RUNNER_TEMP/stead-ios.bundle" \
+            > "$RUNNER_TEMP/stead-metro-prewarm.log" 2>&1 \
+            || {
+              cat "$RUNNER_TEMP/stead-metro-prewarm.log" >&2 || true
+              cat "$RUNNER_TEMP/stead-metro.log" >&2 || true
+              exit 1
+            }
           test -s "$RUNNER_TEMP/stead-ios.bundle"
       - name: Run iOS native journey
         working-directory: mobile
@@ -417,4 +456,5 @@ jobs:
             ${{ runner.temp }}/stead-metro-prewarm.log
             ~/.maestro/tests
             mobile/.expo
+            mobile/.ci/ios
           retention-days: 7
