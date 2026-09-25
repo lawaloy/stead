@@ -191,6 +191,44 @@ describe('TransactionsService', () => {
     });
   });
 
+  it('applies only the supplied from bound when to is omitted', async () => {
+    prisma.transaction.findMany.mockResolvedValue([transactionRecord]);
+
+    await expect(
+      service.list('user_1', { from: '2026-01-01T00:00:00.000Z' }),
+    ).resolves.toEqual([serializedTransactionRecord]);
+
+    expect(prisma.transaction.findMany).toHaveBeenCalledWith({
+      where: {
+        userId: 'user_1',
+        occurredAt: {
+          gte: new Date('2026-01-01T00:00:00.000Z'),
+          lte: undefined,
+        },
+      },
+      orderBy: { occurredAt: 'desc' },
+    });
+  });
+
+  it('applies only the supplied to bound when from is omitted', async () => {
+    prisma.transaction.findMany.mockResolvedValue([transactionRecord]);
+
+    await expect(
+      service.list('user_1', { to: '2026-01-31T23:59:59.000Z' }),
+    ).resolves.toEqual([serializedTransactionRecord]);
+
+    expect(prisma.transaction.findMany).toHaveBeenCalledWith({
+      where: {
+        userId: 'user_1',
+        occurredAt: {
+          gte: undefined,
+          lte: new Date('2026-01-31T23:59:59.000Z'),
+        },
+      },
+      orderBy: { occurredAt: 'desc' },
+    });
+  });
+
   it('previews valid, duplicate, and invalid imported rows', async () => {
     const csv = [
       'date,description,amount,type',
