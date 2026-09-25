@@ -126,11 +126,8 @@ appId: com.lawaloy.stead
     when:
       platform: iOS
     commands:
-      # eraseText often leaves RN controlled values intact on iOS; select-all then
-      # type so 240000 replaces 120000 (appending yields ~100% readiness).
-      - longPressOn:
-          id: transaction-edit-amount
-      - tapOn: Select All
+      # Field uses selectTextOnFocus so the tap above selects the value; typing replaces
+      # it (eraseText/Select All are unreliable for RN controlled inputs on iOS).
       - inputText: '240000'
       - tapOn: Edit transaction
 - scrollUntilVisible:

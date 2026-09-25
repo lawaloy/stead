@@ -284,6 +284,7 @@ export default function TransactionsScreen() {
             style={styles.input}
             value={amountNaira}
             keyboardType="decimal-pad"
+            selectTextOnFocus
             onChangeText={setAmountNaira}
           />
 
