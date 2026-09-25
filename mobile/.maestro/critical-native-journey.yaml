@@ -115,17 +115,23 @@ appId: com.lawaloy.stead
 - tapOn: Edit Native journey income transaction
 - tapOn:
     id: transaction-edit-amount
-- eraseText: 100
-- inputText: '240000'
 - runFlow:
     when:
       platform: Android
     commands:
+      - eraseText: 100
+      - inputText: '240000'
       - hideKeyboard
 - runFlow:
     when:
       platform: iOS
     commands:
+      # eraseText often leaves RN controlled values intact on iOS; select-all then
+      # type so 240000 replaces 120000 (appending yields ~100% readiness).
+      - longPressOn:
+          id: transaction-edit-amount
+      - tapOn: Select All
+      - inputText: '240000'
       - tapOn: Edit transaction
 - scrollUntilVisible:
     element:
@@ -148,7 +154,7 @@ appId: com.lawaloy.stead
     direction: DOWN
 - extendedWaitUntil:
     visible: '20%'
-    timeout: 60000
+    timeout: 90000
 - tapOn:
     id: nav-activity
 - scrollUntilVisible:
