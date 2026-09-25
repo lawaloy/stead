@@ -106,9 +106,10 @@ appId: com.lawaloy.stead
 - tapOn:
     id: nav-dashboard
 - assertVisible: '10%'
-# Do not automate editing a pre-filled amount (Maestro/RN iOS replace is unreliable)
-# and do not tap bare "Income"/"Expense" labels (they collide with list filters).
+# Do not automate editing a pre-filled amount (Maestro/RN iOS replace is unreliable).
 # Reach 20% with a second empty-field income create instead.
+- tapOn:
+    id: nav-activity
 - tapOn:
     id: transaction-add
 - assertVisible: Add Transaction
