@@ -13,6 +13,20 @@ describe('readiness alert rules', () => {
     );
   });
 
+  it('alerts when a seeded stable baseline deteriorates to warning', () => {
+    expect(
+      riskDecision(
+        { status: 'warning', score: 55 },
+        {
+          lastNotifiedStatus: 'stable',
+          lastNotifiedScore: 80,
+          lastRiskAlertAt: null,
+        },
+        now,
+      ),
+    ).toBe('risk');
+  });
+
   it('alerts on status worsening or a 15-point score drop', () => {
     const baseline = {
       lastNotifiedStatus: 'warning',
@@ -79,6 +93,33 @@ describe('readiness alert rules', () => {
       due: false,
       key: '2026-09-06',
     });
+  });
+
+  it('becomes due at the scheduled local hour on the scheduled weekday', () => {
+    expect(
+      weeklySchedule(
+        new Date('2026-09-07T07:00:00.000Z'),
+        'Africa/Lagos',
+        1,
+        9,
+      ),
+    ).toEqual({ due: false, key: '2026-09-06' });
+    expect(
+      weeklySchedule(
+        new Date('2026-09-07T08:00:00.000Z'),
+        'Africa/Lagos',
+        1,
+        9,
+      ),
+    ).toEqual({ due: true, key: '2026-09-06' });
+    expect(
+      weeklySchedule(
+        new Date('2026-09-07T23:00:00.000Z'),
+        'Africa/Lagos',
+        1,
+        9,
+      ),
+    ).toEqual({ due: true, key: '2026-09-06' });
   });
 
   it('deduplicates concurrent evaluations without suppressing a later cycle', () => {
