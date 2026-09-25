@@ -2,7 +2,7 @@
 
 Target branch: `main`
 
-Last verified: 2026-08-22 through the GitHub repository ruleset API.
+Last verified: 2026-09-25 through the GitHub repository ruleset API.
 
 `main` is governed by the active `Stead Rules` repository ruleset. GitHub's
 classic branch-protection endpoint reports no classic protection, so the
@@ -29,10 +29,12 @@ errors, and enables Copilot code review on pushes.
 
 These are the exact contexts stored in the active ruleset:
 
+- [x] `format`
 - [x] `lint`
 - [x] `api-test` — includes API unit and PostgreSQL-backed e2e tests
 - [x] `build`
 - [x] `mobile-test` — includes mobile typecheck and unit tests
+- [x] `mobile-api-journey` — live mobile API client against NestJS + PostgreSQL
 - [x] `CodeQL`
 - [x] `dependency-review` — blocks high-severity or critical runtime dependency findings
 
