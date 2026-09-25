@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { useRouter } from 'expo-router';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
@@ -19,8 +19,14 @@ import {
   resolveEffectiveCountryIso,
 } from '../../src/lib/otp-request';
 
+const initialE2ePhone = () => {
+  // CI-only seed: Maestro/XCTest cannot reliably update this controlled RN field on iOS.
+  const seed = process.env.EXPO_PUBLIC_E2E_PHONE?.trim();
+  return seed ? formatPhoneForDisplay(seed, defaultAuthCountryIso) : '';
+};
+
 export default function RequestOtpScreen() {
-  const [phone, setPhone] = useState('');
+  const [phone, setPhone] = useState(initialE2ePhone);
   const [countryIso, setCountryIso] = useState<AuthCountryIso>(
     defaultAuthCountryIso,
   );
@@ -32,14 +38,6 @@ export default function RequestOtpScreen() {
     setPendingOtpRequestedAt,
     setDevOtpHint,
   } = useAuth();
-
-  // CI-only seed: Maestro/XCTest cannot reliably update this controlled RN field on iOS.
-  useEffect(() => {
-    const seed = process.env.EXPO_PUBLIC_E2E_PHONE?.trim();
-    if (!seed) return;
-    setPhone(formatPhoneForDisplay(seed, defaultAuthCountryIso));
-  }, []);
-
   const countriesQuery = useQuery({
     queryKey: ['auth-countries'],
     queryFn: fetchAuthCountries,

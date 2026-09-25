@@ -172,12 +172,22 @@ appId: com.lawaloy.stead
 - assertVisible: Safe To Spend
 
 # Relaunch without clearing native secure storage to check session restore.
+# clearState:false keeps the session; extended waits absorb emulator GPU glitches
+# (e.g. "Failed to find ColorBuffer") that print ERROR but still complete launch.
 - stopApp
-- launchApp
-- assertVisible: Native journey goal
+- launchApp:
+    clearState: false
+- extendedWaitUntil:
+    visible: Native journey goal
+    timeout: 90000
 - tapOn:
     id: app-logout
-- assertVisible: Stead Login
+- extendedWaitUntil:
+    visible: Stead Login
+    timeout: 60000
 - stopApp
-- launchApp
-- assertVisible: Stead Login
+- launchApp:
+    clearState: false
+- extendedWaitUntil:
+    visible: Stead Login
+    timeout: 90000
