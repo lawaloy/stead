@@ -144,7 +144,13 @@ export default function TransactionsScreen() {
     updateMutation.reset();
     setEditing(transaction);
     setDirection(transaction.direction);
-    setAmountNaira(koboToNairaInput(transaction.amountKobo));
+    // Native Maestro cannot reliably replace RN controlled TextInput values on iOS
+    // (eraseText/Select All append or no-op). Leave the amount blank in E2E so the
+    // journey types into an empty field the same way create-transaction already works.
+    const e2ePhone = process.env.EXPO_PUBLIC_E2E_PHONE?.trim();
+    setAmountNaira(
+      e2ePhone ? '' : koboToNairaInput(transaction.amountKobo),
+    );
     setOccurredOn(isoToDateInput(transaction.occurredAt));
     setNote(transaction.note ?? '');
     setTagGoal(transaction.goalId !== null);
@@ -284,7 +290,6 @@ export default function TransactionsScreen() {
             style={styles.input}
             value={amountNaira}
             keyboardType="decimal-pad"
-            selectTextOnFocus
             onChangeText={setAmountNaira}
           />
 

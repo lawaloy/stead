@@ -115,20 +115,16 @@ appId: com.lawaloy.stead
 - tapOn: Edit Native journey income transaction
 - tapOn:
     id: transaction-edit-amount
+- inputText: '240000'
 - runFlow:
     when:
       platform: Android
     commands:
-      - eraseText: 100
-      - inputText: '240000'
       - hideKeyboard
 - runFlow:
     when:
       platform: iOS
     commands:
-      # Field uses selectTextOnFocus so the tap above selects the value; typing replaces
-      # it (eraseText/Select All are unreliable for RN controlled inputs on iOS).
-      - inputText: '240000'
       - tapOn: Edit transaction
 - scrollUntilVisible:
     element:
