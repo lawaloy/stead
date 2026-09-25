@@ -394,6 +394,11 @@ jobs:
         with:
           path: mobile/.ci/android/stead-debug.apk
           key: android-simulator-app-v1-${{ hashFiles('mobile/package-lock.json', 'mobile/app.json', 'mobile/assets/**') }}
+      - name: Restore Android Metro transforms
+        uses: actions/cache@v4
+        with:
+          path: mobile/.cache/metro
+          key: metro-android-v1-${{ hashFiles('mobile/package-lock.json', 'mobile/metro.config.js', 'mobile/babel.config.js') }}
       - name: Enable KVM for Android emulator
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
@@ -421,6 +426,10 @@ jobs:
             sleep 2
           done
           curl --fail http://127.0.0.1:8081/status | grep -q 'packager-status:running'
+          nohup curl --fail --silent --show-error --retry 3 \
+            'http://127.0.0.1:8081/node_modules/expo-router/entry.bundle?platform=android&dev=true&hot=false&lazy=true&transform.engine=hermes&transform.bytecode=1&unstable_transformProfile=hermes-stable' \
+            --output "$RUNNER_TEMP/stead-android.bundle" \
+            > "$RUNNER_TEMP/stead-metro-prewarm.log" 2>&1 &
       - name: Install Maestro
         run: |
           curl -fsSL https://get.maestro.mobile.dev | bash
@@ -450,6 +459,12 @@ jobs:
             adb reverse tcp:8081 tcp:8081
             adb reverse tcp:3000 tcp:3000
             adb install -r .ci/android/stead-debug.apk
+            for attempt in $(seq 1 180); do
+              if test -s "$RUNNER_TEMP/stead-android.bundle"; then break; fi
+              sleep 1
+            done
+            test -s "$RUNNER_TEMP/stead-android.bundle" || cat "$RUNNER_TEMP/stead-metro-prewarm.log"
+            test -s "$RUNNER_TEMP/stead-android.bundle"
             maestro test -e TEST_PHONE=08030000001 .maestro/critical-native-journey.yaml
       - uses: actions/upload-artifact@v4
         if: failure()
@@ -458,6 +473,7 @@ jobs:
           path: |
             ${{ runner.temp }}/stead-api.log
             ${{ runner.temp }}/stead-metro.log
+            ${{ runner.temp }}/stead-metro-prewarm.log
             ~/.maestro/tests
             mobile/.expo
           retention-days: 7
@@ -494,6 +510,11 @@ jobs:
         with:
           path: mobile/.ci/ios/mobile.app
           key: ios-simulator-app-${{ needs.config.outputs.ios_runner }}-v1-${{ hashFiles('mobile/package-lock.json', 'mobile/app.json', 'mobile/assets/**') }}
+      - name: Restore iOS Metro transforms
+        uses: actions/cache@v4
+        with:
+          path: mobile/.cache/metro
+          key: metro-ios-v1-${{ hashFiles('mobile/package-lock.json', 'mobile/metro.config.js', 'mobile/babel.config.js') }}
       - name: Restore iOS native build caches
         if: steps.ios-app-cache.outputs.cache-hit != 'true'
         id: ios-build-cache
@@ -535,6 +556,10 @@ jobs:
             sleep 2
           done
           curl --fail http://127.0.0.1:8081/status | grep -q 'packager-status:running'
+          nohup curl --fail --silent --show-error --retry 3 \
+            'http://127.0.0.1:8081/node_modules/expo-router/entry.bundle?platform=ios&dev=true&hot=false&lazy=true&transform.engine=hermes&transform.bytecode=1&unstable_transformProfile=hermes-stable' \
+            --output "$RUNNER_TEMP/stead-ios.bundle" \
+            > "$RUNNER_TEMP/stead-metro-prewarm.log" 2>&1 &
       - name: Install Maestro
         run: |
           curl -fsSL https://get.maestro.mobile.dev | bash
@@ -559,6 +584,12 @@ jobs:
             mkdir -p mobile/.ci/ios
             ditto "$APP_PATH" mobile/.ci/ios/mobile.app
           fi
+          for attempt in $(seq 1 180); do
+            if test -s "$RUNNER_TEMP/stead-ios.bundle"; then break; fi
+            sleep 1
+          done
+          test -s "$RUNNER_TEMP/stead-ios.bundle" || cat "$RUNNER_TEMP/stead-metro-prewarm.log"
+          test -s "$RUNNER_TEMP/stead-ios.bundle"
       - name: Save iOS simulator app
         if: steps.ios-app-cache.outputs.cache-hit != 'true'
         uses: actions/cache/save@v4
@@ -583,6 +614,7 @@ jobs:
           path: |
             ${{ runner.temp }}/stead-api.log
             ${{ runner.temp }}/stead-metro.log
+            ${{ runner.temp }}/stead-metro-prewarm.log
             ${{ runner.temp }}/stead-pg.log
             ~/.maestro/tests
             mobile/.expo

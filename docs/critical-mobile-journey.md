@@ -49,8 +49,9 @@ single `ci` workflow runs the same flow in parallel Android and iOS simulator
 jobs when API or mobile paths change, with isolated PostgreSQL 16 databases.
 Installable native binaries are cached by native dependencies and app
 configuration, so JavaScript and journey-only changes do not trigger another
-native compilation. It does not prove physical device behavior, carrier SMS
-delivery, TalkBack, or VoiceOver.
+native compilation. Metro transforms are cached per platform and bundle
+generation starts while the simulator is being prepared. It does not prove
+physical device behavior, carrier SMS delivery, TalkBack, or VoiceOver.
 
 To run locally, start the API against a dedicated disposable schema as above,
 install and start a native debug build (`npx expo run:android` on a configured

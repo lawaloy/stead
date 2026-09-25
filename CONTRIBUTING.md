@@ -88,8 +88,9 @@ Node, npm, the Android API level, or the macOS runner. Native jobs cache Gradle
 and iOS build dependencies plus installable simulator binaries keyed by native
 dependencies and app configuration. JavaScript-only and Maestro-flow changes
 therefore reuse the native binary while Metro serves the current application
-code; a cold native build can still take several minutes. New pushes cancel
-superseded CI runs.
+code. Metro transforms are cached per platform and each bundle is prewarmed in
+parallel with simulator setup; a cold native build can still take several
+minutes. New pushes cancel superseded CI runs.
 
 API e2e tests require PostgreSQL and a dedicated `e2e` or test schema. The
 test harness refuses to clean the development `public` schema. See the root
