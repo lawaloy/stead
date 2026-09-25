@@ -91,8 +91,7 @@ describe('account screen delete busy guard', () => {
 
   it('locks profile, consent, and export while permanent deletion is in flight', async () => {
     let resolveDelete:
-      | ((value: { ok: true; deletedAt: string }) => void)
-      | undefined;
+      ((value: { ok: true; deletedAt: string }) => void) | undefined;
     mockDelete.mockImplementation(
       () =>
         new Promise<{ ok: true; deletedAt: string }>((resolve) => {
