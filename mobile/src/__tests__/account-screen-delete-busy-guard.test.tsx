@@ -91,8 +91,7 @@ describe('account screen delete busy guard', () => {
 
   it('locks profile, consent, and export while permanent deletion is in flight', async () => {
     let resolveDelete:
-      | ((value: { ok: true; deletedAt: string }) => void)
-      | undefined;
+      ((value: { ok: true; deletedAt: string }) => void) | undefined;
     mockDelete.mockImplementation(
       () =>
         new Promise<{ ok: true; deletedAt: string }>((resolve) => {
@@ -125,8 +124,13 @@ describe('account screen delete busy guard', () => {
         ?.onPress?.();
     });
 
-    await waitFor(() => expect(mockDelete).toHaveBeenCalledTimes(1));
-    expect(screen.getByRole('button', { name: 'Save profile' })).toBeDisabled();
+    await waitFor(() => {
+      expect(mockDelete).toHaveBeenCalledTimes(1);
+      expect(queryClient.isMutating()).toBeGreaterThan(0);
+      expect(
+        screen.getByRole('button', { name: 'Save profile' }),
+      ).toBeDisabled();
+    });
     expect(
       screen.getByRole('button', { name: 'Save consent choices' }),
     ).toBeDisabled();
