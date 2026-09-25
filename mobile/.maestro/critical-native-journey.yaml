@@ -106,6 +106,9 @@ appId: com.lawaloy.stead
 - tapOn:
     id: nav-dashboard
 - assertVisible: '10%'
+# Avoid editing amount/note text on iOS: Maestro cannot reliably replace RN
+# controlled TextInput values. Exercise edit/save via direction toggle, then
+# reach 20% with a second empty-field income create (same path as the first).
 - tapOn:
     id: nav-activity
 - scrollUntilVisible:
@@ -113,19 +116,8 @@ appId: com.lawaloy.stead
     timeout: 40000
     visibilityPercentage: 50
 - tapOn: Edit Native journey income transaction
-- tapOn:
-    id: transaction-edit-amount
-- inputText: '240000'
-- runFlow:
-    when:
-      platform: Android
-    commands:
-      - hideKeyboard
-- runFlow:
-    when:
-      platform: iOS
-    commands:
-      - tapOn: Edit transaction
+- tapOn: Expense
+- tapOn: Income
 - scrollUntilVisible:
     element:
       id: transaction-save
@@ -135,8 +127,41 @@ appId: com.lawaloy.stead
     id: transaction-save
 - assertVisible: Native journey income
 - tapOn:
+    id: transaction-add
+- assertVisible: Add Transaction
+- tapOn:
+    id: transaction-amount
+- eraseText: 100
+- inputText: '120000'
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - hideKeyboard
+- tapOn:
+    id: transaction-note
+- eraseText: 100
+- inputText: Native journey topup
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - hideKeyboard
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - tapOn: Add Transaction
+- scrollUntilVisible:
+    element:
+      id: transaction-create
+    timeout: 40000
+    visibilityPercentage: 50
+- tapOn:
+    id: transaction-create
+- assertVisible: Transaction added
+- tapOn:
     id: nav-dashboard
-# Remount + pull-to-refresh on the dashboard ScrollView (not the shell).
 - tapOn:
     id: nav-activity
 - tapOn:
@@ -150,6 +175,12 @@ appId: com.lawaloy.stead
     timeout: 90000
 - tapOn:
     id: nav-activity
+- scrollUntilVisible:
+    element: Delete Native journey topup transaction
+    timeout: 40000
+    visibilityPercentage: 50
+- tapOn: Delete Native journey topup transaction
+- tapOn: Delete
 - scrollUntilVisible:
     element: Delete Native journey income transaction
     timeout: 40000
