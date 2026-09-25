@@ -16,8 +16,8 @@ Current repository status:
   coverage. Auth, goal, transaction, and dashboard screens have component
   journeys, and CI exercises the real mobile API client against a running API
   and PostgreSQL. Android/iOS simulator UI journeys run in `native-ci` on
-  path-filtered PRs (with AVD/binary caches), after merge, on schedule, and
-  on demand.
+  path-filtered PRs: native binaries build once, then Maestro tests install
+  them (AVD/Pods/DerivedData/binary caches keep warm runs shorter).
 - Production readiness: live SMS delivery on real devices, production session
   lifecycle, operations, native UI acceptance, and several product workflows
   remain incomplete.
