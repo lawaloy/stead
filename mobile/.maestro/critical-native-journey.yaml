@@ -9,29 +9,25 @@ appId: com.lawaloy.stead
     timeout: 240000
 - tapOn:
     id: auth-phone
+- inputText: ${TEST_PHONE}
 - runFlow:
     when:
       platform: Android
     commands:
-      - inputText: ${TEST_PHONE}
       - hideKeyboard
 - runFlow:
     when:
       platform: iOS
     commands:
-      # RN controlled TextInput + phone-pad often drops Maestro inputText on iOS
-      # (field stays empty, Request OTP stays disabled). Type on the keypad instead.
-      - tapOn: '0'
-      - tapOn: '8'
-      - tapOn: '0'
-      - tapOn: '3'
-      - tapOn: '0'
-      - tapOn: '0'
-      - tapOn: '0'
-      - tapOn: '0'
-      - tapOn: '0'
-      - tapOn: '0'
-      - tapOn: '1'
+      # If inputText still did not stick, paste from Maestro clipboard into the focused field.
+      - runFlow:
+          when:
+            notVisible: '0803 000 0001'
+          commands:
+            - evalScript: ${maestro.copiedText = '08030000001'}
+            - tapOn:
+                id: auth-phone
+            - pasteText
       - tapOn: Stead Login
 - assertVisible: '0803 000 0001'
 - tapOn:

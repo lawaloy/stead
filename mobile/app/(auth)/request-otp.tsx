@@ -118,9 +118,13 @@ export default function RequestOtpScreen() {
           setPhone(formatPhoneForDisplay(value, effectiveCountryIso))
         }
         placeholder={selectedCountry.phoneExample}
-        keyboardType="phone-pad"
+        // default (not phone-pad): Maestro/XCTest inputText reliably updates RN
+        // controlled state on iOS; phone-pad often accepts the command but leaves value empty.
+        keyboardType="default"
         textContentType="telephoneNumber"
         autoCapitalize="none"
+        autoCorrect={false}
+        autoComplete="tel"
         editable={!mutation.isPending}
         style={styles.input}
       />
