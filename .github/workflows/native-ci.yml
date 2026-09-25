@@ -119,8 +119,6 @@ jobs:
     needs: config
     runs-on: ${{ needs.config.outputs.ios_runner }}
     timeout-minutes: 45
-    env:
-      DERIVED_DATA_PATH: ${{ runner.temp }}/DerivedData
     steps:
       - uses: actions/checkout@v4
         with:
@@ -163,6 +161,10 @@ jobs:
         if: steps.ios-app-cache.outputs.cache-hit != 'true'
         id: xcode
         run: echo "version=$(xcodebuild -version | tr '\n' ' ')" >> "$GITHUB_OUTPUT"
+      - name: Set DerivedData path
+        if: steps.ios-app-cache.outputs.cache-hit != 'true'
+        id: derived
+        run: echo "path=${RUNNER_TEMP}/DerivedData" >> "$GITHUB_OUTPUT"
       - name: Cache Xcode DerivedData (mtime + inode aware)
         if: steps.ios-app-cache.outputs.cache-hit != 'true'
         uses: irgaly/xcode-cache@v1
@@ -171,9 +173,11 @@ jobs:
           restore-keys: |
             ios-dd-${{ needs.config.outputs.ios_runner }}-${{ steps.xcode.outputs.version }}-${{ hashFiles('mobile/package-lock.json', 'mobile/app.json', 'mobile/ios/Podfile.lock') }}-
             ios-dd-${{ needs.config.outputs.ios_runner }}-${{ steps.xcode.outputs.version }}-
-          deriveddata-directory: ${{ env.DERIVED_DATA_PATH }}
+          deriveddata-directory: ${{ steps.derived.outputs.path }}
       - name: Build iOS simulator app
         if: steps.ios-app-cache.outputs.cache-hit != 'true'
+        env:
+          DERIVED_DATA_PATH: ${{ steps.derived.outputs.path }}
         run: bash .github/scripts/build-ios-simulator-app.sh
       - name: Save iOS simulator app
         if: steps.ios-app-cache.outputs.cache-hit != 'true'
