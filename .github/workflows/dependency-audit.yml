@@ -28,7 +28,7 @@ concurrency:
 
 jobs:
   api:
-    name: api
+    name: api-audit
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -68,7 +68,7 @@ jobs:
         run: npm audit --audit-level=moderate
 
   mobile:
-    name: mobile
+    name: mobile-audit
     runs-on: ubuntu-latest
     defaults:
       run:
