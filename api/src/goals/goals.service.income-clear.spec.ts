@@ -55,7 +55,15 @@ describe('GoalsService monthly income clear', () => {
     expect(prisma.goal.updateMany).not.toHaveBeenCalled();
     expect(prisma.goal.update).toHaveBeenCalledWith({
       where: { id: 'goal_1' },
-      data: expect.objectContaining({ monthlyIncomeKobo: null }),
+      data: {
+        name: undefined,
+        amountTotalKobo: undefined,
+        dueDate: undefined,
+        monthlyIncomeKobo: null,
+        isActive: undefined,
+        status: undefined,
+        endedAt: undefined,
+      },
     });
     expect(result.monthlyIncomeKobo).toBeNull();
   });
