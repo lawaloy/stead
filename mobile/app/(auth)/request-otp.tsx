@@ -45,9 +45,15 @@ export default function RequestOtpScreen() {
     clearSessionEndReason,
   } = useAuth();
 
+  if (
+    sessionEndReason === 'expired' &&
+    sessionNotice !== SESSION_EXPIRED_MESSAGE
+  ) {
+    setSessionNotice(SESSION_EXPIRED_MESSAGE);
+  }
+
   useEffect(() => {
     if (sessionEndReason !== 'expired') return;
-    setSessionNotice(SESSION_EXPIRED_MESSAGE);
     clearSessionEndReason();
   }, [sessionEndReason, clearSessionEndReason]);
 

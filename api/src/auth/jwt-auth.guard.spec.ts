@@ -48,11 +48,9 @@ describe('JwtAuthGuard', () => {
   });
 
   it('rejects expired tokens with a distinct session-expired response', () => {
-    const token = jwt.sign(
-      { sub: 'user_1', phone: '+2348012345678' },
-      secret,
-      { expiresIn: -1 },
-    );
+    const token = jwt.sign({ sub: 'user_1', phone: '+2348012345678' }, secret, {
+      expiresIn: -1,
+    });
     const { context } = contextFor(`Bearer ${token}`);
 
     try {

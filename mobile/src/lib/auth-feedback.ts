@@ -2,8 +2,7 @@ import { ApiError } from './api-error';
 
 export const OTP_RESEND_COOLDOWN_MS = 60_000;
 
-export const SESSION_EXPIRED_MESSAGE =
-  'Your session expired. Sign in again.';
+export const SESSION_EXPIRED_MESSAGE = 'Your session expired. Sign in again.';
 
 const fallbackMessages = {
   request: 'We could not send a code right now. Try again in a moment.',

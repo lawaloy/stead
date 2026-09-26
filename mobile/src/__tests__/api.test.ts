@@ -89,9 +89,7 @@ describe('api client', () => {
 
     mock.onGet('/goals/active').reply(401, { message: 'Invalid token' });
 
-    await expect(
-      apiClient.get('/goals/active'),
-    ).rejects.toMatchObject({
+    await expect(apiClient.get('/goals/active')).rejects.toMatchObject({
       message: 'Your session expired. Sign in again.',
       status: 401,
     });
