@@ -138,7 +138,7 @@ describe('transaction import multi-row selection', () => {
       await screen.findByText('Review before importing'),
     ).toBeOnTheScreen();
     expect(
-      screen.getByText('2 ready · 1 duplicate · 1 needs correction'),
+      screen.getByText('2 ready to import · 1 already imported · 1 needs fixing'),
     ).toBeOnTheScreen();
     expect(screen.getByText('Selected: 2 (₦1,250.00)')).toBeOnTheScreen();
 

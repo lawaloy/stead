@@ -70,8 +70,18 @@ describe('pickTransactionCsv', () => {
   });
 
   it.each([
-    ['statement.pdf', 20, 'content', 'Choose a file with a .csv extension.'],
-    ['statement.csv', 0, '   ', 'empty'],
+    [
+      'statement.pdf',
+      20,
+      'content',
+      'Choose a file with a .csv extension.',
+    ],
+    [
+      'statement.csv',
+      0,
+      '   ',
+      'That CSV file is empty. Export a statement that includes at least one transaction row, then try again.',
+    ],
   ])('rejects unsafe file %s', async (name, size, contents, message) => {
     mockPicker.mockResolvedValue(
       pickerResult({
@@ -109,7 +119,7 @@ describe('pickTransactionCsv', () => {
     );
 
     await expect(pickTransactionCsv()).rejects.toThrow(
-      '200,000 characters or fewer',
+      'That CSV is too large (over 200,000 characters). Export a smaller date range, then try again.',
     );
   });
 
@@ -134,5 +144,27 @@ describe('pickTransactionCsv', () => {
       name: 'statement.csv',
       csv,
     });
+  });
+
+  it('surfaces read failures with a clearer unreadable-file message', async () => {
+    mockPicker.mockResolvedValue(
+      pickerResult({
+        canceled: false,
+        assets: [
+          {
+            name: 'statement.csv',
+            uri: 'file:///cache/statement.csv',
+            mimeType: 'text/csv',
+            file: {
+              text: jest.fn().mockRejectedValue(new Error('I/O error')),
+            } as never,
+          },
+        ],
+      }),
+    );
+
+    await expect(pickTransactionCsv()).rejects.toThrow(
+      'Unable to read that CSV file. Close other apps using it, or export the statement again.',
+    );
   });
 });

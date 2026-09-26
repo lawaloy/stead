@@ -112,7 +112,7 @@ describe('transaction import empty selection', () => {
       await screen.findByText('Review before importing'),
     ).toBeOnTheScreen();
     expect(
-      screen.getByText('0 ready · 1 duplicate · 1 needs correction'),
+      screen.getByText('0 ready to import · 1 already imported · 1 needs fixing'),
     ).toBeOnTheScreen();
     expect(
       screen.getByRole('checkbox', { name: 'CSV row 2 Duplicate' }),
