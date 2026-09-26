@@ -162,6 +162,44 @@ describe('AuthProvider session lifecycle', () => {
     expect(mockConfigureApiAuth).toHaveBeenCalled();
   });
 
+  it('waits for SecureStore persistence before exposing the access token', async () => {
+    let releasePersist: (() => void) | undefined;
+    mockSetSession.mockImplementation(
+      () =>
+        new Promise<void>((resolve) => {
+          releasePersist = () => {
+            storedToken = 'new-token';
+            storedRefresh = 'new-refresh';
+            resolve();
+          };
+        }),
+    );
+
+    await render(
+      <AuthProvider>
+        <SessionProbe />
+      </AuthProvider>,
+    );
+    expect(await screen.findByText('signed out')).toBeOnTheScreen();
+
+    await act(async () => {
+      fireEvent.press(screen.getByRole('button', { name: 'Complete login' }));
+    });
+
+    expect(mockSetSession).toHaveBeenCalledWith({
+      token: 'new-token',
+      refreshToken: 'new-refresh',
+    });
+    expect(screen.getByText('signed out')).toBeOnTheScreen();
+
+    await act(async () => {
+      releasePersist?.();
+    });
+    await waitFor(() =>
+      expect(screen.getByText('new-token')).toBeOnTheScreen(),
+    );
+  });
+
   it('passes allDevices when signing out everywhere', async () => {
     await render(
       <AuthProvider>

@@ -93,10 +93,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const completeAuth = useCallback(
     async (session: AuthSessionTokens) => {
       await clearSessionQueryCache();
-      setToken(session.token);
+      // Persist before exposing token in React state. The API client reads from
+      // SecureStore; updating state first lets the auth gate mount dashboard
+      // and fire authenticated requests while the store is still empty → 401 →
+      // silent logout (seen on native iOS after dual-token writes).
+      await tokenStore.setSession(session);
       setSessionEndReason(null);
       resetPendingAuth();
-      await tokenStore.setSession(session);
+      setToken(session.token);
     },
     [resetPendingAuth],
   );
