@@ -6,11 +6,14 @@ Transaction file import is the first automatic financial-data ingestion slice.
 It reduces repetitive manual entry without requiring Stead to hold bank
 credentials or depend on a bank-connectivity provider.
 
-This first release accepts a bounded Stead CSV format. Direct support for each
-bank's export format remains discovery work because column names, transaction
-direction, dates, and amount conventions vary by institution.
+This first release accepts a bounded Stead CSV format. A provisional
+debit/credit statement layout is also accepted when the Stead columns are
+absent (see below). Branded Nigerian bank adapters remain discovery work until
+consented customer samples validate institution-specific exports.
 
 ## CSV format
+
+### Stead canonical
 
 The first row must contain these case-insensitive column names. They may appear
 in any order and the file may contain additional columns:
@@ -30,6 +33,25 @@ date,description,amount,type
 2026-09-01,Salary,"NGN 250,000.00",credit
 2026-09-02,Groceries,12500.50,debit
 ```
+
+### Provisional debit/credit layout
+
+If the Stead columns are not present, the API may adapt a common statement
+shape that uses separate debit and credit amount columns. This adapter is
+**provisional** and is not claimed as support for any specific bank brand.
+
+Accepted case-insensitive headers (any order; extras allowed):
+
+| Role        | Accepted column names                                              |
+| ----------- | ------------------------------------------------------------------ |
+| Date        | `date`, `transaction date`, `value date`, or `posting date`      |
+| Description | `description`, `narration`, `particulars`, or `details`          |
+| Debit       | `debit`                                                            |
+| Credit      | `credit`                                                           |
+
+Dates may be `YYYY-MM-DD`, `DD/MM/YYYY`, or `DD-MM-YYYY`. A row must fill
+exactly one of debit or credit. When both Stead and debit/credit columns are
+present, Stead wins.
 
 Files are limited to 200,000 characters and 500 transaction rows. The API JSON
 parser has a bounded 1 MB request limit so the contract maximum, JSON escaping,
@@ -76,9 +98,10 @@ This means:
 ## Remaining discovery
 
 - Validate the canonical CSV template with launch customers.
+- Validate the provisional debit/credit adapter against consented customer
+  samples before labeling any institution-specific export as supported.
 - Collect representative exports from target Nigerian banks with explicit
-  customer consent and build institution-specific adapters only for validated
-  formats.
+  customer consent and build branded adapters only for validated formats.
 - Decide whether direct bank connectivity provides enough additional value to
   justify provider consent, account-linking, synchronization, and reconciliation
   complexity.
