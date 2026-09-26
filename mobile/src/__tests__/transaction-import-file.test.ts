@@ -70,12 +70,7 @@ describe('pickTransactionCsv', () => {
   });
 
   it.each([
-    [
-      'statement.pdf',
-      20,
-      'content',
-      'Choose a file with a .csv extension.',
-    ],
+    ['statement.pdf', 20, 'content', 'Choose a file with a .csv extension.'],
     [
       'statement.csv',
       0,

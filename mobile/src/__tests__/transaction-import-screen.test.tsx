@@ -127,7 +127,9 @@ describe('transaction import screen', () => {
       await screen.findByText('Review before importing'),
     ).toBeOnTheScreen();
     expect(
-      screen.getByText('1 ready to import · 1 already imported · 1 needs fixing'),
+      screen.getByText(
+        '1 ready to import · 1 already imported · 1 needs fixing',
+      ),
     ).toBeOnTheScreen();
     expect(
       screen.getByRole('checkbox', { name: 'CSV row 2 Salary' }),

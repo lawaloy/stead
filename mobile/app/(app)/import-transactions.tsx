@@ -128,8 +128,7 @@ export default function ImportTransactionsScreen() {
 
   const previewError = previewMutation.error as ApiError | null;
   const confirmError = confirmMutation.error as ApiError | null;
-  const busy =
-    previewMutation.isPending || confirmMutation.isPending;
+  const busy = previewMutation.isPending || confirmMutation.isPending;
   const busyStatus = previewMutation.isPending
     ? 'Checking your CSV…'
     : confirmMutation.isPending
