@@ -45,11 +45,13 @@ const auth = {
   pendingCountryIso: 'NG' as const,
   pendingOtpRequestedAt: null,
   devOtpHint: '123456',
+  sessionEndReason: null as 'expired' | null,
   setPendingPhone: jest.fn(),
   setPendingCountryIso: jest.fn(),
   setPendingOtpRequestedAt: jest.fn(),
   setDevOtpHint: jest.fn(),
   resetPendingAuth: jest.fn(),
+  clearSessionEndReason: jest.fn(),
   completeAuth: jest.fn().mockResolvedValue(undefined),
   logout: jest.fn().mockResolvedValue(undefined),
 };
@@ -114,5 +116,17 @@ describe('OTP screen journeys', () => {
     );
     expect(replace).toHaveBeenCalledWith('/(auth)/request-otp');
     expect(mockVerify).not.toHaveBeenCalled();
+  });
+
+  it('shows and clears a session-expired notice on the request screen', async () => {
+    mockAuth.mockReturnValue({ ...auth, sessionEndReason: 'expired' });
+    await renderScreen(<RequestOtpScreen />);
+
+    expect(
+      await screen.findByRole('alert', {
+        name: 'Your session expired. Sign in again.',
+      }),
+    ).toBeOnTheScreen();
+    expect(auth.clearSessionEndReason).toHaveBeenCalledTimes(1);
   });
 });

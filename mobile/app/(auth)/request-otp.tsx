@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useRouter } from 'expo-router';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
@@ -13,7 +13,10 @@ import {
   withDisplayPhoneExamples,
 } from '../../src/lib/countries';
 import { formatPhoneForDisplay } from '../../src/lib/phone';
-import { getAuthErrorMessage } from '../../src/lib/auth-feedback';
+import {
+  getAuthErrorMessage,
+  SESSION_EXPIRED_MESSAGE,
+} from '../../src/lib/auth-feedback';
 import {
   buildOtpRequestInput,
   resolveEffectiveCountryIso,
@@ -31,13 +34,29 @@ export default function RequestOtpScreen() {
     defaultAuthCountryIso,
   );
   const [countryMenuOpen, setCountryMenuOpen] = useState(false);
+  const [sessionNotice, setSessionNotice] = useState('');
   const router = useRouter();
   const {
     setPendingPhone,
     setPendingCountryIso,
     setPendingOtpRequestedAt,
     setDevOtpHint,
+    sessionEndReason,
+    clearSessionEndReason,
   } = useAuth();
+
+  if (
+    sessionEndReason === 'expired' &&
+    sessionNotice !== SESSION_EXPIRED_MESSAGE
+  ) {
+    setSessionNotice(SESSION_EXPIRED_MESSAGE);
+  }
+
+  useEffect(() => {
+    if (sessionEndReason !== 'expired') return;
+    clearSessionEndReason();
+  }, [sessionEndReason, clearSessionEndReason]);
+
   const countriesQuery = useQuery({
     queryKey: ['auth-countries'],
     queryFn: fetchAuthCountries,
@@ -72,6 +91,15 @@ export default function RequestOtpScreen() {
 
   return (
     <ScreenShell title="Stead Login">
+      {sessionNotice ? (
+        <Text
+          style={styles.notice}
+          accessibilityRole="alert"
+          accessibilityLiveRegion="polite"
+        >
+          {sessionNotice}
+        </Text>
+      ) : null}
       <Text style={styles.label}>Country</Text>
       <View style={styles.countrySelect}>
         <Pressable
@@ -213,4 +241,5 @@ const styles = StyleSheet.create({
   buttonDisabled: { opacity: 0.5 },
   buttonText: { color: '#fff', fontWeight: '700' },
   error: { color: '#c02020' },
+  notice: { color: '#8a5500', fontWeight: '700' },
 });

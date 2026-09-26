@@ -47,6 +47,24 @@ describe('JwtAuthGuard', () => {
     expect(() => guard.canActivate(context)).toThrow(UnauthorizedException);
   });
 
+  it('rejects expired tokens with a distinct session-expired response', () => {
+    const token = jwt.sign({ sub: 'user_1', phone: '+2348012345678' }, secret, {
+      expiresIn: -1,
+    });
+    const { context } = contextFor(`Bearer ${token}`);
+
+    try {
+      guard.canActivate(context);
+      throw new Error('expected UnauthorizedException');
+    } catch (error) {
+      expect(error).toBeInstanceOf(UnauthorizedException);
+      expect((error as UnauthorizedException).getResponse()).toEqual({
+        message: 'Session expired',
+        code: 'SESSION_EXPIRED',
+      });
+    }
+  });
+
   it('rejects tokens missing required user claims', () => {
     const token = jwt.sign({ sub: 'user_1' }, secret);
     const { context } = contextFor(`Bearer ${token}`);
