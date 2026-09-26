@@ -15,8 +15,16 @@ describe('api response contract shapes', () => {
     expect(
       AuthRequestOtpResponseSchema.parse({ ok: true, otp: '123456' }),
     ).toEqual({ ok: true, otp: '123456' });
-    expect(AuthVerifyOtpResponseSchema.parse({ token: 'jwt-token' })).toEqual({
+    expect(
+      AuthVerifyOtpResponseSchema.parse({
+        token: 'jwt-token',
+        refreshToken: 'refresh-token',
+        expiresIn: 900,
+      }),
+    ).toEqual({
       token: 'jwt-token',
+      refreshToken: 'refresh-token',
+      expiresIn: 900,
     });
   });
 

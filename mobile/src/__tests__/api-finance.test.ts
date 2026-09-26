@@ -52,6 +52,8 @@ describe('api finance client', () => {
     mock.reset();
     configureApiAuth({
       getToken: async () => null,
+      getRefreshToken: async () => null,
+      persistSession: async () => undefined,
       onUnauthorized: () => undefined,
     });
   });
@@ -327,6 +329,8 @@ describe('api finance client', () => {
     const onUnauthorized = jest.fn();
     configureApiAuth({
       getToken: async () => 'expired-jwt',
+      getRefreshToken: async () => null,
+      persistSession: async () => undefined,
       onUnauthorized,
     });
 
@@ -366,6 +370,8 @@ describe('api finance client', () => {
     const onUnauthorized = jest.fn();
     configureApiAuth({
       getToken: async () => 'jwt-token',
+      getRefreshToken: async () => null,
+      persistSession: async () => undefined,
       onUnauthorized,
     });
 

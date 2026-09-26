@@ -37,6 +37,7 @@ api/.nyc_output
 !.vscode/tasks.json
 !.vscode/launch.json
 !.vscode/extensions.json
+.cursor/
 
 # dotenv environment variable files
 .env

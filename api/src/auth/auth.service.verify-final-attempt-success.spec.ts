@@ -19,6 +19,12 @@ describe('AuthService verify OTP success on the last allowed attempt', () => {
     user: {
       findUnique: jest.Mock;
     };
+    refreshToken: {
+      create: jest.Mock;
+      findUnique: jest.Mock;
+      update: jest.Mock;
+      updateMany: jest.Mock;
+    };
   };
   let jwt: { signAsync: jest.Mock };
   let telemetry: { recordEvent: jest.Mock; countRecentEvents: jest.Mock };
@@ -32,6 +38,12 @@ describe('AuthService verify OTP success on the last allowed attempt', () => {
       },
       user: {
         findUnique: jest.fn(),
+      },
+      refreshToken: {
+        create: jest.fn().mockResolvedValue({ id: 'rt_1' }),
+        findUnique: jest.fn(),
+        update: jest.fn(),
+        updateMany: jest.fn(),
       },
     };
     jwt = { signAsync: jest.fn() };
@@ -92,9 +104,13 @@ describe('AuthService verify OTP success on the last allowed attempt', () => {
       .mockResolvedValueOnce({ count: 0 });
     jwt.signAsync.mockResolvedValue('jwt_token');
 
-    await expect(service.verifyOtp('08012345678', 'NG', otp)).resolves.toEqual({
+    const session = await service.verifyOtp('08012345678', 'NG', otp);
+    expect(session).toMatchObject({
       token: 'jwt_token',
+      expiresIn: 900,
     });
+    expect(typeof session.refreshToken).toBe('string');
+    expect(session.refreshToken.length).toBeGreaterThan(0);
 
     expect(prisma.otpCode.update).not.toHaveBeenCalled();
     expect(prisma.otpCode.updateMany).toHaveBeenNthCalledWith(1, {
@@ -118,9 +134,12 @@ describe('AuthService verify OTP success on the last allowed attempt', () => {
     expect(telemetry.recordEvent).not.toHaveBeenCalledWith(
       expect.objectContaining({ type: 'otp_verify_locked' }),
     );
-    expect(jwt.signAsync).toHaveBeenCalledWith({
-      sub: 'user_1',
-      phone: '+2348012345678',
-    });
+    expect(jwt.signAsync).toHaveBeenCalledWith(
+      {
+        sub: 'user_1',
+        phone: '+2348012345678',
+      },
+      { expiresIn: 900 },
+    );
   });
 });

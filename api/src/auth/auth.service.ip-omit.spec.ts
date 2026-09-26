@@ -22,6 +22,12 @@ describe('AuthService IP omit branches', () => {
       upsert: jest.Mock;
       findUnique: jest.Mock;
     };
+    refreshToken: {
+      create: jest.Mock;
+      findUnique: jest.Mock;
+      update: jest.Mock;
+      updateMany: jest.Mock;
+    };
   };
   let notificationPublisher: { publishOtpRequested: jest.Mock };
   let jwt: { signAsync: jest.Mock };
@@ -41,6 +47,12 @@ describe('AuthService IP omit branches', () => {
       user: {
         upsert: jest.fn(),
         findUnique: jest.fn(),
+      },
+      refreshToken: {
+        create: jest.fn().mockResolvedValue({ id: 'rt_1' }),
+        findUnique: jest.fn(),
+        update: jest.fn(),
+        updateMany: jest.fn(),
       },
     };
     notificationPublisher = {
@@ -138,9 +150,13 @@ describe('AuthService IP omit branches', () => {
     prisma.otpCode.updateMany.mockResolvedValue({ count: 1 });
     jwt.signAsync.mockResolvedValue('token');
 
-    await expect(
-      service.verifyOtp('08012345678', 'NG', '123456', {}),
-    ).resolves.toEqual({ token: 'token' });
+    const session = await service.verifyOtp('08012345678', 'NG', '123456', {});
+    expect(session).toMatchObject({
+      token: 'token',
+      expiresIn: 900,
+    });
+    expect(typeof session.refreshToken).toBe('string');
+    expect(session.refreshToken.length).toBeGreaterThan(0);
 
     expect(telemetry.countRecentEvents).not.toHaveBeenCalled();
     expect(prisma.otpCode.updateMany).toHaveBeenCalledTimes(2);

@@ -138,3 +138,36 @@ Remaining:
 
 - [ ] Complete a real-provider, real-device OTP pass when sender access is
       available.
+
+## Session tokens and rotation
+
+Access JWTs are short-lived (default `JWT_EXPIRES_IN=15m`). Successful OTP
+verify and `POST /auth/refresh` also return an opaque `refreshToken` (default
+lifetime `AUTH_REFRESH_TOKEN_EXPIRES_IN=30d`). Only a SHA-256 hash of the refresh
+token is stored.
+
+Each refresh **rotates**: the presented token is revoked and replaced in the same
+family. Presenting an already-revoked refresh token is treated as reuse and
+revokes the entire family.
+
+Refresh families also have an absolute max age (`AUTH_REFRESH_FAMILY_MAX_AGE`,
+default `90d`) measured from `familyCreatedAt`. Refresh after that age revokes
+the family and returns 401; the customer must OTP again.
+
+When a device id is present at OTP verify, its HMAC is stored on the family as
+`deviceHash`. Later refresh must present the same device (via
+`X-Stead-Device-Id`). A mismatch or missing device when the family is bound
+returns 401 **without** revoking the family, so other devices keep their own
+sessions. Multiple concurrent devices are supported: each OTP verify on a new
+device creates a separate family.
+
+`POST /auth/logout` with a refresh token revokes that family only. Access-only
+logout is idempotent and does **not** revoke other devices. Sending
+`{ allDevices: true }` (with a valid access bearer and/or refresh token) revokes
+every live refresh row for the user. Account deletion cascades refresh rows.
+
+Operators responding to a stolen session can revoke remaining live refresh tokens
+for a user ID in the database (`RefreshToken` where `userId` matches and
+`revokedAt` is null), or the customer can use **Sign out of all devices** on the
+account screen. Existing long-lived access JWTs issued before this change
+remain valid until their natural expiry; new logins receive the rotating pair.

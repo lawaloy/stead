@@ -6,8 +6,8 @@ import React, {
   useMemo,
   useState,
 } from 'react';
-import { tokenStore } from './token-store';
-import { configureApiAuth } from './api';
+import { tokenStore, type AuthSessionTokens } from './token-store';
+import { configureApiAuth, logoutSession } from './api';
 import { AuthCountryIso, defaultAuthCountryIso } from './countries';
 import { clearSessionQueryCache } from './session-query-cache';
 
@@ -15,6 +15,7 @@ export type SessionEndReason = 'expired';
 
 type LogoutOptions = {
   reason?: SessionEndReason;
+  allDevices?: boolean;
 };
 
 type AuthContextValue = {
@@ -31,7 +32,7 @@ type AuthContextValue = {
   setDevOtpHint: (otp: string) => void;
   resetPendingAuth: () => void;
   clearSessionEndReason: () => void;
-  completeAuth: (token: string) => Promise<void>;
+  completeAuth: (session: AuthSessionTokens) => Promise<void>;
   logout: (options?: LogoutOptions) => Promise<void>;
 };
 
@@ -51,7 +52,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [sessionEndReason, setSessionEndReason] =
     useState<SessionEndReason | null>(null);
 
-  const logout = useCallback(async (options?: LogoutOptions) => {
+  const clearLocalSession = useCallback(async (options?: LogoutOptions) => {
     setToken(null);
     setPendingPhone('');
     setPendingOtpRequestedAt(null);
@@ -62,6 +63,22 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     await tokenStore.clearToken();
     await clearSessionQueryCache();
   }, []);
+
+  const logout = useCallback(
+    async (options?: LogoutOptions) => {
+      const refreshToken = await tokenStore.getRefreshToken();
+      try {
+        await logoutSession({
+          refreshToken,
+          allDevices: options?.allDevices,
+        });
+      } catch {
+        // Best-effort server revoke; local clear still proceeds.
+      }
+      await clearLocalSession(options);
+    },
+    [clearLocalSession],
+  );
 
   const clearSessionEndReason = useCallback(() => {
     setSessionEndReason(null);
@@ -74,12 +91,16 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   }, []);
 
   const completeAuth = useCallback(
-    async (jwt: string) => {
+    async (session: AuthSessionTokens) => {
       await clearSessionQueryCache();
-      setToken(jwt);
+      // Persist before exposing token in React state. The API client reads from
+      // SecureStore; updating state first lets the auth gate mount dashboard
+      // and fire authenticated requests while the store is still empty → 401 →
+      // silent logout (seen on native iOS after dual-token writes).
+      await tokenStore.setSession(session);
       setSessionEndReason(null);
       resetPendingAuth();
-      await tokenStore.setToken(jwt);
+      setToken(session.token);
     },
     [resetPendingAuth],
   );
@@ -100,12 +121,17 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   useEffect(() => {
     configureApiAuth({
-      getToken: async () => token,
-      onUnauthorized: async () => {
-        await logout({ reason: 'expired' });
+      getToken: () => tokenStore.getToken(),
+      getRefreshToken: () => tokenStore.getRefreshToken(),
+      persistSession: async (session) => {
+        await tokenStore.setSession(session);
+        setToken(session.token);
+      },
+      onUnauthorized: async (options) => {
+        await logout(options ?? { reason: 'expired' });
       },
     });
-  }, [logout, token]);
+  }, [logout]);
 
   const value = useMemo<AuthContextValue>(
     () => ({

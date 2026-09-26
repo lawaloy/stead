@@ -1,4 +1,8 @@
-import axios, { AxiosHeaders, isAxiosError } from 'axios';
+import axios, {
+  AxiosHeaders,
+  type InternalAxiosRequestConfig,
+  isAxiosError,
+} from 'axios';
 import { z } from 'zod';
 import { appConfig } from './app-config';
 import { resolveApiBaseUrl } from './base-url';
@@ -23,6 +27,8 @@ import type {
   CreateGoalRequest,
   CreateTransactionRequest,
   EndGoalRequest,
+  LogoutSessionRequest,
+  RefreshSessionRequest,
   RequestOtpRequest,
   UpdateTransactionRequest,
   UpdateGoalRequest,
@@ -33,24 +39,71 @@ import type {
   ConfirmTransactionImportRequest,
   PreviewTransactionImportRequest,
 } from '../contracts/generated/types.gen';
+import type { AuthSessionTokens } from './token-store';
 
 export { ApiError } from './api-error';
 
-type AuthConfig = {
-  getToken: () => Promise<string | null>;
-  onUnauthorized: () => Promise<void> | void;
+type UnauthorizedOptions = {
+  reason?: 'expired';
 };
 
-let getTokenFn: AuthConfig['getToken'] = async () => null;
-let onUnauthorizedFn: AuthConfig['onUnauthorized'] = () => undefined;
+type AuthConfig = {
+  getToken: () => Promise<string | null>;
+  getRefreshToken: () => Promise<string | null>;
+  persistSession: (session: AuthSessionTokens) => Promise<void>;
+  onUnauthorized: (options?: UnauthorizedOptions) => Promise<void> | void;
+};
 
-const isPublicAuthRequest = (url?: string) => {
-  if (!url) return false;
-  return (
-    url.includes('/auth/request-otp') ||
-    url.includes('/auth/verify-otp') ||
-    url.includes('/auth/countries')
+type RetryableRequestConfig = InternalAxiosRequestConfig & {
+  _steadRetry?: boolean;
+};
+
+const PUBLIC_AUTH_PATHS = [
+  appConfig.api.routes.auth.countries,
+  appConfig.api.routes.auth.requestOtp,
+  appConfig.api.routes.auth.verifyOtp,
+  appConfig.api.routes.auth.refresh,
+  appConfig.api.routes.auth.logout,
+] as const;
+
+let getTokenFn: AuthConfig['getToken'] = async () => null;
+let getRefreshTokenFn: AuthConfig['getRefreshToken'] = async () => null;
+let persistSessionFn: AuthConfig['persistSession'] = async () => undefined;
+let onUnauthorizedFn: AuthConfig['onUnauthorized'] = () => undefined;
+let refreshInFlight: Promise<string | null> | null = null;
+
+const isPublicAuthRequest = (config?: InternalAxiosRequestConfig) => {
+  const url = config?.url ?? '';
+  return PUBLIC_AUTH_PATHS.some(
+    (path) => url === path || url.endsWith(path) || url.includes(`${path}?`),
   );
+};
+
+const rotateAccessToken = async (): Promise<string | null> => {
+  if (refreshInFlight) return refreshInFlight;
+
+  refreshInFlight = (async () => {
+    const refreshToken = await getRefreshTokenFn();
+    if (!refreshToken) return null;
+
+    const payload: RefreshSessionRequest = { refreshToken };
+    const response = await apiClient.post(
+      appConfig.api.routes.auth.refresh,
+      payload,
+    );
+    const session = AuthVerifyOtpResponseSchema.parse(response.data);
+    await persistSessionFn({
+      token: session.token,
+      refreshToken: session.refreshToken,
+    });
+    return session.token;
+  })()
+    .catch(() => null)
+    .finally(() => {
+      refreshInFlight = null;
+    });
+
+  return refreshInFlight;
 };
 
 const softenUnauthorizedMessage = (message: string) => {
@@ -84,16 +137,31 @@ apiClient.interceptors.response.use(
   (response) => response,
   async (error: unknown) => {
     if (!isAxiosError(error)) {
+      if (error instanceof ApiError) throw error;
       throw new ApiError({ message: 'Unexpected network error' });
     }
 
     const status = error.response?.status;
+    const original = error.config as RetryableRequestConfig | undefined;
     const body = error.response?.data as
       { message?: string | string[]; details?: unknown } | string | undefined;
-    const requestUrl = error.config?.url;
-    const publicAuth = isPublicAuthRequest(requestUrl);
+    const publicAuth = Boolean(original && isPublicAuthRequest(original));
 
-    if (status === 401 && !publicAuth) await onUnauthorizedFn();
+    if (status === 401 && original && !publicAuth) {
+      if (!original._steadRetry) {
+        const nextToken = await rotateAccessToken();
+        if (nextToken) {
+          original._steadRetry = true;
+          if (!original.headers) original.headers = new AxiosHeaders();
+          original.headers.Authorization = `Bearer ${nextToken}`;
+          // axios-mock-adapter (and some adapters) stick on the failed config;
+          // drop it so the retried request goes through the client again.
+          delete original.adapter;
+          return apiClient.request(original);
+        }
+      }
+      await onUnauthorizedFn({ reason: 'expired' });
+    }
 
     let message = error.message || 'Request failed';
     let details: unknown = undefined;
@@ -117,6 +185,8 @@ apiClient.interceptors.response.use(
 
 export const configureApiAuth = (config: AuthConfig) => {
   getTokenFn = config.getToken;
+  getRefreshTokenFn = config.getRefreshToken;
+  persistSessionFn = config.persistSession;
   onUnauthorizedFn = config.onUnauthorized;
 };
 
@@ -145,6 +215,29 @@ export const verifyOtp = async (
     payload,
   );
   return AuthVerifyOtpResponseSchema.parse(response.data);
+};
+
+export const refreshSession = async (refreshToken: string) => {
+  const payload: RefreshSessionRequest = { refreshToken };
+  const response = await apiClient.post(
+    appConfig.api.routes.auth.refresh,
+    payload,
+  );
+  return AuthVerifyOtpResponseSchema.parse(response.data);
+};
+
+export const logoutSession = async (options?: {
+  refreshToken?: string | null;
+  allDevices?: boolean;
+}) => {
+  const payload: LogoutSessionRequest = {};
+  if (options?.refreshToken) payload.refreshToken = options.refreshToken;
+  if (options?.allDevices) payload.allDevices = true;
+  const response = await apiClient.post(
+    appConfig.api.routes.auth.logout,
+    payload,
+  );
+  return OkResponseSchema.parse(response.data);
 };
 
 export const getActiveGoal = async () => {

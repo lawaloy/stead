@@ -609,4 +609,53 @@ describe('Auth OTP lifecycle edges (e2e)', () => {
       prisma.authEvent.count({ where: { type: 'otp_verify_succeeded' } }),
     ).resolves.toBe(1);
   });
+
+  it('rotates refresh tokens and rejects reuse of the previous refresh token', async () => {
+    const phone = '08066778899';
+    const { otp } = await requestOtp(phone);
+    const verified = await request(app.getHttpServer())
+      .post('/auth/verify-otp')
+      .send({ phone, countryIso: 'NG', otp })
+      .expect(201);
+
+    const first = verified.body as {
+      token: string;
+      refreshToken: string;
+      expiresIn: number;
+    };
+    expect(first.refreshToken).toEqual(expect.any(String));
+    expect(first.expiresIn).toBeGreaterThan(0);
+
+    const rotated = await request(app.getHttpServer())
+      .post('/auth/refresh')
+      .send({ refreshToken: first.refreshToken })
+      .expect(201);
+    const second = rotated.body as {
+      token: string;
+      refreshToken: string;
+    };
+    expect(second.token).toEqual(expect.any(String));
+    expect(second.refreshToken).not.toEqual(first.refreshToken);
+
+    await request(app.getHttpServer())
+      .get('/goals/active')
+      .set('Authorization', `Bearer ${second.token}`)
+      .expect(404);
+
+    await request(app.getHttpServer())
+      .post('/auth/refresh')
+      .send({ refreshToken: first.refreshToken })
+      .expect(401);
+
+    await request(app.getHttpServer())
+      .post('/auth/logout')
+      .send({ refreshToken: second.refreshToken })
+      .expect(200)
+      .expect({ ok: true });
+
+    await request(app.getHttpServer())
+      .post('/auth/refresh')
+      .send({ refreshToken: second.refreshToken })
+      .expect(401);
+  });
 });

@@ -69,7 +69,11 @@ describe('OTP screen error paths', () => {
     mockAuth.mockReturnValue(auth);
     mockCountries.mockResolvedValue({ countries: fallbackAuthCountries });
     mockRequest.mockResolvedValue({ ok: true, otp: '123456' });
-    mockVerify.mockResolvedValue({ token: 'session-token' });
+    mockVerify.mockResolvedValue({
+      token: 'session-token',
+      refreshToken: 'refresh-token',
+      expiresIn: 900,
+    });
   });
 
   it('validates an unnormalizable phone before requesting a code', async () => {

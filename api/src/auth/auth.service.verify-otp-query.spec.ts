@@ -20,6 +20,12 @@ describe('AuthService verify OTP selection query', () => {
     user: {
       findUnique: jest.Mock;
     };
+    refreshToken: {
+      create: jest.Mock;
+      findUnique: jest.Mock;
+      update: jest.Mock;
+      updateMany: jest.Mock;
+    };
   };
   let jwt: { signAsync: jest.Mock };
 
@@ -32,6 +38,12 @@ describe('AuthService verify OTP selection query', () => {
       },
       user: {
         findUnique: jest.fn(),
+      },
+      refreshToken: {
+        create: jest.fn().mockResolvedValue({ id: 'rt_1' }),
+        findUnique: jest.fn(),
+        update: jest.fn(),
+        updateMany: jest.fn(),
       },
     };
     jwt = { signAsync: jest.fn() };
@@ -92,9 +104,13 @@ describe('AuthService verify OTP selection query', () => {
     prisma.otpCode.updateMany.mockResolvedValue({ count: 1 });
     jwt.signAsync.mockResolvedValue('jwt_token');
 
-    await expect(service.verifyOtp('08012345678', 'NG', otp)).resolves.toEqual({
+    const session = await service.verifyOtp('08012345678', 'NG', otp);
+    expect(session).toMatchObject({
       token: 'jwt_token',
+      expiresIn: 900,
     });
+    expect(typeof session.refreshToken).toBe('string');
+    expect(session.refreshToken.length).toBeGreaterThan(0);
 
     expect(prisma.otpCode.findFirst).toHaveBeenCalledWith({
       where: {
