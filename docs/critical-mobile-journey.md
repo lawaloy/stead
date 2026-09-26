@@ -49,7 +49,9 @@ uses a dedicated test phone (`TEST_PHONE`) supplied by the runner.
 Native simulator jobs live in `.github/workflows/native-ci.yml`. Android and
 iOS Maestro run on path-filtered pull requests and after merge to `main` (when
 mobile UI, Maestro, packaging, API, or native CI wiring changes), on a daily
-schedule, and via `workflow_dispatch`. Dedicated `build-android` /
+schedule at 16:00 UTC (after morning Dependabot / Dependency Maintenance /
+Dependency Audit so auto-merges have time to land), and via
+`workflow_dispatch`. Dedicated `build-android` /
 `build-ios` jobs produce installable binaries (cached by native inputs) and
 hand them to Maestro jobs as artifacts. Android warm boots use a cached AVD
 snapshot; iOS miss builds restore source mtimes and use inode-aware DerivedData

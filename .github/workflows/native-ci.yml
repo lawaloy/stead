@@ -1,14 +1,18 @@
 name: native-ci
 
-# Path-filtered PRs, post-merge, daily schedule, and on demand.
-# Native binaries are built in dedicated jobs and handed to Maestro jobs as
-# artifacts (build once → test). Warm Android boots use a cached AVD snapshot;
-# iOS uses mtime/inode-aware DerivedData + Pods caches when the .app misses.
+# Path-filtered PRs, post-merge, daily schedule (after morning deps), and on
+# demand. Native binaries are built in dedicated jobs and handed to Maestro
+# jobs as artifacts (build once → test). Warm Android boots use a cached AVD
+# snapshot; iOS uses mtime/inode-aware DerivedData + Pods caches when the
+# .app misses.
 
 on:
   workflow_dispatch:
+  # After Dependabot + Dependency Maintenance (13:00 UTC) and Dependency
+  # Audit (13:30 UTC), leave room for PR CI and auto-merge onto main before
+  # the daily native smoke. Lockfile merges also trigger via push paths.
   schedule:
-    - cron: '30 14 * * *'
+    - cron: '0 16 * * *'
   pull_request:
     branches: [main]
     paths:

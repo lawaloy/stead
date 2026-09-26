@@ -79,9 +79,9 @@ unit coverage is not the same as a full mobile-to-database acceptance test.
 ### Remaining validation
 
 - A Maestro OTP-to-logout native UI journey is configured for Android and iOS
-  simulators in `native-ci` (path-filtered PRs plus post-merge / scheduled /
-  on demand). Until both jobs pass on the latest main head, it is not
-  validated coverage. Physical-device acceptance remains separate.
+  simulators in `native-ci` (path-filtered PRs plus post-merge / daily 16:00
+  UTC schedule / on demand). Until both jobs pass on the latest main head, it
+  is not validated coverage. Physical-device acceptance remains separate.
 - There is no live Twilio or Termii integration test.
 - There are no load, soak, failover, broad accessibility-audit, or
   security-penetration suites, and no enforced code-coverage threshold. The
