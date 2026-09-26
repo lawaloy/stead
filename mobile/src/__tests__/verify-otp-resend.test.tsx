@@ -40,11 +40,13 @@ const auth = {
   pendingCountryIso: 'NG' as const,
   pendingOtpRequestedAt: Date.now(),
   devOtpHint: '123456',
+  sessionEndReason: null as 'expired' | null,
   setPendingPhone: jest.fn(),
   setPendingCountryIso: jest.fn(),
   setPendingOtpRequestedAt: jest.fn(),
   setDevOtpHint: jest.fn(),
   resetPendingAuth: jest.fn(),
+  clearSessionEndReason: jest.fn(),
   completeAuth: jest.fn().mockResolvedValue(undefined),
   logout: jest.fn().mockResolvedValue(undefined),
 };

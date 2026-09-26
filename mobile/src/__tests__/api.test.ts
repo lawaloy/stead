@@ -80,7 +80,25 @@ describe('api client', () => {
     });
   });
 
-  it('calls unauthorized handler on 401', async () => {
+  it('calls unauthorized handler on authenticated 401 responses', async () => {
+    const onUnauthorized = jest.fn();
+    configureApiAuth({
+      getToken: async () => 'jwt-token',
+      onUnauthorized,
+    });
+
+    mock.onGet('/goals/active').reply(401, { message: 'Invalid token' });
+
+    await expect(
+      apiClient.get('/goals/active'),
+    ).rejects.toMatchObject({
+      message: 'Your session expired. Sign in again.',
+      status: 401,
+    });
+    expect(onUnauthorized).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not clear the session on public auth OTP 401 responses', async () => {
     const onUnauthorized = jest.fn();
     configureApiAuth({
       getToken: async () => null,
@@ -92,7 +110,7 @@ describe('api client', () => {
     await expect(verifyOtp('08012345678', 'NG', '000000')).rejects.toThrow(
       'Unauthorized',
     );
-    expect(onUnauthorized).toHaveBeenCalledTimes(1);
+    expect(onUnauthorized).not.toHaveBeenCalled();
   });
 
   it('joins array validation messages from api errors', async () => {

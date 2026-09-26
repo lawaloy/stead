@@ -40,7 +40,14 @@ export class JwtAuthGuard implements CanActivate {
       }
       req.user = { userId: payload.sub, phone: payload.phone };
       return true;
-    } catch {
+    } catch (error) {
+      if (error instanceof UnauthorizedException) throw error;
+      if (error instanceof jwt.TokenExpiredError) {
+        throw new UnauthorizedException({
+          message: 'Session expired',
+          code: 'SESSION_EXPIRED',
+        });
+      }
       throw new UnauthorizedException('Invalid token');
     }
   }

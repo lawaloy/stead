@@ -2,6 +2,9 @@ import { ApiError } from './api-error';
 
 export const OTP_RESEND_COOLDOWN_MS = 60_000;
 
+export const SESSION_EXPIRED_MESSAGE =
+  'Your session expired. Sign in again.';
+
 const fallbackMessages = {
   request: 'We could not send a code right now. Try again in a moment.',
   verify: 'We could not verify that code right now. Try again in a moment.',
@@ -39,6 +42,10 @@ export const getAuthErrorMessage = (
       return 'Too many incorrect codes came from this device. Try again later.';
     case 'Unexpected network error':
       return 'We could not reach Stead right now. Check your connection and try again.';
+    case 'Invalid token':
+    case 'Session expired':
+    case SESSION_EXPIRED_MESSAGE:
+      return SESSION_EXPIRED_MESSAGE;
     default:
       return error.message || fallbackMessages[action];
   }

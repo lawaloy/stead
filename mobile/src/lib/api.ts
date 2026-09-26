@@ -44,6 +44,26 @@ type AuthConfig = {
 let getTokenFn: AuthConfig['getToken'] = async () => null;
 let onUnauthorizedFn: AuthConfig['onUnauthorized'] = () => undefined;
 
+const isPublicAuthRequest = (url?: string) => {
+  if (!url) return false;
+  return (
+    url.includes('/auth/request-otp') ||
+    url.includes('/auth/verify-otp') ||
+    url.includes('/auth/countries')
+  );
+};
+
+const softenUnauthorizedMessage = (message: string) => {
+  if (
+    message === 'Invalid token' ||
+    message === 'Session expired' ||
+    message === 'Unauthorized'
+  ) {
+    return 'Your session expired. Sign in again.';
+  }
+  return message;
+};
+
 export const apiClient = axios.create({
   baseURL: resolveApiBaseUrl(),
   timeout: appConfig.api.timeoutMs,
@@ -70,8 +90,10 @@ apiClient.interceptors.response.use(
     const status = error.response?.status;
     const body = error.response?.data as
       { message?: string | string[]; details?: unknown } | string | undefined;
+    const requestUrl = error.config?.url;
+    const publicAuth = isPublicAuthRequest(requestUrl);
 
-    if (status === 401) await onUnauthorizedFn();
+    if (status === 401 && !publicAuth) await onUnauthorizedFn();
 
     let message = error.message || 'Request failed';
     let details: unknown = undefined;
@@ -83,6 +105,10 @@ apiClient.interceptors.response.use(
         message = body.message;
       }
       details = body.details;
+    }
+
+    if (status === 401 && !publicAuth) {
+      message = softenUnauthorizedMessage(message);
     }
 
     throw new ApiError({ message, status, details });
