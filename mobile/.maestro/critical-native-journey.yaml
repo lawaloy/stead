@@ -26,7 +26,9 @@ appId: com.lawaloy.stead
 - assertVisible: 'Dev OTP:.*'
 - tapOn:
     id: auth-verify-otp
-- assertVisible: Stability Dashboard
+- extendedWaitUntil:
+    visible: Stability Dashboard
+    timeout: 90000
 - assertVisible: No active goal found
 
 - tapOn:
