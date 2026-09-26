@@ -38,29 +38,37 @@ if (
 
 describe('critical mobile client to live API journey', () => {
   let sessionToken: string | null = null;
+  let sessionRefreshToken: string | null = null;
   const unauthorized = jest.fn();
+
+  const bindSession = () => {
+    configureApiAuth({
+      getToken: async () => sessionToken,
+      getRefreshToken: async () => sessionRefreshToken,
+      persistSession: async (session) => {
+        sessionToken = session.token;
+        sessionRefreshToken = session.refreshToken;
+      },
+      onUnauthorized: unauthorized,
+    });
+  };
 
   beforeAll(() => {
     // A failed run may not reach verification and thus cannot delete its user.
     // Keep its device telemetry from rate-limiting a later local rerun.
     process.env.STEAD_TEST_INSTALLATION_ID = randomUUID();
     apiClient.defaults.baseURL = endpoint;
-    configureApiAuth({
-      getToken: async () => sessionToken,
-      onUnauthorized: unauthorized,
-    });
+    bindSession();
   });
 
   afterEach(async () => {
     if (!sessionToken) return;
-    configureApiAuth({
-      getToken: async () => sessionToken,
-      onUnauthorized: unauthorized,
-    });
+    bindSession();
     try {
       await expect(deleteAccount()).resolves.toMatchObject({ ok: true });
     } finally {
       sessionToken = null;
+      sessionRefreshToken = null;
     }
   });
 
@@ -68,6 +76,8 @@ describe('critical mobile client to live API journey', () => {
     delete process.env.STEAD_TEST_INSTALLATION_ID;
     configureApiAuth({
       getToken: async () => null,
+      getRefreshToken: async () => null,
+      persistSession: async () => undefined,
       onUnauthorized: () => undefined,
     });
   });
@@ -87,7 +97,10 @@ describe('critical mobile client to live API journey', () => {
       throw new Error('Live test API must expose the dev OTP');
     const verified = await verifyOtp(phone, 'NG', requested.otp);
     sessionToken = verified.token;
+    sessionRefreshToken = verified.refreshToken;
     expect(sessionToken).toEqual(expect.any(String));
+    expect(sessionRefreshToken).toEqual(expect.any(String));
+    bindSession();
 
     const dueDate = new Date();
     dueDate.setUTCFullYear(dueDate.getUTCFullYear() + 1);
@@ -156,18 +169,27 @@ describe('critical mobile client to live API journey', () => {
     // A new client instance restores the saved bearer credential; the server
     // remains authoritative for its validity and the data it can read.
     const savedToken = sessionToken;
+    const savedRefresh = sessionRefreshToken;
     sessionToken = null;
+    sessionRefreshToken = null;
     configureApiAuth({
       getToken: async () => savedToken,
+      getRefreshToken: async () => savedRefresh,
+      persistSession: async (session) => {
+        sessionToken = session.token;
+        sessionRefreshToken = session.refreshToken;
+      },
       onUnauthorized: unauthorized,
     });
     expect((await getActiveGoal())?.id).toBe(goal.id);
     expect((await getDashboardStability()).ok).toBe(true);
 
-    // Local logout removes the bearer credential. It does not revoke a JWT
-    // server-side; that remains a separate production session-lifecycle item.
+    // Local logout removes stored credentials. Server revoke is covered by the
+    // mobile AuthProvider logout path against /auth/logout.
     configureApiAuth({
       getToken: async () => null,
+      getRefreshToken: async () => null,
+      persistSession: async () => undefined,
       onUnauthorized: unauthorized,
     });
     await expect(getDashboardStability()).rejects.toMatchObject({
@@ -177,5 +199,7 @@ describe('critical mobile client to live API journey', () => {
 
     // afterEach retains the authenticated token for account cleanup, even
     // when an assertion above fails.
+    sessionToken = savedToken;
+    sessionRefreshToken = savedRefresh;
   });
 });

@@ -66,7 +66,11 @@ describe('OTP screen journeys', () => {
     mockAuth.mockReturnValue(auth);
     mockCountries.mockResolvedValue({ countries: fallbackAuthCountries });
     mockRequest.mockResolvedValue({ ok: true, otp: '123456' });
-    mockVerify.mockResolvedValue({ token: 'session-token' });
+    mockVerify.mockResolvedValue({
+      token: 'session-token',
+      refreshToken: 'refresh-token',
+      expiresIn: 900,
+    });
   });
 
   it('validates the phone, requests a code, and carries the submitted identity to verification', async () => {
@@ -97,7 +101,10 @@ describe('OTP screen journeys', () => {
       expect(mockVerify).toHaveBeenCalledWith('+2348012345678', 'NG', '123456'),
     );
     await waitFor(() =>
-      expect(auth.completeAuth).toHaveBeenCalledWith('session-token'),
+      expect(auth.completeAuth).toHaveBeenCalledWith({
+        token: 'session-token',
+        refreshToken: 'refresh-token',
+      }),
     );
     expect(replace).toHaveBeenCalledWith('/(app)/dashboard');
   });

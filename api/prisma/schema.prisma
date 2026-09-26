@@ -16,6 +16,7 @@ model User {
 
   authEvents        AuthEvent[]
   otpCodes          OtpCode[]
+  refreshTokens     RefreshToken[]
   goals             Goal[]
   transactions      Transaction[]
   alertPreference   AlertPreference?
@@ -23,6 +24,22 @@ model User {
   consentPreference ConsentPreference?
   consentRecords    ConsentRecord[]
   notificationJobs  NotificationJob[]
+}
+
+model RefreshToken {
+  id           String    @id @default(uuid())
+  userId       String
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash    String    @unique
+  familyId     String
+  deviceHash   String?
+  expiresAt    DateTime
+  revokedAt    DateTime?
+  replacedById String?
+  createdAt    DateTime  @default(now())
+
+  @@index([userId])
+  @@index([familyId])
 }
 
 enum ConsentCategory {

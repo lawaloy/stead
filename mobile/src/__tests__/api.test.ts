@@ -5,6 +5,7 @@ import {
   apiClient,
   configureApiAuth,
   fetchAuthCountries,
+  getActiveGoal,
   parseApiValidationErrors,
   requestOtp,
   verifyOtp,
@@ -20,21 +21,25 @@ jest.mock('../lib/installation-id-store', () => ({
   },
 }));
 
+const idleAuth = {
+  getToken: async () => null as string | null,
+  getRefreshToken: async () => null as string | null,
+  persistSession: async () => undefined,
+  onUnauthorized: () => undefined,
+};
+
 describe('api client', () => {
   const mock = createAxiosMock(apiClient);
 
   afterEach(() => {
     mock.reset();
-    configureApiAuth({
-      getToken: async () => null,
-      onUnauthorized: () => undefined,
-    });
+    configureApiAuth(idleAuth);
   });
 
   it('adds Authorization header when token exists', async () => {
     configureApiAuth({
+      ...idleAuth,
       getToken: async () => 'jwt-token',
-      onUnauthorized: () => undefined,
     });
 
     mock.onPost('/auth/request-otp').reply((config) => {
@@ -72,18 +77,27 @@ describe('api client', () => {
         countryIso: 'GB',
         otp: '654321',
       });
-      return [200, { token: 'jwt-token' }];
+      return [
+        200,
+        {
+          token: 'jwt-token',
+          refreshToken: 'refresh-token',
+          expiresIn: 900,
+        },
+      ];
     });
 
     await expect(verifyOtp('+442071838750', 'GB', '654321')).resolves.toEqual({
       token: 'jwt-token',
+      refreshToken: 'refresh-token',
+      expiresIn: 900,
     });
   });
 
-  it('calls unauthorized handler on 401', async () => {
+  it('does not clear the session on public auth 401 responses', async () => {
     const onUnauthorized = jest.fn();
     configureApiAuth({
-      getToken: async () => null,
+      ...idleAuth,
       onUnauthorized,
     });
 
@@ -92,7 +106,86 @@ describe('api client', () => {
     await expect(verifyOtp('08012345678', 'NG', '000000')).rejects.toThrow(
       'Unauthorized',
     );
-    expect(onUnauthorized).toHaveBeenCalledTimes(1);
+    expect(onUnauthorized).not.toHaveBeenCalled();
+  });
+
+  it('refreshes once and retries the original authenticated request on 401', async () => {
+    const onUnauthorized = jest.fn();
+    let accessToken: string | null = 'expired-jwt';
+    let refreshToken: string | null = 'refresh-token';
+    const persistSession = jest.fn(
+      async (session: { token: string; refreshToken: string }) => {
+        accessToken = session.token;
+        refreshToken = session.refreshToken;
+      },
+    );
+    configureApiAuth({
+      getToken: async () => accessToken,
+      getRefreshToken: async () => refreshToken,
+      persistSession,
+      onUnauthorized,
+    });
+
+    mock.onGet('/goals/active').replyOnce(401, { message: 'Unauthorized' });
+    mock.onPost('/auth/refresh').replyOnce((config) => {
+      expect(JSON.parse(config.data as string)).toEqual({
+        refreshToken: 'refresh-token',
+      });
+      return [
+        200,
+        {
+          token: 'new-jwt',
+          refreshToken: 'new-refresh',
+          expiresIn: 900,
+        },
+      ];
+    });
+    mock.onGet('/goals/active').replyOnce((config) => {
+      expect(config.headers?.Authorization).toBe('Bearer new-jwt');
+      return [
+        200,
+        {
+          id: 'goal_1',
+          userId: 'user_1',
+          name: 'Rent',
+          amountTotalKobo: 120_000_000,
+          dueDate: '2026-12-31T00:00:00.000Z',
+          monthlyIncomeKobo: 30_000_000,
+          isActive: true,
+          status: 'active',
+          endedAt: null,
+          createdAt: '2026-06-21T12:00:00.000Z',
+        },
+      ];
+    });
+
+    await expect(getActiveGoal()).resolves.toMatchObject({ id: 'goal_1' });
+    expect(persistSession).toHaveBeenCalledWith({
+      token: 'new-jwt',
+      refreshToken: 'new-refresh',
+    });
+    expect(onUnauthorized).not.toHaveBeenCalled();
+  });
+
+  it('expires the session when refresh fails after an authenticated 401', async () => {
+    const onUnauthorized = jest.fn();
+    configureApiAuth({
+      getToken: async () => 'expired-jwt',
+      getRefreshToken: async () => 'refresh-token',
+      persistSession: async () => undefined,
+      onUnauthorized,
+    });
+
+    mock.onGet('/goals/active').reply(401, { message: 'Unauthorized' });
+    mock
+      .onPost('/auth/refresh')
+      .reply(401, { message: 'Invalid refresh token' });
+
+    await expect(getActiveGoal()).rejects.toMatchObject({
+      name: 'ApiError',
+      status: 401,
+    });
+    expect(onUnauthorized).toHaveBeenCalledWith({ reason: 'expired' });
   });
 
   it('joins array validation messages from api errors', async () => {

@@ -138,3 +138,21 @@ Remaining:
 
 - [ ] Complete a real-provider, real-device OTP pass when sender access is
       available.
+
+## Session tokens and rotation
+
+Access JWTs are short-lived (default `JWT_EXPIRES_IN=15m`). Successful OTP
+verify and `POST /auth/refresh` also return an opaque `refreshToken` (default
+lifetime `AUTH_REFRESH_TOKEN_EXPIRES_IN=30d`). Only a SHA-256 hash of the refresh
+token is stored.
+
+Each refresh **rotates**: the presented token is revoked and replaced in the same
+family. Presenting an already-revoked refresh token is treated as reuse and
+revokes the entire family. `POST /auth/logout` revokes by refresh token (preferred)
+or by access JWT (all live refresh rows for that user). Account deletion cascades
+refresh rows.
+
+Operators responding to a stolen session can revoke remaining live refresh tokens
+for a user ID in the database (`RefreshToken` where `userId` matches and
+`revokedAt` is null). Existing long-lived access JWTs issued before this change
+remain valid until their natural expiry; new logins receive the rotating pair.

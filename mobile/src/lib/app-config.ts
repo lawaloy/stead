@@ -9,6 +9,8 @@ export const appConfig = {
         countries: '/auth/countries',
         requestOtp: '/auth/request-otp',
         verifyOtp: '/auth/verify-otp',
+        refresh: '/auth/refresh',
+        logout: '/auth/logout',
       },
       goals: {
         active: '/goals/active',

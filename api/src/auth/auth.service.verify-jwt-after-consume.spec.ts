@@ -18,6 +18,12 @@ describe('AuthService JWT failure after OTP consume', () => {
     user: {
       findUnique: jest.Mock;
     };
+    refreshToken: {
+      create: jest.Mock;
+      findUnique: jest.Mock;
+      update: jest.Mock;
+      updateMany: jest.Mock;
+    };
   };
   let jwt: { signAsync: jest.Mock };
   let telemetry: { recordEvent: jest.Mock; countRecentEvents: jest.Mock };
@@ -30,6 +36,12 @@ describe('AuthService JWT failure after OTP consume', () => {
       },
       user: {
         findUnique: jest.fn(),
+      },
+      refreshToken: {
+        create: jest.fn().mockResolvedValue({ id: 'rt_1' }),
+        findUnique: jest.fn(),
+        update: jest.fn(),
+        updateMany: jest.fn(),
       },
     };
     jwt = { signAsync: jest.fn() };
@@ -110,9 +122,12 @@ describe('AuthService JWT failure after OTP consume', () => {
     expect(telemetry.recordEvent).toHaveBeenCalledWith(
       expect.objectContaining({ type: 'otp_verify_succeeded' }),
     );
-    expect(jwt.signAsync).toHaveBeenCalledWith({
-      sub: 'user_1',
-      phone: '+2348012345678',
-    });
+    expect(jwt.signAsync).toHaveBeenCalledWith(
+      {
+        sub: 'user_1',
+        phone: '+2348012345678',
+      },
+      { expiresIn: 900 },
+    );
   });
 });

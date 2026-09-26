@@ -61,7 +61,11 @@ describe('verify OTP resend cooldown', () => {
     queryClient.clear();
     jest.clearAllMocks();
     mockRequest.mockResolvedValue({ ok: true, otp: '654321' });
-    mockVerify.mockResolvedValue({ token: 'session-token' });
+    mockVerify.mockResolvedValue({
+      token: 'session-token',
+      refreshToken: 'refresh-token',
+      expiresIn: 900,
+    });
   });
 
   it('keeps resend disabled while the cooldown is still running', async () => {

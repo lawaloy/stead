@@ -66,10 +66,20 @@ describe('verify OTP busy guard', () => {
   });
 
   it('blocks resend while verify is in flight', async () => {
-    let resolveVerify: ((value: { token: string }) => void) | undefined;
+    let resolveVerify:
+      | ((value: {
+          token: string;
+          refreshToken: string;
+          expiresIn: number;
+        }) => void)
+      | undefined;
     mockVerify.mockImplementation(
       () =>
-        new Promise<{ token: string }>((resolve) => {
+        new Promise<{
+          token: string;
+          refreshToken: string;
+          expiresIn: number;
+        }>((resolve) => {
           resolveVerify = resolve;
         }),
     );
@@ -93,10 +103,17 @@ describe('verify OTP busy guard', () => {
     expect(mockRequest).not.toHaveBeenCalled();
 
     await act(async () => {
-      resolveVerify?.({ token: 'session-token' });
+      resolveVerify?.({
+        token: 'session-token',
+        refreshToken: 'refresh-token',
+        expiresIn: 900,
+      });
     });
     await waitFor(() => expect(queryClient.isMutating()).toBe(0));
-    expect(auth.completeAuth).toHaveBeenCalledWith('session-token');
+    expect(auth.completeAuth).toHaveBeenCalledWith({
+      token: 'session-token',
+      refreshToken: 'refresh-token',
+    });
     expect(mockRequest).not.toHaveBeenCalled();
   });
 });

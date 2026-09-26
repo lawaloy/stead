@@ -34,10 +34,14 @@ describe('protected route JwtAuthGuard wiring', () => {
     ]);
   });
 
-  it('guards auth inspection while leaving OTP and countries public', () => {
+  it('guards auth inspection while leaving OTP, refresh, logout, and countries public', () => {
     expect(guardsFor(AuthController)).toEqual([]);
     expect(methodGuards(AuthController.prototype, 'requestOtp')).toEqual([]);
     expect(methodGuards(AuthController.prototype, 'verifyOtp')).toEqual([]);
+    expect(methodGuards(AuthController.prototype, 'refreshSession')).toEqual(
+      [],
+    );
+    expect(methodGuards(AuthController.prototype, 'logoutSession')).toEqual([]);
     expect(methodGuards(AuthController.prototype, 'getCountries')).toEqual([]);
     expect(methodGuards(AuthController.prototype, 'getInspection')).toEqual([
       JwtAuthGuard,

@@ -154,7 +154,26 @@ export type RequestOtpResponse = {
 };
 
 export type VerifyOtpResponse = {
+  /**
+   * Short-lived access JWT.
+   */
   token: string;
+  /**
+   * Opaque refresh token; store securely and rotate on use.
+   */
+  refreshToken: string;
+  /**
+   * Access token lifetime in seconds.
+   */
+  expiresIn: number;
+};
+
+export type RefreshSessionRequest = {
+  refreshToken: string;
+};
+
+export type LogoutSessionRequest = {
+  refreshToken?: string;
 };
 
 export type AuthCountry = {
@@ -406,12 +425,77 @@ export type VerifyOtpError = VerifyOtpErrors[keyof VerifyOtpErrors];
 
 export type VerifyOtpResponses = {
   /**
-   * OTP verified and JWT issued.
+   * OTP verified and session tokens issued.
    */
   201: VerifyOtpResponse;
 };
 
 export type VerifyOtpResponse2 = VerifyOtpResponses[keyof VerifyOtpResponses];
+
+export type RefreshSessionData = {
+  body: RefreshSessionRequest;
+  headers?: {
+    /**
+     * Optional mobile installation UUID used as an additive abuse-control signal. The API persists only a keyed hash.
+     */
+    'X-Stead-Device-Id'?: string;
+  };
+  path?: never;
+  query?: never;
+  url: '/auth/refresh';
+};
+
+export type RefreshSessionErrors = {
+  /**
+   * Authentication is missing or invalid.
+   */
+  401: ErrorResponse;
+};
+
+export type RefreshSessionError =
+  RefreshSessionErrors[keyof RefreshSessionErrors];
+
+export type RefreshSessionResponses = {
+  /**
+   * Access and refresh tokens rotated.
+   */
+  201: VerifyOtpResponse;
+};
+
+export type RefreshSessionResponse =
+  RefreshSessionResponses[keyof RefreshSessionResponses];
+
+export type LogoutSessionData = {
+  body?: LogoutSessionRequest;
+  headers?: {
+    /**
+     * Optional mobile installation UUID used as an additive abuse-control signal. The API persists only a keyed hash.
+     */
+    'X-Stead-Device-Id'?: string;
+  };
+  path?: never;
+  query?: never;
+  url: '/auth/logout';
+};
+
+export type LogoutSessionErrors = {
+  /**
+   * Authentication is missing or invalid.
+   */
+  401: ErrorResponse;
+};
+
+export type LogoutSessionError = LogoutSessionErrors[keyof LogoutSessionErrors];
+
+export type LogoutSessionResponses = {
+  /**
+   * Session revoked when a valid credential was presented.
+   */
+  200: OkResponse;
+};
+
+export type LogoutSessionResponse =
+  LogoutSessionResponses[keyof LogoutSessionResponses];
 
 export type ListGoalsData = {
   body?: never;

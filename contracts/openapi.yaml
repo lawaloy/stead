@@ -51,7 +51,7 @@ paths:
               $ref: '#/components/schemas/VerifyOtpRequest'
       responses:
         '201':
-          description: OTP verified and JWT issued.
+          description: OTP verified and session tokens issued.
           content:
             application/json:
               schema:
@@ -60,6 +60,49 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '429':
           $ref: '#/components/responses/TooManyRequests'
+  /auth/refresh:
+    post:
+      operationId: refreshSession
+      parameters:
+        - $ref: '#/components/parameters/SteadDeviceId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefreshSessionRequest'
+      responses:
+        '201':
+          description: Access and refresh tokens rotated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VerifyOtpResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /auth/logout:
+    post:
+      operationId: logoutSession
+      parameters:
+        - $ref: '#/components/parameters/SteadDeviceId'
+      security:
+        - bearerAuth: []
+        - {}
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LogoutSessionRequest'
+      responses:
+        '200':
+          description: Session revoked when a valid credential was presented.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OkResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
   /goals:
     get:
       operationId: listGoals
@@ -889,9 +932,33 @@ components:
     VerifyOtpResponse:
       type: object
       additionalProperties: false
-      required: [token]
+      required: [token, refreshToken, expiresIn]
       properties:
         token:
+          type: string
+          minLength: 1
+          description: Short-lived access JWT.
+        refreshToken:
+          type: string
+          minLength: 1
+          description: Opaque refresh token; store securely and rotate on use.
+        expiresIn:
+          type: integer
+          minimum: 1
+          description: Access token lifetime in seconds.
+    RefreshSessionRequest:
+      type: object
+      additionalProperties: false
+      required: [refreshToken]
+      properties:
+        refreshToken:
+          type: string
+          minLength: 1
+    LogoutSessionRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        refreshToken:
           type: string
           minLength: 1
     AuthCountry:

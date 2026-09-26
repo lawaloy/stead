@@ -11,6 +11,8 @@ describe('AuthController', () => {
   const authService = {
     requestOtp: jest.fn(),
     verifyOtp: jest.fn(),
+    refreshSession: jest.fn(),
+    revokeSession: jest.fn(),
   };
   const telemetryService = {
     getInspection: jest.fn(),
@@ -132,6 +134,36 @@ describe('AuthController', () => {
     );
     expect(req.get).toHaveBeenCalledWith('user-agent');
     expect(req.get).toHaveBeenCalledWith('x-stead-device-id');
+  });
+
+  it('passes refresh and logout credentials to the auth service', () => {
+    const req = {
+      ip: '127.0.0.1',
+      get: jest.fn((header: string) => {
+        if (header === 'authorization') return 'Bearer access-token';
+        if (header === 'user-agent') return 'jest-agent';
+        return '0f81c2a7-1e6d-4f05-9a1c-03de8a5f6b77';
+      }),
+    };
+
+    void controller.refreshSession(
+      { refreshToken: 'refresh-token' },
+      req as never,
+    );
+    void controller.logoutSession(
+      { refreshToken: 'refresh-token' },
+      req as never,
+    );
+
+    expect(authService.refreshSession).toHaveBeenCalledWith('refresh-token', {
+      ip: '127.0.0.1',
+      userAgent: 'jest-agent',
+      deviceId: '0f81c2a7-1e6d-4f05-9a1c-03de8a5f6b77',
+    });
+    expect(authService.revokeSession).toHaveBeenCalledWith({
+      refreshToken: 'refresh-token',
+      accessToken: 'access-token',
+    });
   });
 
   it('returns auth telemetry inspection', async () => {

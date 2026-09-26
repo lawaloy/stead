@@ -1,6 +1,7 @@
 import * as SecureStore from 'expo-secure-store';
 
-const TOKEN_KEY = 'stead.jwt';
+const ACCESS_TOKEN_KEY = 'stead.jwt';
+const REFRESH_TOKEN_KEY = 'stead.refresh';
 const memoryStore = new Map<string, string>();
 
 const hasSecureStore = () =>
@@ -8,61 +9,93 @@ const hasSecureStore = () =>
   typeof SecureStore.setItemAsync === 'function' &&
   typeof SecureStore.deleteItemAsync === 'function';
 
-const getFallbackToken = () => {
+const getFallback = (key: string) => {
   try {
-    return globalThis.localStorage?.getItem(TOKEN_KEY) ?? null;
+    return globalThis.localStorage?.getItem(key) ?? null;
   } catch {
-    return memoryStore.get(TOKEN_KEY) ?? null;
+    return memoryStore.get(key) ?? null;
   }
 };
 
-const setFallbackToken = (token: string) => {
+const setFallback = (key: string, value: string) => {
   try {
-    globalThis.localStorage?.setItem(TOKEN_KEY, token);
+    globalThis.localStorage?.setItem(key, value);
     return;
   } catch {
-    memoryStore.set(TOKEN_KEY, token);
+    memoryStore.set(key, value);
   }
 };
 
-const clearFallbackToken = () => {
+const clearFallback = (key: string) => {
   try {
-    globalThis.localStorage?.removeItem(TOKEN_KEY);
+    globalThis.localStorage?.removeItem(key);
     return;
   } catch {
-    memoryStore.delete(TOKEN_KEY);
+    memoryStore.delete(key);
   }
+};
+
+const readValue = async (key: string) => {
+  if (!hasSecureStore()) return getFallback(key);
+  try {
+    return await SecureStore.getItemAsync(key);
+  } catch {
+    return getFallback(key);
+  }
+};
+
+const writeValue = async (key: string, value: string) => {
+  if (!hasSecureStore()) {
+    setFallback(key, value);
+    return;
+  }
+  try {
+    await SecureStore.setItemAsync(key, value);
+  } catch {
+    setFallback(key, value);
+  }
+};
+
+const deleteValue = async (key: string) => {
+  if (!hasSecureStore()) {
+    clearFallback(key);
+    return;
+  }
+  try {
+    await SecureStore.deleteItemAsync(key);
+  } catch {
+    clearFallback(key);
+  }
+};
+
+export type AuthSessionTokens = {
+  token: string;
+  refreshToken: string;
 };
 
 export const tokenStore = {
   async getToken() {
-    if (!hasSecureStore()) return getFallbackToken();
-    try {
-      return await SecureStore.getItemAsync(TOKEN_KEY);
-    } catch {
-      return getFallbackToken();
-    }
+    return readValue(ACCESS_TOKEN_KEY);
   },
   async setToken(token: string) {
-    if (!hasSecureStore()) {
-      setFallbackToken(token);
-      return;
-    }
-    try {
-      await SecureStore.setItemAsync(TOKEN_KEY, token);
-    } catch {
-      setFallbackToken(token);
-    }
+    await writeValue(ACCESS_TOKEN_KEY, token);
+  },
+  async getRefreshToken() {
+    return readValue(REFRESH_TOKEN_KEY);
+  },
+  async setRefreshToken(refreshToken: string) {
+    await writeValue(REFRESH_TOKEN_KEY, refreshToken);
+  },
+  async setSession(session: AuthSessionTokens) {
+    await Promise.all([
+      writeValue(ACCESS_TOKEN_KEY, session.token),
+      writeValue(REFRESH_TOKEN_KEY, session.refreshToken),
+    ]);
   },
   async clearToken() {
-    if (!hasSecureStore()) {
-      clearFallbackToken();
-      return;
-    }
-    try {
-      await SecureStore.deleteItemAsync(TOKEN_KEY);
-    } catch {
-      clearFallbackToken();
-    }
+    await Promise.all([
+      deleteValue(ACCESS_TOKEN_KEY),
+      deleteValue(REFRESH_TOKEN_KEY),
+    ]);
   },
 };

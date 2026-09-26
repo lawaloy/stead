@@ -32,6 +32,12 @@ describe('AuthService', () => {
       upsert: jest.Mock;
       findUnique: jest.Mock;
     };
+    refreshToken: {
+      create: jest.Mock;
+      findUnique: jest.Mock;
+      update: jest.Mock;
+      updateMany: jest.Mock;
+    };
   };
   let notificationPublisher: { publishOtpRequested: jest.Mock };
   let jwt: { signAsync: jest.Mock };
@@ -51,6 +57,12 @@ describe('AuthService', () => {
       user: {
         upsert: jest.fn(),
         findUnique: jest.fn(),
+      },
+      refreshToken: {
+        create: jest.fn().mockResolvedValue({ id: 'rt_1' }),
+        findUnique: jest.fn(),
+        update: jest.fn(),
+        updateMany: jest.fn(),
       },
     };
     notificationPublisher = {
@@ -564,11 +576,19 @@ describe('AuthService', () => {
         userAgent: 'jest-agent',
       }),
     );
-    expect(jwt.signAsync).toHaveBeenCalledWith({
-      sub: 'user_1',
-      phone: '+2348012345678',
+    expect(jwt.signAsync).toHaveBeenCalledWith(
+      {
+        sub: 'user_1',
+        phone: '+2348012345678',
+      },
+      { expiresIn: 900 },
+    );
+    expect(result).toMatchObject({
+      token: 'jwt_token',
+      expiresIn: 900,
     });
-    expect(result).toEqual({ token: 'jwt_token' });
+    expect(typeof result.refreshToken).toBe('string');
+    expect(result.refreshToken.length).toBeGreaterThan(0);
   });
 
   it('consumes leftover live OTPs for the user after a successful verify', async () => {
@@ -587,9 +607,13 @@ describe('AuthService', () => {
     prisma.otpCode.updateMany.mockResolvedValue({ count: 1 });
     jwt.signAsync.mockResolvedValue('jwt_token');
 
-    await expect(service.verifyOtp('08012345678', 'NG', otp)).resolves.toEqual({
+    const leftoverSession = await service.verifyOtp('08012345678', 'NG', otp);
+    expect(leftoverSession).toMatchObject({
       token: 'jwt_token',
+      expiresIn: 900,
     });
+    expect(typeof leftoverSession.refreshToken).toBe('string');
+    expect(leftoverSession.refreshToken.length).toBeGreaterThan(0);
 
     expect(prisma.otpCode.updateMany).toHaveBeenCalledTimes(2);
     expect(prisma.otpCode.updateMany).toHaveBeenNthCalledWith(2, {

@@ -34,15 +34,23 @@ describe('tokenStore', () => {
     });
   });
 
-  it('writes and reads token', async () => {
-    await tokenStore.setToken('abc123');
+  it('writes and reads access and refresh tokens', async () => {
+    await tokenStore.setSession({
+      token: 'abc123',
+      refreshToken: 'refresh-abc',
+    });
     await expect(tokenStore.getToken()).resolves.toBe('abc123');
+    await expect(tokenStore.getRefreshToken()).resolves.toBe('refresh-abc');
   });
 
-  it('clears token', async () => {
-    await tokenStore.setToken('abc123');
+  it('clears both access and refresh tokens', async () => {
+    await tokenStore.setSession({
+      token: 'abc123',
+      refreshToken: 'refresh-abc',
+    });
     await tokenStore.clearToken();
     await expect(tokenStore.getToken()).resolves.toBeNull();
+    await expect(tokenStore.getRefreshToken()).resolves.toBeNull();
   });
 
   it('falls back to localStorage when secure store methods are unavailable', async () => {
@@ -67,10 +75,15 @@ describe('tokenStore', () => {
     mockSecureStore.deleteItemAsync = undefined;
 
     try {
-      await tokenStore.setToken('web-token');
+      await tokenStore.setSession({
+        token: 'web-token',
+        refreshToken: 'web-refresh',
+      });
       await expect(tokenStore.getToken()).resolves.toBe('web-token');
+      await expect(tokenStore.getRefreshToken()).resolves.toBe('web-refresh');
       await tokenStore.clearToken();
       await expect(tokenStore.getToken()).resolves.toBeNull();
+      await expect(tokenStore.getRefreshToken()).resolves.toBeNull();
     } finally {
       mockSecureStore.getItemAsync = originalGet;
       mockSecureStore.setItemAsync = originalSet;
@@ -106,10 +119,15 @@ describe('tokenStore', () => {
     });
 
     try {
-      await tokenStore.setToken('web-token');
+      await tokenStore.setSession({
+        token: 'web-token',
+        refreshToken: 'web-refresh',
+      });
       await expect(tokenStore.getToken()).resolves.toBe('web-token');
+      await expect(tokenStore.getRefreshToken()).resolves.toBe('web-refresh');
       await tokenStore.clearToken();
       await expect(tokenStore.getToken()).resolves.toBeNull();
+      await expect(tokenStore.getRefreshToken()).resolves.toBeNull();
     } finally {
       mockSecureStore.getItemAsync = originalGet;
       mockSecureStore.setItemAsync = originalSet;
@@ -140,10 +158,17 @@ describe('tokenStore', () => {
     mockSecureStore.deleteItemAsync = undefined;
 
     try {
-      await tokenStore.setToken('memory-token');
+      await tokenStore.setSession({
+        token: 'memory-token',
+        refreshToken: 'memory-refresh',
+      });
       await expect(tokenStore.getToken()).resolves.toBe('memory-token');
+      await expect(tokenStore.getRefreshToken()).resolves.toBe(
+        'memory-refresh',
+      );
       await tokenStore.clearToken();
       await expect(tokenStore.getToken()).resolves.toBeNull();
+      await expect(tokenStore.getRefreshToken()).resolves.toBeNull();
     } finally {
       mockSecureStore.getItemAsync = originalGet;
       mockSecureStore.setItemAsync = originalSet;

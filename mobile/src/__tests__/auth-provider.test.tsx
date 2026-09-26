@@ -7,23 +7,31 @@ import {
   waitFor,
 } from '@testing-library/react-native';
 import { Pressable, Text, View } from 'react-native';
-import { configureApiAuth } from '../lib/api';
+import { configureApiAuth, logoutSession } from '../lib/api';
 import { AuthProvider, useAuth } from '../lib/auth-state';
 import { queryClient } from '../lib/query-client';
 import { tokenStore } from '../lib/token-store';
 
-jest.mock('../lib/api', () => ({ configureApiAuth: jest.fn() }));
+jest.mock('../lib/api', () => ({
+  configureApiAuth: jest.fn(),
+  logoutSession: jest.fn().mockResolvedValue({ ok: true }),
+}));
 jest.mock('../lib/token-store', () => ({
   tokenStore: {
     getToken: jest.fn(),
     setToken: jest.fn(),
+    getRefreshToken: jest.fn(),
+    setRefreshToken: jest.fn(),
+    setSession: jest.fn(),
     clearToken: jest.fn(),
   },
 }));
 
 const mockConfigureApiAuth = jest.mocked(configureApiAuth);
+const mockLogoutSession = jest.mocked(logoutSession);
 const mockGetToken = jest.mocked(tokenStore.getToken);
-const mockSetToken = jest.mocked(tokenStore.setToken);
+const mockGetRefreshToken = jest.mocked(tokenStore.getRefreshToken);
+const mockSetSession = jest.mocked(tokenStore.setSession);
 const mockClearToken = jest.mocked(tokenStore.clearToken);
 
 const SessionProbe = () => {
@@ -33,7 +41,12 @@ const SessionProbe = () => {
       <Text>{bootstrapping ? 'restoring' : (token ?? 'signed out')}</Text>
       <Pressable
         accessibilityRole="button"
-        onPress={() => void completeAuth('new-token')}
+        onPress={() =>
+          void completeAuth({
+            token: 'new-token',
+            refreshToken: 'new-refresh',
+          })
+        }
       >
         <Text>Complete login</Text>
       </Pressable>
@@ -46,18 +59,24 @@ const SessionProbe = () => {
 
 describe('AuthProvider session lifecycle', () => {
   let storedToken: string | null;
+  let storedRefresh: string | null;
 
   beforeEach(() => {
     queryClient.clear();
     jest.clearAllMocks();
     storedToken = null;
+    storedRefresh = null;
     mockGetToken.mockImplementation(async () => storedToken);
-    mockSetToken.mockImplementation(async (token) => {
-      storedToken = token;
+    mockGetRefreshToken.mockImplementation(async () => storedRefresh);
+    mockSetSession.mockImplementation(async (session) => {
+      storedToken = session.token;
+      storedRefresh = session.refreshToken;
     });
     mockClearToken.mockImplementation(async () => {
       storedToken = null;
+      storedRefresh = null;
     });
+    mockLogoutSession.mockResolvedValue({ ok: true });
   });
 
   it('persists login, restores it after remount, and clears session data on logout', async () => {
@@ -77,7 +96,10 @@ describe('AuthProvider session lifecycle', () => {
     await waitFor(() =>
       expect(screen.getByText('new-token')).toBeOnTheScreen(),
     );
-    expect(mockSetToken).toHaveBeenCalledWith('new-token');
+    expect(mockSetSession).toHaveBeenCalledWith({
+      token: 'new-token',
+      refreshToken: 'new-refresh',
+    });
     expect(
       queryClient.getQueryData(['dashboard', 'stability', 'old-token']),
     ).toBeUndefined();
@@ -99,8 +121,10 @@ describe('AuthProvider session lifecycle', () => {
     await waitFor(() =>
       expect(screen.getByText('signed out')).toBeOnTheScreen(),
     );
+    expect(mockLogoutSession).toHaveBeenCalledWith('new-refresh');
     expect(mockClearToken).toHaveBeenCalledTimes(1);
     expect(storedToken).toBeNull();
+    expect(storedRefresh).toBeNull();
     expect(
       queryClient.getQueryData(['dashboard', 'stability', 'new-token']),
     ).toBeUndefined();
@@ -126,15 +150,16 @@ describe('AuthProvider session lifecycle', () => {
     });
 
     const authConfig = mockConfigureApiAuth.mock.calls.at(-1)?.[0] as {
-      onUnauthorized: () => Promise<void>;
+      onUnauthorized: (options?: { reason?: 'expired' }) => Promise<void>;
     };
     await act(async () => {
-      await authConfig.onUnauthorized();
+      await authConfig.onUnauthorized({ reason: 'expired' });
     });
 
     await waitFor(() =>
       expect(screen.getByText('signed out')).toBeOnTheScreen(),
     );
+    expect(mockLogoutSession).toHaveBeenCalledWith('new-refresh');
     expect(mockClearToken).toHaveBeenCalledTimes(1);
     expect(storedToken).toBeNull();
     expect(

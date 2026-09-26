@@ -50,7 +50,11 @@ describe('verify OTP different-phone reset', () => {
     jest.clearAllMocks();
     mockAuth.mockReturnValue(auth);
     mockRequest.mockResolvedValue({ ok: true, otp: '654321' });
-    mockVerify.mockResolvedValue({ token: 'session-token' });
+    mockVerify.mockResolvedValue({
+      token: 'session-token',
+      refreshToken: 'refresh-token',
+      expiresIn: 900,
+    });
   });
 
   it('clears pending auth before returning to request OTP', async () => {

@@ -6,10 +6,14 @@ import React, {
   useMemo,
   useState,
 } from 'react';
-import { tokenStore } from './token-store';
-import { configureApiAuth } from './api';
+import { tokenStore, type AuthSessionTokens } from './token-store';
+import { configureApiAuth, logoutSession } from './api';
 import { AuthCountryIso, defaultAuthCountryIso } from './countries';
 import { clearSessionQueryCache } from './session-query-cache';
+
+type LogoutOptions = {
+  reason?: 'expired';
+};
 
 type AuthContextValue = {
   token: string | null;
@@ -23,8 +27,8 @@ type AuthContextValue = {
   setPendingOtpRequestedAt: (value: number | null) => void;
   setDevOtpHint: (otp: string) => void;
   resetPendingAuth: () => void;
-  completeAuth: (token: string) => Promise<void>;
-  logout: () => Promise<void>;
+  completeAuth: (session: AuthSessionTokens) => Promise<void>;
+  logout: (options?: LogoutOptions) => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -41,7 +45,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   >(null);
   const [devOtpHint, setDevOtpHint] = useState('');
 
-  const logout = useCallback(async () => {
+  const clearLocalSession = useCallback(async () => {
     setToken(null);
     setPendingPhone('');
     setPendingOtpRequestedAt(null);
@@ -50,6 +54,19 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     await clearSessionQueryCache();
   }, []);
 
+  const logout = useCallback(
+    async (_options?: LogoutOptions) => {
+      const refreshToken = await tokenStore.getRefreshToken();
+      try {
+        await logoutSession(refreshToken);
+      } catch {
+        // Best-effort server revoke; local clear still proceeds.
+      }
+      await clearLocalSession();
+    },
+    [clearLocalSession],
+  );
+
   const resetPendingAuth = useCallback(() => {
     setPendingPhone('');
     setPendingOtpRequestedAt(null);
@@ -57,11 +74,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   }, []);
 
   const completeAuth = useCallback(
-    async (jwt: string) => {
+    async (session: AuthSessionTokens) => {
       await clearSessionQueryCache();
-      setToken(jwt);
+      setToken(session.token);
       resetPendingAuth();
-      await tokenStore.setToken(jwt);
+      await tokenStore.setSession(session);
     },
     [resetPendingAuth],
   );
@@ -82,12 +99,17 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   useEffect(() => {
     configureApiAuth({
-      getToken: async () => token,
-      onUnauthorized: async () => {
-        await logout();
+      getToken: () => tokenStore.getToken(),
+      getRefreshToken: () => tokenStore.getRefreshToken(),
+      persistSession: async (session) => {
+        await tokenStore.setSession(session);
+        setToken(session.token);
+      },
+      onUnauthorized: async (options) => {
+        await logout(options);
       },
     });
-  }, [logout, token]);
+  }, [logout]);
 
   const value = useMemo<AuthContextValue>(
     () => ({

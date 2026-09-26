@@ -59,7 +59,10 @@ export default function VerifyOtpScreen() {
       verifyOtp(pendingPhone, pendingCountryIso, otpToSubmit),
     retry: false,
     onSuccess: async (data) => {
-      await completeAuth(data.token);
+      await completeAuth({
+        token: data.token,
+        refreshToken: data.refreshToken,
+      });
       setDevOtpHint('');
       router.replace('/(app)/dashboard');
     },

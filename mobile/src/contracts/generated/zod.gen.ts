@@ -112,6 +112,16 @@ export const zRequestOtpResponse = z.object({
 
 export const zVerifyOtpResponse = z.object({
   token: z.string().min(1),
+  refreshToken: z.string().min(1),
+  expiresIn: z.int().gte(1),
+});
+
+export const zRefreshSessionRequest = z.object({
+  refreshToken: z.string().min(1),
+});
+
+export const zLogoutSessionRequest = z.object({
+  refreshToken: z.string().min(1).optional(),
 });
 
 export const zAuthCountry = z.object({
@@ -356,9 +366,41 @@ export const zVerifyOtpHeaders = z.object({
 });
 
 /**
- * OTP verified and JWT issued.
+ * OTP verified and session tokens issued.
  */
 export const zVerifyOtpResponse2 = zVerifyOtpResponse;
+
+export const zRefreshSessionBody = zRefreshSessionRequest;
+
+export const zRefreshSessionHeaders = z.object({
+  'X-Stead-Device-Id': z
+    .uuid()
+    .regex(
+      /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$/,
+    )
+    .optional(),
+});
+
+/**
+ * Access and refresh tokens rotated.
+ */
+export const zRefreshSessionResponse = zVerifyOtpResponse;
+
+export const zLogoutSessionBody = zLogoutSessionRequest;
+
+export const zLogoutSessionHeaders = z.object({
+  'X-Stead-Device-Id': z
+    .uuid()
+    .regex(
+      /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$/,
+    )
+    .optional(),
+});
+
+/**
+ * Session revoked when a valid credential was presented.
+ */
+export const zLogoutSessionResponse = zOkResponse;
 
 /**
  * Goals in descending creation order, including lifecycle history.
