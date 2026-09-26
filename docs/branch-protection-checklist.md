@@ -54,6 +54,13 @@ second pull-request gate.
 3. Review the repository-role bypass actors and retain only intentional
    emergency access.
 4. Re-run this audit after each ruleset change and update the verification date.
+5. After `native-ci` is stable on path-filtered PRs and the daily 16:00 UTC
+   schedule: make native required safely. Keep path filters, but ensure a
+   top-level check always runs on every PR (run Maestro when relevant paths
+   change; report success/skip when they do not), then add that check (or
+   `native-android` / `native-ios`) to the ruleset required status checks.
+   Do not require jobs from a workflow that is entirely skipped by
+   `on.pull_request.paths`, or unrelated PRs will block on a pending check.
 
 ## Merge Queue (Optional)
 

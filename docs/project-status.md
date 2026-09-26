@@ -82,6 +82,10 @@ unit coverage is not the same as a full mobile-to-database acceptance test.
   simulators in `native-ci` (path-filtered PRs plus post-merge / daily 16:00
   UTC schedule / on demand). Until both jobs pass on the latest main head, it
   is not validated coverage. Physical-device acceptance remains separate.
+- Once native-ci is stable on daily and PR runs: require it on `main` via an
+  always-on gate that runs Maestro when relevant paths change and passes when
+  they do not (so path-filtered skips do not leave required checks pending).
+  See [Branch Protection Checklist](branch-protection-checklist.md#urgent-follow-up).
 - There is no live Twilio or Termii integration test.
 - There are no load, soak, failover, broad accessibility-audit, or
   security-penetration suites, and no enforced code-coverage threshold. The
