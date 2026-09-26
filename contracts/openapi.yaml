@@ -961,6 +961,9 @@ components:
         refreshToken:
           type: string
           minLength: 1
+        allDevices:
+          type: boolean
+          description: When true, revoke every live refresh family for the user.
     AuthCountry:
       type: object
       additionalProperties: false

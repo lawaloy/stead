@@ -15,6 +15,7 @@ export type SessionEndReason = 'expired';
 
 type LogoutOptions = {
   reason?: SessionEndReason;
+  allDevices?: boolean;
 };
 
 type AuthContextValue = {
@@ -67,7 +68,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     async (options?: LogoutOptions) => {
       const refreshToken = await tokenStore.getRefreshToken();
       try {
-        await logoutSession(refreshToken);
+        await logoutSession({
+          refreshToken,
+          allDevices: options?.allDevices,
+        });
       } catch {
         // Best-effort server revoke; local clear still proceeds.
       }

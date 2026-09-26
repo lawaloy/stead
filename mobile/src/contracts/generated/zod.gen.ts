@@ -122,6 +122,7 @@ export const zRefreshSessionRequest = z.object({
 
 export const zLogoutSessionRequest = z.object({
   refreshToken: z.string().min(1).optional(),
+  allDevices: z.boolean().optional(),
 });
 
 export const zAuthCountry = z.object({

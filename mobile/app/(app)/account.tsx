@@ -163,6 +163,24 @@ export default function AccountScreen() {
     );
   };
 
+  const confirmSignOutAllDevices = () => {
+    Alert.alert(
+      'Sign out of all devices?',
+      'You will need to verify a new code on every phone or tablet that uses Stead.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Sign out everywhere',
+          style: 'destructive',
+          onPress: () =>
+            logout({ allDevices: true }).then(() => {
+              router.replace('/(auth)/request-otp');
+            }),
+        },
+      ],
+    );
+  };
+
   return (
     <ScreenShell title="Account and privacy">
       <View style={styles.card}>
@@ -252,6 +270,25 @@ export default function AccountScreen() {
             <Text style={styles.action}>Contact support</Text>
           </Pressable>
         ) : null}
+      </View>
+
+      <View style={styles.card}>
+        <Text accessibilityRole="header" style={styles.sectionTitle}>
+          Sessions
+        </Text>
+        <Text style={styles.help}>
+          Each phone keeps its own signed-in session after a one-time code.
+          Signing out everywhere ends every session for this account.
+        </Text>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Sign out of all devices"
+          accessibilityState={{ disabled: busy }}
+          disabled={busy}
+          onPress={confirmSignOutAllDevices}
+        >
+          <Text style={styles.action}>Sign out of all devices</Text>
+        </Pressable>
       </View>
 
       <View style={styles.dangerCard}>

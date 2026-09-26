@@ -33,6 +33,7 @@ export const envSchema = Joi.object({
   JWT_SECRET: Joi.string().min(16).required(),
   JWT_EXPIRES_IN: Joi.string().default('15m'),
   AUTH_REFRESH_TOKEN_EXPIRES_IN: Joi.string().default('30d'),
+  AUTH_REFRESH_FAMILY_MAX_AGE: Joi.string().default('90d'),
   AUTH_INSPECTION_OPERATOR_USER_IDS: Joi.string().allow('').default(''),
   AUTH_DEVICE_IDENTIFIER_SECRET: Joi.string().min(32).required(),
   NOTIFICATION_PAYLOAD_ENCRYPTION_KEY: Joi.string().min(32).required(),

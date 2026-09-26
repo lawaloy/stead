@@ -72,6 +72,7 @@ export class AuthController {
     return this.auth.revokeSession({
       refreshToken: dto.refreshToken,
       accessToken,
+      allDevices: dto.allDevices,
     });
   }
 

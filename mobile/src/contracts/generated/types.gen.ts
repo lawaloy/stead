@@ -174,6 +174,10 @@ export type RefreshSessionRequest = {
 
 export type LogoutSessionRequest = {
   refreshToken?: string;
+  /**
+   * When true, revoke every live refresh family for the user.
+   */
+  allDevices?: boolean;
 };
 
 export type AuthCountry = {

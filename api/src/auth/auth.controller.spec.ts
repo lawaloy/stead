@@ -163,6 +163,24 @@ describe('AuthController', () => {
     expect(authService.revokeSession).toHaveBeenCalledWith({
       refreshToken: 'refresh-token',
       accessToken: 'access-token',
+      allDevices: undefined,
+    });
+  });
+
+  it('passes allDevices through logout', () => {
+    const req = {
+      get: jest.fn((header: string) => {
+        if (header === 'authorization') return 'Bearer access-token';
+        return undefined;
+      }),
+    };
+
+    void controller.logoutSession({ allDevices: true }, req as never);
+
+    expect(authService.revokeSession).toHaveBeenCalledWith({
+      refreshToken: undefined,
+      accessToken: 'access-token',
+      allDevices: true,
     });
   });
 

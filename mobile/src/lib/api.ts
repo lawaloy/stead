@@ -226,9 +226,13 @@ export const refreshSession = async (refreshToken: string) => {
   return AuthVerifyOtpResponseSchema.parse(response.data);
 };
 
-export const logoutSession = async (refreshToken?: string | null) => {
+export const logoutSession = async (options?: {
+  refreshToken?: string | null;
+  allDevices?: boolean;
+}) => {
   const payload: LogoutSessionRequest = {};
-  if (refreshToken) payload.refreshToken = refreshToken;
+  if (options?.refreshToken) payload.refreshToken = options.refreshToken;
+  if (options?.allDevices) payload.allDevices = true;
   const response = await apiClient.post(
     appConfig.api.routes.auth.logout,
     payload,

@@ -42,6 +42,7 @@ const DEFAULT_OTP_VERIFY_FAILURE_LIMIT_PER_DEVICE_WINDOW = 8;
 const DEFAULT_OTP_VERIFY_FAILURE_WINDOW_MS = 15 * 60 * 1000;
 const DEFAULT_JWT_EXPIRES_IN = '15m';
 const DEFAULT_REFRESH_TOKEN_EXPIRES_IN = '30d';
+const DEFAULT_REFRESH_FAMILY_MAX_AGE = '90d';
 const OTP_LENGTH = 6;
 const OTP_UPPER_BOUND = 10 ** OTP_LENGTH;
 
@@ -496,15 +497,28 @@ export class AuthService {
       throw new UnauthorizedException('Invalid refresh token');
     }
 
+    const familyMaxAgeMs = parseDurationToMs(this.refreshFamilyMaxAge);
+    if (existing.familyCreatedAt.getTime() + familyMaxAgeMs <= Date.now()) {
+      await this.revokeRefreshFamily(existing.familyId);
+      throw new UnauthorizedException('Invalid refresh token');
+    }
+
     const deviceHash = hashDeviceIdentifier(
       context.deviceId,
       this.config.get<string>('AUTH_DEVICE_IDENTIFIER_SECRET'),
     );
 
+    if (existing.deviceHash) {
+      if (!deviceHash || deviceHash !== existing.deviceHash) {
+        throw new UnauthorizedException('Invalid refresh token');
+      }
+    }
+
     const created = await this.createRefreshTokenRow(
       existing.user.id,
       existing.familyId,
       deviceHash ?? existing.deviceHash,
+      existing.familyCreatedAt,
     );
 
     await this.prisma.refreshToken.update({
@@ -526,39 +540,73 @@ export class AuthService {
   async revokeSession(input: {
     refreshToken?: string;
     accessToken?: string;
+    allDevices?: boolean;
   }): Promise<OkResponse> {
+    if (input.allDevices) {
+      const userId = await this.resolveUserIdForLogout(input);
+      if (userId) {
+        await this.prisma.refreshToken.updateMany({
+          where: { userId, revokedAt: null },
+          data: { revokedAt: new Date() },
+        });
+      }
+      return { ok: true };
+    }
+
     if (input.refreshToken) {
       const existing = await this.prisma.refreshToken.findUnique({
         where: { tokenHash: hashRefreshToken(input.refreshToken) },
       });
       if (existing) {
         await this.revokeRefreshFamily(existing.familyId);
-        return { ok: true };
       }
+      return { ok: true };
     }
 
     if (input.accessToken) {
+      // Access-only logout without allDevices is idempotent and does not
+      // revoke other device families (refresh token identifies this device).
       try {
         const secret = this.config.get<string>('JWT_SECRET');
-        if (!secret) throw new UnauthorizedException('Invalid token');
-        const payload = await this.jwt.verifyAsync<{ sub?: string }>(
-          input.accessToken,
-          { secret },
-        );
-        if (payload.sub) {
-          await this.prisma.refreshToken.updateMany({
-            where: { userId: payload.sub, revokedAt: null },
-            data: { revokedAt: new Date() },
-          });
+        if (secret) {
+          await this.jwt.verifyAsync(input.accessToken, { secret });
         }
-      } catch (error) {
-        if (error instanceof UnauthorizedException) throw error;
+      } catch {
         // Invalid access tokens still return ok so logout is idempotent.
       }
       return { ok: true };
     }
 
     throw new UnauthorizedException('Missing session credential');
+  }
+
+  private async resolveUserIdForLogout(input: {
+    refreshToken?: string;
+    accessToken?: string;
+  }): Promise<string | null> {
+    if (input.accessToken) {
+      try {
+        const secret = this.config.get<string>('JWT_SECRET');
+        if (!secret) return null;
+        const payload = await this.jwt.verifyAsync<{ sub?: string }>(
+          input.accessToken,
+          { secret },
+        );
+        if (payload.sub) return payload.sub;
+      } catch {
+        // Fall through to refresh token lookup.
+      }
+    }
+
+    if (input.refreshToken) {
+      const existing = await this.prisma.refreshToken.findUnique({
+        where: { tokenHash: hashRefreshToken(input.refreshToken) },
+        select: { userId: true },
+      });
+      return existing?.userId ?? null;
+    }
+
+    return null;
   }
 
   private get accessTokenExpiresIn() {
@@ -569,6 +617,13 @@ export class AuthService {
     return (
       this.config.get<string>('AUTH_REFRESH_TOKEN_EXPIRES_IN') ||
       DEFAULT_REFRESH_TOKEN_EXPIRES_IN
+    );
+  }
+
+  private get refreshFamilyMaxAge() {
+    return (
+      this.config.get<string>('AUTH_REFRESH_FAMILY_MAX_AGE') ||
+      DEFAULT_REFRESH_FAMILY_MAX_AGE
     );
   }
 
@@ -594,6 +649,7 @@ export class AuthService {
     userId: string,
     familyId: string,
     deviceHash?: string | null,
+    familyCreatedAt: Date = new Date(),
   ) {
     const rawToken = generateRefreshToken();
     const row = await this.prisma.refreshToken.create({
@@ -601,6 +657,7 @@ export class AuthService {
         userId,
         tokenHash: hashRefreshToken(rawToken),
         familyId,
+        familyCreatedAt,
         deviceHash: deviceHash ?? null,
         expiresAt: new Date(
           Date.now() + parseDurationToMs(this.refreshTokenExpiresIn),

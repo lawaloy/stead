@@ -65,6 +65,12 @@ const SessionProbe = () => {
       </Pressable>
       <Pressable
         accessibilityRole="button"
+        onPress={() => void logout({ allDevices: true })}
+      >
+        <Text>Sign out everywhere</Text>
+      </Pressable>
+      <Pressable
+        accessibilityRole="button"
         onPress={() => void logout({ reason: 'expired' })}
       >
         <Text>Expire session</Text>
@@ -143,7 +149,10 @@ describe('AuthProvider session lifecycle', () => {
     await waitFor(() =>
       expect(screen.getByText('signed out')).toBeOnTheScreen(),
     );
-    expect(mockLogoutSession).toHaveBeenCalledWith('new-refresh');
+    expect(mockLogoutSession).toHaveBeenCalledWith({
+      refreshToken: 'new-refresh',
+      allDevices: undefined,
+    });
     expect(mockClearToken).toHaveBeenCalledTimes(1);
     expect(storedToken).toBeNull();
     expect(storedRefresh).toBeNull();
@@ -151,6 +160,35 @@ describe('AuthProvider session lifecycle', () => {
       queryClient.getQueryData(['dashboard', 'stability', 'new-token']),
     ).toBeUndefined();
     expect(mockConfigureApiAuth).toHaveBeenCalled();
+  });
+
+  it('passes allDevices when signing out everywhere', async () => {
+    await render(
+      <AuthProvider>
+        <SessionProbe />
+      </AuthProvider>,
+    );
+    expect(await screen.findByText('signed out')).toBeOnTheScreen();
+
+    await act(async () => {
+      fireEvent.press(screen.getByRole('button', { name: 'Complete login' }));
+    });
+    await waitFor(() =>
+      expect(screen.getByText('new-token')).toBeOnTheScreen(),
+    );
+
+    await act(async () => {
+      fireEvent.press(
+        screen.getByRole('button', { name: 'Sign out everywhere' }),
+      );
+    });
+    await waitFor(() =>
+      expect(screen.getByText('signed out')).toBeOnTheScreen(),
+    );
+    expect(mockLogoutSession).toHaveBeenCalledWith({
+      refreshToken: 'new-refresh',
+      allDevices: true,
+    });
   });
 
   it('clears the session when the API reports unauthorized', async () => {
@@ -181,7 +219,10 @@ describe('AuthProvider session lifecycle', () => {
     await waitFor(() =>
       expect(screen.getByText('signed out')).toBeOnTheScreen(),
     );
-    expect(mockLogoutSession).toHaveBeenCalledWith('new-refresh');
+    expect(mockLogoutSession).toHaveBeenCalledWith({
+      refreshToken: 'new-refresh',
+      allDevices: undefined,
+    });
     expect(screen.getByText('ended:expired')).toBeOnTheScreen();
     expect(mockClearToken).toHaveBeenCalledTimes(1);
     expect(storedToken).toBeNull();
