@@ -76,12 +76,16 @@ unit coverage is not the same as a full mobile-to-database acceptance test.
   tests, the live mobile API-client journey, contract drift, dependency review,
   dependency audit, and CodeQL.
 
-### Not automated today
+### Remaining validation
 
-- There is no single automated native UI navigation journey that drives the
-  entire app from OTP through logout. Screen tests and the live API-client
-  journey exercise complementary boundaries, not that full device boundary.
-- There is no native Android or iOS acceptance suite.
+- A Maestro OTP-to-logout native UI journey is configured for Android and iOS
+  simulators in `native-ci` (path-filtered PRs plus post-merge / daily 16:00
+  UTC schedule / on demand). Until both jobs pass on the latest main head, it
+  is not validated coverage. Physical-device acceptance remains separate.
+- Once native-ci is stable on daily and PR runs: require it on `main` via an
+  always-on gate that runs Maestro when relevant paths change and passes when
+  they do not (so path-filtered skips do not leave required checks pending).
+  See [Branch Protection Checklist](branch-protection-checklist.md#urgent-follow-up).
 - There is no live Twilio or Termii integration test.
 - There are no load, soak, failover, broad accessibility-audit, or
   security-penetration suites, and no enforced code-coverage threshold. The
@@ -148,10 +152,10 @@ before the score or alerts are treated as financial guidance.
 
 1. Validate OTP delivery and verification with the chosen live SMS provider on
    real Android and iOS devices.
-2. Extend the automated client/API journey to a full native UI navigation pass
-   covering authentication, goal setup, transaction management, dashboard
-   refresh, session restore, and logout. The client/API and screen boundaries
-   are covered separately today.
+2. Stabilize and pass the Android/iOS simulator UI jobs covering authentication,
+   goal setup, transaction management, dashboard recalculation, session
+   restore, and logout; then run physical-device acceptance. The client/API and
+   screen boundaries are already covered separately.
 3. Define production session behavior: token expiry UX, revocation, rotation,
    and incident response.
 4. Establish deployment, monitoring, alerting, and backup/restore; configure

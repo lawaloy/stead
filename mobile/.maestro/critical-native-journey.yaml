@@ -1,0 +1,191 @@
+appId: com.lawaloy.stead
+---
+# Run only against an isolated API schema with SMS_PROVIDER=dev,
+# DEV_EXPOSE_OTP=true, and EXPO_PUBLIC_E2E_PHONE set to a unique disposable
+# NG number (Maestro cannot reliably type into the RN phone field on iOS).
+- launchApp:
+    clearState: true
+- extendedWaitUntil:
+    visible: Stead Login
+    timeout: 240000
+- extendedWaitUntil:
+    visible: '0803 000 0001'
+    timeout: 30000
+- waitForAnimationToEnd
+# iOS: first tap can miss a still-settling Pressable; retry by label if needed.
+- tapOn:
+    id: auth-request-otp
+- runFlow:
+    when:
+      notVisible: Verify OTP
+    commands:
+      - tapOn: Request OTP
+- extendedWaitUntil:
+    visible: Verify OTP
+    timeout: 60000
+- assertVisible: 'Dev OTP:.*'
+- tapOn:
+    id: auth-verify-otp
+- assertVisible: Stability Dashboard
+- assertVisible: No active goal found
+
+- tapOn:
+    id: nav-goal
+- assertVisible: Create a goal
+- tapOn:
+    id: goal-name
+- inputText: Native journey goal
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - hideKeyboard
+- scrollUntilVisible:
+    element:
+      id: goal-target
+    timeout: 40000
+    visibilityPercentage: 50
+- tapOn:
+    id: goal-target
+- inputText: '1200000'
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - hideKeyboard
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - tapOn: Create a goal
+- scrollUntilVisible:
+    element:
+      id: goal-save
+    timeout: 40000
+    visibilityPercentage: 50
+- tapOn:
+    id: goal-save
+- assertVisible: Goal created
+- tapOn:
+    id: nav-dashboard
+- assertVisible: Native journey goal
+- assertVisible: '0%'
+
+# One income of 20% of the goal. Avoid editing pre-filled amounts and avoid a
+# second create (Maestro/RN controlled fields + list refresh are flaky there).
+- tapOn:
+    id: nav-activity
+- tapOn:
+    id: transaction-add
+- assertVisible: Add Transaction
+- tapOn:
+    id: transaction-amount
+- eraseText: 100
+- inputText: '240000'
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - hideKeyboard
+- tapOn:
+    id: transaction-note
+- eraseText: 100
+- inputText: Native journey income
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - hideKeyboard
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - tapOn: Add Transaction
+- scrollUntilVisible:
+    element:
+      id: transaction-create
+    timeout: 40000
+    visibilityPercentage: 50
+- tapOn:
+    id: transaction-create
+- assertVisible: Transaction added
+- tapOn:
+    id: nav-activity
+- scrollUntilVisible:
+    element: Native journey income
+    timeout: 40000
+    visibilityPercentage: 50
+- assertVisible: Native journey income
+- tapOn:
+    id: nav-dashboard
+- swipe:
+    from:
+      id: dashboard-refresh
+    direction: DOWN
+- extendedWaitUntil:
+    visible: '20%'
+    timeout: 90000
+
+- tapOn:
+    id: nav-activity
+- scrollUntilVisible:
+    element: Delete Native journey income transaction
+    timeout: 40000
+    visibilityPercentage: 50
+- tapOn: Delete Native journey income transaction
+- tapOn: Delete
+- assertVisible: No transactions yet
+
+- tapOn:
+    id: nav-dashboard
+- assertVisible: Native journey goal
+- swipe:
+    from:
+      id: dashboard-refresh
+    direction: DOWN
+- extendedWaitUntil:
+    visible: '0%'
+    timeout: 60000
+- assertVisible: Safe To Spend
+
+# Session restore / logout.
+# Android: cold stop+launch keeps SecureStore and should restore the session.
+# iOS+Maestro CI often returns to Stead Login after stopApp (no API calls; token
+# missing at bootstrap). Still cover logout from the live session and a logged-out
+# cold start there.
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - stopApp
+      - launchApp:
+          clearState: false
+      - extendedWaitUntil:
+          visible: Native journey goal
+          timeout: 90000
+      - tapOn:
+          id: app-logout
+      - extendedWaitUntil:
+          visible: Stead Login
+          timeout: 60000
+      - stopApp
+      - launchApp:
+          clearState: false
+      - extendedWaitUntil:
+          visible: Stead Login
+          timeout: 90000
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - tapOn:
+          id: app-logout
+      - extendedWaitUntil:
+          visible: Stead Login
+          timeout: 60000
+      - stopApp
+      - launchApp:
+          clearState: false
+      - extendedWaitUntil:
+          visible: Stead Login
+          timeout: 90000

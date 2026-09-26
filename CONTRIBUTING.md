@@ -80,6 +80,20 @@ Run `npm run format` or `npm run lint:fix` from the repository root to apply
 automatic formatting or lint corrections. CI runs the non-mutating checks and
 rejects formatting drift.
 
+The single `.github/workflows/ci.yml` build/test workflow runs independent
+format, lint, API, and mobile jobs in parallel on pull requests. Native
+Android/iOS simulator journeys live in `.github/workflows/native-ci.yml` and
+run on path-filtered pull requests (mobile UI, Maestro, packaging, API, or
+native CI wiring), after merge to `main`, on a daily schedule at 16:00 UTC
+(after morning Dependabot / Dependency Maintenance / Dependency Audit so
+auto-merges have time to land), and on demand.
+Native binaries are built in dedicated jobs and passed to Maestro jobs as
+artifacts. Warm Android runs use cached AVD boot snapshots; iOS miss builds use
+mtime/inode-aware DerivedData plus Pods caches; both platforms cache installable
+binaries, Maestro CLI, and Metro transforms. Shared non-secret CI toolchain
+versions are kept in `.github/ci.env`; update that file when changing Node, npm,
+the Android API level, or the macOS runner. New pushes cancel superseded CI runs.
+
 API e2e tests require PostgreSQL and a dedicated `e2e` or test schema. The
 test harness refuses to clean the development `public` schema. See the root
 README for the local migration command.

@@ -45,7 +45,6 @@ jobs:
             const delayMs = 15000;
             const requiredWorkflowNames = [
               'ci',
-              'mobile-ci',
               'CodeQL Advanced',
               'Dependency review',
               'Dependency Audit',

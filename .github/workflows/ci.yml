@@ -5,9 +5,32 @@ on:
     branches: [main]
   push:
     branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
 
 jobs:
+  config:
+    runs-on: ubuntu-latest
+    outputs:
+      node_version: ${{ steps.versions.outputs.node_version }}
+      npm_version: ${{ steps.versions.outputs.npm_version }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: versions
+        run: |
+          set -eu
+          source .github/ci.env
+          echo "node_version=$NODE_VERSION" >> "$GITHUB_OUTPUT"
+          echo "npm_version=$NPM_VERSION" >> "$GITHUB_OUTPUT"
+
   format:
+    needs: config
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -16,12 +39,12 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 24
+          node-version: ${{ needs.config.outputs.node_version }}
           cache: npm
           cache-dependency-path: package-lock.json
 
       - name: Pin npm version
-        run: npm install --global npm@11.19.1
+        run: npm install --global npm@${{ needs.config.outputs.npm_version }}
 
       - name: Install formatting dependencies
         run: npm ci
@@ -30,6 +53,7 @@ jobs:
         run: npm run format:check
 
   lint:
+    needs: config
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -43,12 +67,12 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 24
+          node-version: ${{ needs.config.outputs.node_version }}
           cache: npm
           cache-dependency-path: api/package-lock.json
 
       - name: Pin npm version
-        run: npm install --global npm@11.19.1
+        run: npm install --global npm@${{ needs.config.outputs.npm_version }}
 
       - name: Install dependencies
         run: npm ci
@@ -65,12 +89,12 @@ jobs:
       - name: Setup Node for mobile lint
         uses: actions/setup-node@v4
         with:
-          node-version: 24
+          node-version: ${{ needs.config.outputs.node_version }}
           cache: npm
           cache-dependency-path: mobile/package-lock.json
 
       - name: Pin npm version for mobile lint
-        run: npm install --global npm@11.19.1
+        run: npm install --global npm@${{ needs.config.outputs.npm_version }}
 
       - name: Install mobile dependencies
         working-directory: mobile
@@ -82,6 +106,7 @@ jobs:
 
   test:
     name: api-test
+    needs: config
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -115,12 +140,12 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 24
+          node-version: ${{ needs.config.outputs.node_version }}
           cache: npm
           cache-dependency-path: api/package-lock.json
 
       - name: Pin npm version
-        run: npm install --global npm@11.19.1
+        run: npm install --global npm@${{ needs.config.outputs.npm_version }}
 
       - name: Install dependencies
         run: npm ci
@@ -138,6 +163,7 @@ jobs:
         run: npm run test:e2e -- --ci --runInBand
 
   mobile-api-journey:
+    needs: config
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -169,14 +195,14 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 24
+          node-version: ${{ needs.config.outputs.node_version }}
           cache: npm
           cache-dependency-path: |
             api/package-lock.json
             mobile/package-lock.json
 
       - name: Pin npm version
-        run: npm install --global npm@11.19.1
+        run: npm install --global npm@${{ needs.config.outputs.npm_version }}
 
       - name: Install API and mobile dependencies
         run: |
@@ -210,7 +236,7 @@ jobs:
 
   build:
     runs-on: ubuntu-latest
-    needs: [format, lint, test]
+    needs: config
     defaults:
       run:
         working-directory: api
@@ -223,12 +249,12 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 24
+          node-version: ${{ needs.config.outputs.node_version }}
           cache: npm
           cache-dependency-path: api/package-lock.json
 
       - name: Pin npm version
-        run: npm install --global npm@11.19.1
+        run: npm install --global npm@${{ needs.config.outputs.npm_version }}
 
       - name: Install dependencies
         run: npm ci
@@ -242,12 +268,12 @@ jobs:
       - name: Setup Node for mobile build
         uses: actions/setup-node@v4
         with:
-          node-version: 24
+          node-version: ${{ needs.config.outputs.node_version }}
           cache: npm
           cache-dependency-path: mobile/package-lock.json
 
       - name: Pin npm version for mobile build
-        run: npm install --global npm@11.19.1
+        run: npm install --global npm@${{ needs.config.outputs.npm_version }}
 
       - name: Install mobile dependencies
         working-directory: mobile
@@ -256,3 +282,32 @@ jobs:
       - name: Build mobile
         working-directory: mobile
         run: npm run build
+
+  mobile-test:
+    needs: config
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ needs.config.outputs.node_version }}
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+
+      - name: Pin npm version
+        run: npm install --global npm@${{ needs.config.outputs.npm_version }}
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type check
+        run: npm run typecheck
+
+      - name: Unit tests
+        run: npm test -- --runInBand

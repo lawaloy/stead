@@ -27,6 +27,13 @@ jest.mock('expo-router', () => {
 jest.mock('../lib/auth-state', () => ({
   useAuth: jest.fn(),
 }));
+jest.mock('react-native-safe-area-context', () => {
+  const ReactModule = jest.requireActual<typeof import('react')>('react');
+  return {
+    SafeAreaView: ({ children }: { children: React.ReactNode }) =>
+      ReactModule.createElement('View', null, children),
+  };
+});
 
 const mockAuth = jest.mocked(useAuth);
 

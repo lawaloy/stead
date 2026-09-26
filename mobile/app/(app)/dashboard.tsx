@@ -43,7 +43,7 @@ export default function DashboardScreen() {
 
   if (query.isLoading) {
     return (
-      <ScreenShell title="Stability Dashboard">
+      <ScreenShell title="Stability Dashboard" scroll={false}>
         <Text>Loading stability metrics...</Text>
       </ScreenShell>
     );
@@ -51,7 +51,7 @@ export default function DashboardScreen() {
 
   if (query.error) {
     return (
-      <ScreenShell title="Stability Dashboard">
+      <ScreenShell title="Stability Dashboard" scroll={false}>
         <Text style={styles.error}>
           Failed to load dashboard. Pull to retry.
         </Text>
@@ -70,14 +70,14 @@ export default function DashboardScreen() {
 
   if (!query.data?.ok) {
     return (
-      <ScreenShell title="Stability Dashboard">
+      <ScreenShell title="Stability Dashboard" scroll={false}>
         <Text>{query.data?.message || 'No active goal found.'}</Text>
       </ScreenShell>
     );
   }
 
   return (
-    <ScreenShell title="Stability Dashboard">
+    <ScreenShell title="Stability Dashboard" scroll={false}>
       <ScrollView
         testID="dashboard-refresh"
         refreshControl={

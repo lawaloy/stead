@@ -11,8 +11,6 @@ permissions:
 
 env:
   CI: 'true'
-  EXPO_DOCTOR_VERSION: 1.20.1
-  NPM_CHECK_UPDATES_VERSION: 22.2.9
 
 concurrency:
   group: dependency-maintenance
@@ -35,15 +33,26 @@ jobs:
         with:
           token: ${{ steps.app-token.outputs.token }}
 
+      - name: Load shared tool versions
+        id: versions
+        shell: bash
+        run: |
+          set -eu
+          source "$GITHUB_WORKSPACE/.github/ci.env"
+          echo "node_version=$NODE_VERSION" >> "$GITHUB_OUTPUT"
+          echo "npm_version=$NPM_VERSION" >> "$GITHUB_OUTPUT"
+          echo "EXPO_DOCTOR_VERSION=$EXPO_DOCTOR_VERSION" >> "$GITHUB_ENV"
+          echo "NPM_CHECK_UPDATES_VERSION=$NPM_CHECK_UPDATES_VERSION" >> "$GITHUB_ENV"
+
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 24
+          node-version: ${{ steps.versions.outputs.node_version }}
           cache: npm
           cache-dependency-path: api/package-lock.json
 
       - name: Pin npm version
-        run: npm install --global npm@11.19.1
+        run: npm install --global "npm@${{ steps.versions.outputs.npm_version }}"
 
       - name: Update API dependencies
         working-directory: api
@@ -109,7 +118,7 @@ jobs:
           commit-message: 'chore(deps): automated API dependency maintenance'
           body: |
             Automated API dependency maintenance run:
-            - Advances direct API dependencies only within their declared semver ranges using pinned `npm-check-updates@22.2.9` and a three-day release cooldown.
+            - Advances direct API dependencies only within their declared semver ranges using the pinned `npm-check-updates` version in `.github/ci.env` and a three-day release cooldown.
             - Leaves the TypeScript 7 CLI and its TypeScript 6 compatibility alias as deliberate engineering work.
             - Installs the updated lockfile with scripts enabled (including Prisma generate) using the CI-pinned npm version.
             - Applies compatible non-breaking vulnerability fixes, blocks remaining high-severity production findings, and records moderate-or-higher full-tree findings.
@@ -139,15 +148,26 @@ jobs:
         with:
           token: ${{ steps.app-token.outputs.token }}
 
+      - name: Load shared tool versions
+        id: versions
+        shell: bash
+        run: |
+          set -eu
+          source "$GITHUB_WORKSPACE/.github/ci.env"
+          echo "node_version=$NODE_VERSION" >> "$GITHUB_OUTPUT"
+          echo "npm_version=$NPM_VERSION" >> "$GITHUB_OUTPUT"
+          echo "EXPO_DOCTOR_VERSION=$EXPO_DOCTOR_VERSION" >> "$GITHUB_ENV"
+          echo "NPM_CHECK_UPDATES_VERSION=$NPM_CHECK_UPDATES_VERSION" >> "$GITHUB_ENV"
+
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 24
+          node-version: ${{ steps.versions.outputs.node_version }}
           cache: npm
           cache-dependency-path: mobile/package-lock.json
 
       - name: Pin npm version
-        run: npm install --global npm@11.19.1
+        run: npm install --global "npm@${{ steps.versions.outputs.npm_version }}"
 
       - name: Update mobile dependencies
         working-directory: mobile
@@ -235,9 +255,9 @@ jobs:
           commit-message: 'chore(deps): automated mobile dependency maintenance'
           body: |
             Automated mobile dependency maintenance run:
-            - Advances direct mobile dependencies only within their declared semver ranges using pinned `npm-check-updates@22.2.9` and a three-day release cooldown.
+            - Advances direct mobile dependencies only within their declared semver ranges using the pinned `npm-check-updates` version in `.github/ci.env` and a three-day release cooldown.
             - Excludes the Expo/React Native platform stack, the TypeScript 7 CLI, and its TypeScript 6 compatibility alias so platform upgrades remain coordinated.
-            - Aligns non-excluded Expo SDK packages with `expo install --fix`, then verifies the accepted baseline with Expo CLI and pinned `expo-doctor@1.20.1`.
+            - Aligns non-excluded Expo SDK packages with `expo install --fix`, then verifies the accepted baseline with Expo CLI and the pinned `expo-doctor` version in `.github/ci.env`.
             - Installs the updated lockfile with the CI-pinned npm version before Expo checks and app gates.
             - Applies compatible non-breaking vulnerability fixes, blocks remaining high-severity production findings, and records moderate-or-higher full-tree findings.
             - Passes mobile lint, typecheck, tests, and build before this PR is created or updated.

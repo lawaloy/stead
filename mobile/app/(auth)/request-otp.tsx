@@ -19,8 +19,14 @@ import {
   resolveEffectiveCountryIso,
 } from '../../src/lib/otp-request';
 
+const initialE2ePhone = () => {
+  // CI-only seed: Maestro/XCTest cannot reliably update this controlled RN field on iOS.
+  const seed = process.env.EXPO_PUBLIC_E2E_PHONE?.trim();
+  return seed ? formatPhoneForDisplay(seed, defaultAuthCountryIso) : '';
+};
+
 export default function RequestOtpScreen() {
-  const [phone, setPhone] = useState('');
+  const [phone, setPhone] = useState(initialE2ePhone);
   const [countryIso, setCountryIso] = useState<AuthCountryIso>(
     defaultAuthCountryIso,
   );
@@ -111,15 +117,20 @@ export default function RequestOtpScreen() {
       </View>
       <Text style={styles.label}>Phone Number</Text>
       <TextInput
+        testID="auth-phone"
         accessibilityLabel="Phone number"
         value={phone}
         onChangeText={(value) =>
           setPhone(formatPhoneForDisplay(value, effectiveCountryIso))
         }
         placeholder={selectedCountry.phoneExample}
-        keyboardType="phone-pad"
+        // number-pad (not phone-pad): still digits-only UX; phone-pad often lets
+        // Maestro/XCTest inputText "succeed" on iOS without updating RN controlled state.
+        keyboardType="number-pad"
         textContentType="telephoneNumber"
         autoCapitalize="none"
+        autoCorrect={false}
+        autoComplete="tel"
         editable={!mutation.isPending}
         style={styles.input}
       />
@@ -133,6 +144,7 @@ export default function RequestOtpScreen() {
         </Text>
       ) : null}
       <Pressable
+        testID="auth-request-otp"
         accessibilityRole="button"
         accessibilityState={{ disabled: !requestInput || mutation.isPending }}
         style={[

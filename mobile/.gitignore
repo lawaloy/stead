@@ -10,6 +10,7 @@ web-build/
 expo-env.d.ts
 
 # Native
+.ci/
 .kotlin/
 *.orig.*
 *.jks
@@ -19,6 +20,7 @@ expo-env.d.ts
 *.mobileprovision
 
 # Metro
+.cache/
 .metro-health-check*
 
 # debug

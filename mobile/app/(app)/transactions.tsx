@@ -200,7 +200,11 @@ export default function TransactionsScreen() {
           </Text>
         </View>
         <Link href="/(app)/add-transaction" asChild>
-          <Pressable style={styles.primaryButton} accessibilityRole="button">
+          <Pressable
+            testID="transaction-add"
+            style={styles.primaryButton}
+            accessibilityRole="button"
+          >
             <Text style={styles.primaryButtonText}>Add transaction</Text>
           </Pressable>
         </Link>
@@ -275,6 +279,7 @@ export default function TransactionsScreen() {
 
           <Text style={styles.label}>Amount (naira)</Text>
           <TextInput
+            testID="transaction-edit-amount"
             accessibilityLabel="Transaction amount in naira"
             style={styles.input}
             value={amountNaira}
@@ -293,6 +298,7 @@ export default function TransactionsScreen() {
 
           <Text style={styles.label}>Note</Text>
           <TextInput
+            testID="transaction-edit-note"
             accessibilityLabel="Transaction note"
             style={styles.input}
             value={note}
@@ -337,6 +343,7 @@ export default function TransactionsScreen() {
           ) : null}
 
           <Pressable
+            testID="transaction-save"
             accessibilityRole="button"
             accessibilityState={{
               disabled: Boolean(validation) || updateMutation.isPending,
