@@ -176,4 +176,28 @@ describe('transaction import screen errors', () => {
     await waitFor(() => expect(queryClient.isMutating()).toBe(0));
     expect(screen.queryByText('Import complete')).toBeNull();
   });
+
+  it('includes API rowNumbers in the confirm failure message', async () => {
+    mockConfirm.mockRejectedValue(
+      new ApiError({
+        message: 'Only valid rows from the current preview can be imported',
+        details: { rowNumbers: [8, 2] },
+      }),
+    );
+    await renderScreen();
+
+    await fireEvent.press(
+      screen.getByRole('button', { name: 'Choose transaction CSV file' }),
+    );
+    await fireEvent.press(
+      await screen.findByRole('button', { name: 'Import 1 selected' }),
+    );
+
+    expect(
+      await screen.findByRole('alert', {
+        name: 'Only valid rows from the current preview can be imported (rows 8, 2).',
+      }),
+    ).toBeOnTheScreen();
+    await waitFor(() => expect(queryClient.isMutating()).toBe(0));
+  });
 });

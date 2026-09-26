@@ -16,6 +16,10 @@ import {
 import { useAuth } from '../../src/lib/auth-state';
 import { queryClient } from '../../src/lib/query-client';
 import { sessionQueryKeys } from '../../src/lib/session-query-cache';
+import {
+  formatConfirmImportError,
+  formatImportPreviewSummary,
+} from '../../src/lib/transaction-import-feedback';
 import { pickTransactionCsv } from '../../src/lib/transaction-import-file';
 import {
   formatKoboAsNaira,
@@ -124,6 +128,12 @@ export default function ImportTransactionsScreen() {
 
   const previewError = previewMutation.error as ApiError | null;
   const confirmError = confirmMutation.error as ApiError | null;
+  const busy = previewMutation.isPending || confirmMutation.isPending;
+  const busyStatus = previewMutation.isPending
+    ? 'Checking your CSV…'
+    : confirmMutation.isPending
+      ? 'Importing selected rows…'
+      : '';
 
   return (
     <ScreenShell title="Import activity">
@@ -138,9 +148,9 @@ export default function ImportTransactionsScreen() {
           accessibilityRole="button"
           accessibilityLabel="Choose transaction CSV file"
           accessibilityState={{
-            disabled: previewMutation.isPending || confirmMutation.isPending,
+            disabled: busy,
           }}
-          disabled={previewMutation.isPending || confirmMutation.isPending}
+          disabled={busy}
           onPress={() => void chooseFile()}
           style={styles.primaryButton}
         >
@@ -149,10 +159,23 @@ export default function ImportTransactionsScreen() {
           </Text>
         </Pressable>
         {fileName ? <Text style={styles.fileName}>{fileName}</Text> : null}
+        {busyStatus ? (
+          <Text
+            accessibilityLiveRegion="polite"
+            accessibilityRole="progressbar"
+            style={styles.muted}
+          >
+            {busyStatus}
+          </Text>
+        ) : null}
       </View>
 
       {fileError || previewError ? (
-        <Text style={styles.error} accessibilityRole="alert">
+        <Text
+          style={styles.error}
+          accessibilityRole="alert"
+          accessibilityLiveRegion="assertive"
+        >
           {fileError || previewError?.message}
         </Text>
       ) : null}
@@ -175,8 +198,7 @@ export default function ImportTransactionsScreen() {
           <View style={styles.card}>
             <Text style={styles.sectionTitle}>Review before importing</Text>
             <Text style={styles.muted}>
-              {preview.readyCount} ready · {preview.duplicateCount} duplicate ·{' '}
-              {preview.invalidCount} needs correction
+              {formatImportPreviewSummary(preview)}
             </Text>
             <Text style={styles.total}>
               Selected: {selectedCount} ({formatKoboAsNaira(selectedTotalKobo)})
@@ -245,30 +267,24 @@ export default function ImportTransactionsScreen() {
           })}
 
           {confirmError ? (
-            <Text style={styles.error} accessibilityRole="alert">
-              {confirmError.message}
+            <Text
+              style={styles.error}
+              accessibilityRole="alert"
+              accessibilityLiveRegion="assertive"
+            >
+              {formatConfirmImportError(confirmError)}
             </Text>
           ) : null}
           <Pressable
             accessibilityRole="button"
             accessibilityState={{
-              disabled:
-                selectedCount === 0 ||
-                previewMutation.isPending ||
-                confirmMutation.isPending,
+              disabled: selectedCount === 0 || busy,
             }}
-            disabled={
-              selectedCount === 0 ||
-              previewMutation.isPending ||
-              confirmMutation.isPending
-            }
+            disabled={selectedCount === 0 || busy}
             onPress={confirmImport}
             style={[
               styles.primaryButton,
-              (selectedCount === 0 ||
-                previewMutation.isPending ||
-                confirmMutation.isPending) &&
-                styles.disabled,
+              (selectedCount === 0 || busy) && styles.disabled,
             ]}
           >
             <Text style={styles.primaryButtonText}>
