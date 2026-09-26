@@ -34,10 +34,11 @@ export const envSchema = Joi.object({
   JWT_EXPIRES_IN: Joi.string().default('15m'),
   AUTH_REFRESH_TOKEN_EXPIRES_IN: Joi.string().default('30d'),
   AUTH_REFRESH_FAMILY_MAX_AGE: Joi.string().default('90d'),
+  AUTH_REFRESH_MAX_FAMILIES_PER_USER: Joi.number().integer().min(1).default(5),
   AUTH_INSPECTION_OPERATOR_USER_IDS: Joi.string().allow('').default(''),
   AUTH_DEVICE_IDENTIFIER_SECRET: Joi.string().min(32).required(),
   NOTIFICATION_PAYLOAD_ENCRYPTION_KEY: Joi.string().min(32).required(),
-  AUTH_OTP_REQUEST_LIMIT_PER_HOUR: Joi.number().integer().min(1).default(10),
+  AUTH_OTP_REQUEST_LIMIT_PER_HOUR: Joi.number().integer().min(1).default(5),
   AUTH_OTP_REQUEST_LIMIT_PER_IP_PER_HOUR: Joi.number()
     .integer()
     .min(1)
@@ -45,7 +46,7 @@ export const envSchema = Joi.object({
   AUTH_OTP_REQUEST_LIMIT_PER_DEVICE_PER_HOUR: Joi.number()
     .integer()
     .min(1)
-    .default(10),
+    .default(5),
   AUTH_OTP_RESEND_COOLDOWN_MS: Joi.number()
     .integer()
     .min(1_000)
