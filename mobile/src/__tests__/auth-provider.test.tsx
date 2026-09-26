@@ -35,10 +35,20 @@ const mockSetSession = jest.mocked(tokenStore.setSession);
 const mockClearToken = jest.mocked(tokenStore.clearToken);
 
 const SessionProbe = () => {
-  const { bootstrapping, token, completeAuth, logout } = useAuth();
+  const {
+    bootstrapping,
+    token,
+    completeAuth,
+    logout,
+    sessionEndReason,
+    clearSessionEndReason,
+  } = useAuth();
   return (
     <View>
       <Text>{bootstrapping ? 'restoring' : (token ?? 'signed out')}</Text>
+      <Text>
+        {sessionEndReason ? `ended:${sessionEndReason}` : 'ended:none'}
+      </Text>
       <Pressable
         accessibilityRole="button"
         onPress={() =>
@@ -52,6 +62,18 @@ const SessionProbe = () => {
       </Pressable>
       <Pressable accessibilityRole="button" onPress={() => void logout()}>
         <Text>Log out</Text>
+      </Pressable>
+      <Pressable
+        accessibilityRole="button"
+        onPress={() => void logout({ reason: 'expired' })}
+      >
+        <Text>Expire session</Text>
+      </Pressable>
+      <Pressable
+        accessibilityRole="button"
+        onPress={() => clearSessionEndReason()}
+      >
+        <Text>Clear end reason</Text>
       </Pressable>
     </View>
   );
@@ -160,10 +182,32 @@ describe('AuthProvider session lifecycle', () => {
       expect(screen.getByText('signed out')).toBeOnTheScreen(),
     );
     expect(mockLogoutSession).toHaveBeenCalledWith('new-refresh');
+    expect(screen.getByText('ended:expired')).toBeOnTheScreen();
     expect(mockClearToken).toHaveBeenCalledTimes(1);
     expect(storedToken).toBeNull();
     expect(
       queryClient.getQueryData(['dashboard', 'stability', 'new-token']),
     ).toBeUndefined();
+  });
+
+  it('records and clears an expired-session reason for the login screen', async () => {
+    await render(
+      <AuthProvider>
+        <SessionProbe />
+      </AuthProvider>,
+    );
+    expect(await screen.findByText('ended:none')).toBeOnTheScreen();
+
+    await act(async () => {
+      fireEvent.press(screen.getByRole('button', { name: 'Expire session' }));
+    });
+    await waitFor(() =>
+      expect(screen.getByText('ended:expired')).toBeOnTheScreen(),
+    );
+
+    await act(async () => {
+      fireEvent.press(screen.getByRole('button', { name: 'Clear end reason' }));
+    });
+    expect(screen.getByText('ended:none')).toBeOnTheScreen();
   });
 });

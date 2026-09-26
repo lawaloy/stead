@@ -94,6 +94,23 @@ describe('api client', () => {
     });
   });
 
+  it('softens authenticated 401 messages after refresh fails', async () => {
+    const onUnauthorized = jest.fn();
+    configureApiAuth({
+      ...idleAuth,
+      getToken: async () => 'jwt-token',
+      onUnauthorized,
+    });
+
+    mock.onGet('/goals/active').reply(401, { message: 'Invalid token' });
+
+    await expect(apiClient.get('/goals/active')).rejects.toMatchObject({
+      message: 'Your session expired. Sign in again.',
+      status: 401,
+    });
+    expect(onUnauthorized).toHaveBeenCalledWith({ reason: 'expired' });
+  });
+
   it('does not clear the session on public auth 401 responses', async () => {
     const onUnauthorized = jest.fn();
     configureApiAuth({
@@ -184,6 +201,7 @@ describe('api client', () => {
     await expect(getActiveGoal()).rejects.toMatchObject({
       name: 'ApiError',
       status: 401,
+      message: 'Your session expired. Sign in again.',
     });
     expect(onUnauthorized).toHaveBeenCalledWith({ reason: 'expired' });
   });

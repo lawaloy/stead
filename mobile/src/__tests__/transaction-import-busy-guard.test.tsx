@@ -123,6 +123,9 @@ describe('transaction import busy guard', () => {
     await waitFor(() => expect(mockConfirm).toHaveBeenCalledTimes(1));
     expect(await screen.findByText('Importing…')).toBeOnTheScreen();
     expect(
+      screen.getByRole('progressbar', { name: 'Importing selected rows…' }),
+    ).toBeOnTheScreen();
+    expect(
       screen.getByRole('button', { name: 'Choose transaction CSV file' }),
     ).toBeDisabled();
     expect(

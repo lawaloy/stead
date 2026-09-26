@@ -11,8 +11,10 @@ import { configureApiAuth, logoutSession } from './api';
 import { AuthCountryIso, defaultAuthCountryIso } from './countries';
 import { clearSessionQueryCache } from './session-query-cache';
 
+export type SessionEndReason = 'expired';
+
 type LogoutOptions = {
-  reason?: 'expired';
+  reason?: SessionEndReason;
 };
 
 type AuthContextValue = {
@@ -22,11 +24,13 @@ type AuthContextValue = {
   pendingCountryIso: AuthCountryIso;
   pendingOtpRequestedAt: number | null;
   devOtpHint: string;
+  sessionEndReason: SessionEndReason | null;
   setPendingPhone: (phone: string) => void;
   setPendingCountryIso: (countryIso: AuthCountryIso) => void;
   setPendingOtpRequestedAt: (value: number | null) => void;
   setDevOtpHint: (otp: string) => void;
   resetPendingAuth: () => void;
+  clearSessionEndReason: () => void;
   completeAuth: (session: AuthSessionTokens) => Promise<void>;
   logout: (options?: LogoutOptions) => Promise<void>;
 };
@@ -44,28 +48,37 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     number | null
   >(null);
   const [devOtpHint, setDevOtpHint] = useState('');
+  const [sessionEndReason, setSessionEndReason] =
+    useState<SessionEndReason | null>(null);
 
-  const clearLocalSession = useCallback(async () => {
+  const clearLocalSession = useCallback(async (options?: LogoutOptions) => {
     setToken(null);
     setPendingPhone('');
     setPendingOtpRequestedAt(null);
     setDevOtpHint('');
+    if (options?.reason === 'expired') {
+      setSessionEndReason('expired');
+    }
     await tokenStore.clearToken();
     await clearSessionQueryCache();
   }, []);
 
   const logout = useCallback(
-    async (_options?: LogoutOptions) => {
+    async (options?: LogoutOptions) => {
       const refreshToken = await tokenStore.getRefreshToken();
       try {
         await logoutSession(refreshToken);
       } catch {
         // Best-effort server revoke; local clear still proceeds.
       }
-      await clearLocalSession();
+      await clearLocalSession(options);
     },
     [clearLocalSession],
   );
+
+  const clearSessionEndReason = useCallback(() => {
+    setSessionEndReason(null);
+  }, []);
 
   const resetPendingAuth = useCallback(() => {
     setPendingPhone('');
@@ -77,6 +90,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     async (session: AuthSessionTokens) => {
       await clearSessionQueryCache();
       setToken(session.token);
+      setSessionEndReason(null);
       resetPendingAuth();
       await tokenStore.setSession(session);
     },
@@ -106,7 +120,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         setToken(session.token);
       },
       onUnauthorized: async (options) => {
-        await logout(options);
+        await logout(options ?? { reason: 'expired' });
       },
     });
   }, [logout]);
@@ -119,16 +133,19 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       pendingCountryIso,
       pendingOtpRequestedAt,
       devOtpHint,
+      sessionEndReason,
       setPendingPhone,
       setPendingCountryIso,
       setPendingOtpRequestedAt,
       setDevOtpHint,
       resetPendingAuth,
+      clearSessionEndReason,
       completeAuth,
       logout,
     }),
     [
       bootstrapping,
+      clearSessionEndReason,
       completeAuth,
       devOtpHint,
       logout,
@@ -136,6 +153,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       pendingOtpRequestedAt,
       pendingPhone,
       resetPendingAuth,
+      sessionEndReason,
       token,
     ],
   );

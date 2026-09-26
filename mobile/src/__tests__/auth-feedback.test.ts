@@ -126,6 +126,21 @@ describe('auth-feedback', () => {
     ).toBe('Too many incorrect codes came from this device. Try again later.');
   });
 
+  it('maps raw token failure copy to the session-expired notice', () => {
+    expect(
+      getAuthErrorMessage(
+        new ApiError({ message: 'Invalid token', status: 401 }),
+        'request',
+      ),
+    ).toBe('Your session expired. Sign in again.');
+    expect(
+      getAuthErrorMessage(
+        new ApiError({ message: 'Session expired', status: 401 }),
+        'verify',
+      ),
+    ).toBe('Your session expired. Sign in again.');
+  });
+
   it('preserves unknown api messages and falls back when empty', () => {
     expect(
       getAuthErrorMessage(

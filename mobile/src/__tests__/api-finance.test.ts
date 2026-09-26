@@ -338,7 +338,7 @@ describe('api finance client', () => {
     await expect(getActiveGoal()).rejects.toMatchObject({
       name: 'ApiError',
       status: 401,
-      message: 'Unauthorized',
+      message: 'Your session expired. Sign in again.',
     });
     expect(onUnauthorized).toHaveBeenCalledTimes(1);
 

@@ -106,6 +106,17 @@ const rotateAccessToken = async (): Promise<string | null> => {
   return refreshInFlight;
 };
 
+const softenUnauthorizedMessage = (message: string) => {
+  if (
+    message === 'Invalid token' ||
+    message === 'Session expired' ||
+    message === 'Unauthorized'
+  ) {
+    return 'Your session expired. Sign in again.';
+  }
+  return message;
+};
+
 export const apiClient = axios.create({
   baseURL: resolveApiBaseUrl(),
   timeout: appConfig.api.timeoutMs,
@@ -134,8 +145,9 @@ apiClient.interceptors.response.use(
     const original = error.config as RetryableRequestConfig | undefined;
     const body = error.response?.data as
       { message?: string | string[]; details?: unknown } | string | undefined;
+    const publicAuth = Boolean(original && isPublicAuthRequest(original));
 
-    if (status === 401 && original && !isPublicAuthRequest(original)) {
+    if (status === 401 && original && !publicAuth) {
       if (!original._steadRetry) {
         const nextToken = await rotateAccessToken();
         if (nextToken) {
@@ -161,6 +173,10 @@ apiClient.interceptors.response.use(
         message = body.message;
       }
       details = body.details;
+    }
+
+    if (status === 401 && !publicAuth) {
+      message = softenUnauthorizedMessage(message);
     }
 
     throw new ApiError({ message, status, details });
