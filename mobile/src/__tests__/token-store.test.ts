@@ -23,8 +23,11 @@ const { tokenStore } = jest.requireActual(
 describe('tokenStore', () => {
   let originalLocalStorage: Storage | undefined;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     originalLocalStorage = globalThis.localStorage;
+    store.clear();
+    await tokenStore.clearToken();
+    jest.clearAllMocks();
   });
 
   afterEach(() => {
@@ -41,6 +44,23 @@ describe('tokenStore', () => {
     });
     await expect(tokenStore.getToken()).resolves.toBe('abc123');
     await expect(tokenStore.getRefreshToken()).resolves.toBe('refresh-abc');
+  });
+
+  it('serves session tokens from memory even when SecureStore is empty', async () => {
+    await tokenStore.setSession({
+      token: 'mem-access',
+      refreshToken: 'mem-refresh',
+    });
+    store.clear();
+    const originalGet = mockSecureStore.getItemAsync;
+    mockSecureStore.getItemAsync = jest.fn(async () => null);
+
+    try {
+      await expect(tokenStore.getToken()).resolves.toBe('mem-access');
+      await expect(tokenStore.getRefreshToken()).resolves.toBe('mem-refresh');
+    } finally {
+      mockSecureStore.getItemAsync = originalGet;
+    }
   });
 
   it('clears both access and refresh tokens', async () => {

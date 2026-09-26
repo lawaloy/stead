@@ -4,6 +4,12 @@ const ACCESS_TOKEN_KEY = 'stead.jwt';
 const REFRESH_TOKEN_KEY = 'stead.refresh';
 const memoryStore = new Map<string, string>();
 
+/** Process-local session mirror so API calls never race SecureStore I/O. */
+const sessionMemory = {
+  accessToken: null as string | null,
+  refreshToken: null as string | null,
+};
+
 const hasSecureStore = () =>
   typeof SecureStore.getItemAsync === 'function' &&
   typeof SecureStore.setItemAsync === 'function' &&
@@ -75,24 +81,32 @@ export type AuthSessionTokens = {
 
 export const tokenStore = {
   async getToken() {
+    if (sessionMemory.accessToken != null) return sessionMemory.accessToken;
     return readValue(ACCESS_TOKEN_KEY);
   },
   async setToken(token: string) {
+    sessionMemory.accessToken = token;
     await writeValue(ACCESS_TOKEN_KEY, token);
   },
   async getRefreshToken() {
+    if (sessionMemory.refreshToken != null) return sessionMemory.refreshToken;
     return readValue(REFRESH_TOKEN_KEY);
   },
   async setRefreshToken(refreshToken: string) {
+    sessionMemory.refreshToken = refreshToken;
     await writeValue(REFRESH_TOKEN_KEY, refreshToken);
   },
   async setSession(session: AuthSessionTokens) {
-    await Promise.all([
-      writeValue(ACCESS_TOKEN_KEY, session.token),
-      writeValue(REFRESH_TOKEN_KEY, session.refreshToken),
-    ]);
+    // Publish to memory first so interceptors can attach Authorization before
+    // SecureStore I/O finishes (native iOS was racing dual writes → 401 logout).
+    sessionMemory.accessToken = session.token;
+    sessionMemory.refreshToken = session.refreshToken;
+    await writeValue(ACCESS_TOKEN_KEY, session.token);
+    await writeValue(REFRESH_TOKEN_KEY, session.refreshToken);
   },
   async clearToken() {
+    sessionMemory.accessToken = null;
+    sessionMemory.refreshToken = null;
     await Promise.all([
       deleteValue(ACCESS_TOKEN_KEY),
       deleteValue(REFRESH_TOKEN_KEY),

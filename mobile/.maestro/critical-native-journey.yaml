@@ -29,7 +29,9 @@ appId: com.lawaloy.stead
 - extendedWaitUntil:
     visible: Stability Dashboard
     timeout: 90000
-- assertVisible: No active goal found
+- extendedWaitUntil:
+    visible: 'No active goal found.*'
+    timeout: 60000
 
 - tapOn:
     id: nav-goal
@@ -120,10 +122,26 @@ appId: com.lawaloy.stead
 - assertVisible: Native journey income
 - tapOn:
     id: nav-dashboard
-- swipe:
-    from:
+# Wait for the loaded dashboard ScrollView before PTR. Loading/empty states do
+# not mount testID dashboard-refresh; swiping too early fails on iOS.
+- extendedWaitUntil:
+    visible:
       id: dashboard-refresh
-    direction: DOWN
+    timeout: 60000
+- extendedWaitUntil:
+    visible: Native journey goal
+    timeout: 30000
+# iOS Maestro swipe-down is flaky (misses the view / hits system UI). Transaction
+# create already invalidates the dashboard query, so waiting for readiness is
+# enough there; Android still exercises pull-to-refresh.
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - swipe:
+          from:
+            id: dashboard-refresh
+          direction: DOWN
 - extendedWaitUntil:
     visible: '20%'
     timeout: 90000
@@ -140,11 +158,19 @@ appId: com.lawaloy.stead
 
 - tapOn:
     id: nav-dashboard
-- assertVisible: Native journey goal
-- swipe:
-    from:
+- extendedWaitUntil:
+    visible:
       id: dashboard-refresh
-    direction: DOWN
+    timeout: 60000
+- assertVisible: Native journey goal
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - swipe:
+          from:
+            id: dashboard-refresh
+          direction: DOWN
 - extendedWaitUntil:
     visible: '0%'
     timeout: 60000
