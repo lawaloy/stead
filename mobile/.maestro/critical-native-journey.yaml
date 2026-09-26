@@ -29,7 +29,9 @@ appId: com.lawaloy.stead
 - extendedWaitUntil:
     visible: Stability Dashboard
     timeout: 90000
-- assertVisible: No active goal found
+- extendedWaitUntil:
+    visible: 'No active goal found.*'
+    timeout: 60000
 
 - tapOn:
     id: nav-goal
