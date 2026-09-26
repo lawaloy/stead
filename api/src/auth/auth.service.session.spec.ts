@@ -25,6 +25,8 @@ describe('AuthService session refresh', () => {
     refreshToken: {
       create: jest.Mock;
       findUnique: jest.Mock;
+      findMany: jest.Mock;
+      groupBy: jest.Mock;
       update: jest.Mock;
       updateMany: jest.Mock;
     };
@@ -37,6 +39,8 @@ describe('AuthService session refresh', () => {
       refreshToken: {
         create: jest.fn().mockResolvedValue({ id: 'rt_new' }),
         findUnique: jest.fn(),
+        findMany: jest.fn().mockResolvedValue([]),
+        groupBy: jest.fn().mockResolvedValue([]),
         update: jest.fn().mockResolvedValue({}),
         updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
@@ -47,11 +51,12 @@ describe('AuthService session refresh', () => {
     };
     config = {
       get: jest.fn((key: string) => {
-        const values: Record<string, string> = {
+        const values: Record<string, string | number> = {
           JWT_SECRET: 'test-jwt-secret-16',
           JWT_EXPIRES_IN: '15m',
           AUTH_REFRESH_TOKEN_EXPIRES_IN: '30d',
           AUTH_REFRESH_FAMILY_MAX_AGE: '90d',
+          AUTH_REFRESH_MAX_FAMILIES_PER_USER: 5,
           AUTH_DEVICE_IDENTIFIER_SECRET: DEVICE_SECRET,
         };
         return values[key];
@@ -323,5 +328,118 @@ describe('AuthService session refresh', () => {
       ],
     ];
     expect(revoke.where).toEqual({ userId: 'user_1', revokedAt: null });
+  });
+
+  describe('concurrent family cap', () => {
+    type IssueSession = (
+      user: { id: string; phone: string },
+      deviceHash?: string | null,
+    ) => Promise<{ token: string; refreshToken: string; expiresIn: number }>;
+
+    const issueSession = () =>
+      (
+        service as unknown as {
+          issueSession: IssueSession;
+        }
+      ).issueSession.bind(service) as IssueSession;
+
+    it('replaces an existing live family for the same device', async () => {
+      prisma.refreshToken.findMany.mockResolvedValue([
+        { familyId: 'fam-same-device' },
+      ]);
+      prisma.refreshToken.groupBy.mockResolvedValue([]);
+
+      await expect(
+        issueSession()(
+          { id: 'user_1', phone: '+2348012345678' },
+          hashDevice(DEVICE_A),
+        ),
+      ).resolves.toMatchObject({
+        token: 'access_token',
+        expiresIn: 900,
+      });
+
+      const [[sameDeviceRevoke]] = prisma.refreshToken.updateMany.mock
+        .calls as unknown as [
+        [
+          {
+            where: { familyId: string; revokedAt: null };
+            data: { revokedAt: Date };
+          },
+        ],
+      ];
+      expect(sameDeviceRevoke.where.familyId).toBe('fam-same-device');
+      expect(prisma.refreshToken.create).toHaveBeenCalled();
+    });
+
+    it('evicts the oldest family when a new device would exceed the cap', async () => {
+      prisma.refreshToken.findMany.mockResolvedValue([]);
+      prisma.refreshToken.groupBy.mockResolvedValue([
+        {
+          familyId: 'fam-oldest',
+          _min: { familyCreatedAt: new Date('2024-01-01T00:00:00.000Z') },
+        },
+        {
+          familyId: 'fam-2',
+          _min: { familyCreatedAt: new Date('2024-02-01T00:00:00.000Z') },
+        },
+        {
+          familyId: 'fam-3',
+          _min: { familyCreatedAt: new Date('2024-03-01T00:00:00.000Z') },
+        },
+        {
+          familyId: 'fam-4',
+          _min: { familyCreatedAt: new Date('2024-04-01T00:00:00.000Z') },
+        },
+        {
+          familyId: 'fam-5',
+          _min: { familyCreatedAt: new Date('2024-05-01T00:00:00.000Z') },
+        },
+      ]);
+
+      await expect(
+        issueSession()(
+          { id: 'user_1', phone: '+2348012345678' },
+          hashDevice(DEVICE_B),
+        ),
+      ).resolves.toMatchObject({ token: 'access_token' });
+
+      const [[evict]] = prisma.refreshToken.updateMany.mock
+        .calls as unknown as [
+        [
+          {
+            where: { familyId: string; revokedAt: null };
+            data: { revokedAt: Date };
+          },
+        ],
+      ];
+      expect(evict.where.familyId).toBe('fam-oldest');
+      expect(prisma.refreshToken.updateMany).toHaveBeenCalledTimes(1);
+      expect(prisma.refreshToken.create).toHaveBeenCalled();
+    });
+
+    it('does not evict when under the concurrent family cap', async () => {
+      prisma.refreshToken.findMany.mockResolvedValue([]);
+      prisma.refreshToken.groupBy.mockResolvedValue([
+        {
+          familyId: 'fam-1',
+          _min: { familyCreatedAt: new Date('2024-01-01T00:00:00.000Z') },
+        },
+        {
+          familyId: 'fam-2',
+          _min: { familyCreatedAt: new Date('2024-02-01T00:00:00.000Z') },
+        },
+      ]);
+
+      await expect(
+        issueSession()(
+          { id: 'user_1', phone: '+2348012345678' },
+          hashDevice(DEVICE_A),
+        ),
+      ).resolves.toMatchObject({ token: 'access_token' });
+
+      expect(prisma.refreshToken.updateMany).not.toHaveBeenCalled();
+      expect(prisma.refreshToken.create).toHaveBeenCalled();
+    });
   });
 });
