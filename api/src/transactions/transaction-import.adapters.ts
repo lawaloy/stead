@@ -16,7 +16,8 @@ const DESCRIPTION_ALIASES = [
   'details',
 ] as const;
 
-export type TransactionImportAdapterId = 'stead-canonical' | 'provisional-debit-credit';
+export type TransactionImportAdapterId =
+  'stead-canonical' | 'provisional-debit-credit';
 
 export type TransactionImportAdapter = {
   id: TransactionImportAdapterId;

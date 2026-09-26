@@ -81,9 +81,9 @@ describe('transaction import adapters', () => {
   });
 
   it('rejects unknown layouts with the canonical column requirement', () => {
-    expect(() =>
-      toCanonicalImportCsv('foo,bar\n1,2'),
-    ).toThrow(BadRequestException);
+    expect(() => toCanonicalImportCsv('foo,bar\n1,2')).toThrow(
+      BadRequestException,
+    );
     expect(() => toCanonicalImportCsv('foo,bar\n1,2')).toThrow(
       /CSV must include these columns: date, description, amount, type/,
     );
@@ -91,10 +91,9 @@ describe('transaction import adapters', () => {
 
   it('marks rows with both debit and credit filled as invalid after adaptation', () => {
     const [row] = parseTransactionImport(
-      [
-        'date,narration,debit,credit',
-        '2026-09-01,Ambiguous,100,200',
-      ].join('\n'),
+      ['date,narration,debit,credit', '2026-09-01,Ambiguous,100,200'].join(
+        '\n',
+      ),
     );
 
     expect(row.error).toContain('Amount must be a positive naira value');

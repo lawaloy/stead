@@ -42,12 +42,12 @@ shape that uses separate debit and credit amount columns. This adapter is
 
 Accepted case-insensitive headers (any order; extras allowed):
 
-| Role        | Accepted column names                                              |
-| ----------- | ------------------------------------------------------------------ |
-| Date        | `date`, `transaction date`, `value date`, or `posting date`      |
-| Description | `description`, `narration`, `particulars`, or `details`          |
-| Debit       | `debit`                                                            |
-| Credit      | `credit`                                                           |
+| Role        | Accepted column names                                       |
+| ----------- | ----------------------------------------------------------- |
+| Date        | `date`, `transaction date`, `value date`, or `posting date` |
+| Description | `description`, `narration`, `particulars`, or `details`     |
+| Debit       | `debit`                                                     |
+| Credit      | `credit`                                                    |
 
 Dates may be `YYYY-MM-DD`, `DD/MM/YYYY`, or `DD-MM-YYYY`. A row must fill
 exactly one of debit or credit. When both Stead and debit/credit columns are
