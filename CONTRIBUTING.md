@@ -83,8 +83,8 @@ rejects formatting drift.
 The single `.github/workflows/ci.yml` build/test workflow runs independent
 format, lint, API, and mobile jobs in parallel on pull requests. Native
 Android/iOS simulator journeys live in `.github/workflows/native-ci.yml` and
-run on path-filtered pull requests (mobile UI, Maestro, packaging, API, or
-native CI wiring), after merge to `main`, on a daily schedule at 16:00 UTC
+run on path-filtered pull requests (mobile app source outside tests, assets,
+Maestro, packaging, API, contracts, or native CI wiring), after merge to `main`, on a daily schedule at 16:00 UTC
 (after morning Dependabot / Dependency Maintenance / Dependency Audit so
 auto-merges have time to land), and on demand.
 Native binaries are built in dedicated jobs and passed to Maestro jobs as
