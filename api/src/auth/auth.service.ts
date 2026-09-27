@@ -32,17 +32,18 @@ import {
 } from './refresh-token.util';
 import { randomInt } from 'node:crypto';
 
-const DEFAULT_OTP_REQUEST_LIMIT_PER_HOUR = 10;
+const DEFAULT_OTP_REQUEST_LIMIT_PER_HOUR = 5;
 const DEFAULT_OTP_RESEND_COOLDOWN_MS = 60_000;
 const DEFAULT_OTP_MAX_VERIFY_ATTEMPTS = 5;
 const DEFAULT_OTP_REQUEST_LIMIT_PER_IP_PER_HOUR = 20;
-const DEFAULT_OTP_REQUEST_LIMIT_PER_DEVICE_PER_HOUR = 10;
+const DEFAULT_OTP_REQUEST_LIMIT_PER_DEVICE_PER_HOUR = 5;
 const DEFAULT_OTP_VERIFY_FAILURE_LIMIT_PER_IP_WINDOW = 10;
 const DEFAULT_OTP_VERIFY_FAILURE_LIMIT_PER_DEVICE_WINDOW = 8;
 const DEFAULT_OTP_VERIFY_FAILURE_WINDOW_MS = 15 * 60 * 1000;
 const DEFAULT_JWT_EXPIRES_IN = '15m';
 const DEFAULT_REFRESH_TOKEN_EXPIRES_IN = '30d';
 const DEFAULT_REFRESH_FAMILY_MAX_AGE = '90d';
+const DEFAULT_REFRESH_MAX_FAMILIES_PER_USER = 5;
 const OTP_LENGTH = 6;
 const OTP_UPPER_BOUND = 10 ** OTP_LENGTH;
 
@@ -627,11 +628,23 @@ export class AuthService {
     );
   }
 
+  private get maxRefreshFamiliesPerUser() {
+    const raw = this.config.get<number | string>(
+      'AUTH_REFRESH_MAX_FAMILIES_PER_USER',
+    );
+    const parsed =
+      typeof raw === 'number' ? raw : raw != null ? Number(raw) : NaN;
+    return Number.isFinite(parsed) && parsed >= 1
+      ? Math.floor(parsed)
+      : DEFAULT_REFRESH_MAX_FAMILIES_PER_USER;
+  }
+
   private async issueSession(
     user: SessionUser,
     deviceHash?: string | null,
     familyId = generateRefreshFamilyId(),
   ): Promise<VerifyOtpResponse> {
+    await this.prepareRefreshFamilySlot(user.id, deviceHash);
     const created = await this.createRefreshTokenRow(
       user.id,
       familyId,
@@ -643,6 +656,48 @@ export class AuthService {
       refreshToken: created.rawToken,
       expiresIn: parseDurationToSeconds(this.accessTokenExpiresIn),
     };
+  }
+
+  /**
+   * Keeps concurrent live refresh families within AUTH_REFRESH_MAX_FAMILIES_PER_USER.
+   * Re-OTP on the same device replaces that device's family; a new device at the
+   * cap evicts the oldest family so sign-in still succeeds.
+   */
+  private async prepareRefreshFamilySlot(
+    userId: string,
+    deviceHash?: string | null,
+  ) {
+    if (deviceHash) {
+      const sameDeviceFamilies = await this.prisma.refreshToken.findMany({
+        where: { userId, deviceHash, revokedAt: null },
+        distinct: ['familyId'],
+        select: { familyId: true },
+      });
+      for (const row of sameDeviceFamilies) {
+        await this.revokeRefreshFamily(row.familyId);
+      }
+    }
+
+    const liveFamilies = await this.prisma.refreshToken.groupBy({
+      by: ['familyId'],
+      where: { userId, revokedAt: null },
+      _min: { familyCreatedAt: true },
+    });
+
+    // Leave room for the family about to be issued.
+    const overflow = liveFamilies.length - (this.maxRefreshFamiliesPerUser - 1);
+    if (overflow <= 0) {
+      return;
+    }
+
+    const oldestFirst = [...liveFamilies].sort(
+      (a, b) =>
+        (a._min.familyCreatedAt?.getTime() ?? 0) -
+        (b._min.familyCreatedAt?.getTime() ?? 0),
+    );
+    for (let i = 0; i < overflow; i++) {
+      await this.revokeRefreshFamily(oldestFirst[i].familyId);
+    }
   }
 
   private async createRefreshTokenRow(

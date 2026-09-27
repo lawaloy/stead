@@ -12,14 +12,21 @@ appId: com.lawaloy.stead
     visible: '0803 000 0001'
     timeout: 30000
 - waitForAnimationToEnd
-# iOS: first tap can miss a still-settling Pressable; retry by label if needed.
 - tapOn:
     id: auth-request-otp
+# Give the request time to finish and navigate before deciding the tap missed;
+# the button label changes while the request is in flight.
+- extendedWaitUntil:
+    visible: Verify OTP
+    timeout: 20000
+    optional: true
+# iOS: first tap can miss a still-settling Pressable; retry by id if needed.
 - runFlow:
     when:
       notVisible: Verify OTP
     commands:
-      - tapOn: Request OTP
+      - tapOn:
+          id: auth-request-otp
 - extendedWaitUntil:
     visible: Verify OTP
     timeout: 60000

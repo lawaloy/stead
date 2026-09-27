@@ -159,7 +159,10 @@ When a device id is present at OTP verify, its HMAC is stored on the family as
 `X-Stead-Device-Id`). A mismatch or missing device when the family is bound
 returns 401 **without** revoking the family, so other devices keep their own
 sessions. Multiple concurrent devices are supported: each OTP verify on a new
-device creates a separate family.
+device creates a separate family. Concurrent live families are capped
+(`AUTH_REFRESH_MAX_FAMILIES_PER_USER`, default `5`). Re-OTP on the same device
+replaces that device’s family; signing in on a sixth device revokes the oldest
+family so the new session can be issued.
 
 `POST /auth/logout` with a refresh token revokes that family only. Access-only
 logout is idempotent and does **not** revoke other devices. Sending
