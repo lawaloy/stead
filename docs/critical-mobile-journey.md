@@ -48,7 +48,8 @@ uses a dedicated test phone (`TEST_PHONE`) supplied by the runner.
 
 Native simulator jobs live in `.github/workflows/native-ci.yml`. Android and
 iOS Maestro run on path-filtered pull requests and after merge to `main` (when
-mobile UI, Maestro, packaging, API, or native CI wiring changes), on a daily
+mobile app source outside tests, assets, Maestro, packaging, API, contracts,
+or native CI wiring changes), on a daily
 schedule at 16:00 UTC (after morning Dependabot / Dependency Maintenance /
 Dependency Audit so auto-merges have time to land), and via
 `workflow_dispatch`. Dedicated `build-android` /
