@@ -22,6 +22,8 @@ describe('AuthService verify OTP success on the last allowed attempt', () => {
     refreshToken: {
       create: jest.Mock;
       findUnique: jest.Mock;
+      findMany: jest.Mock;
+      groupBy: jest.Mock;
       update: jest.Mock;
       updateMany: jest.Mock;
     };
@@ -42,6 +44,8 @@ describe('AuthService verify OTP success on the last allowed attempt', () => {
       refreshToken: {
         create: jest.fn().mockResolvedValue({ id: 'rt_1' }),
         findUnique: jest.fn(),
+        findMany: jest.fn().mockResolvedValue([]),
+        groupBy: jest.fn().mockResolvedValue([]),
         update: jest.fn(),
         updateMany: jest.fn(),
       },
