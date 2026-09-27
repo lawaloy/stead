@@ -8,7 +8,7 @@ import { configureApp } from './../src/app.setup';
 import { PrismaService } from './../src/prisma/prisma.service';
 
 const PHONE_HOURLY_LIMIT = Number(
-  process.env.AUTH_OTP_REQUEST_LIMIT_PER_HOUR ?? '10',
+  process.env.AUTH_OTP_REQUEST_LIMIT_PER_HOUR ?? '5',
 );
 
 describe('Auth OTP lifecycle edges (e2e)', () => {

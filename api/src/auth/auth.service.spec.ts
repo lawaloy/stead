@@ -35,6 +35,8 @@ describe('AuthService', () => {
     refreshToken: {
       create: jest.Mock;
       findUnique: jest.Mock;
+      findMany: jest.Mock;
+      groupBy: jest.Mock;
       update: jest.Mock;
       updateMany: jest.Mock;
     };
@@ -61,6 +63,8 @@ describe('AuthService', () => {
       refreshToken: {
         create: jest.fn().mockResolvedValue({ id: 'rt_1' }),
         findUnique: jest.fn(),
+        findMany: jest.fn().mockResolvedValue([]),
+        groupBy: jest.fn().mockResolvedValue([]),
         update: jest.fn(),
         updateMany: jest.fn(),
       },
@@ -357,7 +361,7 @@ describe('AuthService', () => {
         countryIso: 'NG',
         ip: '127.0.0.1',
         userAgent: 'jest-agent',
-        metadata: { limit: 10, window: '1h' },
+        metadata: { limit: 5, window: '1h' },
       }),
     );
   });
