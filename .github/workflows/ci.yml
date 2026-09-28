@@ -52,6 +52,9 @@ jobs:
       - name: Check repository formatting
         run: npm run format:check
 
+      - name: Validate workflow contracts
+        run: npm run workflows:check
+
   lint:
     needs: config
     runs-on: ubuntu-latest

@@ -1,9 +1,15 @@
-name: Dependabot Auto Finish
+name: Dependency Auto Finish
 
 on:
   workflow_run:
     workflows:
-      ['ci', 'CodeQL Advanced', 'Dependency review', 'Dependency Audit']
+      [
+        'ci',
+        'native-ci',
+        'CodeQL Advanced',
+        'Dependency review',
+        'Dependency Audit',
+      ]
     types: [completed]
 
 permissions:
@@ -13,7 +19,7 @@ permissions:
   issues: write
 
 concurrency:
-  group: dependabot-auto-finish-${{ github.event.workflow_run.pull_requests[0].number || github.event.workflow_run.id }}
+  group: dependency-auto-finish-${{ github.event.workflow_run.pull_requests[0].number || github.event.workflow_run.id }}
   cancel-in-progress: true
 
 jobs:
@@ -23,5 +29,5 @@ jobs:
       github.event.workflow_run.conclusion == 'success'
     uses: ./.github/workflows/pr-auto-finish-reusable.yml
     with:
-      lane: dependabot
+      lane: auto
     secrets: inherit
