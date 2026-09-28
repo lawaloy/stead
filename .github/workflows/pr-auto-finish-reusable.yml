@@ -36,7 +36,7 @@ jobs:
         with:
           github-token: ${{ steps.app-token.outputs.token }}
           script: |
-            const lane = process.env.LANE;
+            const requestedLane = process.env.LANE;
             const eventPullNumber = context.payload.workflow_run?.pull_requests?.[0]?.number;
             const inputPullNumber = Number(process.env.PULL_NUMBER || 0);
             const pull_number = eventPullNumber || inputPullNumber;
@@ -45,6 +45,7 @@ jobs:
             const delayMs = 15000;
             const requiredWorkflowNames = [
               'ci',
+              'native-ci',
               'CodeQL Advanced',
               'Dependency review',
               'Dependency Audit',
@@ -119,13 +120,27 @@ jobs:
                 })
               ).data;
               const labels = pullRequest.labels.map((label) => label.name);
+              const trustedDependabot = isTrustedDependabot(pullRequest);
+              const trustedMaintenance = isTrustedMaintenance(pullRequest, labels);
+              const lane =
+                requestedLane === 'auto'
+                  ? trustedDependabot
+                    ? 'dependabot'
+                    : trustedMaintenance
+                      ? 'maintenance'
+                      : undefined
+                  : requestedLane;
               const trusted =
                 lane === 'dependabot'
-                  ? isTrustedDependabot(pullRequest)
-                  : isTrustedMaintenance(pullRequest, labels);
+                  ? trustedDependabot
+                  : lane === 'maintenance'
+                    ? trustedMaintenance
+                    : false;
 
               if (!trusted) {
-                core.info(`Skipping because PR does not satisfy trusted ${lane} provenance.`);
+                core.info(
+                  `Skipping because PR does not satisfy trusted ${requestedLane} provenance.`,
+                );
                 return;
               }
 

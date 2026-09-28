@@ -1,8 +1,10 @@
 name: native-ci
 
-# Path-filtered PRs, post-merge, daily schedule (after morning deps), and on
-# demand. Native binaries are built in dedicated jobs and handed to Maestro
-# jobs as artifacts (build once → test). Warm Android boots use a cached AVD
+# Every PR and main-branch push produces a stable native-ci readiness signal.
+# The config job skips expensive native jobs when they are irrelevant.
+# Scheduled and manual runs always execute the full suite. Native binaries are
+# built in dedicated jobs and handed to Maestro jobs as artifacts (build once
+# → test). Warm Android boots use a cached AVD
 # snapshot; iOS uses mtime/inode-aware DerivedData + Pods caches when the
 # .app misses.
 
@@ -10,51 +12,13 @@ on:
   workflow_dispatch:
   # After Dependabot + Dependency Maintenance (13:00 UTC) and Dependency
   # Audit (13:30 UTC), leave room for PR CI and auto-merge onto main before
-  # the daily native smoke. Lockfile merges also trigger via push paths.
+  # the daily native smoke. Main pushes also produce the readiness signal.
   schedule:
     - cron: '0 16 * * *'
   pull_request:
     branches: [main]
-    paths:
-      - 'mobile/.maestro/**'
-      - 'mobile/app/**'
-      - 'mobile/src/**'
-      - '!mobile/src/__tests__/**'
-      - 'mobile/assets/**'
-      - 'mobile/app.json'
-      - 'mobile/babel.config.js'
-      - 'mobile/tsconfig.json'
-      - 'mobile/metro.config.js'
-      - 'mobile/package.json'
-      - 'mobile/package-lock.json'
-      - 'api/**'
-      - 'contracts/**'
-      - '.github/workflows/native-ci.yml'
-      - '.github/scripts/run-android-native-journey.sh'
-      - '.github/scripts/build-ios-simulator-app.sh'
-      - '.github/scripts/install-maestro.sh'
-      - '.github/ci.env'
   push:
     branches: [main]
-    paths:
-      - 'mobile/.maestro/**'
-      - 'mobile/app/**'
-      - 'mobile/src/**'
-      - '!mobile/src/__tests__/**'
-      - 'mobile/assets/**'
-      - 'mobile/app.json'
-      - 'mobile/babel.config.js'
-      - 'mobile/tsconfig.json'
-      - 'mobile/metro.config.js'
-      - 'mobile/package.json'
-      - 'mobile/package-lock.json'
-      - 'api/**'
-      - 'contracts/**'
-      - '.github/workflows/native-ci.yml'
-      - '.github/scripts/run-android-native-journey.sh'
-      - '.github/scripts/build-ios-simulator-app.sh'
-      - '.github/scripts/install-maestro.sh'
-      - '.github/ci.env'
 
 concurrency:
   group: native-ci-${{ github.event.pull_request.number || github.ref }}
@@ -62,17 +26,37 @@ concurrency:
 
 permissions:
   contents: read
+  pull-requests: read
 
 jobs:
   config:
     runs-on: ubuntu-latest
     outputs:
+      run_native: ${{ steps.decision.outputs.run_native }}
       node_version: ${{ steps.versions.outputs.node_version }}
       npm_version: ${{ steps.versions.outputs.npm_version }}
       android_api_level: ${{ steps.versions.outputs.android_api_level }}
       ios_runner: ${{ steps.versions.outputs.ios_runner }}
     steps:
       - uses: actions/checkout@v4
+      - name: Detect native-impacting changes
+        if: github.event_name == 'pull_request' || github.event_name == 'push'
+        id: changes
+        uses: dorny/paths-filter@v4
+        with:
+          predicate-quantifier: some-with-excludes
+          filters: .github/native-ci-paths.yml
+      - name: Resolve native execution decision
+        id: decision
+        env:
+          CHANGED: ${{ steps.changes.outputs.native }}
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          if [[ "$EVENT_NAME" == "pull_request" || "$EVENT_NAME" == "push" ]]; then
+            echo "run_native=$CHANGED" >> "$GITHUB_OUTPUT"
+          else
+            echo "run_native=true" >> "$GITHUB_OUTPUT"
+          fi
       - id: versions
         run: |
           set -eu
@@ -84,6 +68,7 @@ jobs:
 
   build-android:
     needs: config
+    if: needs.config.outputs.run_native == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
@@ -131,6 +116,7 @@ jobs:
 
   build-ios:
     needs: config
+    if: needs.config.outputs.run_native == 'true'
     runs-on: ${{ needs.config.outputs.ios_runner }}
     timeout-minutes: 45
     steps:

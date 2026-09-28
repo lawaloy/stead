@@ -8,9 +8,10 @@
     "setup": "npm ci && npm ci --prefix api && npm ci --prefix mobile",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
+    "workflows:check": "node .github/scripts/validate-workflow-contracts.mjs",
     "lint": "npm --prefix api run lint && npm --prefix mobile run lint",
     "lint:fix": "npm --prefix api run lint:fix && npm --prefix mobile run lint:fix",
-    "check": "npm run format:check && npm run lint"
+    "check": "npm run format:check && npm run workflows:check && npm run lint"
   },
   "devDependencies": {
     "prettier": "3.9.6"
