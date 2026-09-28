@@ -4,12 +4,14 @@ describe('QueuedNotificationPublisher', () => {
   let publisher: QueuedNotificationPublisher;
   let queue: {
     enqueueOtpRequested: jest.Mock;
+    isOtpRequestEnqueued: jest.Mock;
     enqueueReadinessAlert: jest.Mock;
   };
 
   beforeEach(() => {
     queue = {
       enqueueOtpRequested: jest.fn(),
+      isOtpRequestEnqueued: jest.fn(),
       enqueueReadinessAlert: jest.fn(),
     };
     publisher = new QueuedNotificationPublisher(queue as never);
@@ -21,6 +23,8 @@ describe('QueuedNotificationPublisher', () => {
     await expect(
       publisher.publishOtpRequested({
         userId: 'user_1',
+        otpCodeId: 'otp_1',
+        dedupeKey: 'otp.requested:key-hash',
         payload: { phone: '+2348012345678', otp: '123456' },
       }),
     ).resolves.toBeUndefined();
@@ -28,6 +32,8 @@ describe('QueuedNotificationPublisher', () => {
     expect(queue.enqueueOtpRequested).toHaveBeenCalledWith(
       { phone: '+2348012345678', otp: '123456' },
       'user_1',
+      'otp_1',
+      'otp.requested:key-hash',
     );
   });
 
@@ -37,9 +43,23 @@ describe('QueuedNotificationPublisher', () => {
     await expect(
       publisher.publishOtpRequested({
         userId: 'user_1',
+        otpCodeId: 'otp_1',
+        dedupeKey: 'otp.requested:key-hash',
         payload: { phone: '+2348012345678', otp: '123456' },
       }),
     ).rejects.toThrow('database down');
+  });
+
+  it('reports whether an OTP notification is already enqueued', async () => {
+    queue.isOtpRequestEnqueued.mockResolvedValue(true);
+
+    await expect(
+      publisher.isOtpRequestEnqueued('otp.requested:key-hash', 'otp_1'),
+    ).resolves.toBe(true);
+    expect(queue.isOtpRequestEnqueued).toHaveBeenCalledWith(
+      'otp.requested:key-hash',
+      'otp_1',
+    );
   });
 
   it('returns the readiness enqueue result without swallowing collisions', async () => {

@@ -33,10 +33,10 @@ describe('Account self-service (e2e)', () => {
       prisma.alertState.deleteMany(),
       prisma.alertPreference.deleteMany(),
       prisma.authEvent.deleteMany(),
+      prisma.notificationJob.deleteMany(),
       prisma.otpCode.deleteMany(),
       prisma.transaction.deleteMany(),
       prisma.goal.deleteMany(),
-      prisma.notificationJob.deleteMany(),
       prisma.user.deleteMany(),
     ]);
   }

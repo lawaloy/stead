@@ -11,7 +11,16 @@ export class QueuedNotificationPublisher implements NotificationPublisher {
   constructor(private readonly queue: NotificationQueueService) {}
 
   async publishOtpRequested(input: OtpRequestedInput): Promise<void> {
-    await this.queue.enqueueOtpRequested(input.payload, input.userId);
+    await this.queue.enqueueOtpRequested(
+      input.payload,
+      input.userId,
+      input.otpCodeId,
+      input.dedupeKey,
+    );
+  }
+
+  isOtpRequestEnqueued(dedupeKey: string, otpCodeId: string): Promise<boolean> {
+    return this.queue.isOtpRequestEnqueued(dedupeKey, otpCodeId);
   }
 
   publishReadinessAlert(input: ReadinessAlertInput): Promise<boolean> {

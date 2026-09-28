@@ -73,11 +73,11 @@ describe('Auth notification pipeline (e2e)', () => {
 
     await prisma.$transaction([
       prisma.authEvent.deleteMany(),
+      prisma.notificationJob.deleteMany(),
       prisma.otpCode.deleteMany(),
       prisma.transaction.deleteMany(),
       prisma.goal.deleteMany(),
       prisma.user.deleteMany(),
-      prisma.notificationJob.deleteMany(),
     ]);
   }
 
@@ -144,6 +144,7 @@ describe('Auth notification pipeline (e2e)', () => {
     }, 'the dev provider to send the persisted notification job');
 
     expect(sentJob).toMatchObject({
+      otpCodeId: otpCode.id,
       attempts: 0,
       lastError: null,
       provider: 'dev',

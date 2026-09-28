@@ -67,21 +67,59 @@ export class NotificationQueueService {
 
   async enqueueOtpRequested(
     payload: OtpRequestedPayload,
-    userId?: string,
+    userId: string | undefined,
+    otpCodeId: string,
+    dedupeKey: string,
   ): Promise<string> {
-    const job = await this.prisma.notificationJob.create({
-      data: {
-        type: 'otp.requested',
-        payloadJson: this.encryptPayload(payload),
-        userId,
-        status: 'pending',
-        attempts: 0,
-        maxAttempts: 3,
-        nextRunAt: new Date(),
-      },
-    });
+    try {
+      const job = await this.prisma.notificationJob.create({
+        data: {
+          type: 'otp.requested',
+          payloadJson: this.encryptPayload(payload),
+          userId,
+          otpCodeId,
+          dedupeKey,
+          status: 'pending',
+          attempts: 0,
+          maxAttempts: 3,
+          nextRunAt: new Date(),
+        },
+      });
 
-    return job.id;
+      return job.id;
+    } catch (error: unknown) {
+      if (
+        error &&
+        typeof error === 'object' &&
+        'code' in error &&
+        error.code === 'P2002'
+      ) {
+        const existing = await this.prisma.notificationJob.findUnique({
+          where: { dedupeKey },
+          select: { id: true, type: true, otpCodeId: true },
+        });
+        if (
+          existing?.type === 'otp.requested' &&
+          existing.otpCodeId === otpCodeId
+        ) {
+          return existing.id;
+        }
+      }
+      throw error;
+    }
+  }
+
+  async isOtpRequestEnqueued(
+    dedupeKey: string,
+    otpCodeId: string,
+  ): Promise<boolean> {
+    const existing = await this.prisma.notificationJob.findUnique({
+      where: { dedupeKey },
+      select: { type: true, otpCodeId: true },
+    });
+    return (
+      existing?.type === 'otp.requested' && existing.otpCodeId === otpCodeId
+    );
   }
 
   async enqueueReadinessAlert(input: ReadinessAlertInput): Promise<boolean> {

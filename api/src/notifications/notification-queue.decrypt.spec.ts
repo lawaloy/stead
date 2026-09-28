@@ -176,10 +176,15 @@ describe('NotificationQueueService decrypt fail-closed paths', () => {
     configGet.mockReturnValue(undefined);
 
     await expect(
-      queue.enqueueOtpRequested({
-        phone: '+2348000000000',
-        otp: '123456',
-      }),
+      queue.enqueueOtpRequested(
+        {
+          phone: '+2348000000000',
+          otp: '123456',
+        },
+        undefined,
+        'otp_1',
+        'otp.requested:test-missing-key',
+      ),
     ).rejects.toThrow('Notification payload encryption key is not configured');
     expect(prisma.notificationJob.create).not.toHaveBeenCalled();
   });

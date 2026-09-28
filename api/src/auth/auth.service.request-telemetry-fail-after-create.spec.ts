@@ -15,6 +15,7 @@ describe('AuthService telemetry failure after OTP create', () => {
       create: jest.Mock;
       findUnique: jest.Mock;
       findFirst: jest.Mock;
+      update: jest.Mock;
     };
     user: {
       upsert: jest.Mock;
@@ -30,6 +31,7 @@ describe('AuthService telemetry failure after OTP create', () => {
         create: jest.fn(),
         findUnique: jest.fn().mockResolvedValue(null),
         findFirst: jest.fn(),
+        update: jest.fn(),
       },
       user: {
         upsert: jest.fn(),
@@ -77,7 +79,7 @@ describe('AuthService telemetry failure after OTP create', () => {
     service = module.get<AuthService>(AuthService);
   });
 
-  it('persists the OTP but does not enqueue SMS when request telemetry fails', async () => {
+  it('completes OTP delivery before surfacing a telemetry failure', async () => {
     prisma.otpCode.count.mockResolvedValue(0);
     prisma.user.upsert.mockResolvedValue({
       id: 'user_1',
@@ -114,6 +116,18 @@ describe('AuthService telemetry failure after OTP create', () => {
         userId: 'user_1',
       }),
     );
-    expect(notificationPublisher.publishOtpRequested).not.toHaveBeenCalled();
+    expect(notificationPublisher.publishOtpRequested).toHaveBeenCalledWith({
+      userId: 'user_1',
+      otpCodeId: 'otp_1',
+      dedupeKey: expect.stringMatching(/^otp\.requested:/) as unknown,
+      payload: {
+        phone: '+2348012345678',
+        otp: expect.any(String) as unknown,
+      },
+    });
+    expect(prisma.otpCode.update).toHaveBeenCalledWith({
+      where: { id: 'otp_1' },
+      data: { requestCompletedAt: expect.any(Date) as Date },
+    });
   });
 });

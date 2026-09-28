@@ -204,10 +204,16 @@ describe('AuthService', () => {
     });
     expect(notificationPublisher.publishOtpRequested).toHaveBeenCalledWith({
       userId: 'user_1',
+      otpCodeId: 'otp_1',
+      dedupeKey: expect.stringMatching(/^otp\.requested:/) as unknown,
       payload: {
         phone: '+2348012345678',
         otp: expect.any(String) as unknown,
       },
+    });
+    expect(prisma.otpCode.update).toHaveBeenCalledWith({
+      where: { id: 'otp_1' },
+      data: { requestCompletedAt: expect.any(Date) as Date },
     });
     expect(telemetry.recordEvent).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -237,6 +243,8 @@ describe('AuthService', () => {
     expect(response).not.toHaveProperty('otp');
     expect(notificationPublisher.publishOtpRequested).toHaveBeenCalledWith({
       userId: 'user_1',
+      otpCodeId: 'otp_1',
+      dedupeKey: expect.stringMatching(/^otp\.requested:/) as unknown,
       payload: {
         phone: '+2348012345678',
         otp: expect.any(String) as unknown,
@@ -269,6 +277,8 @@ describe('AuthService', () => {
     });
     expect(notificationPublisher.publishOtpRequested).toHaveBeenCalledWith({
       userId: 'user_1',
+      otpCodeId: 'otp_1',
+      dedupeKey: expect.stringMatching(/^otp\.requested:/) as unknown,
       payload: { phone: '+2348012345678', otp: response.otp },
     });
     expect(insecureRandom).not.toHaveBeenCalled();
@@ -411,13 +421,8 @@ describe('AuthService', () => {
         userAgent: 'jest-agent',
       },
     });
-    expect(telemetry.recordEvent).toHaveBeenCalledWith(
-      expect.objectContaining({
-        type: 'otp_requested',
-        phone: '+2348012345678',
-        countryIso: 'NG',
-      }),
-    );
+    expect(prisma.otpCode.update).not.toHaveBeenCalled();
+    expect(telemetry.recordEvent).not.toHaveBeenCalled();
   });
 
   it('rejects otp resend during cooldown window', async () => {

@@ -47,8 +47,18 @@ describe('NotificationQueueService encrypt IV uniqueness', () => {
     );
 
     const payload = { phone: '+2348000000000', otp: '123456' };
-    await queue.enqueueOtpRequested(payload);
-    await queue.enqueueOtpRequested(payload);
+    await queue.enqueueOtpRequested(
+      payload,
+      undefined,
+      'otp_1',
+      'otp.requested:key-1',
+    );
+    await queue.enqueueOtpRequested(
+      payload,
+      undefined,
+      'otp_2',
+      'otp.requested:key-2',
+    );
 
     expect(envelopes).toHaveLength(2);
     expect(envelopes[0]).not.toEqual(envelopes[1]);
