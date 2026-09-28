@@ -3,6 +3,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { createHmac } from 'node:crypto';
 import * as jwt from 'jsonwebtoken';
 import request from 'supertest';
+import { randomUUID } from 'node:crypto';
 import { App } from 'supertest/types';
 import { AppModule } from './../src/app.module';
 import { configureApp } from './../src/app.setup';
@@ -83,6 +84,7 @@ describe('Auth notification pipeline (e2e)', () => {
   it('persists, sends, and verifies an OTP through the real database pipeline', async () => {
     const otpResponse = await request(app.getHttpServer())
       .post('/auth/request-otp')
+      .set('Idempotency-Key', randomUUID())
       .set('User-Agent', OTP_REQUEST_USER_AGENT)
       .set('X-Stead-Device-Id', DEVICE_ID)
       .send({ phone: HAPPY_PATH_PHONE, countryIso: 'NG' })
@@ -205,6 +207,7 @@ describe('Auth notification pipeline (e2e)', () => {
 
     const otpResponse = await request(app.getHttpServer())
       .post('/auth/request-otp')
+      .set('Idempotency-Key', randomUUID())
       .set('User-Agent', OTP_REQUEST_USER_AGENT)
       .send({ phone: FAILURE_PATH_PHONE, countryIso: 'NG' })
       .expect(201);
@@ -300,16 +303,19 @@ describe('Auth notification pipeline (e2e)', () => {
   it('rate limits OTP requests and verification failures by device', async () => {
     await request(app.getHttpServer())
       .post('/auth/request-otp')
+      .set('Idempotency-Key', randomUUID())
       .set('X-Stead-Device-Id', DEVICE_ID)
       .send({ phone: '08021234567', countryIso: 'NG' })
       .expect(201);
     await request(app.getHttpServer())
       .post('/auth/request-otp')
+      .set('Idempotency-Key', randomUUID())
       .set('X-Stead-Device-Id', DEVICE_ID)
       .send({ phone: '08041234567', countryIso: 'NG' })
       .expect(201);
     await request(app.getHttpServer())
       .post('/auth/request-otp')
+      .set('Idempotency-Key', randomUUID())
       .set('X-Stead-Device-Id', DEVICE_ID)
       .send({ phone: '08061234567', countryIso: 'NG' })
       .expect(429)
@@ -321,6 +327,7 @@ describe('Auth notification pipeline (e2e)', () => {
 
     const otpResponse = await request(app.getHttpServer())
       .post('/auth/request-otp')
+      .set('Idempotency-Key', randomUUID())
       .set('X-Stead-Device-Id', SECOND_DEVICE_ID)
       .send({ phone: '08071234567', countryIso: 'NG' })
       .expect(201);

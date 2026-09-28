@@ -23,7 +23,9 @@ describe('AuthService OTP crypto padding', () => {
     otpCode: {
       count: jest.Mock;
       create: jest.Mock;
+      findUnique: jest.Mock;
       findFirst: jest.Mock;
+      update: jest.Mock;
     };
     user: {
       upsert: jest.Mock;
@@ -37,7 +39,9 @@ describe('AuthService OTP crypto padding', () => {
       otpCode: {
         count: jest.fn().mockResolvedValue(0),
         create: jest.fn().mockResolvedValue({ id: 'otp_1' }),
+        findUnique: jest.fn().mockResolvedValue(null),
         findFirst: jest.fn().mockResolvedValue(null),
+        update: jest.fn(),
       },
       user: {
         upsert: jest.fn().mockResolvedValue({
@@ -107,6 +111,7 @@ describe('AuthService OTP crypto padding', () => {
       jest.mocked(randomInt).mockReturnValue(value);
 
       const response = await service.requestOtp('08012345678', 'NG', {
+        idempotencyKey: '00000000-0000-4000-8000-000000000001',
         ip: '127.0.0.1',
         userAgent: 'jest-agent',
       });

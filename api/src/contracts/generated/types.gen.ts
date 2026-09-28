@@ -342,6 +342,11 @@ export type ErrorResponse = {
 };
 
 /**
+ * Stable UUIDv4 reused for every retry of one logical OTP request.
+ */
+export type IdempotencyKey = string;
+
+/**
  * Optional mobile installation UUID used as an additive abuse-control signal. The API persists only a keyed hash.
  */
 export type SteadDeviceId = string;
@@ -367,11 +372,15 @@ export type GetAuthCountriesResponse =
 
 export type RequestOtpData = {
   body: RequestOtpRequest;
-  headers?: {
+  headers: {
     /**
      * Optional mobile installation UUID used as an additive abuse-control signal. The API persists only a keyed hash.
      */
     'X-Stead-Device-Id'?: string;
+    /**
+     * Stable UUIDv4 reused for every retry of one logical OTP request.
+     */
+    'Idempotency-Key': string;
   };
   path?: never;
   query?: never;
@@ -384,9 +393,17 @@ export type RequestOtpErrors = {
    */
   400: ErrorResponse;
   /**
+   * The idempotency key was already used for a different request.
+   */
+  409: ErrorResponse;
+  /**
    * OTP abuse-control limit reached.
    */
   429: ErrorResponse;
+  /**
+   * The original idempotent request is still processing; retry with the same key.
+   */
+  503: ErrorResponse;
 };
 
 export type RequestOtpError = RequestOtpErrors[keyof RequestOtpErrors];

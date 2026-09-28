@@ -3,6 +3,7 @@ import axios, {
   type InternalAxiosRequestConfig,
   isAxiosError,
 } from 'axios';
+import * as Crypto from 'expo-crypto';
 import { z } from 'zod';
 import { appConfig } from './app-config';
 import { resolveApiBaseUrl } from './base-url';
@@ -56,6 +57,25 @@ type AuthConfig = {
 
 type RetryableRequestConfig = InternalAxiosRequestConfig & {
   _steadRetry?: boolean;
+};
+
+const OTP_REQUEST_MAX_ATTEMPTS = 3;
+const OTP_REQUEST_RETRY_BASE_MS = 500;
+
+const wait = (milliseconds: number) =>
+  new Promise((resolve) => setTimeout(resolve, milliseconds));
+
+const isRetryableOtpRequestError = (error: unknown) =>
+  error instanceof ApiError &&
+  (error.status === undefined ||
+    error.status === 408 ||
+    error.status === 425 ||
+    error.status >= 500);
+
+const otpRetryDelayMs = (failedAttempt: number) => {
+  const exponential = OTP_REQUEST_RETRY_BASE_MS * 2 ** (failedAttempt - 1);
+  const jitter = 0.75 + Math.random() * 0.5;
+  return Math.round(exponential * jitter);
 };
 
 const PUBLIC_AUTH_PATHS = [
@@ -197,11 +217,27 @@ export const fetchAuthCountries = async () => {
 
 export const requestOtp = async (phone: string, countryIso: string) => {
   const payload: RequestOtpRequest = { phone, countryIso };
-  const response = await apiClient.post(
-    appConfig.api.routes.auth.requestOtp,
-    payload,
-  );
-  return AuthRequestOtpResponseSchema.parse(response.data);
+  const idempotencyKey = Crypto.randomUUID();
+
+  for (let attempt = 1; attempt <= OTP_REQUEST_MAX_ATTEMPTS; attempt += 1) {
+    try {
+      const response = await apiClient.post(
+        appConfig.api.routes.auth.requestOtp,
+        payload,
+        { headers: { 'Idempotency-Key': idempotencyKey } },
+      );
+      return AuthRequestOtpResponseSchema.parse(response.data);
+    } catch (error: unknown) {
+      const canRetry =
+        isRetryableOtpRequestError(error) && attempt < OTP_REQUEST_MAX_ATTEMPTS;
+      if (!canRetry) {
+        throw error;
+      }
+      await wait(otpRetryDelayMs(attempt));
+    }
+  }
+
+  throw new ApiError({ message: 'OTP request retry policy exhausted' });
 };
 
 export const verifyOtp = async (

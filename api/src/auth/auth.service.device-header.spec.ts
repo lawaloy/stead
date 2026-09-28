@@ -14,7 +14,9 @@ describe('AuthService device header edges', () => {
     otpCode: {
       count: jest.Mock;
       create: jest.Mock;
+      findUnique: jest.Mock;
       findFirst: jest.Mock;
+      update: jest.Mock;
     };
     user: {
       upsert: jest.Mock;
@@ -29,7 +31,9 @@ describe('AuthService device header edges', () => {
       otpCode: {
         count: jest.fn(),
         create: jest.fn(),
+        findUnique: jest.fn().mockResolvedValue(null),
         findFirst: jest.fn(),
+        update: jest.fn(),
       },
       user: {
         upsert: jest.fn(),
@@ -87,10 +91,16 @@ describe('AuthService device header edges', () => {
     'rejects a malformed device id (%p) before writing an OTP',
     async (deviceId) => {
       await expect(
-        service.requestOtp('08012345678', 'NG', { deviceId }),
+        service.requestOtp('08012345678', 'NG', {
+          deviceId,
+          idempotencyKey: '00000000-0000-4000-8000-000000000001',
+        }),
       ).rejects.toBeInstanceOf(BadRequestException);
       await expect(
-        service.requestOtp('08012345678', 'NG', { deviceId }),
+        service.requestOtp('08012345678', 'NG', {
+          deviceId,
+          idempotencyKey: '00000000-0000-4000-8000-000000000001',
+        }),
       ).rejects.toMatchObject({
         message: 'X-Stead-Device-Id must be a valid UUIDv4 identifier',
       });
@@ -124,7 +134,10 @@ describe('AuthService device header edges', () => {
     prisma.otpCode.findFirst.mockResolvedValue(null);
     prisma.otpCode.create.mockResolvedValue({ id: 'otp_1' });
 
-    await service.requestOtp('08012345678', 'NG', { deviceId: '' });
+    await service.requestOtp('08012345678', 'NG', {
+      deviceId: '',
+      idempotencyKey: '00000000-0000-4000-8000-000000000001',
+    });
 
     expect(telemetry.countRecentEvents).not.toHaveBeenCalled();
     expect(notificationPublisher.publishOtpRequested).toHaveBeenCalledWith({

@@ -88,6 +88,7 @@ export type {
   GetDashboardStabilityResponses,
   Goal,
   GoalStatus,
+  IdempotencyKey,
   ListGoalsData,
   ListGoalsError,
   ListGoalsErrors,
