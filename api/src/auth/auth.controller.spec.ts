@@ -5,6 +5,7 @@ import { AuthTelemetryService } from './auth-telemetry.service';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { CountriesService } from '../countries/countries.service';
+import { BadRequestException } from '@nestjs/common';
 
 describe('AuthController', () => {
   let controller: AuthController;
@@ -56,11 +57,13 @@ describe('AuthController', () => {
   it('passes request metadata when requesting otp', () => {
     const req = {
       ip: '127.0.0.1',
-      get: jest.fn((header: string) =>
-        header === 'user-agent'
-          ? 'jest-agent'
-          : '0f81c2a7-1e6d-4f05-9a1c-03de8a5f6b77',
-      ),
+      get: jest.fn((header: string) => {
+        if (header === 'user-agent') return 'jest-agent';
+        if (header === 'x-stead-device-id') {
+          return '0f81c2a7-1e6d-4f05-9a1c-03de8a5f6b77';
+        }
+        return '00000000-0000-4000-8000-000000000001';
+      }),
     };
 
     void controller.requestOtp(
@@ -72,6 +75,7 @@ describe('AuthController', () => {
       ip: '127.0.0.1',
       userAgent: 'jest-agent',
       deviceId: '0f81c2a7-1e6d-4f05-9a1c-03de8a5f6b77',
+      idempotencyKey: '00000000-0000-4000-8000-000000000001',
     });
   });
 
@@ -102,10 +106,14 @@ describe('AuthController', () => {
     );
   });
 
-  it('forwards undefined ip and user-agent when request metadata is absent', () => {
+  it('forwards undefined optional metadata when request metadata is absent', () => {
     const req = {
       ip: undefined,
-      get: jest.fn().mockReturnValue(undefined),
+      get: jest.fn((header: string) =>
+        header === 'idempotency-key'
+          ? '00000000-0000-4000-8000-000000000001'
+          : undefined,
+      ),
     };
 
     void controller.requestOtp(
@@ -121,6 +129,7 @@ describe('AuthController', () => {
       ip: undefined,
       userAgent: undefined,
       deviceId: undefined,
+      idempotencyKey: '00000000-0000-4000-8000-000000000001',
     });
     expect(authService.verifyOtp).toHaveBeenCalledWith(
       '08012345678',
@@ -134,6 +143,21 @@ describe('AuthController', () => {
     );
     expect(req.get).toHaveBeenCalledWith('user-agent');
     expect(req.get).toHaveBeenCalledWith('x-stead-device-id');
+  });
+
+  it('rejects an OTP request without an Idempotency-Key header', () => {
+    const req = {
+      ip: '127.0.0.1',
+      get: jest.fn().mockReturnValue(undefined),
+    };
+
+    expect(() =>
+      controller.requestOtp(
+        { phone: '08012345678', countryIso: 'NG' },
+        req as never,
+      ),
+    ).toThrow(BadRequestException);
+    expect(authService.requestOtp).not.toHaveBeenCalled();
   });
 
   it('passes refresh and logout credentials to the auth service', () => {

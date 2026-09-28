@@ -1,6 +1,7 @@
 import { INestApplication } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import request from 'supertest';
+import { randomUUID } from 'node:crypto';
 import { App } from 'supertest/types';
 import { AppModule } from './../src/app.module';
 import { configureApp } from './../src/app.setup';
@@ -57,11 +58,13 @@ describe('Auth OTP IP abuse and resend cooldown (e2e)', () => {
   it('blocks a second OTP request for the same phone during the resend cooldown', async () => {
     await request(app.getHttpServer())
       .post('/auth/request-otp')
+      .set('Idempotency-Key', randomUUID())
       .send({ phone: '08033445566', countryIso: 'NG' })
       .expect(201);
 
     await request(app.getHttpServer())
       .post('/auth/request-otp')
+      .set('Idempotency-Key', randomUUID())
       .send({ phone: '08033445566', countryIso: 'NG' })
       .expect(429)
       .expect((response) => {
@@ -85,6 +88,7 @@ describe('Auth OTP IP abuse and resend cooldown (e2e)', () => {
       const phone = `08002${String(index).padStart(6, '0')}`;
       await request(app.getHttpServer())
         .post('/auth/request-otp')
+        .set('Idempotency-Key', randomUUID())
         .send({ phone, countryIso: 'NG' })
         .expect(201);
     }
@@ -99,6 +103,7 @@ describe('Auth OTP IP abuse and resend cooldown (e2e)', () => {
 
     await request(app.getHttpServer())
       .post('/auth/request-otp')
+      .set('Idempotency-Key', randomUUID())
       .send({ phone: '08002999999', countryIso: 'NG' })
       .expect(429)
       .expect((response) => {
@@ -117,6 +122,7 @@ describe('Auth OTP IP abuse and resend cooldown (e2e)', () => {
   it('rate limits OTP verify failures by client IP when the device header is omitted', async () => {
     const otpResponse = await request(app.getHttpServer())
       .post('/auth/request-otp')
+      .set('Idempotency-Key', randomUUID())
       .send({ phone: '08003123456', countryIso: 'NG' })
       .expect(201);
     const otp = (otpResponse.body as { otp: string }).otp;

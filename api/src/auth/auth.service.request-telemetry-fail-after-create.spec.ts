@@ -13,6 +13,7 @@ describe('AuthService telemetry failure after OTP create', () => {
     otpCode: {
       count: jest.Mock;
       create: jest.Mock;
+      findUnique: jest.Mock;
       findFirst: jest.Mock;
     };
     user: {
@@ -27,6 +28,7 @@ describe('AuthService telemetry failure after OTP create', () => {
       otpCode: {
         count: jest.fn(),
         create: jest.fn(),
+        findUnique: jest.fn().mockResolvedValue(null),
         findFirst: jest.fn(),
       },
       user: {
@@ -87,6 +89,7 @@ describe('AuthService telemetry failure after OTP create', () => {
 
     await expect(
       service.requestOtp('08012345678', 'NG', {
+        idempotencyKey: '00000000-0000-4000-8000-000000000001',
         ip: '127.0.0.1',
         userAgent: 'jest-agent',
       }),
@@ -96,6 +99,8 @@ describe('AuthService telemetry failure after OTP create', () => {
       data: {
         userId: 'user_1',
         codeHash: expect.any(String) as unknown,
+        requestKeyHash: expect.any(String) as unknown,
+        developmentOtp: undefined,
         expiresAt: expect.any(Date) as unknown,
         ip: '127.0.0.1',
         userAgent: 'jest-agent',

@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   HttpException,
   HttpStatus,
   Inject,
@@ -30,7 +31,7 @@ import {
   parseDurationToMs,
   parseDurationToSeconds,
 } from './refresh-token.util';
-import { randomInt } from 'node:crypto';
+import { createHash, randomInt } from 'node:crypto';
 
 const DEFAULT_OTP_REQUEST_LIMIT_PER_HOUR = 5;
 const DEFAULT_OTP_RESEND_COOLDOWN_MS = 60_000;
@@ -46,11 +47,17 @@ const DEFAULT_REFRESH_FAMILY_MAX_AGE = '90d';
 const DEFAULT_REFRESH_MAX_FAMILIES_PER_USER = 5;
 const OTP_LENGTH = 6;
 const OTP_UPPER_BOUND = 10 ** OTP_LENGTH;
+const IDEMPOTENCY_KEY_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-type OtpRequestContext = {
+type AuthRequestContext = {
   ip?: string;
   userAgent?: string;
   deviceId?: string;
+};
+
+type OtpRequestContext = AuthRequestContext & {
+  idempotencyKey: string;
 };
 
 type SessionUser = {
@@ -95,6 +102,45 @@ export class AuthService {
     );
   }
 
+  private buildOtpRequestResponse(
+    developmentOtp?: string | null,
+  ): RequestOtpResponse {
+    if (
+      this.config.get<string>('DEV_EXPOSE_OTP') === 'true' &&
+      developmentOtp
+    ) {
+      return { ok: true, otp: developmentOtp };
+    }
+
+    return { ok: true };
+  }
+
+  private async replayOtpRequest(
+    requestKeyHash: string,
+    normalizedPhone: string,
+  ): Promise<RequestOtpResponse | null> {
+    const existing = await this.prisma.otpCode.findUnique({
+      where: { requestKeyHash },
+      include: { user: { select: { phone: true } } },
+    });
+    if (!existing) return null;
+
+    if (existing.user.phone !== normalizedPhone) {
+      throw new ConflictException(
+        'Idempotency-Key was already used for another OTP request.',
+      );
+    }
+
+    if (!existing.requestCompletedAt) {
+      throw new HttpException(
+        'The matching OTP request is still processing. Retry shortly.',
+        HttpStatus.SERVICE_UNAVAILABLE,
+      );
+    }
+
+    return this.buildOtpRequestResponse(existing.developmentOtp);
+  }
+
   private get otpRequestLimitPerIpPerHour() {
     return (
       this.config.get<number>('AUTH_OTP_REQUEST_LIMIT_PER_IP_PER_HOUR') ??
@@ -134,13 +180,22 @@ export class AuthService {
   async requestOtp(
     phone: string,
     countryIso: string,
-    context: OtpRequestContext = {},
+    context: OtpRequestContext,
   ): Promise<RequestOtpResponse> {
     const country = await this.countries.requireAuthCountry(countryIso);
     const normalizedPhone = normalizePhoneNumber(
       phone,
       country.iso as CountryIso,
     );
+    const idempotencyKey = context.idempotencyKey.trim().toLowerCase();
+    if (!IDEMPOTENCY_KEY_PATTERN.test(idempotencyKey)) {
+      throw new BadRequestException('Idempotency-Key must be a UUIDv4 value.');
+    }
+    const requestKeyHash = createHash('sha256')
+      .update(idempotencyKey)
+      .digest('hex');
+    const replay = await this.replayOtpRequest(requestKeyHash, normalizedPhone);
+    if (replay) return replay;
     const deviceHash = hashDeviceIdentifier(
       context.deviceId,
       this.config.get<string>('AUTH_DEVICE_IDENTIFIER_SECRET'),
@@ -236,6 +291,19 @@ export class AuthService {
       orderBy: { createdAt: 'desc' },
     });
     if (latestOtp) {
+      if (
+        latestOtp.requestKeyHash === requestKeyHash &&
+        latestOtp.requestCompletedAt
+      ) {
+        return this.buildOtpRequestResponse(latestOtp.developmentOtp);
+      }
+      if (latestOtp.requestKeyHash === requestKeyHash) {
+        throw new HttpException(
+          'The matching OTP request is still processing. Retry shortly.',
+          HttpStatus.SERVICE_UNAVAILABLE,
+        );
+      }
+
       await this.telemetry.recordEvent({
         type: 'otp_resend_blocked',
         phone: normalizedPhone,
@@ -254,16 +322,38 @@ export class AuthService {
     const otp = generateOtp();
     const codeHash = await bcrypt.hash(otp, 10);
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
+    const developmentOtp =
+      this.config.get<string>('DEV_EXPOSE_OTP') === 'true' ? otp : undefined;
 
-    await this.prisma.otpCode.create({
-      data: {
-        userId: user.id,
-        codeHash,
-        expiresAt,
-        ip: context.ip || undefined,
-        userAgent: context.userAgent || undefined,
-      },
-    });
+    let otpCodeId: string;
+    try {
+      const created = await this.prisma.otpCode.create({
+        data: {
+          userId: user.id,
+          codeHash,
+          requestKeyHash,
+          developmentOtp,
+          expiresAt,
+          ip: context.ip || undefined,
+          userAgent: context.userAgent || undefined,
+        },
+      });
+      otpCodeId = created.id;
+    } catch (error: unknown) {
+      if (
+        error &&
+        typeof error === 'object' &&
+        'code' in error &&
+        error.code === 'P2002'
+      ) {
+        const replay = await this.replayOtpRequest(
+          requestKeyHash,
+          normalizedPhone,
+        );
+        if (replay) return replay;
+      }
+      throw error;
+    }
 
     await this.telemetry.recordEvent({
       type: 'otp_requested',
@@ -278,18 +368,19 @@ export class AuthService {
       payload: { phone: normalizedPhone, otp },
     });
 
-    if (this.config.get<string>('DEV_EXPOSE_OTP') === 'true') {
-      return { ok: true, otp };
-    }
+    await this.prisma.otpCode.update({
+      where: { id: otpCodeId },
+      data: { requestCompletedAt: new Date() },
+    });
 
-    return { ok: true };
+    return this.buildOtpRequestResponse(developmentOtp);
   }
 
   async verifyOtp(
     phone: string,
     countryIso: string,
     otp: string,
-    context: OtpRequestContext = {},
+    context: AuthRequestContext = {},
   ): Promise<VerifyOtpResponse> {
     const country = await this.countries.requireAuthCountry(countryIso);
     const normalizedPhone = normalizePhoneNumber(
@@ -473,7 +564,7 @@ export class AuthService {
 
   async refreshSession(
     refreshToken: string,
-    context: OtpRequestContext = {},
+    context: AuthRequestContext = {},
   ): Promise<VerifyOtpResponse> {
     const tokenHash = hashRefreshToken(refreshToken);
     const existing = await this.prisma.refreshToken.findUnique({

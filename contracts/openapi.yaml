@@ -21,6 +21,7 @@ paths:
       operationId: requestOtp
       parameters:
         - $ref: '#/components/parameters/SteadDeviceId'
+        - $ref: '#/components/parameters/IdempotencyKey'
       requestBody:
         required: true
         content:
@@ -36,8 +37,12 @@ paths:
                 $ref: '#/components/schemas/RequestOtpResponse'
         '400':
           $ref: '#/components/responses/BadRequest'
+        '409':
+          $ref: '#/components/responses/Conflict'
         '429':
           $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
   /auth/verify-otp:
     post:
       operationId: verifyOtp
@@ -510,6 +515,15 @@ components:
       scheme: bearer
       bearerFormat: JWT
   parameters:
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      description: Stable UUIDv4 reused for every retry of one logical OTP request.
+      schema:
+        type: string
+        format: uuid
+        pattern: '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$'
     SteadDeviceId:
       name: X-Stead-Device-Id
       in: header
@@ -545,8 +559,20 @@ components:
         application/json:
           schema:
             $ref: '#/components/schemas/ErrorResponse'
+    Conflict:
+      description: The idempotency key was already used for a different request.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
     TooManyRequests:
       description: OTP abuse-control limit reached.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    ServiceUnavailable:
+      description: The original idempotent request is still processing; retry with the same key.
       content:
         application/json:
           schema:

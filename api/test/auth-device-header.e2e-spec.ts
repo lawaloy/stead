@@ -1,6 +1,7 @@
 import { INestApplication } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import request from 'supertest';
+import { randomUUID } from 'node:crypto';
 import { App } from 'supertest/types';
 import { AppModule } from './../src/app.module';
 import { configureApp } from './../src/app.setup';
@@ -54,6 +55,7 @@ describe('Auth device header (e2e)', () => {
   it('rejects malformed X-Stead-Device-Id on request and verify without persisting auth state', async () => {
     await request(app.getHttpServer())
       .post('/auth/request-otp')
+      .set('Idempotency-Key', randomUUID())
       .set('X-Stead-Device-Id', 'device-one')
       .send({ phone: '08091234567', countryIso: 'NG' })
       .expect(400)
@@ -83,6 +85,7 @@ describe('Auth device header (e2e)', () => {
   it('lets older clients omit the device header and stores no device hash', async () => {
     const otpResponse = await request(app.getHttpServer())
       .post('/auth/request-otp')
+      .set('Idempotency-Key', randomUUID())
       .send({ phone: OMITTED_HEADER_PHONE, countryIso: 'NG' })
       .expect(201);
     const otpBody = otpResponse.body as { ok: boolean; otp: string };
@@ -119,6 +122,7 @@ describe('Auth device header (e2e)', () => {
   it('still hashes a valid device header on the same request path', async () => {
     await request(app.getHttpServer())
       .post('/auth/request-otp')
+      .set('Idempotency-Key', randomUUID())
       .set('X-Stead-Device-Id', VALID_DEVICE_ID)
       .send({ phone: '08011234567', countryIso: 'NG' })
       .expect(201);

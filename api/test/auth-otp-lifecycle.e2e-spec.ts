@@ -1,6 +1,7 @@
 import { INestApplication } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import * as bcrypt from 'bcrypt';
+import { randomUUID } from 'node:crypto';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import { AppModule } from './../src/app.module';
@@ -55,6 +56,7 @@ describe('Auth OTP lifecycle edges (e2e)', () => {
   async function requestOtp(phone: string) {
     const response = await request(app.getHttpServer())
       .post('/auth/request-otp')
+      .set('Idempotency-Key', randomUUID())
       .send({ phone, countryIso: 'NG' })
       .expect(201);
     return response.body as { ok: true; otp: string };
@@ -84,9 +86,45 @@ describe('Auth OTP lifecycle edges (e2e)', () => {
     ).toBe(true);
   });
 
+  it('requires an idempotency key for every OTP request', async () => {
+    await request(app.getHttpServer())
+      .post('/auth/request-otp')
+      .send({ phone: '08012345678', countryIso: 'NG' })
+      .expect(400)
+      .expect((response) => {
+        expect(response.body).toMatchObject({
+          message: 'Idempotency-Key header is required.',
+        });
+      });
+
+    await expect(prisma.otpCode.count()).resolves.toBe(0);
+  });
+
+  it('replays an idempotent OTP request without issuing another code', async () => {
+    const idempotencyKey = '0f81c2a7-1e6d-4f05-9a1c-03de8a5f6b77';
+    const first = await request(app.getHttpServer())
+      .post('/auth/request-otp')
+      .set('Idempotency-Key', idempotencyKey)
+      .send({ phone: '08012345678', countryIso: 'NG' })
+      .expect(201);
+    const replay = await request(app.getHttpServer())
+      .post('/auth/request-otp')
+      .set('Idempotency-Key', idempotencyKey)
+      .send({ phone: '08012345678', countryIso: 'NG' })
+      .expect(201);
+
+    expect(replay.body).toEqual(first.body);
+    await expect(prisma.otpCode.count()).resolves.toBe(1);
+    await expect(prisma.notificationJob.count()).resolves.toBe(1);
+    await expect(
+      prisma.authEvent.count({ where: { type: 'otp_requested' } }),
+    ).resolves.toBe(1);
+  });
+
   it('rejects OTP requests when the phone does not match the selected country', async () => {
     await request(app.getHttpServer())
       .post('/auth/request-otp')
+      .set('Idempotency-Key', randomUUID())
       .send({ phone: '+14155552671', countryIso: 'NG' })
       .expect(400)
       .expect((response) => {
@@ -103,6 +141,7 @@ describe('Auth OTP lifecycle edges (e2e)', () => {
   it('rejects OTP requests for an unsupported country before writing auth state', async () => {
     await request(app.getHttpServer())
       .post('/auth/request-otp')
+      .set('Idempotency-Key', randomUUID())
       .send({ phone: '08012345678', countryIso: 'ZZ' })
       .expect(400)
       .expect((response) => {
@@ -226,6 +265,7 @@ describe('Auth OTP lifecycle edges (e2e)', () => {
       data: Array.from({ length: PHONE_HOURLY_LIMIT }, () => ({
         userId: user.id,
         codeHash,
+        requestKeyHash: randomUUID(),
         createdAt,
         expiresAt,
       })),
@@ -233,6 +273,7 @@ describe('Auth OTP lifecycle edges (e2e)', () => {
 
     await request(app.getHttpServer())
       .post('/auth/request-otp')
+      .set('Idempotency-Key', randomUUID())
       .send({ phone, countryIso: 'NG' })
       .expect(429)
       .expect((response) => {
@@ -559,6 +600,7 @@ describe('Auth OTP lifecycle edges (e2e)', () => {
 
     await request(app.getHttpServer())
       .post('/auth/request-otp')
+      .set('Idempotency-Key', randomUUID())
       .send({ phone, countryIso: 'NG' })
       .expect(429)
       .expect((response) => {

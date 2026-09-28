@@ -13,6 +13,7 @@ describe('AuthService missing device identifier secret', () => {
     otpCode: {
       count: jest.Mock;
       create: jest.Mock;
+      findUnique: jest.Mock;
       findFirst: jest.Mock;
     };
     user: {
@@ -30,6 +31,7 @@ describe('AuthService missing device identifier secret', () => {
       otpCode: {
         count: jest.fn(),
         create: jest.fn(),
+        findUnique: jest.fn().mockResolvedValue(null),
         findFirst: jest.fn(),
       },
       user: {
@@ -86,7 +88,10 @@ describe('AuthService missing device identifier secret', () => {
 
   it('rejects OTP request and verify when device id is present but device secret is unset', async () => {
     await expect(
-      service.requestOtp('08012345678', 'NG', { deviceId }),
+      service.requestOtp('08012345678', 'NG', {
+        deviceId,
+        idempotencyKey: '00000000-0000-4000-8000-000000000001',
+      }),
     ).rejects.toThrow('Auth device identifier secret is not configured');
     await expect(
       service.verifyOtp('08012345678', 'NG', '123456', { deviceId }),

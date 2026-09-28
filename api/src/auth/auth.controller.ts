@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   DefaultValuePipe,
@@ -36,10 +37,16 @@ export class AuthController {
 
   @Post('request-otp')
   requestOtp(@Body() dto: RequestOtpDto, @Req() req: Request) {
+    const idempotencyKey = req.get('idempotency-key');
+    if (!idempotencyKey) {
+      throw new BadRequestException('Idempotency-Key header is required.');
+    }
+
     return this.auth.requestOtp(dto.phone, dto.countryIso, {
       ip: req.ip,
       userAgent: req.get('user-agent'),
       deviceId: req.get('x-stead-device-id'),
+      idempotencyKey,
     });
   }
 

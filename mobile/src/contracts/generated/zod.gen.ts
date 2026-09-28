@@ -324,6 +324,15 @@ export const zErrorResponse = z.object({
 });
 
 /**
+ * Stable UUIDv4 reused for every retry of one logical OTP request.
+ */
+export const zIdempotencyKey = z
+  .uuid()
+  .regex(
+    /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$/,
+  );
+
+/**
  * Optional mobile installation UUID used as an additive abuse-control signal. The API persists only a keyed hash.
  */
 export const zSteadDeviceId = z
@@ -348,6 +357,11 @@ export const zRequestOtpHeaders = z.object({
       /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$/,
     )
     .optional(),
+  'Idempotency-Key': z
+    .uuid()
+    .regex(
+      /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$/,
+    ),
 });
 
 /**

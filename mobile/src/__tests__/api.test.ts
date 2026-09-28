@@ -32,6 +32,8 @@ describe('api client', () => {
   const mock = createAxiosMock(apiClient);
 
   afterEach(() => {
+    jest.useRealTimers();
+    jest.restoreAllMocks();
     mock.reset();
     configureApiAuth(idleAuth);
   });
@@ -68,6 +70,46 @@ describe('api client', () => {
       ok: true,
       otp: '123456',
     });
+  });
+
+  it('retries transient OTP failures with backoff and one idempotency key', async () => {
+    jest.useFakeTimers();
+    jest.spyOn(Math, 'random').mockReturnValue(0.5);
+    const idempotencyKeys: string[] = [];
+    let attempts = 0;
+
+    mock.onPost('/auth/request-otp').reply((config) => {
+      attempts += 1;
+      idempotencyKeys.push(String(config.headers?.['Idempotency-Key']));
+      if (attempts < 3) return [503, { message: 'still processing' }];
+      return [200, { ok: true, otp: '123456' }];
+    });
+
+    const responsePromise = requestOtp('08012345678', 'NG');
+    await jest.runAllTimersAsync();
+
+    await expect(responsePromise).resolves.toEqual({
+      ok: true,
+      otp: '123456',
+    });
+    expect(attempts).toBe(3);
+    expect(new Set(idempotencyKeys).size).toBe(1);
+    expect(idempotencyKeys[0]).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
+    );
+  });
+
+  it('does not retry a rate-limited OTP request', async () => {
+    let attempts = 0;
+    mock.onPost('/auth/request-otp').reply(() => {
+      attempts += 1;
+      return [429, { message: 'Please wait before requesting another OTP.' }];
+    });
+
+    await expect(requestOtp('08012345678', 'NG')).rejects.toMatchObject({
+      status: 429,
+    });
+    expect(attempts).toBe(1);
   });
 
   it('posts country-aware payloads for otp verification', async () => {

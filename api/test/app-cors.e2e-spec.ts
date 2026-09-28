@@ -41,12 +41,15 @@ describe('App CORS (e2e)', () => {
       .options('/auth/request-otp')
       .set('Origin', 'http://localhost:8081')
       .set('Access-Control-Request-Method', 'POST')
-      .set('Access-Control-Request-Headers', 'content-type,x-stead-device-id')
+      .set(
+        'Access-Control-Request-Headers',
+        'content-type,idempotency-key,x-stead-device-id',
+      )
       .expect(204)
       .expect('access-control-allow-origin', 'http://localhost:8081')
       .expect(
         'access-control-allow-headers',
-        /content-type,x-stead-device-id/i,
+        /content-type,idempotency-key,x-stead-device-id/i,
       );
   });
 });

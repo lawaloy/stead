@@ -14,6 +14,7 @@ describe('AuthService IP omit branches', () => {
     otpCode: {
       count: jest.Mock;
       create: jest.Mock;
+      findUnique: jest.Mock;
       findFirst: jest.Mock;
       update: jest.Mock;
       updateMany: jest.Mock;
@@ -42,6 +43,7 @@ describe('AuthService IP omit branches', () => {
       otpCode: {
         count: jest.fn(),
         create: jest.fn(),
+        findUnique: jest.fn().mockResolvedValue(null),
         findFirst: jest.fn(),
         update: jest.fn(),
         updateMany: jest.fn(),
@@ -116,7 +118,9 @@ describe('AuthService IP omit branches', () => {
     prisma.otpCode.findFirst.mockResolvedValue(null);
     prisma.otpCode.create.mockResolvedValue({ id: 'otp_1' });
 
-    await service.requestOtp('08012345678', 'NG', {});
+    await service.requestOtp('08012345678', 'NG', {
+      idempotencyKey: '00000000-0000-4000-8000-000000000001',
+    });
 
     expect(telemetry.countRecentEvents).not.toHaveBeenCalled();
     expect(prisma.otpCode.count).toHaveBeenCalled();
@@ -131,6 +135,8 @@ describe('AuthService IP omit branches', () => {
       data: {
         userId: 'user_1',
         codeHash: expect.any(String) as unknown,
+        requestKeyHash: expect.any(String) as unknown,
+        developmentOtp: undefined,
         expiresAt: expect.any(Date) as unknown,
         ip: undefined,
         userAgent: undefined,

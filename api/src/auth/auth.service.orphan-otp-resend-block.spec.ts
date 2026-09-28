@@ -14,6 +14,7 @@ describe('AuthService orphan OTP resend block', () => {
     otpCode: {
       count: jest.Mock;
       create: jest.Mock;
+      findUnique: jest.Mock;
       findFirst: jest.Mock;
     };
     user: {
@@ -28,6 +29,7 @@ describe('AuthService orphan OTP resend block', () => {
       otpCode: {
         count: jest.fn(),
         create: jest.fn(),
+        findUnique: jest.fn().mockResolvedValue(null),
         findFirst: jest.fn(),
       },
       user: {
@@ -92,6 +94,7 @@ describe('AuthService orphan OTP resend block', () => {
 
     await expect(
       service.requestOtp('08012345678', 'NG', {
+        idempotencyKey: '00000000-0000-4000-8000-000000000001',
         ip: '127.0.0.1',
         userAgent: 'jest-agent',
       }),
@@ -102,6 +105,7 @@ describe('AuthService orphan OTP resend block', () => {
 
     await expect(
       service.requestOtp('08012345678', 'NG', {
+        idempotencyKey: '00000000-0000-4000-8000-000000000002',
         ip: '127.0.0.1',
         userAgent: 'jest-agent',
       }),

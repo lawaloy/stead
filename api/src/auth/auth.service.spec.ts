@@ -10,6 +10,10 @@ import { PrismaService } from '../prisma/prisma.service';
 import { NOTIFICATION_PUBLISHER } from '../notifications/notification-publisher';
 import { CountriesService } from '../countries/countries.service';
 
+const OTP_CONTEXT = {
+  idempotencyKey: '00000000-0000-4000-8000-000000000001',
+};
+
 describe('AuthService', () => {
   let service: AuthService;
   type MockUser = { id: string; phone: string };
@@ -24,6 +28,7 @@ describe('AuthService', () => {
     otpCode: {
       count: jest.Mock;
       create: jest.Mock;
+      findUnique: jest.Mock;
       findFirst: jest.Mock;
       update: jest.Mock;
       updateMany: jest.Mock;
@@ -52,6 +57,7 @@ describe('AuthService', () => {
       otpCode: {
         count: jest.fn(),
         create: jest.fn(),
+        findUnique: jest.fn().mockResolvedValue(null),
         findFirst: jest.fn(),
         update: jest.fn(),
         updateMany: jest.fn(),
@@ -149,16 +155,16 @@ describe('AuthService', () => {
       new BadRequestException('countryIso must be supported'),
     );
 
-    await expect(service.requestOtp('08012345678', 'ZZ')).rejects.toThrow(
-      'countryIso must be supported',
-    );
+    await expect(
+      service.requestOtp('08012345678', 'ZZ', OTP_CONTEXT),
+    ).rejects.toThrow('countryIso must be supported');
     expect(prisma.user.upsert).not.toHaveBeenCalled();
   });
 
   it('rejects otp requests when phone does not match the selected country', async () => {
-    await expect(service.requestOtp('+1 415 555 2671', 'NG')).rejects.toThrow(
-      BadRequestException,
-    );
+    await expect(
+      service.requestOtp('+1 415 555 2671', 'NG', OTP_CONTEXT),
+    ).rejects.toThrow(BadRequestException);
 
     expect(prisma.otpCode.count).not.toHaveBeenCalled();
     expect(prisma.user.upsert).not.toHaveBeenCalled();
@@ -175,6 +181,7 @@ describe('AuthService', () => {
     prisma.otpCode.create.mockResolvedValue({ id: 'otp_1' });
 
     await service.requestOtp('08012345678', 'NG', {
+      ...OTP_CONTEXT,
       ip: '127.0.0.1',
       userAgent: 'jest-agent',
     });
@@ -188,6 +195,8 @@ describe('AuthService', () => {
       data: {
         userId: 'user_1',
         codeHash: expect.any(String) as unknown,
+        requestKeyHash: expect.any(String) as unknown,
+        developmentOtp: undefined,
         expiresAt: expect.any(Date) as unknown,
         ip: '127.0.0.1',
         userAgent: 'jest-agent',
@@ -219,6 +228,7 @@ describe('AuthService', () => {
     prisma.otpCode.create.mockResolvedValue({ id: 'otp_1' });
 
     const response = await service.requestOtp('08012345678', 'NG', {
+      ...OTP_CONTEXT,
       ip: '127.0.0.1',
       userAgent: 'jest-agent',
     });
@@ -248,6 +258,7 @@ describe('AuthService', () => {
     prisma.otpCode.create.mockResolvedValue({ id: 'otp_1' });
 
     const response = await service.requestOtp('08012345678', 'NG', {
+      ...OTP_CONTEXT,
       ip: '127.0.0.1',
       userAgent: 'jest-agent',
     });
@@ -268,6 +279,7 @@ describe('AuthService', () => {
 
     await expect(
       service.requestOtp('08012345678', 'NG', {
+        ...OTP_CONTEXT,
         ip: '127.0.0.1',
         userAgent: 'jest-agent',
       }),
@@ -306,6 +318,7 @@ describe('AuthService', () => {
 
     await expect(
       service.requestOtp('08012345678', 'NG', {
+        ...OTP_CONTEXT,
         deviceId,
         userAgent: 'jest-agent',
       }),
@@ -337,6 +350,7 @@ describe('AuthService', () => {
 
     await expect(
       service.requestOtp('08012345678', 'NG', {
+        ...OTP_CONTEXT,
         ip: '127.0.0.1',
         userAgent: 'jest-agent',
       }),
@@ -380,6 +394,7 @@ describe('AuthService', () => {
 
     await expect(
       service.requestOtp('08012345678', 'NG', {
+        ...OTP_CONTEXT,
         ip: '127.0.0.1',
         userAgent: 'jest-agent',
       }),
@@ -389,6 +404,8 @@ describe('AuthService', () => {
       data: {
         userId: 'user_1',
         codeHash: expect.any(String) as unknown,
+        requestKeyHash: expect.any(String) as unknown,
+        developmentOtp: undefined,
         expiresAt: expect.any(Date) as unknown,
         ip: '127.0.0.1',
         userAgent: 'jest-agent',
@@ -411,11 +428,11 @@ describe('AuthService', () => {
     } satisfies MockUser);
     prisma.otpCode.findFirst.mockResolvedValue({ id: 'otp_recent' });
 
-    await expect(service.requestOtp('+2348012345678', 'NG')).rejects.toThrow(
-      HttpException,
-    );
     await expect(
-      service.requestOtp('+2348012345678', 'NG'),
+      service.requestOtp('+2348012345678', 'NG', OTP_CONTEXT),
+    ).rejects.toThrow(HttpException);
+    await expect(
+      service.requestOtp('+2348012345678', 'NG', OTP_CONTEXT),
     ).rejects.toMatchObject({
       message: 'Please wait before requesting another OTP.',
     });
@@ -441,7 +458,7 @@ describe('AuthService', () => {
     prisma.otpCode.findFirst.mockResolvedValue({ id: 'otp_recent' });
 
     await expect(
-      service.requestOtp('+2348012345678', 'NG'),
+      service.requestOtp('+2348012345678', 'NG', OTP_CONTEXT),
     ).rejects.toMatchObject({
       message: 'Please wait before requesting another OTP.',
       status: HttpStatus.TOO_MANY_REQUESTS,
@@ -472,6 +489,7 @@ describe('AuthService', () => {
     telemetry.countRecentEvents.mockResolvedValueOnce(3);
     await expect(
       service.requestOtp('08012345678', 'NG', {
+        ...OTP_CONTEXT,
         ip: '203.0.113.10',
         userAgent: 'jest-agent',
       }),
@@ -490,6 +508,7 @@ describe('AuthService', () => {
     prisma.otpCode.count.mockResolvedValueOnce(4);
     await expect(
       service.requestOtp('08012345678', 'NG', {
+        ...OTP_CONTEXT,
         ip: '203.0.113.10',
         userAgent: 'jest-agent',
       }),
@@ -514,7 +533,7 @@ describe('AuthService', () => {
     prisma.otpCode.findFirst.mockResolvedValue(null);
     prisma.otpCode.create.mockResolvedValue({ id: 'otp_us' });
 
-    await service.requestOtp('4155552671', 'US');
+    await service.requestOtp('4155552671', 'US', OTP_CONTEXT);
 
     expect(prisma.user.upsert).toHaveBeenCalledWith({
       where: { phone: '+14155552671' },
