@@ -390,7 +390,7 @@ describe('AuthService', () => {
     );
   });
 
-  it('surfaces notification enqueue failures after storing the otp', async () => {
+  it('records the abuse event before surfacing notification enqueue failures', async () => {
     prisma.otpCode.count.mockResolvedValue(0);
     prisma.user.upsert.mockResolvedValue({
       id: 'user_1',
@@ -422,7 +422,16 @@ describe('AuthService', () => {
       },
     });
     expect(prisma.otpCode.update).not.toHaveBeenCalled();
-    expect(telemetry.recordEvent).not.toHaveBeenCalled();
+    expect(telemetry.recordEvent).toHaveBeenCalledWith({
+      type: 'otp_requested',
+      phone: '+2348012345678',
+      countryIso: 'NG',
+      ip: '127.0.0.1',
+      userAgent: 'jest-agent',
+      deviceHash: undefined,
+      userId: 'user_1',
+      otpCodeId: 'otp_1',
+    });
   });
 
   it('rejects otp resend during cooldown window', async () => {

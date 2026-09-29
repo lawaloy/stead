@@ -139,10 +139,17 @@ export class AuthService {
     if (!existing.requestCompletedAt) {
       const notificationDedupeKey = otpNotificationDedupeKey(requestKeyHash);
       if (
-        await this.notificationPublisher.isOtpRequestEnqueued(
+        (await this.notificationPublisher.isOtpRequestEnqueued(
           notificationDedupeKey,
           existing.id,
-        )
+        )) ||
+        (await this.notificationPublisher.adoptLegacyOtpRequest({
+          userId: existing.userId,
+          otpCodeId: existing.id,
+          dedupeKey: notificationDedupeKey,
+          requestedAt: existing.createdAt,
+          expiresAt: existing.expiresAt,
+        }))
       ) {
         await this.prisma.otpCode.update({
           where: { id: existing.id },
@@ -409,6 +416,22 @@ export class AuthService {
     }
 
     const notificationDedupeKey = otpNotificationDedupeKey(requestKeyHash);
+    try {
+      await this.telemetry.recordEvent({
+        type: 'otp_requested',
+        phone: normalizedPhone,
+        countryIso: country.iso,
+        ...eventContext,
+        userId: user.id,
+        otpCodeId,
+      });
+    } catch (error: unknown) {
+      await this.prisma.otpCode
+        .deleteMany({ where: { id: otpCodeId, requestCompletedAt: null } })
+        .catch(() => undefined);
+      throw error;
+    }
+
     await this.notificationPublisher.publishOtpRequested({
       userId: user.id,
       otpCodeId,
@@ -419,14 +442,6 @@ export class AuthService {
     await this.prisma.otpCode.update({
       where: { id: otpCodeId },
       data: { requestCompletedAt: new Date() },
-    });
-
-    await this.telemetry.recordEvent({
-      type: 'otp_requested',
-      phone: normalizedPhone,
-      countryIso: country.iso,
-      ...eventContext,
-      userId: user.id,
     });
 
     return this.buildOtpRequestResponse(developmentOtp);

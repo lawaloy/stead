@@ -160,17 +160,17 @@ describe('Operator inspection access (e2e)', () => {
     await prisma.notificationJob.createMany({
       data: [
         {
-          type: 'otp.requested',
+          type: 'weekly.summary',
           payloadJson: redactedPayload,
           status: 'sent',
         },
         {
-          type: 'otp.requested',
+          type: 'weekly.summary',
           payloadJson: redactedPayload,
           status: 'sent',
         },
         {
-          type: 'otp.requested',
+          type: 'weekly.summary',
           payloadJson: redactedPayload,
           status: 'dead_letter',
         },

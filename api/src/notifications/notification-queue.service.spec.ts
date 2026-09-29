@@ -163,6 +163,47 @@ describe('NotificationQueueService', () => {
     ).resolves.toBe(false);
   });
 
+  it('adopts a legacy OTP job into the linked queue contract', async () => {
+    const requestedAt = new Date('2026-09-28T10:00:00Z');
+    const expiresAt = new Date('2026-09-28T10:10:00Z');
+    prisma.notificationJob.findFirst.mockResolvedValue({ id: 'legacy_job' });
+    prisma.notificationJob.updateMany.mockResolvedValue({ count: 1 });
+
+    await expect(
+      queue.adoptLegacyOtpRequest({
+        userId: 'user_1',
+        otpCodeId: 'otp_1',
+        dedupeKey: 'otp.requested:key-hash',
+        requestedAt,
+        expiresAt,
+      }),
+    ).resolves.toBe(true);
+    expect(prisma.notificationJob.findFirst).toHaveBeenCalledWith({
+      where: {
+        type: 'otp.requested',
+        userId: 'user_1',
+        otpCodeId: null,
+        dedupeKey: null,
+        createdAt: { gte: requestedAt, lte: expiresAt },
+      },
+      orderBy: { createdAt: 'asc' },
+      select: { id: true },
+    });
+    expect(prisma.notificationJob.updateMany).toHaveBeenCalledWith({
+      where: {
+        id: 'legacy_job',
+        type: 'otp.requested',
+        userId: 'user_1',
+        otpCodeId: null,
+        dedupeKey: null,
+      },
+      data: {
+        otpCodeId: 'otp_1',
+        dedupeKey: 'otp.requested:key-hash',
+      },
+    });
+  });
+
   it('deletes linked and legacy queued jobs for an account phone', async () => {
     let legacyPayload = '';
     prisma.notificationJob.create.mockImplementation(

@@ -12,6 +12,14 @@ export interface OtpRequestedInput {
   payload: OtpRequestedPayload;
 }
 
+export interface LegacyOtpRequestInput {
+  userId: string;
+  otpCodeId: string;
+  dedupeKey: string;
+  requestedAt: Date;
+  expiresAt: Date;
+}
+
 export type ReadinessAlertType =
   'weekly.summary' | 'risk.alert' | 'risk.recovery';
 
@@ -31,5 +39,6 @@ export interface ReadinessAlertInput {
 export interface NotificationPublisher {
   publishOtpRequested(input: OtpRequestedInput): Promise<void>;
   isOtpRequestEnqueued(dedupeKey: string, otpCodeId: string): Promise<boolean>;
+  adoptLegacyOtpRequest(input: LegacyOtpRequestInput): Promise<boolean>;
   publishReadinessAlert(input: ReadinessAlertInput): Promise<boolean>;
 }

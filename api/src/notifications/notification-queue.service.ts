@@ -12,7 +12,10 @@ import {
   OtpRequestedPayload,
   ReadinessAlertPayload,
 } from './notification.types';
-import type { ReadinessAlertInput } from './notification-publisher';
+import type {
+  LegacyOtpRequestInput,
+  ReadinessAlertInput,
+} from './notification-publisher';
 
 const JOB_LOCK_TIMEOUT_MS = 5 * 60 * 1000;
 const REDACTED_PAYLOAD_JSON = JSON.stringify({ redacted: true });
@@ -120,6 +123,52 @@ export class NotificationQueueService {
     return (
       existing?.type === 'otp.requested' && existing.otpCodeId === otpCodeId
     );
+  }
+
+  async adoptLegacyOtpRequest(input: LegacyOtpRequestInput): Promise<boolean> {
+    const legacyJob = await this.prisma.notificationJob.findFirst({
+      where: {
+        type: 'otp.requested',
+        userId: input.userId,
+        otpCodeId: null,
+        dedupeKey: null,
+        createdAt: {
+          gte: input.requestedAt,
+          lte: input.expiresAt,
+        },
+      },
+      orderBy: { createdAt: 'asc' },
+      select: { id: true },
+    });
+    if (!legacyJob) return false;
+
+    try {
+      const adopted = await this.prisma.notificationJob.updateMany({
+        where: {
+          id: legacyJob.id,
+          type: 'otp.requested',
+          userId: input.userId,
+          otpCodeId: null,
+          dedupeKey: null,
+        },
+        data: {
+          otpCodeId: input.otpCodeId,
+          dedupeKey: input.dedupeKey,
+        },
+      });
+      if (adopted.count === 1) return true;
+    } catch (error: unknown) {
+      if (
+        !error ||
+        typeof error !== 'object' ||
+        !('code' in error) ||
+        error.code !== 'P2002'
+      ) {
+        throw error;
+      }
+    }
+
+    return this.isOtpRequestEnqueued(input.dedupeKey, input.otpCodeId);
   }
 
   async enqueueReadinessAlert(input: ReadinessAlertInput): Promise<boolean> {

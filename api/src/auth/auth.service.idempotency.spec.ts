@@ -26,6 +26,7 @@ describe('AuthService OTP request idempotency', () => {
   let notificationPublisher: {
     publishOtpRequested: jest.Mock;
     isOtpRequestEnqueued: jest.Mock;
+    adoptLegacyOtpRequest: jest.Mock;
   };
 
   beforeEach(async () => {
@@ -48,6 +49,7 @@ describe('AuthService OTP request idempotency', () => {
     notificationPublisher = {
       publishOtpRequested: jest.fn(),
       isOtpRequestEnqueued: jest.fn().mockResolvedValue(false),
+      adoptLegacyOtpRequest: jest.fn().mockResolvedValue(false),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -159,6 +161,36 @@ describe('AuthService OTP request idempotency', () => {
       data: { requestCompletedAt: expect.any(Date) as Date },
     });
     expect(prisma.otpCode.create).not.toHaveBeenCalled();
+    expect(notificationPublisher.publishOtpRequested).not.toHaveBeenCalled();
+  });
+
+  it('adopts a queued job from the previous release before stale cleanup', async () => {
+    const createdAt = new Date(Date.now() - 60_000);
+    const expiresAt = new Date(Date.now() + 9 * 60_000);
+    prisma.otpCode.findUnique.mockResolvedValue({
+      id: 'otp_legacy',
+      userId: 'user_1',
+      createdAt,
+      expiresAt,
+      requestCompletedAt: null,
+      developmentOtp: '123456',
+      user: { phone: '+2348012345678' },
+    });
+    notificationPublisher.adoptLegacyOtpRequest.mockResolvedValue(true);
+
+    await expect(
+      service.requestOtp('08012345678', 'NG', {
+        idempotencyKey: IDEMPOTENCY_KEY,
+      }),
+    ).resolves.toEqual({ ok: true, otp: '123456' });
+    expect(notificationPublisher.adoptLegacyOtpRequest).toHaveBeenCalledWith({
+      userId: 'user_1',
+      otpCodeId: 'otp_legacy',
+      dedupeKey: expect.stringMatching(/^otp\.requested:/) as unknown,
+      requestedAt: createdAt,
+      expiresAt,
+    });
+    expect(prisma.otpCode.deleteMany).not.toHaveBeenCalled();
     expect(notificationPublisher.publishOtpRequested).not.toHaveBeenCalled();
   });
 

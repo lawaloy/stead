@@ -5,6 +5,7 @@ describe('QueuedNotificationPublisher', () => {
   let queue: {
     enqueueOtpRequested: jest.Mock;
     isOtpRequestEnqueued: jest.Mock;
+    adoptLegacyOtpRequest: jest.Mock;
     enqueueReadinessAlert: jest.Mock;
   };
 
@@ -12,6 +13,7 @@ describe('QueuedNotificationPublisher', () => {
     queue = {
       enqueueOtpRequested: jest.fn(),
       isOtpRequestEnqueued: jest.fn(),
+      adoptLegacyOtpRequest: jest.fn(),
       enqueueReadinessAlert: jest.fn(),
     };
     publisher = new QueuedNotificationPublisher(queue as never);
@@ -60,6 +62,20 @@ describe('QueuedNotificationPublisher', () => {
       'otp.requested:key-hash',
       'otp_1',
     );
+  });
+
+  it('delegates adoption of a legacy OTP notification', async () => {
+    const input = {
+      userId: 'user_1',
+      otpCodeId: 'otp_1',
+      dedupeKey: 'otp.requested:key-hash',
+      requestedAt: new Date('2026-09-28T10:00:00Z'),
+      expiresAt: new Date('2026-09-28T10:10:00Z'),
+    };
+    queue.adoptLegacyOtpRequest.mockResolvedValue(true);
+
+    await expect(publisher.adoptLegacyOtpRequest(input)).resolves.toBe(true);
+    expect(queue.adoptLegacyOtpRequest).toHaveBeenCalledWith(input);
   });
 
   it('returns the readiness enqueue result without swallowing collisions', async () => {
