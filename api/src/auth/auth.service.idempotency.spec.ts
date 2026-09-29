@@ -19,10 +19,15 @@ describe('AuthService OTP request idempotency', () => {
       findFirst: jest.Mock;
       findUnique: jest.Mock;
       update: jest.Mock;
+      deleteMany: jest.Mock;
     };
     user: { upsert: jest.Mock };
   };
-  let notificationPublisher: { publishOtpRequested: jest.Mock };
+  let notificationPublisher: {
+    publishOtpRequested: jest.Mock;
+    isOtpRequestEnqueued: jest.Mock;
+    adoptLegacyOtpRequest: jest.Mock;
+  };
 
   beforeEach(async () => {
     prisma = {
@@ -32,6 +37,7 @@ describe('AuthService OTP request idempotency', () => {
         findFirst: jest.fn().mockResolvedValue(null),
         findUnique: jest.fn().mockResolvedValue(null),
         update: jest.fn().mockResolvedValue({ id: 'otp_1' }),
+        deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
       },
       user: {
         upsert: jest.fn().mockResolvedValue({
@@ -40,7 +46,11 @@ describe('AuthService OTP request idempotency', () => {
         }),
       },
     };
-    notificationPublisher = { publishOtpRequested: jest.fn() };
+    notificationPublisher = {
+      publishOtpRequested: jest.fn(),
+      isOtpRequestEnqueued: jest.fn().mockResolvedValue(false),
+      adoptLegacyOtpRequest: jest.fn().mockResolvedValue(false),
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -116,6 +126,8 @@ describe('AuthService OTP request idempotency', () => {
 
   it('returns a retryable response while the original request is processing', async () => {
     prisma.otpCode.findUnique.mockResolvedValue({
+      id: 'otp_1',
+      createdAt: new Date(),
       requestCompletedAt: null,
       developmentOtp: '123456',
       user: { phone: '+2348012345678' },
@@ -127,6 +139,168 @@ describe('AuthService OTP request idempotency', () => {
       }),
     ).rejects.toMatchObject({ status: HttpStatus.SERVICE_UNAVAILABLE });
     expect(prisma.otpCode.create).not.toHaveBeenCalled();
+  });
+
+  it('repairs an incomplete request when its notification job was enqueued', async () => {
+    prisma.otpCode.findUnique.mockResolvedValue({
+      id: 'otp_1',
+      createdAt: new Date(Date.now() - 60_000),
+      requestCompletedAt: null,
+      developmentOtp: '123456',
+      user: { phone: '+2348012345678' },
+    });
+    notificationPublisher.isOtpRequestEnqueued.mockResolvedValue(true);
+
+    await expect(
+      service.requestOtp('08012345678', 'NG', {
+        idempotencyKey: IDEMPOTENCY_KEY,
+      }),
+    ).resolves.toEqual({ ok: true, otp: '123456' });
+    expect(prisma.otpCode.update).toHaveBeenCalledWith({
+      where: { id: 'otp_1' },
+      data: { requestCompletedAt: expect.any(Date) as Date },
+    });
+    expect(prisma.otpCode.create).not.toHaveBeenCalled();
+    expect(notificationPublisher.publishOtpRequested).not.toHaveBeenCalled();
+  });
+
+  it('adopts a queued job from the previous release before stale cleanup', async () => {
+    const createdAt = new Date(Date.now() - 60_000);
+    const expiresAt = new Date(Date.now() + 9 * 60_000);
+    prisma.otpCode.findUnique.mockResolvedValue({
+      id: 'otp_legacy',
+      userId: 'user_1',
+      createdAt,
+      expiresAt,
+      requestCompletedAt: null,
+      developmentOtp: '123456',
+      user: { phone: '+2348012345678' },
+    });
+    notificationPublisher.adoptLegacyOtpRequest.mockResolvedValue(true);
+
+    await expect(
+      service.requestOtp('08012345678', 'NG', {
+        idempotencyKey: IDEMPOTENCY_KEY,
+      }),
+    ).resolves.toEqual({ ok: true, otp: '123456' });
+    expect(notificationPublisher.adoptLegacyOtpRequest).toHaveBeenCalledWith({
+      userId: 'user_1',
+      otpCodeId: 'otp_legacy',
+      dedupeKey: expect.stringMatching(/^otp\.requested:/) as unknown,
+      requestedAt: createdAt,
+      expiresAt,
+    });
+    expect(prisma.otpCode.deleteMany).not.toHaveBeenCalled();
+    expect(notificationPublisher.publishOtpRequested).not.toHaveBeenCalled();
+  });
+
+  it('restarts a stale incomplete request when no notification was enqueued', async () => {
+    prisma.otpCode.findUnique.mockResolvedValueOnce({
+      id: 'otp_stale',
+      createdAt: new Date(Date.now() - 60_000),
+      requestCompletedAt: null,
+      developmentOtp: '111111',
+      user: { phone: '+2348012345678' },
+    });
+    prisma.otpCode.deleteMany.mockResolvedValue({ count: 1 });
+
+    await expect(
+      service.requestOtp('08012345678', 'NG', {
+        idempotencyKey: IDEMPOTENCY_KEY,
+      }),
+    ).resolves.toMatchObject({ ok: true });
+    expect(prisma.otpCode.deleteMany).toHaveBeenCalledWith({
+      where: {
+        id: 'otp_stale',
+        requestCompletedAt: null,
+        createdAt: { lte: expect.any(Date) as Date },
+      },
+    });
+    expect(prisma.otpCode.create).toHaveBeenCalledTimes(1);
+    expect(notificationPublisher.publishOtpRequested).toHaveBeenCalledTimes(1);
+  });
+
+  it('repairs a stale request when enqueue wins the cleanup race', async () => {
+    prisma.otpCode.findUnique.mockResolvedValue({
+      id: 'otp_stale',
+      createdAt: new Date(Date.now() - 60_000),
+      requestCompletedAt: null,
+      developmentOtp: '123456',
+      user: { phone: '+2348012345678' },
+    });
+    notificationPublisher.isOtpRequestEnqueued
+      .mockResolvedValueOnce(false)
+      .mockResolvedValueOnce(true);
+    prisma.otpCode.deleteMany.mockRejectedValue({ code: 'P2003' });
+
+    await expect(
+      service.requestOtp('08012345678', 'NG', {
+        idempotencyKey: IDEMPOTENCY_KEY,
+      }),
+    ).resolves.toEqual({ ok: true, otp: '123456' });
+    expect(prisma.otpCode.update).toHaveBeenCalledWith({
+      where: { id: 'otp_stale' },
+      data: { requestCompletedAt: expect.any(Date) as Date },
+    });
+    expect(prisma.otpCode.create).not.toHaveBeenCalled();
+  });
+
+  it('repairs completion after enqueue succeeds but the completion write fails', async () => {
+    prisma.otpCode.update
+      .mockRejectedValueOnce(new Error('completion write unavailable'))
+      .mockResolvedValueOnce({ id: 'otp_1' });
+
+    await expect(
+      service.requestOtp('08012345678', 'NG', {
+        idempotencyKey: IDEMPOTENCY_KEY,
+      }),
+    ).rejects.toThrow('completion write unavailable');
+
+    prisma.otpCode.findUnique.mockResolvedValue({
+      id: 'otp_1',
+      createdAt: new Date(),
+      requestCompletedAt: null,
+      developmentOtp: '123456',
+      user: { phone: '+2348012345678' },
+    });
+    notificationPublisher.isOtpRequestEnqueued.mockResolvedValue(true);
+
+    await expect(
+      service.requestOtp('08012345678', 'NG', {
+        idempotencyKey: IDEMPOTENCY_KEY,
+      }),
+    ).resolves.toEqual({ ok: true, otp: '123456' });
+    expect(notificationPublisher.publishOtpRequested).toHaveBeenCalledTimes(1);
+    expect(prisma.otpCode.update).toHaveBeenCalledTimes(2);
+  });
+
+  it('restarts after a failed enqueue once the incomplete request is stale', async () => {
+    notificationPublisher.publishOtpRequested.mockRejectedValueOnce(
+      new Error('queue unavailable'),
+    );
+
+    await expect(
+      service.requestOtp('08012345678', 'NG', {
+        idempotencyKey: IDEMPOTENCY_KEY,
+      }),
+    ).rejects.toThrow('queue unavailable');
+
+    prisma.otpCode.findUnique.mockResolvedValueOnce({
+      id: 'otp_1',
+      createdAt: new Date(Date.now() - 60_000),
+      requestCompletedAt: null,
+      developmentOtp: '123456',
+      user: { phone: '+2348012345678' },
+    });
+    prisma.otpCode.deleteMany.mockResolvedValue({ count: 1 });
+
+    await expect(
+      service.requestOtp('08012345678', 'NG', {
+        idempotencyKey: IDEMPOTENCY_KEY,
+      }),
+    ).resolves.toMatchObject({ ok: true });
+    expect(notificationPublisher.publishOtpRequested).toHaveBeenCalledTimes(2);
+    expect(prisma.otpCode.create).toHaveBeenCalledTimes(2);
   });
 
   it('replays the winning request when concurrent inserts collide', async () => {

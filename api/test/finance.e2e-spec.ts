@@ -84,11 +84,11 @@ describe('Finance flows (e2e)', () => {
 
     await prisma.$transaction([
       prisma.authEvent.deleteMany(),
+      prisma.notificationJob.deleteMany(),
       prisma.otpCode.deleteMany(),
       prisma.transaction.deleteMany(),
       prisma.goal.deleteMany(),
       prisma.user.deleteMany(),
-      prisma.notificationJob.deleteMany(),
     ]);
   }
 

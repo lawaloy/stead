@@ -15,6 +15,8 @@ describe('AuthService telemetry failure after OTP create', () => {
       create: jest.Mock;
       findUnique: jest.Mock;
       findFirst: jest.Mock;
+      update: jest.Mock;
+      deleteMany: jest.Mock;
     };
     user: {
       upsert: jest.Mock;
@@ -30,6 +32,8 @@ describe('AuthService telemetry failure after OTP create', () => {
         create: jest.fn(),
         findUnique: jest.fn().mockResolvedValue(null),
         findFirst: jest.fn(),
+        update: jest.fn(),
+        deleteMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
       user: {
         upsert: jest.fn(),
@@ -77,7 +81,7 @@ describe('AuthService telemetry failure after OTP create', () => {
     service = module.get<AuthService>(AuthService);
   });
 
-  it('persists the OTP but does not enqueue SMS when request telemetry fails', async () => {
+  it('does not queue an uncounted OTP when telemetry persistence fails', async () => {
     prisma.otpCode.count.mockResolvedValue(0);
     prisma.user.upsert.mockResolvedValue({
       id: 'user_1',
@@ -115,5 +119,9 @@ describe('AuthService telemetry failure after OTP create', () => {
       }),
     );
     expect(notificationPublisher.publishOtpRequested).not.toHaveBeenCalled();
+    expect(prisma.otpCode.deleteMany).toHaveBeenCalledWith({
+      where: { id: 'otp_1', requestCompletedAt: null },
+    });
+    expect(prisma.otpCode.update).not.toHaveBeenCalled();
   });
 });

@@ -116,7 +116,8 @@ model OtpCode {
   ip        String?
   userAgent String?
 
-  authEvents AuthEvent[]
+  authEvents      AuthEvent[]
+  notificationJob NotificationJob?
 }
 
 model AuthEvent {
@@ -214,6 +215,8 @@ model NotificationJob {
   providerMessageId String?
   userId            String?
   user              User?                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  otpCodeId         String?               @unique
+  otpCode           OtpCode?              @relation(fields: [otpCodeId], references: [id], onDelete: Restrict)
   goalId            String?
   dedupeKey         String?               @unique
   createdAt         DateTime              @default(now())

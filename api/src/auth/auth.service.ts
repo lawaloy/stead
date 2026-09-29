@@ -41,6 +41,7 @@ const DEFAULT_OTP_REQUEST_LIMIT_PER_DEVICE_PER_HOUR = 5;
 const DEFAULT_OTP_VERIFY_FAILURE_LIMIT_PER_IP_WINDOW = 10;
 const DEFAULT_OTP_VERIFY_FAILURE_LIMIT_PER_DEVICE_WINDOW = 8;
 const DEFAULT_OTP_VERIFY_FAILURE_WINDOW_MS = 15 * 60 * 1000;
+const OTP_REQUEST_PROCESSING_TIMEOUT_MS = 30_000;
 const DEFAULT_JWT_EXPIRES_IN = '15m';
 const DEFAULT_REFRESH_TOKEN_EXPIRES_IN = '30d';
 const DEFAULT_REFRESH_FAMILY_MAX_AGE = '90d';
@@ -67,6 +68,10 @@ type SessionUser = {
 
 function generateOtp() {
   return randomInt(0, OTP_UPPER_BOUND).toString().padStart(OTP_LENGTH, '0');
+}
+
+function otpNotificationDedupeKey(requestKeyHash: string) {
+  return `otp.requested:${requestKeyHash}`;
 }
 
 @Injectable()
@@ -132,6 +137,61 @@ export class AuthService {
     }
 
     if (!existing.requestCompletedAt) {
+      const notificationDedupeKey = otpNotificationDedupeKey(requestKeyHash);
+      if (
+        (await this.notificationPublisher.isOtpRequestEnqueued(
+          notificationDedupeKey,
+          existing.id,
+        )) ||
+        (await this.notificationPublisher.adoptLegacyOtpRequest({
+          userId: existing.userId,
+          otpCodeId: existing.id,
+          dedupeKey: notificationDedupeKey,
+          requestedAt: existing.createdAt,
+          expiresAt: existing.expiresAt,
+        }))
+      ) {
+        await this.prisma.otpCode.update({
+          where: { id: existing.id },
+          data: { requestCompletedAt: new Date() },
+        });
+        return this.buildOtpRequestResponse(existing.developmentOtp);
+      }
+
+      const processingDeadline = new Date(
+        Date.now() - OTP_REQUEST_PROCESSING_TIMEOUT_MS,
+      );
+      if (existing.createdAt <= processingDeadline) {
+        try {
+          const removed = await this.prisma.otpCode.deleteMany({
+            where: {
+              id: existing.id,
+              requestCompletedAt: null,
+              createdAt: { lte: processingDeadline },
+            },
+          });
+          if (removed.count === 1) return null;
+        } catch (error: unknown) {
+          if (
+            error &&
+            typeof error === 'object' &&
+            'code' in error &&
+            error.code === 'P2003' &&
+            (await this.notificationPublisher.isOtpRequestEnqueued(
+              notificationDedupeKey,
+              existing.id,
+            ))
+          ) {
+            await this.prisma.otpCode.update({
+              where: { id: existing.id },
+              data: { requestCompletedAt: new Date() },
+            });
+            return this.buildOtpRequestResponse(existing.developmentOtp);
+          }
+          throw error;
+        }
+      }
+
       throw new HttpException(
         'The matching OTP request is still processing. Retry shortly.',
         HttpStatus.SERVICE_UNAVAILABLE,
@@ -355,16 +415,27 @@ export class AuthService {
       throw error;
     }
 
-    await this.telemetry.recordEvent({
-      type: 'otp_requested',
-      phone: normalizedPhone,
-      countryIso: country.iso,
-      ...eventContext,
-      userId: user.id,
-    });
+    const notificationDedupeKey = otpNotificationDedupeKey(requestKeyHash);
+    try {
+      await this.telemetry.recordEvent({
+        type: 'otp_requested',
+        phone: normalizedPhone,
+        countryIso: country.iso,
+        ...eventContext,
+        userId: user.id,
+        otpCodeId,
+      });
+    } catch (error: unknown) {
+      await this.prisma.otpCode
+        .deleteMany({ where: { id: otpCodeId, requestCompletedAt: null } })
+        .catch(() => undefined);
+      throw error;
+    }
 
     await this.notificationPublisher.publishOtpRequested({
       userId: user.id,
+      otpCodeId,
+      dedupeKey: notificationDedupeKey,
       payload: { phone: normalizedPhone, otp },
     });
 

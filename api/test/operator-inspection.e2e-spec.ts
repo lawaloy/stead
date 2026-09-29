@@ -42,11 +42,11 @@ describe('Operator inspection access (e2e)', () => {
 
     await prisma.$transaction([
       prisma.authEvent.deleteMany(),
+      prisma.notificationJob.deleteMany(),
       prisma.otpCode.deleteMany(),
       prisma.transaction.deleteMany(),
       prisma.goal.deleteMany(),
       prisma.user.deleteMany(),
-      prisma.notificationJob.deleteMany(),
     ]);
   }
 
@@ -160,17 +160,17 @@ describe('Operator inspection access (e2e)', () => {
     await prisma.notificationJob.createMany({
       data: [
         {
-          type: 'otp.requested',
+          type: 'weekly.summary',
           payloadJson: redactedPayload,
           status: 'sent',
         },
         {
-          type: 'otp.requested',
+          type: 'weekly.summary',
           payloadJson: redactedPayload,
           status: 'sent',
         },
         {
-          type: 'otp.requested',
+          type: 'weekly.summary',
           payloadJson: redactedPayload,
           status: 'dead_letter',
         },

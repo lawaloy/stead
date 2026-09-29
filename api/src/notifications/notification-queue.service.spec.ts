@@ -65,10 +65,15 @@ describe('NotificationQueueService', () => {
     );
     prisma.notificationJob.findFirst.mockResolvedValue({ id: 'job_1' });
     prisma.notificationJob.updateMany.mockResolvedValue({ count: 1 });
-    await queue.enqueueOtpRequested({
-      phone: '+2348000000000',
-      otp: '123456',
-    });
+    await queue.enqueueOtpRequested(
+      {
+        phone: '+2348000000000',
+        otp: '123456',
+      },
+      undefined,
+      'otp_1',
+      'otp.requested:test-1',
+    );
     expect(encryptedPayloadJson).not.toContain('+2348000000000');
     expect(encryptedPayloadJson).not.toContain('123456');
 
@@ -99,7 +104,104 @@ describe('NotificationQueueService', () => {
       phone: '+2348000000000',
       otp: '123456',
     });
-    expect(prisma.notificationJob.create).toHaveBeenCalled();
+    expect(prisma.notificationJob.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        type: 'otp.requested',
+        otpCodeId: 'otp_1',
+        dedupeKey: 'otp.requested:test-1',
+      }) as unknown,
+    });
+  });
+
+  it('reuses the existing OTP job when the dedupe key collides', async () => {
+    prisma.notificationJob.create.mockRejectedValue({ code: 'P2002' });
+    prisma.notificationJob.findUnique.mockResolvedValue({
+      id: 'job_existing',
+      type: 'otp.requested',
+      otpCodeId: 'otp_1',
+    });
+
+    await expect(
+      queue.enqueueOtpRequested(
+        { phone: '+2348000000000', otp: '123456' },
+        'user_1',
+        'otp_1',
+        'otp.requested:key-hash',
+      ),
+    ).resolves.toBe('job_existing');
+  });
+
+  it('rejects a dedupe collision linked to another OTP record', async () => {
+    const collision = { code: 'P2002' };
+    prisma.notificationJob.create.mockRejectedValue(collision);
+    prisma.notificationJob.findUnique.mockResolvedValue({
+      id: 'job_existing',
+      type: 'otp.requested',
+      otpCodeId: 'otp_other',
+    });
+
+    await expect(
+      queue.enqueueOtpRequested(
+        { phone: '+2348000000000', otp: '123456' },
+        'user_1',
+        'otp_1',
+        'otp.requested:key-hash',
+      ),
+    ).rejects.toBe(collision);
+  });
+
+  it('reports whether an OTP job exists for a dedupe key', async () => {
+    prisma.notificationJob.findUnique
+      .mockResolvedValueOnce({ type: 'otp.requested', otpCodeId: 'otp_1' })
+      .mockResolvedValueOnce(null);
+
+    await expect(
+      queue.isOtpRequestEnqueued('otp.requested:key-hash', 'otp_1'),
+    ).resolves.toBe(true);
+    await expect(
+      queue.isOtpRequestEnqueued('otp.requested:missing', 'otp_2'),
+    ).resolves.toBe(false);
+  });
+
+  it('adopts a legacy OTP job into the linked queue contract', async () => {
+    const requestedAt = new Date('2026-09-28T10:00:00Z');
+    const expiresAt = new Date('2026-09-28T10:10:00Z');
+    prisma.notificationJob.findFirst.mockResolvedValue({ id: 'legacy_job' });
+    prisma.notificationJob.updateMany.mockResolvedValue({ count: 1 });
+
+    await expect(
+      queue.adoptLegacyOtpRequest({
+        userId: 'user_1',
+        otpCodeId: 'otp_1',
+        dedupeKey: 'otp.requested:key-hash',
+        requestedAt,
+        expiresAt,
+      }),
+    ).resolves.toBe(true);
+    expect(prisma.notificationJob.findFirst).toHaveBeenCalledWith({
+      where: {
+        type: 'otp.requested',
+        userId: 'user_1',
+        otpCodeId: null,
+        dedupeKey: null,
+        createdAt: { gte: requestedAt, lte: expiresAt },
+      },
+      orderBy: { createdAt: 'asc' },
+      select: { id: true },
+    });
+    expect(prisma.notificationJob.updateMany).toHaveBeenCalledWith({
+      where: {
+        id: 'legacy_job',
+        type: 'otp.requested',
+        userId: 'user_1',
+        otpCodeId: null,
+        dedupeKey: null,
+      },
+      data: {
+        otpCodeId: 'otp_1',
+        dedupeKey: 'otp.requested:key-hash',
+      },
+    });
   });
 
   it('deletes linked and legacy queued jobs for an account phone', async () => {
@@ -110,10 +212,15 @@ describe('NotificationQueueService', () => {
         return Promise.resolve({ id: 'legacy_job' });
       },
     );
-    await queue.enqueueOtpRequested({
-      phone: '+2348000000000',
-      otp: '123456',
-    });
+    await queue.enqueueOtpRequested(
+      {
+        phone: '+2348000000000',
+        otp: '123456',
+      },
+      undefined,
+      'otp_2',
+      'otp.requested:test-2',
+    );
     prisma.notificationJob.findMany.mockResolvedValue([
       { id: 'linked_job', userId: 'user_1', payloadJson: '{}' },
       { id: 'legacy_job', userId: null, payloadJson: legacyPayload },
