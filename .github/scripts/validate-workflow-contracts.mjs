@@ -17,10 +17,18 @@ const readQuotedItems = (source, startMarker, endMarker) => {
   );
 };
 
-const [entrypoint, reusable, nativeWorkflow] = await Promise.all([
+const [
+  entrypoint,
+  reusable,
+  nativeWorkflow,
+  dependencyAuditWorkflow,
+  dependencyMaintenanceWorkflow,
+] = await Promise.all([
   readFile('.github/workflows/dependency-auto-finish.yml', 'utf8'),
   readFile('.github/workflows/pr-auto-finish-reusable.yml', 'utf8'),
   readFile('.github/workflows/native-ci.yml', 'utf8'),
+  readFile('.github/workflows/dependency-audit.yml', 'utf8'),
+  readFile('.github/workflows/deps-maintenance.yml', 'utf8'),
 ]);
 
 const triggerWorkflows = readQuotedItems(entrypoint, 'workflows:', 'types:');
@@ -39,6 +47,18 @@ assert.match(
   nativeWorkflow,
   /filters: \.github\/native-ci-paths\.yml/,
   'native-ci must use the shared native path policy.',
+);
+
+const auditWrapperInvocation = /node \.\.\/\.github\/scripts\/audit-npm\.mjs/g;
+assert.equal(
+  [...dependencyAuditWorkflow.matchAll(auditWrapperInvocation)].length,
+  2,
+  'Scheduled mobile audits must use the expiring advisory-exception wrapper.',
+);
+assert.equal(
+  [...dependencyMaintenanceWorkflow.matchAll(auditWrapperInvocation)].length,
+  2,
+  'Mobile dependency maintenance must use the same audit exception policy.',
 );
 
 console.log('Workflow contracts are synchronized.');

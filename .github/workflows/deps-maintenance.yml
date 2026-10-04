@@ -198,13 +198,12 @@ jobs:
 
       - name: Block high-severity production vulnerabilities
         working-directory: mobile
-        run: npm audit --omit=dev --audit-level=high
+        run: node ../.github/scripts/audit-npm.mjs --omit-dev --audit-level=high
 
       - name: Mobile full-tree audit report
         if: always()
-        continue-on-error: true
         working-directory: mobile
-        run: npm audit --audit-level=moderate
+        run: node ../.github/scripts/audit-npm.mjs --audit-level=moderate
 
       - name: Verify Expo dependency compatibility
         working-directory: mobile
