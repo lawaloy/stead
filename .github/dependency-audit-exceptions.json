@@ -1,0 +1,44 @@
+{
+  "exceptions": [
+    {
+      "advisoryId": 1240992,
+      "ghsa": "GHSA-vfj7-8cjw-p6xm",
+      "package": "braces",
+      "workspace": "mobile",
+      "expiresOn": "2026-10-17",
+      "allowedVulnerabilities": [
+        "@expo/cli",
+        "@expo/metro",
+        "@expo/metro-config",
+        "@expo/metro-file-map",
+        "@react-native/community-cli-plugin",
+        "@react-native/metro-config",
+        "@react-native/virtualized-lists",
+        "@testing-library/react-native",
+        "braces",
+        "expo",
+        "metro",
+        "metro-config",
+        "metro-file-map",
+        "metro-transform-worker",
+        "micromatch",
+        "react-native",
+        "react-native-reanimated",
+        "react-native-worklets"
+      ]
+    },
+    {
+      "advisoryId": 1240912,
+      "ghsa": "GHSA-86w9-cpqp-85rv",
+      "package": "node-forge",
+      "workspace": "mobile",
+      "expiresOn": "2026-10-17",
+      "allowedVulnerabilities": [
+        "@expo/cli",
+        "@expo/code-signing-certificates",
+        "expo",
+        "node-forge"
+      ]
+    }
+  ]
+}

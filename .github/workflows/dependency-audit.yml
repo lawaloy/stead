@@ -100,9 +100,8 @@ jobs:
         run: npm ci --ignore-scripts
 
       - name: Fail on high-severity production vulnerabilities
-        run: npm audit --omit=dev --audit-level=high
+        run: node ../.github/scripts/audit-npm.mjs --omit-dev --audit-level=high
 
       - name: Report moderate-or-higher full-tree vulnerabilities
         if: always()
-        continue-on-error: true
-        run: npm audit --audit-level=moderate
+        run: node ../.github/scripts/audit-npm.mjs --audit-level=moderate
