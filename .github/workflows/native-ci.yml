@@ -89,7 +89,10 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: mobile/.ci/android/stead-debug.apk
-          key: android-simulator-app-v2-${{ hashFiles('mobile/package-lock.json', 'mobile/app.json', 'mobile/assets/**', 'mobile/app/**', 'mobile/src/**') }}
+          # The build recipe lives inline in this workflow and its toolchain
+          # pins in ci.env, so both are part of the key: a build-only change
+          # must not reuse an APK produced by the old recipe.
+          key: android-simulator-app-v3-${{ hashFiles('mobile/package-lock.json', 'mobile/app.json', 'mobile/assets/**', 'mobile/app/**', 'mobile/src/**', '.github/ci.env', '.github/workflows/native-ci.yml') }}
       - name: Build Android simulator app
         if: steps.android-app-cache.outputs.cache-hit != 'true'
         run: |
@@ -128,12 +131,19 @@ jobs:
           node-version: ${{ needs.config.outputs.node_version }}
           cache: npm
           cache-dependency-path: mobile/package-lock.json
+      # Resolved before the app-cache restore so the cached .app is keyed on
+      # the Xcode that built it (runner images can change Xcode in place).
+      - name: Resolve Xcode version
+        id: xcode
+        run: echo "version=$(xcodebuild -version | tr '\n' ' ')" >> "$GITHUB_OUTPUT"
       - name: Restore iOS simulator app
         id: ios-app-cache
         uses: actions/cache/restore@v4
         with:
           path: mobile/.ci/ios/mobile.app
-          key: ios-simulator-app-${{ needs.config.outputs.ios_runner }}-v2-${{ hashFiles('mobile/package-lock.json', 'mobile/app.json', 'mobile/assets/**', 'mobile/app/**', 'mobile/src/**') }}
+          # Include the build script, toolchain pins, and this workflow so a
+          # build-only change must rebuild instead of reusing a stale .app.
+          key: ios-simulator-app-${{ needs.config.outputs.ios_runner }}-${{ steps.xcode.outputs.version }}-v3-${{ hashFiles('mobile/package-lock.json', 'mobile/app.json', 'mobile/assets/**', 'mobile/app/**', 'mobile/src/**', '.github/scripts/build-ios-simulator-app.sh', '.github/ci.env', '.github/workflows/native-ci.yml') }}
       - name: Restore source mtimes for incremental Xcode
         if: steps.ios-app-cache.outputs.cache-hit != 'true'
         uses: chetan/git-restore-mtime-action@v2
@@ -157,10 +167,6 @@ jobs:
           key: ios-pods-${{ needs.config.outputs.ios_runner }}-${{ hashFiles('mobile/ios/Podfile.lock', 'mobile/package-lock.json') }}
           restore-keys: |
             ios-pods-${{ needs.config.outputs.ios_runner }}-
-      - name: Resolve Xcode version
-        if: steps.ios-app-cache.outputs.cache-hit != 'true'
-        id: xcode
-        run: echo "version=$(xcodebuild -version | tr '\n' ' ')" >> "$GITHUB_OUTPUT"
       - name: Set DerivedData path
         if: steps.ios-app-cache.outputs.cache-hit != 'true'
         id: derived
