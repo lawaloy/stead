@@ -104,11 +104,7 @@ describe('dependency overrides', () => {
     expect(missingDependencies).toEqual([]);
   });
 
-  it('retains Expo optional native peer metadata without forcing peer installs', () => {
-    const packageJson = readJson<{
-      dependencies?: Record<string, string>;
-      devDependencies?: Record<string, string>;
-    }>('package.json');
+  it('retains Expo optional native peer metadata', () => {
     const packageLock = readJson<PackageLock>('package-lock.json');
     const packages = packageLock.packages;
 
@@ -144,16 +140,45 @@ describe('dependency overrides', () => {
         },
       },
     });
+  });
 
-    expect(
-      packageJson.dependencies?.['react-native-reanimated'],
-    ).toBeUndefined();
-    expect(packageJson.dependencies?.['react-native-worklets']).toBeUndefined();
-    expect(
-      packageJson.devDependencies?.['react-native-reanimated'],
-    ).toBeUndefined();
-    expect(
-      packageJson.devDependencies?.['react-native-worklets'],
-    ).toBeUndefined();
+  it('pins Reanimated and worklets as Expo SDK-aligned direct dependencies', () => {
+    // The app never imports these, but react-native-drawer-layout (via
+    // expo-router) pulls Reanimated in and expo-modules-core peers on
+    // worklets. Left transitive, npm was free to float them: #537 broke
+    // native builds when the lockfile drifted to Reanimated 4.2.2, which
+    // rejects React Native 0.86. Pinning them as direct deps with
+    // `npx expo install` keeps them on the SDK's tested pair, which supports
+    // RN 0.86 and satisfies expo-modules-core's worklets range.
+    // deps-maintenance keeps them aligned with `expo install --fix`
+    // (ncu rejects react-native-*).
+    const packageJson = readJson<{
+      dependencies?: Record<string, string>;
+      devDependencies?: Record<string, string>;
+    }>('package.json');
+    const packageLock = readJson<PackageLock>('package-lock.json');
+    const bundledNativeModules = JSON.parse(
+      readFileSync(
+        join(mobileRoot, 'node_modules', 'expo', 'bundledNativeModules.json'),
+        'utf8',
+      ),
+    ) as Record<string, string>;
+
+    for (const packageName of [
+      'react-native-reanimated',
+      'react-native-worklets',
+    ]) {
+      const expoVersion = bundledNativeModules[packageName];
+      const lockedPackage = packageLock.packages[`node_modules/${packageName}`];
+
+      expect(expoVersion).toMatch(/^\d+\.\d+\.\d+$/);
+      expect(packageJson.dependencies?.[packageName]).toBe(expoVersion);
+      expect(packageJson.devDependencies?.[packageName]).toBeUndefined();
+      expect(packageLock.packages[''].dependencies?.[packageName]).toBe(
+        expoVersion,
+      );
+      expect(lockedPackage?.version).toBe(expoVersion);
+      expect(lockedPackage?.peer).toBeUndefined();
+    }
   });
 });
