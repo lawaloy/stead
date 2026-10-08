@@ -14,8 +14,29 @@ appId: com.lawaloy.stead
 - waitForAnimationToEnd
 - tapOn:
     id: auth-request-otp
-# The app owns bounded retries with one idempotency key. Never tap twice after
-# an ambiguous timeout because the original request may have succeeded.
+# iOS 26 simulator: XCTest injects each tap through a fresh virtual digitizer.
+# Under load backboardd sometimes registers it twice ("unknown digitizer"),
+# drops the lift-off ("didn't see a previous touch down") and then cancels the
+# touch ("canceling paths"). The app only gets touch-down + cancel, so onPress
+# never runs and no request is sent.
+# Tap once more only while the button is still idle. An accepted tap renders
+# "Requesting..." with the button disabled until the request settles, and on
+# success Verify OTP is pushed before the button re-enables. So "Request OTP"
+# enabled with no Verify OTP means the first touch never reached onPress, and
+# this tap cannot duplicate a request. Never tap again once the request has
+# started: the app owns bounded retries with one idempotency key.
+- runFlow:
+    label: Re-tap Request OTP after a dropped iOS simulator touch
+    when:
+      platform: iOS
+      visible:
+        id: auth-request-otp
+        text: Request OTP
+        enabled: true
+      notVisible: Verify OTP
+    commands:
+      - tapOn:
+          id: auth-request-otp
 # Keep this wait long (same as Stead Login): on slow CI macOS simulators the
 # OTP request round-trip (JS thread + local API + app retries) can exceed 60s,
 # and a timeout here cannot be recovered by tapping again.
