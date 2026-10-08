@@ -399,6 +399,16 @@ jobs:
           fi
           test -f "$PWD/mobile.app/Info.plist"
           echo "Unpacked $PWD/mobile.app"
+      - name: Boot iOS simulator
+        run: |
+          set -eu
+          DEVICE_ID="$(xcrun simctl list devices available -j | jq -r '[.devices[] | .[] | select(.name == "iPhone 17")] | last | .udid')"
+          test -n "$DEVICE_ID" && test "$DEVICE_ID" != null
+          echo "IOS_DEVICE_ID=$DEVICE_ID" >> "$GITHUB_ENV"
+          # Boot now, in the background, so the cold simulator does its first-boot work
+          # (data migration, system apps) while dependencies install and the API and
+          # Metro start, instead of right before Maestro needs it.
+          nohup xcrun simctl boot "$DEVICE_ID" > "$RUNNER_TEMP/simctl-boot.log" 2>&1 &
       - name: Restore iOS Metro transforms
         uses: actions/cache@v4
         with:
@@ -443,10 +453,18 @@ jobs:
       - name: Install app on simulator
         run: |
           set -eu
-          DEVICE_ID="$(xcrun simctl list devices available -j | jq -r '[.devices[] | .[] | select(.name == "iPhone 17")] | last | .udid')"
-          test -n "$DEVICE_ID" && test "$DEVICE_ID" != null
-          xcrun simctl boot "$DEVICE_ID" || true
+          DEVICE_ID="$IOS_DEVICE_ID"
+          # Waits for the background boot (or boots if it failed). When the boot has
+          # already finished, bootstatus only prints "already booted" and does not wait
+          # for system apps, so also prove SpringBoard can launch an app.
+          cat "$RUNNER_TEMP/simctl-boot.log" || true
           xcrun simctl bootstatus "$DEVICE_ID" -b
+          for attempt in $(seq 1 30); do
+            if xcrun simctl launch "$DEVICE_ID" com.apple.Preferences > /dev/null 2>&1; then break; fi
+            sleep 5
+          done
+          xcrun simctl launch "$DEVICE_ID" com.apple.Preferences
+          xcrun simctl terminate "$DEVICE_ID" com.apple.Preferences || true
           APP_PATH=mobile/.ci/ios/mobile.app
           test -d "$APP_PATH"
           test -f "$APP_PATH/Info.plist"
@@ -485,9 +503,35 @@ jobs:
               exit 1
             }
           test -s "$RUNNER_TEMP/stead-ios.bundle"
+      - name: Warm up Maestro iOS driver
+        env:
+          # Applies to this warm-up only. The first XCTest runner launch on a freshly
+          # booted simulator is the slow one (run 37712983199 attempt 1: about 122s from
+          # xcodebuild to a ready driver vs about 40s in passing runs), so pay it here
+          # with room to spare. The real test keeps Maestro's default 120s limit.
+          MAESTRO_DRIVER_STARTUP_TIMEOUT: '300000'
+        run: |
+          set -eu
+          touch "$RUNNER_TEMP/maestro-sessions.marker"
+          # `maestro hierarchy` starts the driver on the device, reads the screen and
+          # stops. That installs and launches the XCTest runner once, so the journey's
+          # own driver start is a warm one.
+          for attempt in 1 2; do
+            started=$(date +%s)
+            if maestro --device "$IOS_DEVICE_ID" hierarchy > "$RUNNER_TEMP/maestro-warmup-hierarchy.json" 2> "$RUNNER_TEMP/maestro-warmup.log"; then
+              echo "Maestro iOS driver warm-up finished in $(( $(date +%s) - started ))s (attempt $attempt)"
+              exit 0
+            fi
+            echo "Maestro iOS driver warm-up attempt $attempt failed after $(( $(date +%s) - started ))s:" >&2
+            tail -n 40 "$RUNNER_TEMP/maestro-warmup.log" >&2 || true
+          done
+          exit 1
       - name: Run iOS native journey
         working-directory: mobile
         run: maestro test -e TEST_PHONE=08030000001 .maestro/critical-native-journey.yaml
+      - name: Report Maestro iOS driver startup
+        if: ${{ !cancelled() }}
+        run: bash .github/scripts/report-maestro-ios-driver-startup.sh "$RUNNER_TEMP/maestro-sessions.marker"
       - name: Check Metro reused the prewarmed bundle
         if: ${{ !cancelled() }}
         run: bash .github/scripts/check-metro-bundle-reuse.sh iOS

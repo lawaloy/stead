@@ -18,4 +18,5 @@ native:
   - '.github/scripts/build-ios-simulator-app.sh'
   - '.github/scripts/install-maestro.sh'
   - '.github/scripts/check-metro-bundle-reuse.sh'
+  - '.github/scripts/report-maestro-ios-driver-startup.sh'
   - '.github/ci.env'
