@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { useRouter } from 'expo-router';
 import {
   Alert,
   Linking,
@@ -52,7 +51,6 @@ const Toggle = ({
 
 export default function AccountScreen() {
   const { token, logout } = useAuth();
-  const router = useRouter();
   const queryKey = sessionQueryKeys.account(token);
   const query = useQuery({
     queryKey,
@@ -111,8 +109,8 @@ export default function AccountScreen() {
   const deleteMutation = useMutation({
     mutationFn: deleteAccount,
     onSuccess: async () => {
+      // The root layout's auth guards return to sign-in once the token clears.
       await logout();
-      router.replace('/(auth)/request-otp');
     },
   });
 
@@ -172,10 +170,7 @@ export default function AccountScreen() {
         {
           text: 'Sign out everywhere',
           style: 'destructive',
-          onPress: () =>
-            logout({ allDevices: true }).then(() => {
-              router.replace('/(auth)/request-otp');
-            }),
+          onPress: () => logout({ allDevices: true }),
         },
       ],
     );

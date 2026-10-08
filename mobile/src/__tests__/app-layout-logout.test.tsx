@@ -1,6 +1,6 @@
 import React from 'react';
 import { fireEvent, render, waitFor } from '@testing-library/react-native';
-import AppLayout from '../../app/(app)/_layout';
+import AppLayout, { unstable_settings } from '../../app/(app)/_layout';
 import { useAuth } from '../lib/auth-state';
 
 const replace = jest.fn();
@@ -47,12 +47,19 @@ describe('app layout logout', () => {
     } as never);
   });
 
-  it('clears the session and returns to request OTP', async () => {
+  it('clears the session and leaves the return to sign-in to the root auth guard', async () => {
     const view = await render(<AppLayout />);
 
     await fireEvent.press(view.getByText('Logout'));
 
     await waitFor(() => expect(logout).toHaveBeenCalledTimes(1));
-    expect(replace).toHaveBeenCalledWith('/(auth)/request-otp');
+    // Clearing the token makes Stack.Protected in app/_layout.tsx swap to the
+    // auth screens. Navigating here as well would start an overlapping native
+    // transition, which can leave an untouchable screen on iOS 26.
+    expect(replace).not.toHaveBeenCalled();
+  });
+
+  it('opens the dashboard first when the app group mounts after sign-in', () => {
+    expect(unstable_settings.initialRouteName).toBe('dashboard');
   });
 });

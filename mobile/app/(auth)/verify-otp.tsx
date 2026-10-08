@@ -64,7 +64,9 @@ export default function VerifyOtpScreen() {
         refreshToken: data.refreshToken,
       });
       setDevOtpHint('');
-      router.replace('/(app)/dashboard');
+      // No router.replace here: completeAuth sets the token, and the root
+      // layout's Stack.Protected guards swap to the (app) group. Navigating as
+      // well would race that swap with a second native transition.
     },
   });
 

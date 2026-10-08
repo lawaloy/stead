@@ -1,20 +1,26 @@
 import React from 'react';
-import { Link, Stack, useRouter } from 'expo-router';
+import { Link, Stack } from 'expo-router';
 import { Pressable, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../../src/lib/auth-state';
 
+// Opened after sign-in (and on signed-in cold starts) when the root stack
+// swaps to the (app) group; without this the nested stack would start on the
+// first route alphabetically.
+export const unstable_settings = {
+  initialRouteName: 'dashboard',
+};
+
 const LogoutButton = () => {
   const { logout } = useAuth();
-  const router = useRouter();
 
   return (
     <Pressable
       testID="app-logout"
-      onPress={async () => {
-        await logout();
-        router.replace('/(auth)/request-otp');
-      }}
+      // Clearing the token is enough: the root layout's Stack.Protected guards
+      // swap to the auth screens. An extra router.replace here would start a
+      // second, overlapping native transition (see app/_layout.tsx).
+      onPress={() => logout()}
       style={{ marginRight: 12 }}
     >
       <Text style={{ color: '#c02020', fontWeight: '700' }}>Logout</Text>

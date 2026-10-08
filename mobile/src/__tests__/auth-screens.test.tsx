@@ -94,7 +94,7 @@ describe('OTP screen journeys', () => {
     expect(push).toHaveBeenCalledWith('/(auth)/verify-otp');
   });
 
-  it('verifies the code and persists the session before entering the dashboard', async () => {
+  it('verifies the code and persists the session, leaving the dashboard switch to the auth guard', async () => {
     await renderScreen(<VerifyOtpScreen />);
     expect(screen.getByText('Dev OTP: 123456')).toBeOnTheScreen();
     await fireEvent.press(screen.getByRole('button', { name: 'Verify OTP' }));
@@ -108,7 +108,11 @@ describe('OTP screen journeys', () => {
         refreshToken: 'refresh-token',
       }),
     );
-    expect(replace).toHaveBeenCalledWith('/(app)/dashboard');
+    await waitFor(() => expect(auth.setDevOtpHint).toHaveBeenCalledWith(''));
+    // completeAuth sets the token; Stack.Protected in app/_layout.tsx swaps to
+    // (app). A second imperative navigation would race that native transition.
+    expect(replace).not.toHaveBeenCalled();
+    expect(push).not.toHaveBeenCalled();
   });
 
   it('does not verify when there is no pending phone', async () => {

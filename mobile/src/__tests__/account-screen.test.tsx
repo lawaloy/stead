@@ -182,6 +182,7 @@ describe('account and privacy screen', () => {
     });
     await waitFor(() => expect(mockDelete).toHaveBeenCalled());
     expect(logout).toHaveBeenCalled();
-    expect(replace).toHaveBeenCalledWith('/(auth)/request-otp');
+    // Navigation back to sign-in is owned by the root layout's auth guards.
+    expect(replace).not.toHaveBeenCalled();
   });
 });

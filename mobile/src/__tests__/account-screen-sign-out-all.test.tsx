@@ -107,7 +107,8 @@ describe('account screen sign out all devices', () => {
     });
 
     expect(logout).toHaveBeenCalledWith({ allDevices: true });
-    expect(replace).toHaveBeenCalledWith('/(auth)/request-otp');
+    // Navigation back to sign-in is owned by the root layout's auth guards.
+    expect(replace).not.toHaveBeenCalled();
     view.unmount();
   });
 

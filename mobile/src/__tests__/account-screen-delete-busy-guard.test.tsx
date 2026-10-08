@@ -152,6 +152,7 @@ describe('account screen delete busy guard', () => {
     });
     await waitFor(() => expect(queryClient.isMutating()).toBe(0));
     expect(logout).toHaveBeenCalledTimes(1);
-    expect(replace).toHaveBeenCalledWith('/(auth)/request-otp');
+    // Navigation back to sign-in is owned by the root layout's auth guards.
+    expect(replace).not.toHaveBeenCalled();
   });
 });
