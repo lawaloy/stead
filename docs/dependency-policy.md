@@ -30,3 +30,9 @@ constitute a safe remediation.
 
 The API's Multer override is pinned to 2.4.0, the first release patched for
 [GHSA-3pph-fpjx-jg34](https://github.com/advisories/GHSA-3pph-fpjx-jg34).
+
+Mobile overrides `js-yaml` to 4.3.2 for `@istanbuljs/load-nyc-config` only (test
+tooling via `babel-plugin-istanbul`). Its `js-yaml` 3 range pulled in `argparse` 1 and
+`sprintf-js`, which has no release patched for
+[GHSA-hp3w-g68c-fv3c](https://github.com/advisories/GHSA-hp3w-g68c-fv3c);
+the package only calls `load()`, which `js-yaml` 4 keeps.

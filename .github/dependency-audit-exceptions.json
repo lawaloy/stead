@@ -39,36 +39,6 @@
         "expo",
         "node-forge"
       ]
-    },
-    {
-      "advisoryId": 1241202,
-      "ghsa": "GHSA-hp3w-g68c-fv3c",
-      "package": "sprintf-js",
-      "workspace": "mobile",
-      "expiresOn": "2026-11-06",
-      "allowedVulnerabilities": [
-        "@istanbuljs/load-nyc-config",
-        "@jest/core",
-        "@jest/expect",
-        "@jest/globals",
-        "@jest/reporters",
-        "@jest/transform",
-        "@testing-library/react-native",
-        "argparse",
-        "babel-jest",
-        "babel-plugin-istanbul",
-        "jest",
-        "jest-circus",
-        "jest-cli",
-        "jest-config",
-        "jest-resolve-dependencies",
-        "jest-runner",
-        "jest-runtime",
-        "jest-snapshot",
-        "js-yaml",
-        "sprintf-js",
-        "ts-jest"
-      ]
     }
   ]
 }
