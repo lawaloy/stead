@@ -5,7 +5,7 @@
       "ghsa": "GHSA-vfj7-8cjw-p6xm",
       "package": "braces",
       "workspace": "mobile",
-      "expiresOn": "2026-10-17",
+      "expiresOn": "2026-11-06",
       "allowedVulnerabilities": [
         "@expo/cli",
         "@expo/metro",
@@ -32,7 +32,7 @@
       "ghsa": "GHSA-86w9-cpqp-85rv",
       "package": "node-forge",
       "workspace": "mobile",
-      "expiresOn": "2026-10-17",
+      "expiresOn": "2026-11-06",
       "allowedVulnerabilities": [
         "@expo/cli",
         "@expo/code-signing-certificates",
