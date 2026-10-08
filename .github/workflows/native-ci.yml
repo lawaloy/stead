@@ -287,9 +287,12 @@ jobs:
             sleep 2
           done
           curl --fail http://127.0.0.1:8081/status | grep -q 'packager-status:running'
-          nohup curl --fail --silent --show-error --retry 3 \
-            'http://127.0.0.1:8081/node_modules/expo-router/entry.bundle?platform=android&dev=true&hot=false&lazy=true&transform.engine=hermes&transform.bytecode=1&unstable_transformProfile=hermes-stable' \
-            --output "$RUNNER_TEMP/stead-android.bundle" \
+          # Prewarm the exact bundle the app requests (see the iOS job for why the
+          # URL must go through Expo's virtual entry). Query string mirrors
+          # DevServerHelper.createBundleURL in RN 0.86.
+          nohup bash -c 'curl --fail --silent --show-error --retry 3 \
+            "http://127.0.0.1:8081/.expo/.virtual-metro-entry.bundle?platform=android&dev=true&lazy=true&minify=false&app=com.lawaloy.stead&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server" \
+            --output "$RUNNER_TEMP/stead-android.bundle"; echo $? > "$RUNNER_TEMP/stead-metro-prewarm.exit"' \
             > "$RUNNER_TEMP/stead-metro-prewarm.log" 2>&1 &
       - name: Install Maestro
         run: bash .github/scripts/install-maestro.sh
@@ -311,6 +314,22 @@ jobs:
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
           disable-animations: false
           script: echo "Generated AVD snapshot for caching."
+      - name: Wait for Metro prewarm
+        run: |
+          set -eu
+          # The prewarm runs in the background while Maestro and the AVD are set up.
+          # Let it finish before the app launches so the app's request is a cache hit.
+          for attempt in $(seq 1 300); do
+            if [[ -f "$RUNNER_TEMP/stead-metro-prewarm.exit" ]]; then break; fi
+            sleep 2
+          done
+          if [[ "$(cat "$RUNNER_TEMP/stead-metro-prewarm.exit" 2>/dev/null)" != 0 ]]; then
+            echo "Metro prewarm failed or did not finish" >&2
+            cat "$RUNNER_TEMP/stead-metro-prewarm.log" >&2 || true
+            cat "$RUNNER_TEMP/stead-metro.log" >&2 || true
+            exit 1
+          fi
+          test -s "$RUNNER_TEMP/stead-android.bundle"
       - name: Run Android native journey
         uses: reactivecircus/android-emulator-runner@v2
         with:
@@ -321,6 +340,9 @@ jobs:
           disable-animations: true
           working-directory: mobile
           script: bash ../.github/scripts/run-android-native-journey.sh
+      - name: Check Metro reused the prewarmed bundle
+        if: ${{ !cancelled() }}
+        run: bash .github/scripts/check-metro-bundle-reuse.sh Android
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
@@ -440,9 +462,21 @@ jobs:
             fi
             sleep 5
           done
-          # Ensure Metro has produced the iOS bundle before Maestro launches.
+          # Ensure Metro has built the exact bundle the app will request before
+          # Maestro launches, so the app's request is served from Metro's cache.
+          # The app asks for Expo's virtual entry (.expo/.virtual-metro-entry), which
+          # @expo/metro-config rewrites to node_modules/expo-router/entry and fills in
+          # transform options (transform.routerRoot=app plus the Hermes options).
+          # Requesting expo-router/entry directly skipped that rewrite, so the prewarm
+          # had no transform.routerRoot, Metro treated the app's request as a different
+          # bundle and transformed every module again (up to ~128s), and the app gave up
+          # with "Could not connect to development server".
+          # Query string mirrors RCTBundleURLProvider in RN 0.86 (the RCTMultipartDataTask
+          # GET in the simulator log); check-metro-bundle-reuse.sh fails if it drifts.
+          BUNDLE_ID="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$APP_PATH/Info.plist")"
+          test -n "$BUNDLE_ID"
           curl --fail --silent --show-error --retry 5 --retry-delay 2 \
-            'http://127.0.0.1:8081/node_modules/expo-router/entry.bundle?platform=ios&dev=true&hot=false&lazy=true&transform.engine=hermes&transform.bytecode=1&unstable_transformProfile=hermes-stable' \
+            "http://127.0.0.1:8081/.expo/.virtual-metro-entry.bundle?platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=${BUNDLE_ID}" \
             --output "$RUNNER_TEMP/stead-ios.bundle" \
             > "$RUNNER_TEMP/stead-metro-prewarm.log" 2>&1 \
             || {
@@ -454,6 +488,9 @@ jobs:
       - name: Run iOS native journey
         working-directory: mobile
         run: maestro test -e TEST_PHONE=08030000001 .maestro/critical-native-journey.yaml
+      - name: Check Metro reused the prewarmed bundle
+        if: ${{ !cancelled() }}
+        run: bash .github/scripts/check-metro-bundle-reuse.sh iOS
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
