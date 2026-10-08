@@ -18,8 +18,7 @@ appId: com.lawaloy.stead
 # Under load backboardd sometimes registers it twice ("unknown digitizer"),
 # drops the lift-off ("didn't see a previous touch down") and then cancels the
 # touch ("canceling paths"). The app only gets touch-down + cancel, so onPress
-# never runs and no request is sent. native-ci reports these log lines after
-# the journey.
+# never runs and no request is sent.
 # Tap once more only while the button is still idle. An accepted tap renders
 # "Requesting..." with the button disabled until the request settles, and on
 # success Verify OTP is pushed before the button re-enables. So "Request OTP"

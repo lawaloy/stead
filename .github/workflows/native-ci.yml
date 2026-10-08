@@ -453,12 +453,7 @@ jobs:
           test -s "$RUNNER_TEMP/stead-ios.bundle"
       - name: Run iOS native journey
         working-directory: mobile
-        run: |
-          touch "$RUNNER_TEMP/maestro-journey.marker"
-          maestro test -e TEST_PHONE=08030000001 .maestro/critical-native-journey.yaml
-      - name: Report iOS simulator dropped touches
-        if: ${{ !cancelled() }}
-        run: bash .github/scripts/report-ios-dropped-touches.sh "$RUNNER_TEMP/maestro-journey.marker"
+        run: maestro test -e TEST_PHONE=08030000001 .maestro/critical-native-journey.yaml
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
