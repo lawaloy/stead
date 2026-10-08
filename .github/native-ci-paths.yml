@@ -17,4 +17,5 @@ native:
   - '.github/scripts/run-android-native-journey.sh'
   - '.github/scripts/build-ios-simulator-app.sh'
   - '.github/scripts/install-maestro.sh'
+  - '.github/scripts/report-ios-dropped-touches.sh'
   - '.github/ci.env'
