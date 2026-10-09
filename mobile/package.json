@@ -74,6 +74,9 @@
     "decode-uri-component": "0.5.0",
     "uuid": "14.0.1",
     "shell-quote": "1.12.0",
-    "source-map-js": "1.2.2"
+    "source-map-js": "1.2.2",
+    "@istanbuljs/load-nyc-config": {
+      "js-yaml": "4.3.2"
+    }
   }
 }

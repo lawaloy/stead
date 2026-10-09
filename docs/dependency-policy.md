@@ -14,12 +14,12 @@ has a near-term expiry. The machine-readable allowlist is
 accepts only the exact advisory, workspace, propagated package names, and date
 recorded there. Every other finding at the configured severity still fails CI.
 
-As of October 3, 2026, Expo 57's build toolchain has two temporary exceptions:
+As of October 8, 2026, Expo 57's build toolchain has two temporary exceptions:
 
 | Advisory                                                                 | Package            | Exposure in Stead                                                                                                                                                                                          | Expiry / removal condition                                                                              |
 | ------------------------------------------------------------------------ | ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
-| [GHSA-vfj7-8cjw-p6xm](https://github.com/advisories/GHSA-vfj7-8cjw-p6xm) | `braces` 3.0.3     | Used through Metro to match repository/build paths. Stead does not pass customer input to Metro or ship Metro in the native application bundle.                                                            | October 17, 2026; remove immediately when a patched `braces` release is available through Expo/Metro.   |
-| [GHSA-86w9-cpqp-85rv](https://github.com/advisories/GHSA-86w9-cpqp-85rv) | `node-forge` 1.4.0 | Used by Expo CLI's code-signing tooling during development/builds. Stead does not use it for API authentication or runtime signature verification, and it is not shipped in the native application bundle. | October 17, 2026; remove immediately when the upstream node-forge fix is released and consumed by Expo. |
+| [GHSA-vfj7-8cjw-p6xm](https://github.com/advisories/GHSA-vfj7-8cjw-p6xm) | `braces` 3.0.3     | Used through Metro to match repository/build paths. Stead does not pass customer input to Metro or ship Metro in the native application bundle.                                                            | November 6, 2026; remove immediately when a patched `braces` release is available through Expo/Metro.   |
+| [GHSA-86w9-cpqp-85rv](https://github.com/advisories/GHSA-86w9-cpqp-85rv) | `node-forge` 1.4.0 | Used by Expo CLI's code-signing tooling during development/builds. Stead does not use it for API authentication or runtime signature verification, and it is not shipped in the native application bundle. | November 6, 2026; remove immediately when the upstream node-forge fix is released and consumed by Expo. |
 
 The 20 mobile entries reported by npm are propagation through Expo, Metro, and
 React Native from these two source advisories; they are not 20 independent
@@ -30,3 +30,9 @@ constitute a safe remediation.
 
 The API's Multer override is pinned to 2.4.0, the first release patched for
 [GHSA-3pph-fpjx-jg34](https://github.com/advisories/GHSA-3pph-fpjx-jg34).
+
+Mobile overrides `js-yaml` to 4.3.2 for `@istanbuljs/load-nyc-config` only (test
+tooling via `babel-plugin-istanbul`). Its `js-yaml` 3 range pulled in `argparse` 1 and
+`sprintf-js`, which has no release patched for
+[GHSA-hp3w-g68c-fv3c](https://github.com/advisories/GHSA-hp3w-g68c-fv3c);
+the package only calls `load()`, which `js-yaml` 4 keeps.

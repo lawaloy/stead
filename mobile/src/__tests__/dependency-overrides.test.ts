@@ -83,6 +83,39 @@ describe('dependency overrides', () => {
     });
   });
 
+  it('resolves js-yaml 4 for @istanbuljs/load-nyc-config so sprintf-js stays out of the tree', () => {
+    // load-nyc-config 1.1.0 (via babel-plugin-istanbul) declares js-yaml ^3,
+    // which pulls argparse 1 and sprintf-js (GHSA-hp3w-g68c-fv3c, no patched
+    // release). It only calls js-yaml's load(), which js-yaml 4 keeps.
+    const packageJson = readJson('package.json');
+    const packageLock = readJson<PackageLock>('package-lock.json');
+    const packages = packageLock.packages;
+    const loadNycConfigPath = 'node_modules/@istanbuljs/load-nyc-config';
+
+    expect(packageJson).toMatchObject({
+      overrides: {
+        '@istanbuljs/load-nyc-config': {
+          'js-yaml': '4.3.2',
+        },
+      },
+    });
+    expect(packages[loadNycConfigPath]).toBeDefined();
+
+    const resolvedJsYamlPath = lockfileDependencyCandidates(
+      loadNycConfigPath,
+      'js-yaml',
+    ).find((candidate) => packages[candidate]);
+
+    expect(resolvedJsYamlPath).toBeDefined();
+    expect(packages[resolvedJsYamlPath as string]).toMatchObject({
+      version: '4.3.2',
+    });
+    expect(
+      Object.keys(packages).filter((path) =>
+        path.endsWith('node_modules/sprintf-js'),
+      ),
+    ).toEqual([]);
+  });
   it('keeps every package dependency resolvable in the lockfile', () => {
     const packageLock = readJson<PackageLock>('package-lock.json');
 
