@@ -1,5 +1,8 @@
 # Agents
 
+<details open>
+<summary><strong>Show or hide document contents</strong></summary>
+
 ## Cursor Cloud specific instructions
 
 ### Overview
@@ -103,3 +106,5 @@ npm run start   # Expo dev server
 ```
 
 The mobile app reads `EXPO_PUBLIC_API_URL` from `mobile/.env` (defaults to `http://localhost:3000`).
+
+</details>

@@ -1,5 +1,8 @@
 # Critical Mobile Journey Verification
 
+<details open>
+<summary><strong>Show or hide document contents</strong></summary>
+
 CI runs `mobile/integration/critical-journey.test.ts` against a running NestJS
 API and PostgreSQL 16 in the dedicated `e2e_mobile` schema. The test uses the
 mobile app's actual API client, generated response validators, request
@@ -14,10 +17,12 @@ verification cannot exhaust the device OTP limit on later reruns.
 The companion React Native component tests cover the auth and dashboard
 screens, while an AuthProvider test covers token persistence, restoration, and
 session-cache clearing on logout. Existing goal and transaction screen tests
-cover their form and management paths. These tests do not render the whole app against the live API
-or drive native Android/iOS navigation. They do not validate Twilio/Termii
-delivery, device secure storage, TalkBack, or VoiceOver. JWT revocation and
-expiry UX remain separate session-lifecycle work.
+cover their form and management paths. These tests do not render the whole app
+against the live API or drive native Android/iOS navigation. They do not
+validate Twilio/Termii delivery, device secure storage, TalkBack, or VoiceOver.
+Rotating refresh-token behavior and session-expiry feedback are automated
+separately; live-provider and physical-device expiry/revocation acceptance
+remain release checks.
 
 To repeat the live client/API run locally, use only a disposable database schema:
 
@@ -46,13 +51,13 @@ Twilio or Termii account. It requires a disposable API database schema and
 production API. The flow clears the app's local state at the beginning and
 uses a dedicated test phone (`TEST_PHONE`) supplied by the runner.
 
-Native simulator jobs live in `.github/workflows/native-ci.yml`. Android and
-iOS Maestro run on path-filtered pull requests and after merge to `main` (when
-mobile app source outside tests, assets, Maestro, packaging, API, contracts,
-or native CI wiring changes), on a daily
-schedule at 16:00 UTC (after morning Dependabot / Dependency Maintenance /
-Dependency Audit so auto-merges have time to land), and via
-`workflow_dispatch`. Dedicated `build-android` /
+Native simulator jobs live in `.github/workflows/native-ci.yml`. Its `config`
+job reports on every pull request and `main` push; Android and iOS Maestro run
+when the shared native path policy detects relevant mobile, API, contract, or CI
+changes. The complete suite also runs daily at 16:00 UTC (after morning
+Dependabot, Dependency Maintenance, and Dependency Audit activity) and via
+`workflow_dispatch`. Both platform journeys passed together on mobile
+dependency PR #543 on 2026-10-08. Dedicated `build-android` /
 `build-ios` jobs produce installable binaries (cached by native inputs) and
 hand them to Maestro jobs as artifacts. Android warm boots use a cached AVD
 snapshot; iOS miss builds restore source mtimes and use inode-aware DerivedData
@@ -70,6 +75,8 @@ from `mobile/`. Use a different disposable Nigerian test number for each run.
 Android needs `adb reverse tcp:3000 tcp:3000` and
 `adb reverse tcp:8081 tcp:8081` when the app uses `127.0.0.1`. The local
 machine must have Java 17+, the Maestro CLI, the appropriate native SDK, and
-the development API/Metro servers running. This Windows workstation has no
-Android emulator and cannot run an iOS simulator; CI is the execution source
-for both platform results.
+the development API/Metro servers running. iOS simulation requires macOS and
+Xcode; developers without both native toolchains can rely on CI for the
+platform results.
+
+</details>

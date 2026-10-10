@@ -1,5 +1,8 @@
 # Architecture Roadmap
 
+<details open>
+<summary><strong>Show or hide document contents</strong></summary>
+
 ## Context
 
 - Product: Stead Financial Stability Layer.
@@ -113,7 +116,9 @@ This sequence is intentional. Stead should prioritize user-facing product surfac
 
 ### Stage 1: Harden Modular Monolith (now -> short term)
 
-- Lock module boundaries in API (`auth`, `countries`, `goals`, `transactions`, `dashboard`, `notifications`, and provider-specific `sms`).
+- Lock module boundaries in API (`auth`, `countries`, `account`, `goals`,
+  `transactions`, `dashboard`, `alerts`, `notifications`, and provider-specific
+  `sms`).
 - Enforce contract tests between API responses and mobile schema decoders.
 - Keep key boundary and ownership choices explicit in this roadmap and in
   code-level interfaces.
@@ -155,7 +160,7 @@ This sequence is intentional. Stead should prioritize user-facing product surfac
   - Detailed status and sequencing live in
     [Project Status](project-status.md#milestone-tracking).
 - Enabling and architecture priorities:
-  - Completed P0: the local mobile auth acceptance pass is recorded and
+  - Completed P0: the local Expo web auth acceptance pass is recorded and
     Dependency Review is blocking in the active `main` ruleset.
   - Completed P1: authoritative API/mobile contract generation and device-aware
     OTP abuse controls with stronger operator diagnostics.
@@ -168,9 +173,11 @@ This sequence is intentional. Stead should prioritize user-facing product surfac
     they are introduced.
   - P1: validate real-provider OTP delivery and the operator response playbook
     when a paid or verified sender account is available.
-  - P1: complete the native Android/iOS UI journey and real-device acceptance
-    before treating the vertical slice as production-ready. Screen and live
-    mobile-client/API boundaries are already covered separately.
+  - Completed P1: Android/iOS simulator journeys exercise authentication, goal
+    setup, transaction correction/deletion, dashboard refresh, session restore,
+    and logout against the running API and PostgreSQL.
+  - P1: complete live-provider and physical-device accessibility/acceptance
+    before treating the vertical slice as production-ready.
   - Next extraction step: define the cross-process command envelope,
     correlation/idempotency strategy, and queue selection criteria before
     moving the worker out of the API deployment.
@@ -236,3 +243,5 @@ This sequence is intentional. Stead should prioritize user-facing product surfac
 - Contract package distribution method (private npm registry vs git tags).
 - API gateway requirement timing.
 - Multi-region and data residency requirements for Nigerian users.
+
+</details>

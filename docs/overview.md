@@ -1,5 +1,8 @@
 # Overview
 
+<details open>
+<summary><strong>Show or hide document contents</strong></summary>
+
 ## Table of contents
 
 - [Vision](#11-vision)
@@ -97,7 +100,8 @@ Implemented API modules:
 1. Phone authentication
    - OTP request and verify endpoints
    - Phone normalization by country
-   - JWT-based sessions
+   - Short-lived access JWTs and rotating, device-bound refresh-token families
+   - Idempotent OTP request recovery across partial notification failures
    - Per-phone, per-IP, and keyed pseudonymous device OTP request throttles
    - OTP resend cooldown
    - Verify attempt lockout
@@ -165,6 +169,8 @@ Implemented screens and flows:
   linking, and explicit import confirmation
 - Stability dashboard
 - SMS notification preferences for weekly summaries and risk/recovery alerts
+- Account profile and optional-consent management, sanitized JSON export,
+  configured support access, guarded deletion, and sign-out across devices
 
 Mobile API responses are parsed with Zod schemas before the UI consumes them.
 
@@ -199,12 +205,12 @@ Product milestones and enabling delivery work are tracked separately in
 [Project Status](project-status.md#milestone-tracking). The largest current
 gaps are:
 
-1. Real-provider OTP validation on native Android and iOS devices.
-2. A full native UI navigation journey; auth, dashboard, transaction, and goal
-   screens have component coverage, while a separate live mobile API-client
-   journey exercises the running API and PostgreSQL.
-3. Production session lifecycle, operational monitoring, backup/restore, and
-   enforcement of documented privacy/retention/account-deletion procedures.
+1. Real-provider OTP and readiness-alert delivery on physical Android and iOS
+   devices. The complete dev-provider simulator journey is automated in CI.
+2. Physical-device accessibility and acceptance, including TalkBack, VoiceOver,
+   secure storage, background/restart behavior, and session expiry/revocation.
+3. Deployment, operational monitoring, incident runbooks, backup/restore, and
+   enforcement of documented privacy, retention, and deletion procedures.
 4. Customer validation and bank-export adapters for the canonical CSV ingestion
    slice, followed by a separate decision on direct bank connectivity; richer
    obligation planning and internal operations tooling remain later work.
@@ -215,3 +221,5 @@ See [Project Status](project-status.md) for the full capability matrix, exact
 test boundaries, and recommended delivery ordering. See
 [Auth Hardening](auth-hardening.md) for the completed Expo web validation and
 the still-deferred real-provider pass.
+
+</details>

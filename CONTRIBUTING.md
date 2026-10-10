@@ -1,5 +1,8 @@
 # Contributing to Stead
 
+<details open>
+<summary><strong>Show or hide document contents</strong></summary>
+
 ## Branching
 
 - Base all work on `main`.
@@ -12,7 +15,8 @@
 
 ## Commit Convention
 
-Use Conventional Commits.
+Use Conventional Commits. The canonical type definitions and examples are in
+the [commit message convention](.github/commit-convention.md).
 
 Format:
 `<type>(<scope>): <summary>`
@@ -34,6 +38,8 @@ Common types:
 - Keep PRs focused and small.
 - Include clear testing notes.
 - Link related issue(s).
+- Wait for every expected check on the latest commit and address conversation,
+  review, and inline-thread feedback before merging.
 
 Use the repo template format (see [`.github/pull_request_template.md`](.github/pull_request_template.md)):
 
@@ -63,11 +69,9 @@ Use the repo template format (see [`.github/pull_request_template.md`](.github/p
 - Include **`<!-- AUTO:START -->` / `<!-- AUTO:END -->`** markers so the [PR Description workflow](.github/workflows/pr-description.yml) can refresh the file list without overwriting your text.
 - Fill in **at least one What + Why bullet** before pushing again; until then, later syncs skip auto-updates so an empty template is not clobbered.
 
-Example with `gh`:
-
-```bash
-gh pr create --title "feat: your change" --body-file .github/pull_request_template.md
-```
+Create the PR with the GitHub web interface or the installed GitHub integration.
+Repository automation must follow the GitHub-app-first policy in
+[`AGENTS.md`](AGENTS.md#github-operations) instead of assuming a local CLI token.
 
 Local verification (recommended before push):
 
@@ -82,11 +86,12 @@ rejects formatting drift.
 
 The single `.github/workflows/ci.yml` build/test workflow runs independent
 format, lint, API, and mobile jobs in parallel on pull requests. Native
-Android/iOS simulator journeys live in `.github/workflows/native-ci.yml` and
-run on path-filtered pull requests (mobile app source outside tests, assets,
-Maestro, packaging, API, contracts, or native CI wiring), after merge to `main`, on a daily schedule at 16:00 UTC
-(after morning Dependabot / Dependency Maintenance / Dependency Audit so
-auto-merges have time to land), and on demand.
+Android/iOS simulator journeys live in `.github/workflows/native-ci.yml`. Its
+configuration job reports on every pull request and `main` push; expensive
+native jobs run only when the shared native path policy matches. Scheduled
+16:00 UTC and manual runs execute the full suite. The daily run follows morning
+Dependabot, Dependency Maintenance, and Dependency Audit activity so automated
+dependency PRs have time to land.
 Native binaries are built in dedicated jobs and passed to Maestro jobs as
 artifacts. Warm Android runs use cached AVD boot snapshots; iOS miss builds use
 mtime/inode-aware DerivedData plus Pods caches; both platforms cache installable
@@ -146,3 +151,5 @@ npm run start
   request or response, and `npm run contracts:generate` is run from `api/`.
 - Generated contract files are committed but never edited by hand.
 - PR approved and merged via squash.
+
+</details>

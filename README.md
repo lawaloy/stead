@@ -1,25 +1,33 @@
 # Stead
 
+<details open>
+<summary><strong>Show or hide document contents</strong></summary>
+
 Stead is a Financial Stability Layer that turns cashflow into decision intelligence to help users plan for obligations and spend safely.
 
 Current repository status:
 
 - API: the core auth, goal lifecycle/history, manual-transaction,
   stability-dashboard, account/data self-service, and persisted
-  OTP/readiness-notification boundaries are implemented.
+  OTP/readiness-notification boundaries are implemented. Authentication uses
+  short-lived access tokens and rotating, device-bound refresh-token families.
 - Mobile: the core vertical slice supports OTP login, active-goal creation,
   manual transaction creation, transaction history/filtering/edit/delete, and
   dashboard viewing, goal lifecycle/history, and SMS notification preferences.
   Customers can also manage their profile and optional consents, export their
-  data, contact configured support, and permanently delete their account.
+  data, contact configured support, permanently delete their account, and
+  preview and confirm bounded CSV transaction imports.
 - Verification: auth/notification and finance have PostgreSQL-backed e2e
   coverage. Auth, goal, transaction, and dashboard screens have component
   journeys, and CI exercises the real mobile API client against a running API
-  and PostgreSQL. Android/iOS simulator UI journeys run in `native-ci` on
-  path-filtered PRs: native binaries build once, then Maestro tests install
-  them (AVD/Pods/DerivedData/binary caches keep warm runs shorter).
-- Production readiness: live SMS delivery on real devices, production session
-  lifecycle, operations, native UI acceptance, and several product workflows
+  and PostgreSQL. `native-ci` reports on every PR and `main` push, runs the
+  Android/iOS Maestro journeys when native-impacting paths change, and runs the
+  full suite daily and on demand. Native binaries build once, then Maestro tests
+  install them; AVD, Pods, DerivedData, binary, and Metro caches shorten warm
+  runs.
+- Production readiness: live provider-backed SMS delivery and physical-device
+  accessibility/acceptance, deployment and operational monitoring,
+  backup/restore enforcement, and customer validation of ingestion and scoring
   remain incomplete.
 
 Weekly summaries and material risk/recovery alerts are opt-in. Customers choose
@@ -69,6 +77,7 @@ API (from `api/`):
 
 ```bash
 cd api
+docker compose up -d
 npx prisma generate
 npx prisma migrate dev
 npm run start:dev
@@ -84,7 +93,9 @@ npm run start
 ```
 
 Copy `mobile/.env.example` to `mobile/.env` and set `EXPO_PUBLIC_API_URL` when
-the API is not running on the default local URL. Set
+the API is not running on the default local URL. Android emulators commonly use
+`http://10.0.2.2:3000`; physical devices need the development machine's
+reachable LAN address. Set
 `EXPO_PUBLIC_SUPPORT_EMAIL` to the staffed customer-support address for the
 target environment.
 
@@ -121,3 +132,5 @@ The database and schema persist in the Docker volume, so this migration step
 does not need to be repeated before every unchanged test run.
 
 For the full vision, product strategy, current implementation, remaining gaps, and architecture see [docs/overview.md](docs/overview.md).
+
+</details>

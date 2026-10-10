@@ -1,5 +1,8 @@
 # Commit Message Convention
 
+<details open>
+<summary><strong>Show or hide document contents</strong></summary>
+
 Use Conventional Commits:
 
 `<type>(<scope>): <summary>`
@@ -19,3 +22,5 @@ Types:
 - `test`: tests added/updated
 - `chore`: maintenance work
 - `ci`: CI workflow changes
+
+</details>

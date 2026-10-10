@@ -1,5 +1,8 @@
 # Account and Data Self-Service
 
+<details open>
+<summary><strong>Show or hide document contents</strong></summary>
+
 Stead customers can manage a display name and optional consent choices, export
 their data as portable JSON, contact the configured support address, and
 permanently delete their account from the mobile app.
@@ -67,3 +70,5 @@ export, ownership, and database deletion. Mobile tests cover profile and
 consent changes, export sharing, the typed deletion gate, session clearing, and
 navigation to sign-in. Production backup expiry, support staffing, native share
 sheets, and platform email clients still require operational/native validation.
+
+</details>
