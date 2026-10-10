@@ -6,12 +6,28 @@
   },
   "scripts": {
     "setup": "npm ci && npm ci --prefix api && npm ci --prefix mobile",
+    "bootstrap": "npm run setup && npm run dev:prepare",
+    "env:init": "node scripts/local-workflow.mjs env:init",
+    "db:start": "node scripts/local-workflow.mjs db:start",
+    "db:stop": "node scripts/local-workflow.mjs db:stop",
+    "dev:prepare": "node scripts/local-workflow.mjs dev:prepare",
+    "dev:api": "npm --prefix api run start:dev",
+    "dev:mobile": "npm --prefix mobile run start",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "workflows:check": "node .github/scripts/validate-workflow-contracts.mjs",
+    "automation:test": "node --test scripts/local-workflow.test.mjs",
     "lint": "npm --prefix api run lint && npm --prefix mobile run lint",
     "lint:fix": "npm --prefix api run lint:fix && npm --prefix mobile run lint:fix",
-    "check": "npm run format:check && npm run workflows:check && npm run lint"
+    "contracts:check": "npm --prefix api run contracts:check",
+    "typecheck": "npm --prefix api run typecheck && npm --prefix mobile run typecheck",
+    "test": "npm --prefix api run test -- --runInBand && npm --prefix mobile run test -- --runInBand",
+    "build": "npm --prefix api run build && npm --prefix mobile run build",
+    "check": "npm run format:check && npm run workflows:check && npm run automation:test && npm run lint",
+    "verify": "npm run check && npm run contracts:check && npm run typecheck && npm run test && npm run build",
+    "test:e2e:local": "node scripts/local-workflow.mjs test:e2e",
+    "test:journey:local": "node scripts/local-workflow.mjs test:journey",
+    "verify:full": "npm run verify && npm run test:e2e:local && npm run test:journey:local"
   },
   "devDependencies": {
     "prettier": "3.9.6"

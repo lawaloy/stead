@@ -51,35 +51,27 @@ Repeat the complete wait-and-inspect cycle after every push because a new head c
 ### Starting the database
 
 ```bash
-dockerd &>/var/log/dockerd.log &
-sleep 3
-cd api && docker compose up -d
+npm run db:start
 ```
 
-Wait for Postgres to accept connections before running migrations:
-
-```bash
-docker exec stead_db pg_isready -U stead
-```
+The command starts the Compose service and waits for PostgreSQL readiness.
 
 API e2e tests delete their fixtures and must use a dedicated schema. Never run
 them against the development `public` schema. The test harness defaults to the
-local `e2e` schema. Prepare it before the first run and whenever migrations
-change:
+local `e2e` schema. Prepare it and run the suite from the repository root:
 
-```powershell
-cd api
-$env:DATABASE_URL = 'postgresql://stead:stead@localhost:5432/stead?schema=e2e'
-npx prisma migrate deploy
-npm run test:e2e -- --runInBand
+```bash
+npm run test:e2e:local
 ```
 
-The schema persists in the Docker volume, so unchanged test runs do not need a
-fresh migration.
+This command starts and waits for PostgreSQL, supplies the dedicated schema and
+test secrets, applies migrations, and runs the suite.
 
 ### Environment files
 
-Copy `.env.example` to `.env` in both `api/` and `mobile/`. Key gotchas:
+Run `npm run env:init` to create missing `.env` files in `api/` and `mobile/`.
+It generates three distinct local API secrets and never overwrites an existing
+file. Key gotchas:
 
 - `JWT_SECRET` must be at least **16 characters**.
 - `NOTIFICATION_PAYLOAD_ENCRYPTION_KEY` must be at least **32 characters** and must not reuse the JWT secret.
@@ -91,9 +83,8 @@ Copy `.env.example` to `.env` in both `api/` and `mobile/`. Key gotchas:
 ### Running the API
 
 ```bash
-cd api
-npx prisma migrate dev   # apply pending migrations
-SMS_PROVIDER=dev DEV_EXPOSE_OTP=true npm run start:dev   # dev server on port 3000
+npm run dev:prepare
+npm run dev:api
 ```
 
 The dev server watches source files but **does not restart on `.env` changes**; restart the process manually if you edit `.env`.
@@ -101,8 +92,7 @@ The dev server watches source files but **does not restart on `.env` changes**; 
 ### Running mobile
 
 ```bash
-cd mobile
-npm run start   # Expo dev server
+npm run dev:mobile
 ```
 
 The mobile app reads `EXPO_PUBLIC_API_URL` from `mobile/.env` (defaults to `http://localhost:3000`).

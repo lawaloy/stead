@@ -46,6 +46,7 @@ Quick links
 - Active architecture milestone: [docs/architecture-roadmap.md](docs/architecture-roadmap.md#delivery-roadmap)
 - Auth readiness work: [docs/auth-hardening.md](docs/auth-hardening.md)
 - Repository rules audit: [docs/branch-protection-checklist.md](docs/branch-protection-checklist.md)
+- Local automation and manual boundaries: [docs/developer-automation.md](docs/developer-automation.md)
 - Contributing: [CONTRIBUTING.md](CONTRIBUTING.md)
 - API: [api/](api/)
 - Mobile: [mobile/](mobile/)
@@ -60,76 +61,56 @@ compatibility package for tools that still require the legacy compiler API.
 The scheduled TypeScript 6 Removal Readiness workflow tracks when that
 compatibility layer can be removed safely.
 
-Get started
+## Get Started
 
-Install all repository, API, and mobile dependencies from the repository root:
-
-```bash
-npm run setup
-```
-
-This is the recommended first command for a new clone. Use `npm run
-format:check` and `npm run lint` for non-mutating checks, or `npm run format`
-and `npm run lint:fix` to apply automatic fixes. Formatting uses the pinned
-repository Prettier version and LF line endings on every platform.
-
-API (from `api/`):
+From a new clone, run:
 
 ```bash
-cd api
-docker compose up -d
-npx prisma generate
-npx prisma migrate dev
-npm run start:dev
+npm run bootstrap
 ```
 
-Copy `api/.env.example` to `api/.env` first. Set `DATABASE_URL`; generate independent random values for `JWT_SECRET` (16+ characters), `NOTIFICATION_PAYLOAD_ENCRYPTION_KEY` (32+ characters), and `AUTH_DEVICE_IDENTIFIER_SECRET` (32+ characters); and never reuse the checked-in placeholders. The device secret creates non-reversible identifiers for device-aware OTP throttling and must remain stable within an environment. Inspection endpoints deny access by default; add trusted user IDs to the comma-separated `AUTH_INSPECTION_OPERATOR_USER_IDS` only when operator access is needed. The example uses `SMS_PROVIDER=dev` and `DEV_EXPOSE_OTP=true` so local OTP requests still create notification jobs without calling Twilio or Termii. Both development-only settings are rejected in production. For local Postgres, `api/docker-compose.yml` provides a development database.
+This installs all root, API, and mobile dependencies; creates missing local
+environment files with three distinct generated API secrets; starts PostgreSQL;
+waits for it to accept connections; and applies committed migrations. Existing
+`.env` files are never overwritten.
 
-Mobile (from `mobile/`):
+Start the API and mobile app in separate terminals:
 
 ```bash
-cd mobile
-npm run start
+npm run dev:api
+npm run dev:mobile
 ```
 
-Copy `mobile/.env.example` to `mobile/.env` and set `EXPO_PUBLIC_API_URL` when
-the API is not running on the default local URL. Android emulators commonly use
-`http://10.0.2.2:3000`; physical devices need the development machine's
-reachable LAN address. Set
-`EXPO_PUBLIC_SUPPORT_EMAIL` to the staffed customer-support address for the
-target environment.
+The generated API environment uses `SMS_PROVIDER=dev` and
+`DEV_EXPOSE_OTP=true`, so local authentication does not need Twilio or Termii.
+Edit `mobile/.env` when the API is not available at the default local URL:
+Android emulators commonly use `http://10.0.2.2:3000`, while physical devices
+need the development machine's reachable LAN address. Set
+`EXPO_PUBLIC_SUPPORT_EMAIL` to a staffed address for release builds. Restart a
+running API or Expo process after changing its environment file.
 
-Useful checks:
+## Verification
 
-After running `npm run setup`:
+Run the deterministic checks, unit tests, contract check, typechecks, and builds:
 
 ```bash
-npm run format:check
-npm run lint
-
-npm --prefix api run test -- --runInBand
-npm --prefix api run build
-
-npm --prefix mobile run typecheck
-npm --prefix mobile test -- --runInBand
-npm --prefix mobile run build
+npm run verify
 ```
 
-The API e2e suite uses PostgreSQL and deletes its own fixtures. It refuses to
-run against the development `public` schema. The test harness defaults to the
-local `e2e` schema and also accepts an `E2E_DATABASE_URL` override. Before the
-first local e2e run, and whenever migrations change, apply migrations to the
-dedicated schema:
+Database-backed suites have safe root commands that start PostgreSQL, wait for
+readiness, migrate dedicated schemas, and supply isolated test settings:
 
-```powershell
-cd api
-$env:DATABASE_URL = 'postgresql://stead:stead@localhost:5432/stead?schema=e2e'
-npx prisma migrate deploy
-npm run test:e2e -- --runInBand
+```bash
+npm run test:e2e:local
+npm run test:journey:local
+# Or run every local gate:
+npm run verify:full
 ```
 
-The database and schema persist in the Docker volume, so this migration step
-does not need to be repeated before every unchanged test run.
+The e2e harness still refuses the development `public` schema. Stop the local
+database with `npm run db:stop`. See
+[Developer Automation](docs/developer-automation.md) for command behavior,
+lower-level fallbacks, and the checks that must remain human-led.
 
 For the full vision, product strategy, current implementation, remaining gaps, and architecture see [docs/overview.md](docs/overview.md).
 

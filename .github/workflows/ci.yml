@@ -55,6 +55,9 @@ jobs:
       - name: Validate workflow contracts
         run: npm run workflows:check
 
+      - name: Test developer automation
+        run: npm run automation:test
+
   lint:
     needs: config
     runs-on: ubuntu-latest
@@ -156,14 +159,12 @@ jobs:
       - name: Generate Prisma client
         run: npx prisma generate
 
-      - name: Apply database migrations
-        run: npx prisma migrate deploy
-
       - name: Unit tests
         run: npm run test -- --ci --runInBand
 
-      - name: End-to-end tests
-        run: npm run test:e2e -- --ci --runInBand
+      - name: Database-backed API end-to-end tests
+        working-directory: .
+        run: node scripts/local-workflow.mjs test:e2e --database-ready
 
   mobile-api-journey:
     needs: config
@@ -212,30 +213,8 @@ jobs:
           npm --prefix api ci
           npm --prefix mobile ci
 
-      - name: Migrate and build API
-        working-directory: api
-        run: |
-          npx prisma migrate deploy
-          npm run build
-
       - name: Exercise live mobile API client journey
-        run: |
-          node api/dist/src/main.js > "$RUNNER_TEMP/stead-api.log" 2>&1 &
-          api_pid=$!
-          trap 'kill "$api_pid" 2>/dev/null || true' EXIT
-          ready=0
-          for attempt in {1..30}; do
-            if curl --fail --silent "$STEAD_TEST_API_URL/auth/countries" > /dev/null; then
-              ready=1
-              break
-            fi
-            sleep 1
-          done
-          if [ "$ready" -ne 1 ]; then
-            cat "$RUNNER_TEMP/stead-api.log"
-            exit 1
-          fi
-          npm --prefix mobile run test:live-api
+        run: node scripts/local-workflow.mjs test:journey --database-ready
 
   build:
     runs-on: ubuntu-latest

@@ -24,21 +24,20 @@ Rotating refresh-token behavior and session-expiry feedback are automated
 separately; live-provider and physical-device expiry/revocation acceptance
 remain release checks.
 
-To repeat the live client/API run locally, use only a disposable database schema:
+Repeat the live client/API run from the repository root:
 
-1. Start PostgreSQL with `cd api; docker compose up -d`.
-2. In `api/`, set `DATABASE_URL` to
-   `postgresql://stead:stead@localhost:5432/stead?schema=e2e_mobile`, set the
-   three distinct test secrets, `NODE_ENV=test`, `SMS_PROVIDER=dev`, and
-   `DEV_EXPOSE_OTP=true`.
-3. Run `npx prisma migrate deploy`, then `npm run build`, then
-   `node dist/src/main.js`. Keep that process running.
-4. In `mobile/`, set `STEAD_TEST_API_URL=http://127.0.0.1:3000` and run
-   `npm run test:live-api`.
+```bash
+npm run test:journey:local
+```
+
+The command starts PostgreSQL, waits for readiness, applies migrations to the
+dedicated `e2e_mobile` schema, supplies test-only secrets and the development
+SMS provider, builds and starts the API, waits for its health endpoint, runs the
+mobile test, and always stops the API process.
 
 The test refuses any non-localhost URL. Never point the server at a development
-`public` schema or a production database for this run. The CI job supplies all
-test environment variables and starts/stops the API automatically.
+`public` schema or a production database for this run. The local runner and CI
+both supply the isolated settings and manage the API process automatically.
 
 ## Native UI journey
 

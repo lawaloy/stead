@@ -43,25 +43,10 @@ Common types:
 
 Use the repo template format (see [`.github/pull_request_template.md`](.github/pull_request_template.md)):
 
-```markdown
-## What + Why
-
-- Why this change exists (at least one bullet)
-
-## Checks
-
-- [ ] `root`: `npm run format:check`
-- [ ] `root`: `npm run lint`
-- [ ] `api`: `npm run build`
-- [ ] `api`: `npm run test -- --ci --runInBand`
-- [ ] `api`: `npm run test:e2e -- --ci --runInBand`
-- [ ] `mobile`: `npm run typecheck`
-- [ ] `mobile`: `npm test -- --runInBand`
-- [ ] `mobile`: `npm run build`
-
-<!-- AUTO:START -->
-<!-- AUTO:END -->
-```
+The template is the single source of truth for its exact headings, local-check
+list, and automation markers; do not copy a second version into documentation.
+It currently records `npm run verify`, `npm run test:e2e:local`, and `npm run
+test:journey:local`.
 
 **Important:**
 
@@ -73,12 +58,14 @@ Create the PR with the GitHub web interface or the installed GitHub integration.
 Repository automation must follow the GitHub-app-first policy in
 [`AGENTS.md`](AGENTS.md#github-operations) instead of assuming a local CLI token.
 
-Local verification (recommended before push):
+Local verification before push:
 
-- New clone: `npm run setup` from the repository root
-- Repository root: `npm run format:check`, `npm run lint`
-- API: `npm run contracts:check`, `npm run test -- --runInBand`, `npm run test:e2e -- --runInBand`, `npm run build`
-- Mobile: `npm run typecheck`, `npm test -- --runInBand`, `npm run build`
+- New clone: `npm run bootstrap` from the repository root
+- Deterministic checks, unit tests, contracts, typechecks, and builds:
+  `npm run verify`
+- PostgreSQL API e2e suite: `npm run test:e2e:local`
+- Live mobile API-client journey: `npm run test:journey:local`
+- Every local gate in sequence: `npm run verify:full`
 
 Run `npm run format` or `npm run lint:fix` from the repository root to apply
 automatic formatting or lint corrections. CI runs the non-mutating checks and
@@ -99,9 +86,9 @@ binaries, Maestro CLI, and Metro transforms. Shared non-secret CI toolchain
 versions are kept in `.github/ci.env`; update that file when changing Node, npm,
 the Android API level, or the macOS runner. New pushes cancel superseded CI runs.
 
-API e2e tests require PostgreSQL and a dedicated `e2e` or test schema. The
-test harness refuses to clean the development `public` schema. See the root
-README for the local migration command.
+The database-backed root commands start PostgreSQL, wait for readiness, migrate
+dedicated schemas, and provide safe test settings. The API e2e harness also
+refuses to clean the development `public` schema.
 
 ## Local Setup
 
@@ -114,34 +101,38 @@ API and mobile scripts invoke the TypeScript 7 CLI through
 `@typescript/typescript6` until the TypeScript 6 Removal Readiness workflow
 reports that a fully tested removal trial is eligible.
 
-API:
+Prepare a new clone:
 
 ```bash
-cd api
-npm ci
-npx prisma generate
-npx prisma migrate dev
-npm run start:dev
+npm run bootstrap
 ```
 
-Mobile:
+Then start the API and mobile app in separate terminals:
 
 ```bash
-cd mobile
-npm ci
-npm run start
+npm run dev:api
+npm run dev:mobile
 ```
+
+`npm run bootstrap` installs all three dependency trees, creates only missing
+environment files, generates distinct local API secrets, starts PostgreSQL,
+waits for readiness, and applies committed migrations. Use `npm run
+dev:prepare` to repeat only the environment/database preparation, or `npm run
+db:stop` to stop PostgreSQL without deleting its volume.
 
 ## Environment
 
-- Copy `api/.env.example` to `api/.env`.
-- Copy `mobile/.env.example` to `mobile/.env`.
+- `npm run env:init` creates missing `api/.env` and `mobile/.env` files and
+  never overwrites existing files.
 - Do not commit secrets.
 - Generate independent random values for `JWT_SECRET`, `NOTIFICATION_PAYLOAD_ENCRYPTION_KEY`, and `AUTH_DEVICE_IDENTIFIER_SECRET`; do not reuse secrets or use the example placeholders.
 - Leave `AUTH_INSPECTION_OPERATOR_USER_IDS` empty unless specific authenticated user IDs need operator access.
 - Set `EXPO_PUBLIC_SUPPORT_EMAIL` to a monitored address for release builds so
   customers can reach support from the account screen.
 - Add new required env vars to the matching `.env.example`.
+
+See [Developer Automation](docs/developer-automation.md) for the command matrix
+and the release checks that intentionally remain manual.
 
 ## Definition of Done
 
