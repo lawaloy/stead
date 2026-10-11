@@ -3,98 +3,79 @@
 <details open>
 <summary><strong>Show or hide document contents</strong></summary>
 
-## Cursor Cloud specific instructions
+This file contains repository-specific instructions for coding agents. Human
+onboarding belongs in [CONTRIBUTING.md](CONTRIBUTING.md), and canonical local
+command behavior belongs in
+[Developer Automation](docs/developer-automation.md). Do not duplicate those
+documents here.
 
-### Overview
+## Agent Startup
 
-Stead is a monorepo with two sub-projects:
+Read the repository shape and prerequisites in [README.md](README.md), then use
+the root commands defined in
+[Developer Automation](docs/developer-automation.md). The supported Node range
+is machine-enforced by the root `package.json`.
 
-- **`api/`** — NestJS REST API (TypeScript, Prisma ORM, PostgreSQL 16, JWT auth with OTP)
-- **`mobile/`** — Expo React Native mobile app (TypeScript, React 19, Expo Router)
+API e2e work must use the dedicated schema supplied by
+`npm run test:e2e:local`; never run fixture-cleaning tests against `public`.
 
-Standard commands for lint, test, build, and dev are documented in the root `README.md` and `CONTRIBUTING.md`.
+## Opening Pull Requests
 
-### Opening pull requests
+Open PRs **ready for review by default**. Use draft status only when the user
+explicitly requests it or the work is intentionally incomplete.
 
-Open PRs **ready for review by default**. Use `--draft` only when the user explicitly requests a draft or the work is intentionally incomplete.
+Use [`.github/pull_request_template.md`](.github/pull_request_template.md):
 
-When creating PRs, use [`.github/pull_request_template.md`](.github/pull_request_template.md):
+- fill at least one `## What + Why` bullet;
+- report local verification honestly under `## Checks`; and
+- retain `<!-- AUTO:START -->` and `<!-- AUTO:END -->` so automation can update
+  its section in place.
 
-- **`## What + Why`** with at least one filled bullet (not `## Summary`)
-- **`## Checks`** for local verification before push
-- **`<!-- AUTO:START -->` … `<!-- AUTO:END -->`** markers so the PR Description workflow can update the file list in place
+For ordinary PRs, do not enable auto-merge when creating the PR. Wait until all
+workflows and check integrations expected for the PR's event and changed paths
+have produced runs for the latest head commit and every resulting run is
+terminal, including checks not required by branch protection. Also wait for PR
+review automation still running against an earlier commit because it may post
+relevant feedback after a push. If an expected run does not appear, investigate
+the missing run rather than treating its absence as success. Success is
+acceptable; accept a skipped or neutral conclusion only when it is expected and
+documented. Failure, cancellation, timeout, or action-required conclusions
+block completion.
 
-Fill in **What + Why** before the next push. Details: [CONTRIBUTING.md](CONTRIBUTING.md#pull-requests).
+Then inspect the PR conversation, submitted reviews, and inline review threads.
+Address every actionable item, reply with the outcome, and resolve a thread
+only after the concern is fixed or answered with documented rationale.
 
-For ordinary PRs, do not enable auto-merge when creating the PR. Wait until all workflows and check integrations expected for the PR’s event and changed paths have produced runs for the latest head commit and every resulting run is terminal, including checks not required by branch protection. Also wait for any PR review automation still running against an earlier commit, because it may post relevant feedback after a push. If an expected run does not appear, investigate the missing run rather than treating its absence as success. Success is acceptable; accept a skipped or neutral conclusion only when it is expected and documented. Failure, cancellation, timeout, or action-required conclusions block completion.
-Then inspect the PR conversation, submitted reviews, and inline review threads. Address every actionable item, reply with the outcome, and resolve a thread only after the concern is fixed or answered with documented rationale.
-Repeat the complete wait-and-inspect cycle after every push because a new head commit invalidates the previous check and review assessment. Immediately before completion, re-check the latest commit, all check and review-automation runs, and all three feedback surfaces. Merge manually only when nothing is pending, no expected runs are missing, no unacceptable conclusions remain, and no actionable feedback is unresolved.
+Repeat the complete wait-and-inspect cycle after every push because a new head
+commit invalidates the previous check and review assessment. Immediately before
+completion, re-check the latest commit, all check and review-automation runs,
+and all three feedback surfaces. Merge manually only when nothing is pending,
+no expected runs are missing, no unacceptable conclusions remain, and no
+actionable feedback is unresolved.
 
-### GitHub operations
+## GitHub Operations
 
-- Use the installed GitHub app connector first for remote GitHub operations,
-  including pull requests, issues, reviews, checks, workflow runs, labels, and
-  auto-merge.
-- Do not default to the `gh` CLI and do not treat an expired or missing `gh`
-  token as a blocker while the GitHub app connector is available.
-- Use `gh` only when the user explicitly requests it or after confirming that
-  the GitHub app connector does not expose the required operation.
-- Continue to use local `git` commands for working-tree inspection, branches,
-  commits, and synchronizing the local checkout. `git` and `gh` are separate
-  tools; this preference does not prohibit normal local Git workflows.
+- Use the installed GitHub app connector first for pull requests, issues,
+  reviews, checks, workflow runs, labels, and merge operations.
+- Do not default to `gh` or treat an expired/missing `gh` token as a blocker
+  while the connector exposes the required operation.
+- Use `gh` only when the user explicitly requests it or after confirming the
+  connector lacks the required operation.
+- Continue using local `git` for working-tree inspection, branches, commits, and
+  synchronization; `git` and `gh` are separate tools.
 
-### Prerequisites
+## Safety-Critical Local Rules
 
-- **Node.js 24.15+ (24.x)** (required by NestJS 12 tooling and Jest ESM support; TypeScript 6 remains installed only as a compiler-API compatibility layer for supporting tools)
-- **Docker** (required for PostgreSQL via `api/docker-compose.yml`)
-
-### Starting the database
-
-```bash
-npm run db:start
-```
-
-The command starts the Compose service and waits for PostgreSQL readiness.
-
-API e2e tests delete their fixtures and must use a dedicated schema. Never run
-them against the development `public` schema. The test harness defaults to the
-local `e2e` schema. Prepare it and run the suite from the repository root:
-
-```bash
-npm run test:e2e:local
-```
-
-This command starts and waits for PostgreSQL, supplies the dedicated schema and
-test secrets, applies migrations, and runs the suite.
-
-### Environment files
-
-Run `npm run env:init` to create missing `.env` files in `api/` and `mobile/`.
-It generates three distinct local API secrets and never overwrites an existing
-file. Key gotchas:
-
-- `JWT_SECRET` must be at least **16 characters**.
-- `NOTIFICATION_PAYLOAD_ENCRYPTION_KEY` must be at least **32 characters** and must not reuse the JWT secret.
-- `AUTH_DEVICE_IDENTIFIER_SECRET` must be at least **32 characters**, must not reuse either secret above, and must remain stable within an environment so device abuse history stays correlated.
-- `AUTH_INSPECTION_OPERATOR_USER_IDS` is a comma-separated allowlist; leaving it empty denies inspection access to everyone.
-- Use `SMS_PROVIDER=dev` locally when testing without Twilio or Termii credentials; this provider is rejected in production.
-- Set `DEV_EXPOSE_OTP=true` in the API environment (or pass it as env var when starting the server) to have the `/auth/request-otp` response include the OTP in plaintext — useful for testing auth flows without an SMS provider.
-
-### Running the API
-
-```bash
-npm run dev:prepare
-npm run dev:api
-```
-
-The dev server watches source files but **does not restart on `.env` changes**; restart the process manually if you edit `.env`.
-
-### Running mobile
-
-```bash
-npm run dev:mobile
-```
-
-The mobile app reads `EXPO_PUBLIC_API_URL` from `mobile/.env` (defaults to `http://localhost:3000`).
+- Preserve existing `.env` files. `npm run env:init` creates only missing files.
+- Keep `JWT_SECRET`, `NOTIFICATION_PAYLOAD_ENCRYPTION_KEY`, and
+  `AUTH_DEVICE_IDENTIFIER_SECRET` distinct; the latter two require at least 32
+  characters and the JWT secret requires at least 16.
+- Keep `AUTH_INSPECTION_OPERATOR_USER_IDS` empty unless authenticated operator
+  access is intentionally configured.
+- `SMS_PROVIDER=dev` and `DEV_EXPOSE_OTP=true` are local/test settings and are
+  rejected in production.
+- Restart API or Expo processes after changing their environment files.
+- Use `npm run verify:full` for the complete local gate. Native, live-provider,
+  physical-device, and production checks remain separate evidence boundaries.
 
 </details>

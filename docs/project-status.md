@@ -3,7 +3,7 @@
 <details open>
 <summary><strong>Show or hide document contents</strong></summary>
 
-Last reviewed against the repository: 2026-10-10.
+Last reviewed against the repository: 2026-10-11.
 
 This document separates four states that should not be treated as equivalent:
 

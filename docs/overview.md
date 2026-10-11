@@ -1,225 +1,97 @@
-# Overview
+# Product and System Overview
 
 <details open>
 <summary><strong>Show or hide document contents</strong></summary>
 
-## Table of contents
+This document owns Stead's stable product framing and present system shape. It
+does not track delivery progress; use [Project Status](project-status.md) for
+current capabilities, evidence, priorities, and release gaps.
 
-- [Vision](#11-vision)
-- [Problem Statement](#2-problem-statement)
-- [Product Strategy](#3-product-strategy)
-- [Current Implementation](#4-current-implementation)
-- [System Architecture](#5-system-architecture)
-- [Remaining Gaps](#6-remaining-gaps)
+## Vision
 
-For the endpoint-by-endpoint product and verification matrix, see
-[Project Status](project-status.md). That document is the source of truth for
-distinguishing implemented code from mobile exposure, automated coverage, and
-production validation.
+Stead is a financial stability layer that helps Nigerians prepare for future
+obligations by translating cash flow into decision intelligence.
 
-## 1.1 Vision
+It answers one question: **What can I safely spend today without creating
+future financial pressure?**
 
-Stead is a Financial Stability Layer that helps Nigerians stay prepared for future financial obligations by translating their cashflow into decision intelligence.
+Stead begins as a decision-support system rather than a wallet, bank, payment
+processor, or lender. Over time it may grow into a broader financial platform,
+but stability and pre-spend intelligence remain the differentiator.
 
-Stead answers one question:
+## Problem
 
-“What can I safely spend today without creating future financial pressure?”
+Many customers receive periodic income but face large, infrequent obligations
+such as rent, school fees, and emergencies. Existing financial products make it
+easy to move or borrow money, but rarely show whether today's spending creates
+future pressure.
 
-Today, Stead is not:
+Stead focuses on:
 
-- A wallet
-- A neobank
-- A payment processor
-- A lending company
+- readiness for known obligations;
+- pacing and safe-to-spend guidance;
+- early warning when financial stability materially changes; and
+- understandable history so customers can correct and trust their inputs.
 
-Stead is:
+## Product Strategy
 
-- A financial stability engine
-- A cashflow interpretation layer
-- A decision-support system
+The initial wedge is annual-rent readiness: it is predictable, painful,
+widely relevant, and naturally recurring. The underlying model is goal-agnostic
+so the same system can support other obligations without changing its core
+decision logic.
 
-Long term, Stead can evolve from a financial stability layer into a broader financial platform. The wedge is decision intelligence and financial stability first; over time, that layer can expand into richer money movement, account, and operating capabilities without losing the core focus on helping users act safely and stay financially prepared.
+The product surface spans five stable domains:
 
-## 2. Problem Statement
+1. Identity and account lifecycle.
+2. Goals and financial inputs.
+3. Readiness and stability scoring.
+4. Proactive alerts and notification delivery.
+5. Data ingestion and customer-controlled export/deletion.
 
-Nigerians:
+Detailed behavior belongs in the feature documents listed in the
+[Documentation Guide](README.md).
 
-- Earn income monthly
-- Face large, infrequent financial shocks (rent, school fees, emergencies)
-- Lack a system to pace toward these obligations
-- Often borrow or experience pressure due to poor visibility
+## Current System Shape
 
-Existing fintech players:
+Stead is currently a modular monolith with two primary applications:
 
-- Optimize for transaction volume
-- Increase money movement
-- Offer reactive loans
+- an Expo React Native mobile application as the customer surface; and
+- a NestJS API backed by Prisma and PostgreSQL.
 
-They do not optimize for:
+The API owns identity, accounts, goals, transactions, ingestion, scoring,
+alerts, and persisted notification delivery. Twilio and Termii adapters isolate
+external SMS delivery, while a development adapter supports local and automated
+journeys.
 
-- Stability
-- Pre-spend intelligence
-- Long-horizon readiness
+`contracts/openapi.yaml` is authoritative for mobile-consumed API routes.
+Generated API types and mobile types/Zod validators keep both sides aligned;
+internal inspection routes remain operator-only.
 
-## 3. Product Strategy
+## Current Boundaries
 
-### 3.1 Category Definition
+- **Identity and access:** authentication, sessions, account profile, consent,
+  export, deletion, and auth telemetry.
+- **Financial inputs:** obligation goals, transactions, goal contribution
+  mapping, and file ingestion.
+- **Planning and scoring:** readiness, required pace, safe-to-spend, stability
+  score, and risk status.
+- **Messaging:** customer preferences, notification jobs, provider abstraction,
+  retry, cooldown, deduplication, and dead-letter state.
 
-Stead defines:
+These boundaries are logical ownership boundaries inside one API deployment.
+Future physical extraction is governed by the
+[Architecture Roadmap](architecture-roadmap.md), not by this overview.
 
-- Financial Stability Infrastructure
+## Delivery Status
 
-This sits above wallets and banks.
+The repository contains a working core vertical slice, not a fully
+production-validated financial product. [Project Status](project-status.md) is
+the sole detailed source for:
 
-Wallets move money.
-Stead interprets money.
-
-In the current phase, that positioning is intentional. Over time, Stead can grow from infrastructure and decisioning into a fuller financial product surface, closer to the breadth of modern fintech platforms, while keeping stability and pre-spend intelligence as the differentiator.
-
-### 3.2 Wedge Use Case (v1)
-
-Annual rent readiness.
-
-Why:
-
-- Predictable
-- High emotional pain
-- Universally relevant
-- Strong retention driver
-
-Internally, the system is goal-agnostic.
-
-## 4. Current Implementation
-
-### 4.1 API
-
-The backend is a NestJS API backed by Prisma and Postgres.
-
-Implemented API modules:
-
-1. Phone authentication
-   - OTP request and verify endpoints
-   - Phone normalization by country
-   - Short-lived access JWTs and rotating, device-bound refresh-token families
-   - Idempotent OTP request recovery across partial notification failures
-   - Per-phone, per-IP, and keyed pseudonymous device OTP request throttles
-   - OTP resend cooldown
-   - Verify attempt lockout
-   - Auth event telemetry for request, resend, verify failure, lockout, and success outcomes
-   - Multi-window operator diagnostics for lockout trends, repeated phones/IPs/devices, and device-signal coverage
-
-2. SMS and notification jobs
-   - Twilio and Termii provider support
-   - Local development SMS provider support
-   - Provider configuration validation at startup
-   - Persisted notification jobs for OTP delivery
-   - Retry and dead-letter state
-   - Provider metadata capture for sent jobs
-   - Authenticated inspection endpoints for auth events and notification queue state
-   - Queue health diagnostics for retries, stale processing locks, recent attempt failures, dead letters, and the latest failure
-   - Opt-in weekly readiness summaries and material risk/recovery SMS alerts
-   - Timezone-aware schedules, 24-hour risk cooldown, and queue deduplication
-
-3. Obligation goals
-   - Name
-   - Amount
-   - Due date
-   - Optional monthly income estimate
-   - Single active goal per user
-   - Active, completed, cancelled, and replaced lifecycle states
-   - Authenticated goal history with preserved transaction links
-
-4. Manual transactions
-   - Income entry
-   - Expense entry
-   - Optional goal tagging
-   - List, update, and delete support
-   - Canonical CSV preview and confirmed batch import
-   - Row-level validation and database-enforced retry deduplication
-
-5. Stability dashboard
-
-   Displays:
-   - Goal readiness %
-   - Required monthly pace
-   - Safe-to-spend amount
-   - Stability score (0–100)
-   - Risk status (stable / warning / critical)
-   - Goal saved amount
-   - Estimated balance
-
-### 4.2 Mobile
-
-The mobile app is an Expo Router app.
-
-Implemented screens and flows:
-
-- OTP request and verify
-- Resend cooldown and clearer auth error states
-- Dev OTP hint support when the API enables `DEV_EXPOSE_OTP=true`
-- Token persistence and unauthorized-session clearing
-- A stable installation UUID sent with API requests for server-side abuse correlation; the API persists only a keyed hash
-- Goal setup, editing, intentional replacement, completion/cancellation, and
-  lifecycle history
-- Manual income/expense entry in naira with a calendar-date input and optional
-  active-goal tagging
-- Transaction activity history with income/expense filters, visible net,
-  editing, explicit goal-link management, and confirmed deletion
-- CSV transaction-file selection, preview, row selection, optional active-goal
-  linking, and explicit import confirmation
-- Stability dashboard
-- SMS notification preferences for weekly summaries and risk/recovery alerts
-- Account profile and optional-consent management, sanitized JSON export,
-  configured support access, guarded deletion, and sign-out across devices
-
-Mobile API responses are parsed with Zod schemas before the UI consumes them.
-
-The mobile product exposes the customer-facing goal and transaction lifecycle
-surfaces implemented by the API. Internal auth and queue inspection endpoints
-remain intentionally operator-only.
-
-## 5. System Architecture
-
-### 5.1 High-Level Architecture
-
-- Mobile App (React Native)
-- API (NestJS)
-- Postgres (via Prisma)
-- SMS Provider (Twilio or Termii for OTP and readiness alerts)
-- In-process notification worker backed by the database
-
-### 5.2 Current Boundaries
-
-- Identity and access: users, profiles, optional consent history, data export,
-  account deletion, OTP lifecycle, JWT sessions, auth telemetry
-- Financial inputs: goals, transactions, goal contribution tagging
-- Planning and scoring: readiness, monthly pace, safe-to-spend, stability score/status
-- Messaging: notification jobs, SMS provider abstraction, retry/dead-letter state
-
-## 6. Remaining Gaps
-
-The repository contains a working core vertical slice, not a complete or
-production-validated financial product.
-
-Product milestones and enabling delivery work are tracked separately in
-[Project Status](project-status.md#milestone-tracking). The largest current
-gaps are:
-
-1. Real-provider OTP and readiness-alert delivery on physical Android and iOS
-   devices. The complete dev-provider simulator journey is automated in CI.
-2. Physical-device accessibility and acceptance, including TalkBack, VoiceOver,
-   secure storage, background/restart behavior, and session expiry/revocation.
-3. Deployment, operational monitoring, incident runbooks, backup/restore, and
-   enforcement of documented privacy, retention, and deletion procedures.
-4. Customer validation and bank-export adapters for the canonical CSV ingestion
-   slice, followed by a separate decision on direct bank connectivity; richer
-   obligation planning and internal operations tooling remain later work.
-5. Customer validation of stability thresholds and alert copy, plus live SMS
-   delivery validation on native devices.
-
-See [Project Status](project-status.md) for the full capability matrix, exact
-test boundaries, and recommended delivery ordering. See
-[Auth Hardening](auth-hardening.md) for the completed Expo web validation and
-the still-deferred real-provider pass.
+- what is implemented and exposed to customers;
+- what automated evidence exists;
+- what has been validated in production-like conditions;
+- the active customer-value milestone; and
+- the remaining production-pilot blockers.
 
 </details>

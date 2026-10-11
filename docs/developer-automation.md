@@ -18,7 +18,7 @@ environment files, and gives database-backed tests their own schemas.
 | `npm run dev:prepare`        | Initializes missing env files, starts/waits for PostgreSQL, and applies committed migrations.                                                        |
 | `npm run dev:api`            | Starts the watch-mode NestJS API using `api/.env`.                                                                                                   |
 | `npm run dev:mobile`         | Starts Expo using `mobile/.env`.                                                                                                                     |
-| `npm run verify`             | Runs formatting, workflow-contract and automation tests, lint, generated-contract drift, API/mobile typechecks, unit tests, and builds.              |
+| `npm run verify`             | Runs formatting, workflow contracts, automation tests, lint, generated-contract drift, API/mobile typechecks, unit tests, and builds.                |
 | `npm run test:e2e:local`     | Starts/waits for PostgreSQL, migrates the isolated `e2e` schema, supplies safe test settings, and runs API e2e tests.                                |
 | `npm run test:journey:local` | Migrates `e2e_mobile`, builds/starts/waits for the API, runs the real mobile API-client journey, and stops the API even when the test fails.         |
 | `npm run verify:full`        | Runs `verify`, the API e2e suite, and the live mobile API-client journey in sequence.                                                                |
