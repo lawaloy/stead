@@ -16,18 +16,26 @@ const E2E_DATABASE_URL = `${DATABASE_BASE}?schema=e2e`;
 const JOURNEY_DATABASE_URL = `${DATABASE_BASE}?schema=e2e_mobile`;
 const JOURNEY_API_URL = 'http://127.0.0.1:3000';
 
-const testEnvironment = (databaseUrl) => ({
-  ...process.env,
-  DATABASE_URL: databaseUrl,
-  NODE_ENV: 'test',
-  JWT_SECRET: 'stead-local-test-jwt-secret',
-  NOTIFICATION_PAYLOAD_ENCRYPTION_KEY:
-    'stead-local-test-notification-key-1234567890',
-  AUTH_DEVICE_IDENTIFIER_SECRET:
-    'stead-local-test-device-identifier-key-1234567890',
-  SMS_PROVIDER: 'dev',
-  DEV_EXPOSE_OTP: 'true',
-});
+export const testEnvironment = (
+  databaseUrl,
+  inheritedEnvironment = process.env,
+) => {
+  const environment = {
+    ...inheritedEnvironment,
+    DATABASE_URL: databaseUrl,
+    PORT: '3000',
+    NODE_ENV: 'test',
+    JWT_SECRET: 'stead-local-test-jwt-secret',
+    NOTIFICATION_PAYLOAD_ENCRYPTION_KEY:
+      'stead-local-test-notification-key-1234567890',
+    AUTH_DEVICE_IDENTIFIER_SECRET:
+      'stead-local-test-device-identifier-key-1234567890',
+    SMS_PROVIDER: 'dev',
+    DEV_EXPOSE_OTP: 'true',
+  };
+  delete environment.E2E_DATABASE_URL;
+  return environment;
+};
 
 const commandText = (command, args) => [command, ...args].join(' ');
 

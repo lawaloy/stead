@@ -12,6 +12,7 @@ import test from 'node:test';
 import {
   initializeLocalEnvironment,
   renderApiEnvironment,
+  testEnvironment,
 } from './local-workflow.mjs';
 
 const API_EXAMPLE = `DATABASE_URL="postgresql://localhost/stead"
@@ -55,6 +56,21 @@ test('the repository API example stays compatible with secure generation', () =>
 
   assert.equal(new Set(generated).size, generated.length);
   assert.doesNotMatch(rendered, /__REPLACE_ME__/);
+});
+
+test('testEnvironment replaces inherited database and port selectors', () => {
+  const databaseUrl = 'postgresql://localhost/stead?schema=e2e';
+  const environment = testEnvironment(databaseUrl, {
+    DATABASE_URL: 'postgresql://localhost/stead?schema=public',
+    E2E_DATABASE_URL: 'postgresql://localhost/stead?schema=e2e_other',
+    PORT: '4999',
+    PRESERVED_SETTING: 'preserved',
+  });
+
+  assert.equal(environment.DATABASE_URL, databaseUrl);
+  assert.equal(environment.E2E_DATABASE_URL, undefined);
+  assert.equal(environment.PORT, '3000');
+  assert.equal(environment.PRESERVED_SETTING, 'preserved');
 });
 
 test('initializeLocalEnvironment creates missing files without overwriting them', () => {
