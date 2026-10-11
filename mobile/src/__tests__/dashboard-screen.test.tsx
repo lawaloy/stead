@@ -6,6 +6,13 @@ import type { DashboardStabilityResponse } from '../contracts/generated/types.ge
 import { getDashboardStability } from '../lib/api';
 import { queryClient } from '../lib/query-client';
 
+let onFocus: (() => void) | undefined;
+
+jest.mock('expo-router', () => ({
+  useFocusEffect: (effect: () => void) => {
+    onFocus = effect;
+  },
+}));
 jest.mock('react-native-safe-area-context', () => {
   const ReactModule = jest.requireActual<typeof import('react')>('react');
   return {
@@ -50,6 +57,7 @@ const renderScreen = () =>
 
 describe('stability dashboard screen', () => {
   beforeEach(() => {
+    onFocus = undefined;
     queryClient.clear();
     jest.clearAllMocks();
     mockDashboard.mockResolvedValue(stability);
@@ -80,6 +88,31 @@ describe('stability dashboard screen', () => {
     await act(async () => refresh.props.onRefresh());
     expect(await screen.findByText('25%')).toBeOnTheScreen();
     expect(screen.getByText('71')).toBeOnTheScreen();
+  });
+
+  it('refetches stability when the screen regains focus', async () => {
+    let release!: (value: DashboardStabilityResponse) => void;
+    mockDashboard.mockReturnValueOnce(
+      new Promise((resolve) => {
+        release = resolve;
+      }),
+    );
+    await renderScreen();
+
+    await act(async () => onFocus?.());
+    expect(mockDashboard).toHaveBeenCalledTimes(1);
+
+    await act(async () => release(stability));
+    expect(await screen.findByText('17%')).toBeOnTheScreen();
+
+    mockDashboard.mockResolvedValueOnce({
+      ...stability,
+      metrics: { ...stability.metrics, readinessPct: 20, stabilityScore: 16 },
+    });
+    await act(async () => onFocus?.());
+    expect(await screen.findByText('20%')).toBeOnTheScreen();
+    expect(screen.getByText('16')).toBeOnTheScreen();
+    expect(mockDashboard).toHaveBeenCalledTimes(2);
   });
 
   it('shows a missing-goal state instead of fabricated metrics', async () => {

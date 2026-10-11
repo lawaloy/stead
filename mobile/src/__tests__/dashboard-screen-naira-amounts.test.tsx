@@ -6,6 +6,9 @@ import type { DashboardStabilityResponse } from '../contracts/generated/types.ge
 import { getDashboardStability } from '../lib/api';
 import { queryClient } from '../lib/query-client';
 
+jest.mock('expo-router', () => ({
+  useFocusEffect: () => undefined,
+}));
 jest.mock('react-native-safe-area-context', () => {
   const ReactModule = jest.requireActual<typeof import('react')>('react');
   return {
