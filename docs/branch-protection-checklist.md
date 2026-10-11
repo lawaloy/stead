@@ -1,13 +1,16 @@
 # Branch Protection Checklist
 
+<details open>
+<summary><strong>Show or hide document contents</strong></summary>
+
 Target branch: `main`
 
-Last verified: 2026-09-25 through the GitHub repository ruleset API.
+Active ruleset last verified: 2026-10-10 through the GitHub repository ruleset
+API.
 
-`main` is governed by the active `Stead Rules` repository ruleset. GitHub's
-classic branch-protection endpoint reports no classic protection, so the
-ruleset—not the classic protection page—is the source of truth for this
-checklist.
+`main` is governed by the active `Stead Rules` repository ruleset. This
+checklist treats that ruleset—not the classic branch-protection page—as the
+source of truth.
 
 ## Current Ruleset
 
@@ -40,10 +43,10 @@ These are the exact contexts stored in the active ruleset:
 
 The Dependency Review workflow is required and its scan step propagates
 failures, so a newly introduced high-severity or critical runtime dependency
-finding blocks a merge. The Dependency Audit workflow runs daily for both API
-and mobile (and on demand) to detect high-severity findings already present in
-each production dependency tree; it is an operational monitor rather than a
-second pull-request gate.
+finding blocks a merge. Dependency Audit runs daily and on demand for both
+projects, and also runs on pull requests and `main` pushes that change package
+metadata or the mobile audit-exception policy. It blocks affected PRs even
+though its job contexts are not stored as required ruleset checks.
 
 ## Urgent Follow-up
 
@@ -54,13 +57,12 @@ second pull-request gate.
 3. Review the repository-role bypass actors and retain only intentional
    emergency access.
 4. Re-run this audit after each ruleset change and update the verification date.
-5. After `native-ci` is stable on path-filtered PRs and the daily 16:00 UTC
-   schedule: make native required safely. Keep path filters, but ensure a
-   top-level check always runs on every PR (run Maestro when relevant paths
-   change; report success/skip when they do not), then add that check (or
-   `native-android` / `native-ios`) to the ruleset required status checks.
-   Do not require jobs from a workflow that is entirely skipped by
-   `on.pull_request.paths`, or unrelated PRs will block on a pending check.
+5. `native-ci` now starts on every PR and `main` push and uses its `config` job
+   to decide whether the expensive platform jobs are relevant. Before making it
+   required, add one stable aggregate readiness job that depends on the
+   conditional Android/iOS jobs and reports success when they legitimately
+   skip. Requiring `native-android` or `native-ios` directly would leave
+   unrelated PRs waiting for contexts that do not run.
 
 ## Merge Queue (Optional)
 
@@ -70,3 +72,5 @@ second pull-request gate.
 
 - [ ] Protect tags matching `v*`
 - [ ] Use semantic versioning for releases
+
+</details>

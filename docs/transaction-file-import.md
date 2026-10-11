@@ -1,5 +1,8 @@
 # Transaction File Import
 
+<details open>
+<summary><strong>Show or hide document contents</strong></summary>
+
 ## Purpose
 
 Transaction file import is the first automatic financial-data ingestion slice.
@@ -107,3 +110,5 @@ This means:
   complexity.
 - Add category suggestions only after the imported-description quality is
   understood; this release preserves descriptions but does not infer categories.
+
+</details>

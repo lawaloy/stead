@@ -1,5 +1,8 @@
 # Weekly Readiness and Risk Alerts
 
+<details open>
+<summary><strong>Show or hide document contents</strong></summary>
+
 Stead can send opted-in customers weekly goal summaries and material
 risk/recovery alerts by SMS. Both preference switches default to off. Saving
 one preference does not implicitly enable the other.
@@ -59,3 +62,5 @@ validation, encrypted/deduplicated queueing, consumer delivery, generated API
 contracts, and mobile controls. Real Twilio or Termii delivery on target Android
 and iOS devices remains a production-validation step; automated provider mocks
 do not establish that external sender configuration or carrier delivery works.
+
+</details>

@@ -1,148 +1,132 @@
 # Contributing to Stead
 
-## Branching
+<details open>
+<summary><strong>Show or hide document contents</strong></summary>
 
-- Base all work on `main`.
-- Use short-lived branches:
-  - `feature/<area>-<task>`
-  - `fix/<area>-<task>`
-  - `chore/<area>-<task>`
-  - `hotfix/<area>-<task>`
-- Keep one concern per branch.
+This guide owns the contributor lifecycle: preparing a checkout, choosing a
+branch, making and validating a focused change, and taking its pull request
+through review. Command internals belong in
+[Developer Automation](docs/developer-automation.md), while current product
+priorities belong in [Project Status](docs/project-status.md).
 
-## Commit Convention
+## New Contributor Workflow
 
-Use Conventional Commits.
+1. Install the [repository prerequisites](README.md#new-contributor-quick-start)
+   and start the Docker daemon.
+2. Clone and prepare the repository:
 
-Format:
-`<type>(<scope>): <summary>`
+   ```bash
+   git clone https://github.com/lawaloy/stead.git
+   cd stead
+   npm run bootstrap
+   ```
 
-Examples:
+3. Create a focused branch from the latest remote `main`:
 
-- `feat(auth): add refresh token rotation`
-- `fix(api): handle null amount in transaction mapper`
-- `feat(mobile): add goal setup screen`
-- `chore(ci): add npm cache to workflow`
+   ```bash
+   git switch main
+   git pull --ff-only origin main
+   git switch -c feature/<area>-<task>
+   ```
 
-Common types:
+   Use `fix/`, `chore/`, or `hotfix/` instead when it better describes the
+   change.
 
-- `feat`, `fix`, `chore`, `docs`, `refactor`, `test`, `ci`
+4. Review the generated `api/.env` and `mobile/.env`, then start the API and
+   mobile app in separate terminals:
+
+   ```bash
+   npm run dev:api
+   npm run dev:mobile
+   ```
+
+5. Make one cohesive change. Add or update tests at the narrowest useful
+   boundary, and update the authoritative documentation when behavior, status,
+   contracts, or operations change.
+6. Apply safe automatic fixes and run the full local gate:
+
+   ```bash
+   npm run format
+   npm run lint:fix
+   npm run verify:full
+   ```
+
+7. Review the diff and commit it using the
+   [commit message convention](.github/commit-convention.md):
+
+   ```bash
+   git status --short
+   git diff --check
+   git add <files>
+   git commit -m "feat(area): describe the change"
+   ```
+
+8. Push the branch and open a ready-for-review pull request into `main` using
+   [the repository template](.github/pull_request_template.md):
+
+   ```bash
+   git push -u origin feature/<area>-<task>
+   ```
+
+9. Wait for every expected check and review automation run. Address actionable
+   conversation comments, submitted reviews, and inline threads; push any fixes;
+   and repeat the complete check-and-review cycle for the new commit.
+10. After finishing local work, stop PostgreSQL without deleting its volume:
+
+    ```bash
+    npm run db:stop
+    ```
+
+## Working Agreements
+
+- Keep one concern per branch and avoid unrelated cleanup.
+- Never commit secrets or customer-sensitive data.
+- Follow the environment-file guarantees in
+  [Developer Automation](docs/developer-automation.md#safety-properties).
+- Keep `AUTH_INSPECTION_OPERATOR_USER_IDS` empty unless specific authenticated
+  users require operator access.
+- Set `EXPO_PUBLIC_SUPPORT_EMAIL` to a monitored address for release builds.
+- Add every required environment variable to the matching `.env.example`.
+- Never run e2e tests against the development `public` schema. Use the root
+  database-backed commands, which enforce dedicated schemas.
+- Update `contracts/openapi.yaml` before changing a mobile-consumed API request
+  or response. Run `npm --prefix api run contracts:generate`, commit the
+  generated API/mobile files, and never edit generated files by hand.
+
+## Validation Strategy
+
+Use focused package-level commands while iterating and `npm run verify:full`
+for pre-push evidence. The canonical breakdown of automated layers, safety
+guarantees, native CI boundaries, and intentionally manual release gates lives
+only in [Developer Automation](docs/developer-automation.md).
 
 ## Pull Requests
 
-- Open PRs into `main`.
-- Keep PRs focused and small.
-- Include clear testing notes.
-- Link related issue(s).
+- Open ordinary PRs ready for review; use draft status only for intentionally
+  incomplete work.
+- Use `## What + Why`, complete the checks section honestly, and retain the
+  `<!-- AUTO:START -->` / `<!-- AUTO:END -->` markers. The PR Description
+  workflow owns the content between those markers.
+- Fill at least one `What + Why` bullet before the next push so automation can
+  update the description without replacing an empty template.
+- Link related issues and describe relevant validation or intentionally skipped
+  checks.
+- Do not enable auto-merge for ordinary PRs. Merge only after all expected runs
+  for the latest commit are terminal and acceptable and no actionable feedback
+  remains unresolved.
 
-Use the repo template format (see [`.github/pull_request_template.md`](.github/pull_request_template.md)):
-
-```markdown
-## What + Why
-
-- Why this change exists (at least one bullet)
-
-## Checks
-
-- [ ] `root`: `npm run format:check`
-- [ ] `root`: `npm run lint`
-- [ ] `api`: `npm run build`
-- [ ] `api`: `npm run test -- --ci --runInBand`
-- [ ] `api`: `npm run test:e2e -- --ci --runInBand`
-- [ ] `mobile`: `npm run typecheck`
-- [ ] `mobile`: `npm test -- --runInBand`
-- [ ] `mobile`: `npm run build`
-
-<!-- AUTO:START -->
-<!-- AUTO:END -->
-```
-
-**Important:**
-
-- Use **`## What + Why`**, not `## Summary` — matches the pull request template.
-- Include **`<!-- AUTO:START -->` / `<!-- AUTO:END -->`** markers so the [PR Description workflow](.github/workflows/pr-description.yml) can refresh the file list without overwriting your text.
-- Fill in **at least one What + Why bullet** before pushing again; until then, later syncs skip auto-updates so an empty template is not clobbered.
-
-Example with `gh`:
-
-```bash
-gh pr create --title "feat: your change" --body-file .github/pull_request_template.md
-```
-
-Local verification (recommended before push):
-
-- New clone: `npm run setup` from the repository root
-- Repository root: `npm run format:check`, `npm run lint`
-- API: `npm run contracts:check`, `npm run test -- --runInBand`, `npm run test:e2e -- --runInBand`, `npm run build`
-- Mobile: `npm run typecheck`, `npm test -- --runInBand`, `npm run build`
-
-Run `npm run format` or `npm run lint:fix` from the repository root to apply
-automatic formatting or lint corrections. CI runs the non-mutating checks and
-rejects formatting drift.
-
-The single `.github/workflows/ci.yml` build/test workflow runs independent
-format, lint, API, and mobile jobs in parallel on pull requests. Native
-Android/iOS simulator journeys live in `.github/workflows/native-ci.yml` and
-run on path-filtered pull requests (mobile app source outside tests, assets,
-Maestro, packaging, API, contracts, or native CI wiring), after merge to `main`, on a daily schedule at 16:00 UTC
-(after morning Dependabot / Dependency Maintenance / Dependency Audit so
-auto-merges have time to land), and on demand.
-Native binaries are built in dedicated jobs and passed to Maestro jobs as
-artifacts. Warm Android runs use cached AVD boot snapshots; iOS miss builds use
-mtime/inode-aware DerivedData plus Pods caches; both platforms cache installable
-binaries, Maestro CLI, and Metro transforms. Shared non-secret CI toolchain
-versions are kept in `.github/ci.env`; update that file when changing Node, npm,
-the Android API level, or the macOS runner. New pushes cancel superseded CI runs.
-
-API e2e tests require PostgreSQL and a dedicated `e2e` or test schema. The
-test harness refuses to clean the development `public` schema. See the root
-README for the local migration command.
-
-## Local Setup
-
-Use Node.js 24.15+ on the 24.x line for the complete repository. See
-[dependency maintenance](docs/dependency-policy.md) for supported version
-baselines and the overrides that still require upstream fixes.
-
-API and mobile scripts invoke the TypeScript 7 CLI through
-`@typescript/native`. Keep the `typescript` dependency mapped to
-`@typescript/typescript6` until the TypeScript 6 Removal Readiness workflow
-reports that a fully tested removal trial is eligible.
-
-API:
-
-```bash
-cd api
-npm ci
-npx prisma generate
-npx prisma migrate dev
-npm run start:dev
-```
-
-Mobile:
-
-```bash
-cd mobile
-npm ci
-npm run start
-```
-
-## Environment
-
-- Copy `api/.env.example` to `api/.env`.
-- Copy `mobile/.env.example` to `mobile/.env`.
-- Do not commit secrets.
-- Generate independent random values for `JWT_SECRET`, `NOTIFICATION_PAYLOAD_ENCRYPTION_KEY`, and `AUTH_DEVICE_IDENTIFIER_SECRET`; do not reuse secrets or use the example placeholders.
-- Leave `AUTH_INSPECTION_OPERATOR_USER_IDS` empty unless specific authenticated user IDs need operator access.
-- Set `EXPO_PUBLIC_SUPPORT_EMAIL` to a monitored address for release builds so
-  customers can reach support from the account screen.
-- Add new required env vars to the matching `.env.example`.
+Remote repository automation follows the GitHub-app-first policy in
+[`AGENTS.md`](AGENTS.md#github-operations). Contributors may use the GitHub web
+interface or their preferred authenticated client.
 
 ## Definition of Done
 
-- Code is linted, tested, and builds.
-- API behavior and contracts are documented when changed.
-- `contracts/openapi.yaml` is updated before changing a mobile-consumed API
-  request or response, and `npm run contracts:generate` is run from `api/`.
-- Generated contract files are committed but never edited by hand.
-- PR approved and merged via squash.
+- The change is focused, understandable, and contains no unrelated edits.
+- Formatting, relevant tests, contracts, typechecks, and builds pass.
+- Behavior and operational consequences are tested at appropriate boundaries.
+- Authoritative documentation and examples match the implementation.
+- No secrets or sensitive customer data are introduced.
+- The latest PR commit has no pending or unacceptable checks and no unresolved
+  actionable feedback.
+
+</details>

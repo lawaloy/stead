@@ -6,14 +6,26 @@ labels: ''
 assignees: ''
 ---
 
-**Is your feature request related to a problem? Please describe.**
-A clear and concise description of what the problem is. Ex. I'm always frustrated when [...]
+## Customer problem
 
-**Describe the solution you'd like**
-A clear and concise description of what you want to happen.
+Describe the customer problem, who experiences it, and any evidence that shows
+its urgency.
 
-**Describe alternatives you've considered**
-A clear and concise description of any alternative solutions or features you've considered.
+## Desired outcome
 
-**Additional context**
-Add any other context or screenshots about the feature request here.
+Describe the outcome the customer should be able to achieve. A proposed
+solution is welcome, but keep the outcome distinct from the implementation.
+
+## Scope and acceptance
+
+List the smallest valuable slice and how we can verify that it works. Note any
+privacy, security, accessibility, operational, or external-provider concerns.
+
+## Alternatives considered
+
+Describe other solutions or workarounds you considered.
+
+## Additional context
+
+Add relevant research, examples, or screenshots. Do not include secrets or
+customer-sensitive data.

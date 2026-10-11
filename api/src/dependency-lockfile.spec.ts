@@ -34,6 +34,11 @@ const auditRemediationPins = [
     version: '2.4.0',
     lockfilePath: 'node_modules/multer',
   },
+  {
+    packageName: 'proxy-addr',
+    version: '2.0.8',
+    lockfilePath: 'node_modules/proxy-addr',
+  },
 ] as const;
 
 const readJson = <T = Record<string, unknown>>(fileName: string) =>

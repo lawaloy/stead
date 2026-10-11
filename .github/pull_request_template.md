@@ -4,14 +4,9 @@
 
 ## Checks
 
-- [ ] `root`: `npm run format:check`
-- [ ] `root`: `npm run lint`
-- [ ] `api`: `npm run build`
-- [ ] `api`: `npm run test -- --ci --runInBand`
-- [ ] `api`: `npm run test:e2e -- --ci --runInBand`
-- [ ] `mobile`: `npm run typecheck`
-- [ ] `mobile`: `npm test -- --runInBand`
-- [ ] `mobile`: `npm run build`
+- [ ] `root`: `npm run verify`
+- [ ] `root`: `npm run test:e2e:local`
+- [ ] `root`: `npm run test:journey:local`
 
 <!-- AUTO:START -->
 

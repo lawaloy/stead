@@ -1,123 +1,68 @@
 # Stead
 
-Stead is a Financial Stability Layer that turns cashflow into decision intelligence to help users plan for obligations and spend safely.
+<details open>
+<summary><strong>Show or hide document contents</strong></summary>
 
-Current repository status:
+Stead is a financial stability layer that turns cash flow into decision
+intelligence, helping customers plan for obligations and spend safely.
 
-- API: the core auth, goal lifecycle/history, manual-transaction,
-  stability-dashboard, account/data self-service, and persisted
-  OTP/readiness-notification boundaries are implemented.
-- Mobile: the core vertical slice supports OTP login, active-goal creation,
-  manual transaction creation, transaction history/filtering/edit/delete, and
-  dashboard viewing, goal lifecycle/history, and SMS notification preferences.
-  Customers can also manage their profile and optional consents, export their
-  data, contact configured support, and permanently delete their account.
-- Verification: auth/notification and finance have PostgreSQL-backed e2e
-  coverage. Auth, goal, transaction, and dashboard screens have component
-  journeys, and CI exercises the real mobile API client against a running API
-  and PostgreSQL. Android/iOS simulator UI journeys run in `native-ci` on
-  path-filtered PRs: native binaries build once, then Maestro tests install
-  them (AVD/Pods/DerivedData/binary caches keep warm runs shorter).
-- Production readiness: live SMS delivery on real devices, production session
-  lifecycle, operations, native UI acceptance, and several product workflows
-  remain incomplete.
+The repository is a TypeScript monorepo containing:
 
-Weekly summaries and material risk/recovery alerts are opt-in. Customers choose
-their local weekly schedule in the mobile app; delivery uses the same encrypted,
-retryable SMS queue as OTP. See [docs/readiness-alerts.md](docs/readiness-alerts.md)
-for the rules and operational boundaries.
+- `api/`: NestJS REST API, Prisma, and PostgreSQL 16.
+- `mobile/`: Expo React Native application using Expo Router.
+- `contracts/`: authoritative OpenAPI contract for mobile-consumed endpoints.
 
-Account export, optional-consent history, deletion behavior, retention policy,
-and support configuration are documented in
-[docs/account-data-self-service.md](docs/account-data-self-service.md).
+Read the [Product and System Overview](docs/overview.md) for the stable product
+model. What is currently delivered, validated, prioritized, or still blocking
+a pilot is maintained only in [Project Status](docs/project-status.md).
 
-Quick links
+## New Contributor Quick Start
 
-- Overview: [docs/overview.md](docs/overview.md)
-- Product milestones, capability, and test status: [docs/project-status.md](docs/project-status.md)
-- Active architecture milestone: [docs/architecture-roadmap.md](docs/architecture-roadmap.md#delivery-roadmap)
-- Auth readiness work: [docs/auth-hardening.md](docs/auth-hardening.md)
-- Repository rules audit: [docs/branch-protection-checklist.md](docs/branch-protection-checklist.md)
-- Contributing: [CONTRIBUTING.md](CONTRIBUTING.md)
-- API: [api/](api/)
-- Mobile: [mobile/](mobile/)
+Prerequisites:
 
-Prerequisites: Node.js 24.15+ on the 24.x line, plus Docker
-for the local PostgreSQL database. Both npm projects enforce the supported
-Node.js range during dependency installation.
-
-Both projects use the TypeScript 7 native CLI for typechecking and API builds.
-The package named `typescript` remains mapped to Microsoft's TypeScript 6
-compatibility package for tools that still require the legacy compiler API.
-The scheduled TypeScript 6 Removal Readiness workflow tracks when that
-compatibility layer can be removed safely.
-
-Get started
-
-Install all repository, API, and mobile dependencies from the repository root:
+- Git
+- Node.js 24.15+ on the 24.x line
+- Docker with its daemon running
 
 ```bash
-npm run setup
+git clone https://github.com/lawaloy/stead.git
+cd stead
+npm run bootstrap
 ```
 
-This is the recommended first command for a new clone. Use `npm run
-format:check` and `npm run lint` for non-mutating checks, or `npm run format`
-and `npm run lint:fix` to apply automatic fixes. Formatting uses the pinned
-repository Prettier version and LF line endings on every platform.
+See [Developer Automation](docs/developer-automation.md) for exactly what
+`bootstrap` does and its safety guarantees.
 
-API (from `api/`):
+Start the API and mobile app in separate terminals:
 
 ```bash
-cd api
-npx prisma generate
-npx prisma migrate dev
-npm run start:dev
+npm run dev:api
+npm run dev:mobile
 ```
 
-Copy `api/.env.example` to `api/.env` first. Set `DATABASE_URL`; generate independent random values for `JWT_SECRET` (16+ characters), `NOTIFICATION_PAYLOAD_ENCRYPTION_KEY` (32+ characters), and `AUTH_DEVICE_IDENTIFIER_SECRET` (32+ characters); and never reuse the checked-in placeholders. The device secret creates non-reversible identifiers for device-aware OTP throttling and must remain stable within an environment. Inspection endpoints deny access by default; add trusted user IDs to the comma-separated `AUTH_INSPECTION_OPERATOR_USER_IDS` only when operator access is needed. The example uses `SMS_PROVIDER=dev` and `DEV_EXPOSE_OTP=true` so local OTP requests still create notification jobs without calling Twilio or Termii. Both development-only settings are rejected in production. For local Postgres, `api/docker-compose.yml` provides a development database.
+Local authentication uses the development SMS provider and does not require a
+Twilio or Termii account. Follow the ordered
+[contributor workflow](CONTRIBUTING.md#new-contributor-workflow) before making a
+change.
 
-Mobile (from `mobile/`):
+## Common Verification
 
 ```bash
-cd mobile
-npm run start
+npm run verify
+npm run verify:full
 ```
 
-Copy `mobile/.env.example` to `mobile/.env` and set `EXPO_PUBLIC_API_URL` when
-the API is not running on the default local URL. Set
-`EXPO_PUBLIC_SUPPORT_EMAIL` to the staffed customer-support address for the
-target environment.
+The command behavior, individual test commands, environment safety, and manual
+release gates are documented in
+[Developer Automation](docs/developer-automation.md).
 
-Useful checks:
+## Documentation
 
-After running `npm run setup`:
+Use the [Documentation Guide](docs/README.md) to find the authoritative document
+for product scope, delivery status, architecture, feature behavior, validation,
+security, and repository governance.
 
-```bash
-npm run format:check
-npm run lint
+For contribution rules, start with [CONTRIBUTING.md](CONTRIBUTING.md). For the
+API and mobile source, see [`api/`](api/) and [`mobile/`](mobile/).
 
-npm --prefix api run test -- --runInBand
-npm --prefix api run build
-
-npm --prefix mobile run typecheck
-npm --prefix mobile test -- --runInBand
-npm --prefix mobile run build
-```
-
-The API e2e suite uses PostgreSQL and deletes its own fixtures. It refuses to
-run against the development `public` schema. The test harness defaults to the
-local `e2e` schema and also accepts an `E2E_DATABASE_URL` override. Before the
-first local e2e run, and whenever migrations change, apply migrations to the
-dedicated schema:
-
-```powershell
-cd api
-$env:DATABASE_URL = 'postgresql://stead:stead@localhost:5432/stead?schema=e2e'
-npx prisma migrate deploy
-npm run test:e2e -- --runInBand
-```
-
-The database and schema persist in the Docker volume, so this migration step
-does not need to be repeated before every unchanged test run.
-
-For the full vision, product strategy, current implementation, remaining gaps, and architecture see [docs/overview.md](docs/overview.md).
+</details>

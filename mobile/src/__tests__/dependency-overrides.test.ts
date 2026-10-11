@@ -67,20 +67,26 @@ const lockfileDependencyCandidates = (
 };
 
 describe('dependency overrides', () => {
-  it('pins URL decoding to the patched version in package metadata and lockfile', () => {
-    const packageJson = readJson('package.json');
+  it('pins top-level audit remediations in package metadata and lockfile', () => {
+    const packageJson = readJson<{
+      overrides: Record<string, string | Record<string, string>>;
+    }>('package.json');
     const packageLock = readJson<PackageLock>('package-lock.json');
+    const pins = {
+      'decode-uri-component': '0.5.0',
+      'shell-quote': '1.12.0',
+      'source-map-js': '1.2.2',
+      uuid: '14.0.1',
+    } as const;
 
-    expect(packageJson).toMatchObject({
-      overrides: {
-        'decode-uri-component': '0.5.0',
-      },
-    });
-    expect(
-      packageLock.packages['node_modules/decode-uri-component'],
-    ).toMatchObject({
-      version: '0.5.0',
-    });
+    for (const [packageName, version] of Object.entries(pins)) {
+      expect(packageJson.overrides[packageName]).toBe(version);
+      expect(packageLock.packages[`node_modules/${packageName}`]).toMatchObject(
+        {
+          version,
+        },
+      );
+    }
   });
 
   it('resolves js-yaml 4 for @istanbuljs/load-nyc-config so sprintf-js stays out of the tree', () => {

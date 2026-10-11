@@ -1,5 +1,8 @@
 # Auth Hardening
 
+<details open>
+<summary><strong>Show or hide document contents</strong></summary>
+
 ## Goal
 
 Move OTP authentication from "implemented in code" to "operationally usable"
@@ -8,12 +11,13 @@ for early environments.
 ## Current Validation Status
 
 The API path is automated: PostgreSQL-backed e2e tests cover OTP persistence,
-dev-provider delivery, verification, retry, and dead-letter behavior. Mobile
-schemas and token storage have unit coverage. The integrated Expo web path has
-also passed against a running local API. A native Android/iOS device pass
-remains part of real-provider validation.
+idempotent request recovery, dev-provider delivery, verification, retry, and
+dead-letter behavior. Mobile schemas, rotating session storage, and expiry
+feedback have unit coverage. The integrated Expo web path has passed against a
+running local API, and CI runs the OTP-to-logout journey on Android and iOS
+simulators. Live-provider delivery and physical-device acceptance remain.
 
-## P0: Local Mobile Auth Acceptance Pass
+## P0: Local Expo Web Auth Acceptance Pass
 
 This acceptance pass is complete for Expo web and did not require a paid SMS
 provider.
@@ -52,8 +56,9 @@ NestJS API and PostgreSQL 16 container. No manual database edits were used.
   the app cleared the token and returned to the login flow.
 - The browser reported no uncaught page errors during the pass.
 
-The workstation has no Android SDK/emulator (`adb` and `emulator` are not
-installed), so this record does not claim a native Android/iOS lifecycle pass.
+This historical record covers Expo web only. Native simulator coverage is now
+provided separately by `native-ci`; it does not turn this record into a
+physical-device or live-provider validation.
 
 ## P1: Abuse Controls and Operator Diagnostics
 
@@ -174,3 +179,5 @@ for a user ID in the database (`RefreshToken` where `userId` matches and
 `revokedAt` is null), or the customer can use **Sign out of all devices** on the
 account screen. Existing long-lived access JWTs issued before this change
 remain valid until their natural expiry; new logins receive the rotating pair.
+
+</details>

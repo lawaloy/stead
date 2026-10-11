@@ -21,12 +21,14 @@ const [
   entrypoint,
   reusable,
   nativeWorkflow,
+  ciWorkflow,
   dependencyAuditWorkflow,
   dependencyMaintenanceWorkflow,
 ] = await Promise.all([
   readFile('.github/workflows/dependency-auto-finish.yml', 'utf8'),
   readFile('.github/workflows/pr-auto-finish-reusable.yml', 'utf8'),
   readFile('.github/workflows/native-ci.yml', 'utf8'),
+  readFile('.github/workflows/ci.yml', 'utf8'),
   readFile('.github/workflows/dependency-audit.yml', 'utf8'),
   readFile('.github/workflows/deps-maintenance.yml', 'utf8'),
 ]);
@@ -47,6 +49,16 @@ assert.match(
   nativeWorkflow,
   /filters: \.github\/native-ci-paths\.yml/,
   'native-ci must use the shared native path policy.',
+);
+assert.match(
+  ciWorkflow,
+  /node scripts\/local-workflow\.mjs test:e2e --database-ready/,
+  'CI API e2e must reuse the developer automation runner.',
+);
+assert.match(
+  ciWorkflow,
+  /node scripts\/local-workflow\.mjs test:journey --database-ready/,
+  'CI mobile/API journey must reuse the developer automation runner.',
 );
 
 const auditWrapperInvocation = /node \.\.\/\.github\/scripts\/audit-npm\.mjs/g;
