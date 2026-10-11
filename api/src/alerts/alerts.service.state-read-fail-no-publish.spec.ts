@@ -26,7 +26,7 @@ describe('AlertsService evaluateUser when alert state read fails', () => {
     );
   });
 
-  it('does not publish or upsert when the existing alert state cannot be read', async () => {
+  it('does not publish or upsert when alert state lookup throws', async () => {
     prisma.alertPreference.findUnique.mockResolvedValue({
       weeklySummaryEnabled: true,
       riskAlertsEnabled: true,

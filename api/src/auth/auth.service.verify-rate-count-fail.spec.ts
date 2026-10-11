@@ -10,9 +10,17 @@ import { CountriesService } from '../countries/countries.service';
 describe('AuthService verify OTP rate-limit count failure', () => {
   let service: AuthService;
   let prisma: {
-    otpCode: { findFirst: jest.Mock; update: jest.Mock; updateMany: jest.Mock };
+    otpCode: {
+      findFirst: jest.Mock;
+      update: jest.Mock;
+      updateMany: jest.Mock;
+    };
     user: { findUnique: jest.Mock };
-    refreshToken: { create: jest.Mock };
+    refreshToken: {
+      create: jest.Mock;
+      findMany: jest.Mock;
+      groupBy: jest.Mock;
+    };
   };
   let jwt: { signAsync: jest.Mock };
   let telemetry: { recordEvent: jest.Mock; countRecentEvents: jest.Mock };
@@ -25,7 +33,11 @@ describe('AuthService verify OTP rate-limit count failure', () => {
         updateMany: jest.fn(),
       },
       user: { findUnique: jest.fn() },
-      refreshToken: { create: jest.fn() },
+      refreshToken: {
+        create: jest.fn(),
+        findMany: jest.fn(),
+        groupBy: jest.fn(),
+      },
     };
     jwt = { signAsync: jest.fn() };
     telemetry = {
@@ -82,17 +94,17 @@ describe('AuthService verify OTP rate-limit count failure', () => {
     service = module.get(AuthService);
   });
 
-  it('does not look up a user or consume an OTP when the IP verify-limit query fails', async () => {
+  it('does not look up or consume an OTP when the IP verify-lock query fails', async () => {
     telemetry.countRecentEvents.mockRejectedValue(
-      new Error('telemetry count unavailable'),
+      new Error('verify lock count unavailable'),
     );
 
     await expect(
       service.verifyOtp('08012345678', 'NG', '123456', {
         ip: '203.0.113.10',
-        deviceId: '11111111-1111-4111-8111-111111111111',
+        userAgent: 'jest-agent',
       }),
-    ).rejects.toThrow('telemetry count unavailable');
+    ).rejects.toThrow('verify lock count unavailable');
 
     expect(telemetry.countRecentEvents).toHaveBeenCalledTimes(1);
     expect(telemetry.countRecentEvents).toHaveBeenCalledWith({
