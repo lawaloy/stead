@@ -418,6 +418,80 @@ describe('AuthService session refresh', () => {
       expect(prisma.refreshToken.create).toHaveBeenCalled();
     });
 
+    it('evicts multiple oldest families when live count overflows the cap by more than one', async () => {
+      prisma.refreshToken.findMany.mockResolvedValue([]);
+      prisma.refreshToken.groupBy.mockResolvedValue([
+        {
+          familyId: 'fam-oldest',
+          _min: { familyCreatedAt: new Date('2024-01-01T00:00:00.000Z') },
+        },
+        {
+          familyId: 'fam-2',
+          _min: { familyCreatedAt: new Date('2024-02-01T00:00:00.000Z') },
+        },
+        {
+          familyId: 'fam-3',
+          _min: { familyCreatedAt: new Date('2024-03-01T00:00:00.000Z') },
+        },
+        {
+          familyId: 'fam-4',
+          _min: { familyCreatedAt: new Date('2024-04-01T00:00:00.000Z') },
+        },
+        {
+          familyId: 'fam-5',
+          _min: { familyCreatedAt: new Date('2024-05-01T00:00:00.000Z') },
+        },
+        {
+          familyId: 'fam-6',
+          _min: { familyCreatedAt: new Date('2024-06-01T00:00:00.000Z') },
+        },
+      ]);
+
+      await expect(
+        issueSession()(
+          { id: 'user_1', phone: '+2348012345678' },
+          hashDevice(DEVICE_B),
+        ),
+      ).resolves.toMatchObject({ token: 'access_token' });
+
+      const evictions = prisma.refreshToken.updateMany.mock
+        .calls as unknown as [
+        [{ where: { familyId: string; revokedAt: null } }],
+        [{ where: { familyId: string; revokedAt: null } }],
+      ];
+      expect(evictions.map(([arg]) => arg.where.familyId)).toEqual([
+        'fam-oldest',
+        'fam-2',
+      ]);
+      expect(prisma.refreshToken.updateMany).toHaveBeenCalledTimes(2);
+      expect(prisma.refreshToken.create).toHaveBeenCalled();
+    });
+
+    it('revokes every live family bound to the same device before issuing a replacement', async () => {
+      prisma.refreshToken.findMany.mockResolvedValue([
+        { familyId: 'fam-device-old' },
+        { familyId: 'fam-device-newer' },
+      ]);
+      prisma.refreshToken.groupBy.mockResolvedValue([]);
+
+      await expect(
+        issueSession()(
+          { id: 'user_1', phone: '+2348012345678' },
+          hashDevice(DEVICE_A),
+        ),
+      ).resolves.toMatchObject({ token: 'access_token' });
+
+      const revokes = prisma.refreshToken.updateMany.mock.calls as unknown as [
+        [{ where: { familyId: string; revokedAt: null } }],
+        [{ where: { familyId: string; revokedAt: null } }],
+      ];
+      expect(revokes.map(([arg]) => arg.where.familyId)).toEqual([
+        'fam-device-old',
+        'fam-device-newer',
+      ]);
+      expect(prisma.refreshToken.create).toHaveBeenCalled();
+    });
+
     it('does not evict when under the concurrent family cap', async () => {
       prisma.refreshToken.findMany.mockResolvedValue([]);
       prisma.refreshToken.groupBy.mockResolvedValue([
