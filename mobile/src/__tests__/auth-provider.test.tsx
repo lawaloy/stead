@@ -15,6 +15,8 @@ import { tokenStore } from '../lib/token-store';
 jest.mock('../lib/api', () => ({
   configureApiAuth: jest.fn(),
   logoutSession: jest.fn().mockResolvedValue({ ok: true }),
+  abandonInFlightRefresh: jest.fn(),
+  waitForInFlightRefresh: jest.fn(() => null),
 }));
 jest.mock('../lib/token-store', () => ({
   tokenStore: {

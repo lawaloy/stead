@@ -7,7 +7,12 @@ import React, {
   useState,
 } from 'react';
 import { tokenStore, type AuthSessionTokens } from './token-store';
-import { configureApiAuth, logoutSession } from './api';
+import {
+  abandonInFlightRefresh,
+  configureApiAuth,
+  logoutSession,
+  waitForInFlightRefresh,
+} from './api';
 import { AuthCountryIso, defaultAuthCountryIso } from './countries';
 import { clearSessionQueryCache } from './session-query-cache';
 
@@ -66,6 +71,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const logout = useCallback(
     async (options?: LogoutOptions) => {
+      abandonInFlightRefresh?.();
+      const pendingRefresh = waitForInFlightRefresh?.();
+      if (pendingRefresh) await pendingRefresh;
       const refreshToken = await tokenStore.getRefreshToken();
       try {
         await logoutSession({

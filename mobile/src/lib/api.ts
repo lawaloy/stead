@@ -91,6 +91,14 @@ let getRefreshTokenFn: AuthConfig['getRefreshToken'] = async () => null;
 let persistSessionFn: AuthConfig['persistSession'] = async () => undefined;
 let onUnauthorizedFn: AuthConfig['onUnauthorized'] = () => undefined;
 let refreshInFlight: Promise<string | null> | null = null;
+let refreshEpoch = 0;
+
+/** Invalidate an in-flight access-token refresh so it cannot persist after logout. */
+export const abandonInFlightRefresh = () => {
+  refreshEpoch += 1;
+};
+
+export const waitForInFlightRefresh = () => refreshInFlight;
 
 const isPublicAuthRequest = (config?: InternalAxiosRequestConfig) => {
   const url = config?.url ?? '';
@@ -102,6 +110,7 @@ const isPublicAuthRequest = (config?: InternalAxiosRequestConfig) => {
 const rotateAccessToken = async (): Promise<string | null> => {
   if (refreshInFlight) return refreshInFlight;
 
+  const epoch = refreshEpoch;
   refreshInFlight = (async () => {
     const refreshToken = await getRefreshTokenFn();
     if (!refreshToken) return null;
@@ -111,11 +120,14 @@ const rotateAccessToken = async (): Promise<string | null> => {
       appConfig.api.routes.auth.refresh,
       payload,
     );
+    if (epoch !== refreshEpoch) return null;
     const session = AuthVerifyOtpResponseSchema.parse(response.data);
+    if (epoch !== refreshEpoch) return null;
     await persistSessionFn({
       token: session.token,
       refreshToken: session.refreshToken,
     });
+    if (epoch !== refreshEpoch) return null;
     return session.token;
   })()
     .catch(() => null)

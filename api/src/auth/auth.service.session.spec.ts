@@ -135,15 +135,16 @@ describe('AuthService session refresh', () => {
     expect(createArg.data.familyId).toBe('family_1');
     expect(createArg.data.familyCreatedAt).toEqual(familyCreatedAt);
     expect(createArg.data.deviceHash).toBe(hashDevice(DEVICE_A));
-    const [[updateArg]] = prisma.refreshToken.update.mock.calls as unknown as [
+    const [[updateArg]] = prisma.refreshToken.updateMany.mock
+      .calls as unknown as [
       [
         {
-          where: { id: string };
+          where: { id: string; revokedAt: null };
           data: { revokedAt: Date; replacedById: string };
         },
       ],
     ];
-    expect(updateArg.where.id).toBe('rt_old');
+    expect(updateArg.where).toEqual({ id: 'rt_old', revokedAt: null });
     expect(updateArg.data.replacedById).toBe('rt_new');
     expect(updateArg.data.revokedAt).toBeInstanceOf(Date);
   });
@@ -254,6 +255,23 @@ describe('AuthService session refresh', () => {
     ];
     expect(expiredUpdate.where.id).toBe('rt_old');
     expect(expiredUpdate.data.revokedAt).toBeInstanceOf(Date);
+  });
+
+  it('discards a successor when the predecessor is revoked mid-rotation', async () => {
+    const raw = 'raced-refresh';
+    prisma.refreshToken.findUnique.mockResolvedValue(liveToken(raw));
+    prisma.refreshToken.updateMany.mockResolvedValue({ count: 0 });
+
+    await expect(service.refreshSession(raw)).rejects.toBeInstanceOf(
+      UnauthorizedException,
+    );
+    expect(prisma.refreshToken.create).toHaveBeenCalled();
+    const [[successorRevoke]] = prisma.refreshToken.update.mock
+      .calls as unknown as [
+      [{ where: { id: string }; data: { revokedAt: Date } }],
+    ];
+    expect(successorRevoke.where.id).toBe('rt_new');
+    expect(successorRevoke.data.revokedAt).toBeInstanceOf(Date);
   });
 
   it('revokes a family by refresh token on logout', async () => {
