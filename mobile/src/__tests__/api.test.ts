@@ -190,6 +190,9 @@ describe('api client', () => {
       expect(JSON.parse(config.data as string)).toEqual({
         refreshToken: 'refresh-token',
       });
+      expect(config.headers?.['X-Stead-Device-Id']).toBe(
+        '0f81c2a7-1e6d-4f05-9a1c-03de8a5f6b77',
+      );
       return [
         200,
         {
@@ -199,6 +202,7 @@ describe('api client', () => {
         },
       ];
     });
+
     mock.onGet('/goals/active').replyOnce((config) => {
       expect(config.headers?.Authorization).toBe('Bearer new-jwt');
       return [

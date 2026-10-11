@@ -243,6 +243,46 @@ describe('AuthProvider session lifecycle', () => {
     );
   });
 
+  it('updates the in-memory access token after a silent refresh persist', async () => {
+    await render(
+      <AuthProvider>
+        <SessionProbe />
+      </AuthProvider>,
+    );
+    expect(await screen.findByText('signed out')).toBeOnTheScreen();
+
+    await act(async () => {
+      fireEvent.press(screen.getByRole('button', { name: 'Complete login' }));
+    });
+    await waitFor(() =>
+      expect(screen.getByText('new-token')).toBeOnTheScreen(),
+    );
+
+    const authConfig = mockConfigureApiAuth.mock.calls.at(-1)?.[0] as {
+      persistSession: (session: {
+        token: string;
+        refreshToken: string;
+      }) => Promise<void>;
+    };
+
+    await act(async () => {
+      await authConfig.persistSession({
+        token: 'rotated-token',
+        refreshToken: 'rotated-refresh',
+      });
+    });
+
+    await waitFor(() =>
+      expect(screen.getByText('rotated-token')).toBeOnTheScreen(),
+    );
+    expect(mockSetSession).toHaveBeenCalledWith({
+      token: 'rotated-token',
+      refreshToken: 'rotated-refresh',
+    });
+    expect(storedToken).toBe('rotated-token');
+    expect(storedRefresh).toBe('rotated-refresh');
+  });
+
   it('passes allDevices when signing out everywhere', async () => {
     await render(
       <AuthProvider>
