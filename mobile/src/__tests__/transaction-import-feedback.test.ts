@@ -44,4 +44,31 @@ describe('transaction import feedback', () => {
       ),
     ).toBe('Only valid rows from the current preview can be imported');
   });
+
+  it('ignores non-numeric confirm row details and strips a trailing period', () => {
+    expect(
+      formatConfirmImportError(
+        new ApiError({
+          message: 'Import could not finish.',
+          details: { rowNumbers: [3, '4', Number.NaN, 7] },
+        }),
+      ),
+    ).toBe('Import could not finish (rows 3, 7).');
+    expect(
+      formatConfirmImportError(
+        new ApiError({
+          message: 'Import could not finish',
+          details: 'not-an-object',
+        }),
+      ),
+    ).toBe('Import could not finish');
+    expect(
+      formatConfirmImportError(
+        new ApiError({
+          message: 'Import could not finish',
+          details: { rowNumbers: '1,2' },
+        }),
+      ),
+    ).toBe('Import could not finish');
+  });
 });

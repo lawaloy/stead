@@ -53,11 +53,29 @@ describe('goal form helpers', () => {
       buildCreateGoalPayload({ ...validFields, monthlyIncomeNaira: '' }),
     ).not.toHaveProperty('monthlyIncomeKobo');
     expect(
+      buildCreateGoalPayload({ ...validFields, monthlyIncomeNaira: '0' }),
+    ).toMatchObject({ monthlyIncomeKobo: 0 });
+    expect(
       buildUpdateGoalPayload({ ...validFields, monthlyIncomeNaira: '' }),
     ).toMatchObject({ monthlyIncomeKobo: null });
     expect(
       buildUpdateGoalPayload({ ...validFields, monthlyIncomeNaira: '0' }),
     ).toMatchObject({ monthlyIncomeKobo: 0 });
+  });
+
+  it('rejects optional income that overflows safe integer kobo', () => {
+    expect(
+      goalFormValidationError({
+        ...validFields,
+        monthlyIncomeNaira: '90071992547410',
+      }),
+    ).toBe('Enter a valid monthly income or leave it blank');
+    expect(
+      buildCreateGoalPayload({
+        ...validFields,
+        monthlyIncomeNaira: '90071992547410',
+      }),
+    ).toBeNull();
   });
 
   it('maps an API goal back into editable customer-friendly fields', () => {
