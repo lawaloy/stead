@@ -92,10 +92,17 @@ let persistSessionFn: AuthConfig['persistSession'] = async () => undefined;
 let onUnauthorizedFn: AuthConfig['onUnauthorized'] = () => undefined;
 let refreshInFlight: Promise<string | null> | null = null;
 let refreshEpoch = 0;
+let refreshAllowed = true;
 
-/** Invalidate an in-flight access-token refresh so it cannot persist after logout. */
+/** Invalidate current and future access-token refreshes so they cannot persist after logout. */
 export const abandonInFlightRefresh = () => {
   refreshEpoch += 1;
+  refreshAllowed = false;
+};
+
+/** Re-enable refresh after a successful login. */
+export const allowTokenRefresh = () => {
+  refreshAllowed = true;
 };
 
 export const waitForInFlightRefresh = () => refreshInFlight;
@@ -108,26 +115,29 @@ const isPublicAuthRequest = (config?: InternalAxiosRequestConfig) => {
 };
 
 const rotateAccessToken = async (): Promise<string | null> => {
+  if (!refreshAllowed) return null;
   if (refreshInFlight) return refreshInFlight;
 
   const epoch = refreshEpoch;
   refreshInFlight = (async () => {
+    if (!refreshAllowed || epoch !== refreshEpoch) return null;
     const refreshToken = await getRefreshTokenFn();
     if (!refreshToken) return null;
+    if (!refreshAllowed || epoch !== refreshEpoch) return null;
 
     const payload: RefreshSessionRequest = { refreshToken };
     const response = await apiClient.post(
       appConfig.api.routes.auth.refresh,
       payload,
     );
-    if (epoch !== refreshEpoch) return null;
+    if (!refreshAllowed || epoch !== refreshEpoch) return null;
     const session = AuthVerifyOtpResponseSchema.parse(response.data);
-    if (epoch !== refreshEpoch) return null;
+    if (!refreshAllowed || epoch !== refreshEpoch) return null;
     await persistSessionFn({
       token: session.token,
       refreshToken: session.refreshToken,
     });
-    if (epoch !== refreshEpoch) return null;
+    if (!refreshAllowed || epoch !== refreshEpoch) return null;
     return session.token;
   })()
     .catch(() => null)
@@ -220,6 +230,7 @@ export const configureApiAuth = (config: AuthConfig) => {
   getRefreshTokenFn = config.getRefreshToken;
   persistSessionFn = config.persistSession;
   onUnauthorizedFn = config.onUnauthorized;
+  refreshAllowed = true;
 };
 
 export const fetchAuthCountries = async () => {

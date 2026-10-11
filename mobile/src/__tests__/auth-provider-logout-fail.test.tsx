@@ -16,6 +16,7 @@ jest.mock('../lib/api', () => ({
   configureApiAuth: jest.fn(),
   logoutSession: jest.fn().mockResolvedValue({ ok: true }),
   abandonInFlightRefresh: jest.fn(),
+  allowTokenRefresh: jest.fn(),
   waitForInFlightRefresh: jest.fn(() => null),
 }));
 jest.mock('../lib/token-store', () => ({

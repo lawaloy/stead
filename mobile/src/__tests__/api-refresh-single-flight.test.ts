@@ -1,6 +1,7 @@
 import { createAxiosMock } from './axios-mock';
 import {
   abandonInFlightRefresh,
+  allowTokenRefresh,
   apiClient,
   configureApiAuth,
   getActiveGoal,
@@ -163,6 +164,63 @@ describe('api client refresh single-flight', () => {
     });
     expect(persistSession).not.toHaveBeenCalled();
     expect(onUnauthorized).toHaveBeenCalledWith({ reason: 'expired' });
+  });
+
+  it('does not persist a refresh that starts after logout abandons the session', async () => {
+    const onUnauthorized = jest.fn();
+    const persistSession = jest.fn();
+    configureApiAuth({
+      getToken: async () => 'expired-jwt',
+      getRefreshToken: async () => 'refresh-token',
+      persistSession,
+      onUnauthorized,
+    });
+
+    abandonInFlightRefresh();
+
+    mock.onGet('/goals/active').replyOnce(401, { message: 'Unauthorized' });
+    mock.onPost('/auth/refresh').reply(200, refreshedSession);
+
+    await expect(getActiveGoal()).rejects.toMatchObject({
+      status: 401,
+      message: 'Your session expired. Sign in again.',
+    });
+    expect(persistSession).not.toHaveBeenCalled();
+    expect(
+      mock.history.post.filter((entry) => entry.url === '/auth/refresh'),
+    ).toHaveLength(0);
+    expect(onUnauthorized).toHaveBeenCalledWith({ reason: 'expired' });
+  });
+
+  it('refreshes again after allowTokenRefresh re-enables the session', async () => {
+    const onUnauthorized = jest.fn();
+    let accessToken: string | null = 'expired-jwt';
+    const persistSession = jest.fn(
+      async (session: { token: string; refreshToken: string }) => {
+        accessToken = session.token;
+      },
+    );
+    configureApiAuth({
+      getToken: async () => accessToken,
+      getRefreshToken: async () => 'refresh-token',
+      persistSession,
+      onUnauthorized,
+    });
+
+    abandonInFlightRefresh();
+    allowTokenRefresh();
+
+    mock.onGet('/goals/active').reply((config) => {
+      if (config.headers?.Authorization === 'Bearer expired-jwt') {
+        return [401, { message: 'Unauthorized' }];
+      }
+      return [200, goalResponse];
+    });
+    mock.onPost('/auth/refresh').reply(200, refreshedSession);
+
+    await expect(getActiveGoal()).resolves.toMatchObject({ id: 'goal_1' });
+    expect(persistSession).toHaveBeenCalledTimes(1);
+    expect(onUnauthorized).not.toHaveBeenCalled();
   });
 
   it('expires the session without calling refresh when no refresh token is stored', async () => {
