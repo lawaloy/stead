@@ -319,6 +319,9 @@ export default function GoalScreen() {
             <Pressable
               testID="goal-save"
               accessibilityRole="button"
+              accessibilityState={{
+                disabled: Boolean(validation) || saveMutation.isPending,
+              }}
               style={[
                 styles.button,
                 (Boolean(validation) || saveMutation.isPending) &&
