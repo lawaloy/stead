@@ -151,9 +151,9 @@ appId: com.lawaloy.stead
 - extendedWaitUntil:
     visible: Native journey goal
     timeout: 30000
-# iOS Maestro swipe-down is flaky (misses the view / hits system UI). Transaction
-# create already invalidates the dashboard query, so waiting for readiness is
-# enough there; Android still exercises pull-to-refresh.
+# iOS Maestro swipe-down is flaky (misses the view / hits system UI). The
+# dashboard refetches when the screen gains focus, so waiting for readiness is
+# enough there. Android still exercises pull-to-refresh.
 - runFlow:
     when:
       platform: Android
