@@ -84,7 +84,7 @@ describe('AuthService refresh predecessor update failure', () => {
       deviceHash: null,
       user: { id: 'user_1', phone: '+2348012345678' },
     });
-    prisma.refreshToken.update.mockRejectedValue(
+    prisma.refreshToken.updateMany.mockRejectedValue(
       new Error('refresh update unavailable'),
     );
 
@@ -93,14 +93,14 @@ describe('AuthService refresh predecessor update failure', () => {
     );
 
     expect(prisma.refreshToken.create).toHaveBeenCalledTimes(1);
-    expect(prisma.refreshToken.update).toHaveBeenCalledWith({
-      where: { id: 'rt_old' },
+    expect(prisma.refreshToken.updateMany).toHaveBeenCalledWith({
+      where: { id: 'rt_old', revokedAt: null },
       data: {
         revokedAt: expect.any(Date) as unknown,
         replacedById: 'rt_new',
       },
     });
-    expect(prisma.refreshToken.updateMany).not.toHaveBeenCalled();
+    expect(prisma.refreshToken.update).not.toHaveBeenCalled();
     expect(jwt.signAsync).not.toHaveBeenCalled();
   });
 });
