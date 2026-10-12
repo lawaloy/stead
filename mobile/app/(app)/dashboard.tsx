@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { useFocusEffect } from 'expo-router';
 import {
   RefreshControl,
   ScrollView,
@@ -40,6 +41,17 @@ export default function DashboardScreen() {
     enabled: Boolean(token),
     retry: 1,
   });
+  const { refetch } = query;
+
+  // This screen stays mounted under the stack. Invalidating it while another
+  // route is focused can refresh the cache without the covered screen painting
+  // the new metrics, and staleTime then skips a fetch on the way back.
+  useFocusEffect(
+    useCallback(() => {
+      if (!token) return;
+      void refetch({ cancelRefetch: false });
+    }, [refetch, token]),
+  );
 
   if (query.isLoading) {
     return (
@@ -49,7 +61,7 @@ export default function DashboardScreen() {
     );
   }
 
-  if (query.error) {
+  if (query.isLoadingError) {
     return (
       <ScreenShell title="Stability Dashboard" scroll={false}>
         <Text style={styles.error}>
