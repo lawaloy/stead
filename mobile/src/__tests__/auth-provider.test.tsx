@@ -15,6 +15,9 @@ import { tokenStore } from '../lib/token-store';
 jest.mock('../lib/api', () => ({
   configureApiAuth: jest.fn(),
   logoutSession: jest.fn().mockResolvedValue({ ok: true }),
+  abandonInFlightRefresh: jest.fn(),
+  allowTokenRefresh: jest.fn(),
+  waitForInFlightRefresh: jest.fn(() => null),
 }));
 jest.mock('../lib/token-store', () => ({
   tokenStore: {
@@ -160,6 +163,46 @@ describe('AuthProvider session lifecycle', () => {
       queryClient.getQueryData(['dashboard', 'stability', 'new-token']),
     ).toBeUndefined();
     expect(mockConfigureApiAuth).toHaveBeenCalled();
+  });
+
+  it('does not restore tokens when a refresh persist arrives after logout', async () => {
+    await render(
+      <AuthProvider>
+        <SessionProbe />
+      </AuthProvider>,
+    );
+    expect(await screen.findByText('signed out')).toBeOnTheScreen();
+
+    await act(async () => {
+      fireEvent.press(screen.getByRole('button', { name: 'Complete login' }));
+    });
+    await waitFor(() =>
+      expect(screen.getByText('new-token')).toBeOnTheScreen(),
+    );
+
+    await act(async () => {
+      fireEvent.press(screen.getByRole('button', { name: 'Log out' }));
+    });
+    await waitFor(() =>
+      expect(screen.getByText('signed out')).toBeOnTheScreen(),
+    );
+
+    const authConfig = mockConfigureApiAuth.mock.calls.at(-1)?.[0] as {
+      persistSession: (session: {
+        token: string;
+        refreshToken: string;
+      }) => Promise<void>;
+    };
+    await act(async () => {
+      await authConfig.persistSession({
+        token: 'resurrected-jwt',
+        refreshToken: 'resurrected-refresh',
+      });
+    });
+
+    expect(screen.getByText('signed out')).toBeOnTheScreen();
+    expect(storedToken).toBeNull();
+    expect(storedRefresh).toBeNull();
   });
 
   it('waits for SecureStore persistence before exposing the access token', async () => {

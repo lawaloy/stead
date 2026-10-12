@@ -4,10 +4,17 @@ import React, {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react';
 import { tokenStore, type AuthSessionTokens } from './token-store';
-import { configureApiAuth, logoutSession } from './api';
+import {
+  abandonInFlightRefresh,
+  allowTokenRefresh,
+  configureApiAuth,
+  logoutSession,
+  waitForInFlightRefresh,
+} from './api';
 import { AuthCountryIso, defaultAuthCountryIso } from './countries';
 import { clearSessionQueryCache } from './session-query-cache';
 
@@ -51,6 +58,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [devOtpHint, setDevOtpHint] = useState('');
   const [sessionEndReason, setSessionEndReason] =
     useState<SessionEndReason | null>(null);
+  const sessionLiveRef = useRef(true);
 
   const clearLocalSession = useCallback(async (options?: LogoutOptions) => {
     setToken(null);
@@ -61,12 +69,19 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       setSessionEndReason('expired');
     }
     await tokenStore.clearToken();
-    await clearSessionQueryCache();
   }, []);
 
   const logout = useCallback(
     async (options?: LogoutOptions) => {
+      sessionLiveRef.current = false;
+      abandonInFlightRefresh?.();
+      const pendingRefresh = waitForInFlightRefresh?.();
       const refreshToken = await tokenStore.getRefreshToken();
+      if (pendingRefresh) await pendingRefresh;
+      // Drop stored credentials before the server revoke so a late 401 cannot
+      // read a refresh token and sign the user back in. Cache clearing can
+      // fail; it must not skip the revoke, so it runs after.
+      await clearLocalSession(options);
       try {
         await logoutSession({
           refreshToken,
@@ -75,7 +90,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       } catch {
         // Best-effort server revoke; local clear still proceeds.
       }
-      await clearLocalSession(options);
+      await clearSessionQueryCache();
     },
     [clearLocalSession],
   );
@@ -98,6 +113,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       // and fire authenticated requests while the store is still empty → 401 →
       // silent logout (seen on native iOS after dual-token writes).
       await tokenStore.setSession(session);
+      sessionLiveRef.current = true;
+      allowTokenRefresh?.();
       setSessionEndReason(null);
       resetPendingAuth();
       setToken(session.token);
@@ -124,7 +141,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       getToken: () => tokenStore.getToken(),
       getRefreshToken: () => tokenStore.getRefreshToken(),
       persistSession: async (session) => {
+        if (!sessionLiveRef.current) return;
         await tokenStore.setSession(session);
+        if (!sessionLiveRef.current) {
+          await tokenStore.clearToken();
+          return;
+        }
         setToken(session.token);
       },
       onUnauthorized: async (options) => {

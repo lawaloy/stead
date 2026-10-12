@@ -684,13 +684,23 @@ export class AuthService {
       existing.familyCreatedAt,
     );
 
-    await this.prisma.refreshToken.update({
-      where: { id: existing.id },
+    // Only win the rotation if the predecessor is still live. Logout or a
+    // parallel refresh can revoke it after the findUnique check; leaving the
+    // successor live would resurrect a session the user just signed out of.
+    const rotated = await this.prisma.refreshToken.updateMany({
+      where: { id: existing.id, revokedAt: null },
       data: {
         revokedAt: new Date(),
         replacedById: created.id,
       },
     });
+    if (rotated.count !== 1) {
+      await this.prisma.refreshToken.update({
+        where: { id: created.id },
+        data: { revokedAt: new Date() },
+      });
+      throw new UnauthorizedException('Invalid refresh token');
+    }
 
     const token = await this.signAccessToken(existing.user);
     return {

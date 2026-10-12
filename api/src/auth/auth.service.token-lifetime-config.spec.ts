@@ -28,6 +28,7 @@ describe('AuthService configured token lifetimes', () => {
       findMany: jest.Mock;
       groupBy: jest.Mock;
       update: jest.Mock;
+      updateMany: jest.Mock;
     };
   };
   let jwt: { signAsync: jest.Mock };
@@ -53,6 +54,7 @@ describe('AuthService configured token lifetimes', () => {
         findMany: jest.fn().mockResolvedValue([]),
         groupBy: jest.fn().mockResolvedValue([]),
         update: jest.fn().mockResolvedValue({}),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
     };
     jwt = { signAsync: jest.fn().mockResolvedValue('access_token') };
