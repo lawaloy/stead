@@ -61,7 +61,7 @@ export default function DashboardScreen() {
     );
   }
 
-  if (query.error) {
+  if (query.isLoadingError) {
     return (
       <ScreenShell title="Stability Dashboard" scroll={false}>
         <Text style={styles.error}>

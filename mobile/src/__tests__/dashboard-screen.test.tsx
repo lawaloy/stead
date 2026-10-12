@@ -115,6 +115,30 @@ describe('stability dashboard screen', () => {
     expect(mockDashboard).toHaveBeenCalledTimes(2);
   });
 
+  it('keeps cached metrics when a focus refresh fails', async () => {
+    await renderScreen();
+    expect(await screen.findByText('17%')).toBeOnTheScreen();
+
+    mockDashboard.mockRejectedValue(new Error('Offline'));
+    await act(async () => {
+      onFocus?.();
+    });
+    await waitFor(() => expect(mockDashboard).toHaveBeenCalledTimes(3), {
+      timeout: 4_000,
+    });
+    await act(async () => {
+      await Promise.allSettled(
+        mockDashboard.mock.results.map((result) => result.value),
+      );
+    });
+
+    expect(screen.getByText('Annual rent')).toBeOnTheScreen();
+    expect(screen.getByText('17%')).toBeOnTheScreen();
+    expect(
+      screen.queryByText('Failed to load dashboard. Pull to retry.'),
+    ).not.toBeOnTheScreen();
+  });
+
   it('shows a missing-goal state instead of fabricated metrics', async () => {
     mockDashboard.mockResolvedValue({
       ok: false,
