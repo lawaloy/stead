@@ -69,7 +69,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       setSessionEndReason('expired');
     }
     await tokenStore.clearToken();
-    await clearSessionQueryCache();
   }, []);
 
   const logout = useCallback(
@@ -79,6 +78,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       const pendingRefresh = waitForInFlightRefresh?.();
       const refreshToken = await tokenStore.getRefreshToken();
       if (pendingRefresh) await pendingRefresh;
+      // Drop stored credentials before the server revoke so a late 401 cannot
+      // read a refresh token and sign the user back in. Cache clearing can
+      // fail; it must not skip the revoke, so it runs after.
       await clearLocalSession(options);
       try {
         await logoutSession({
@@ -88,6 +90,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       } catch {
         // Best-effort server revoke; local clear still proceeds.
       }
+      await clearSessionQueryCache();
     },
     [clearLocalSession],
   );
