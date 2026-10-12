@@ -29,6 +29,16 @@ describe('refresh-token.util', () => {
     expect(parseDurationToSeconds('15m')).toBe(900);
   });
 
+  it('parses second and hour units, trimming and ignoring case', () => {
+    expect(parseDurationToMs('30s')).toBe(30_000);
+    expect(parseDurationToMs('1h')).toBe(3_600_000);
+    expect(parseDurationToMs(' 15m ')).toBe(15 * 60_000);
+    expect(parseDurationToMs('15M')).toBe(15 * 60_000);
+    expect(parseDurationToMs('1H')).toBe(3_600_000);
+    expect(parseDurationToSeconds('30s')).toBe(30);
+    expect(parseDurationToSeconds('1h')).toBe(3_600);
+  });
+
   it('rejects unsupported duration strings', () => {
     expect(() => parseDurationToMs('15x')).toThrow('Unsupported duration');
   });
