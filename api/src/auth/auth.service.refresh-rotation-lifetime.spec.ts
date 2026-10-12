@@ -28,6 +28,7 @@ describe('AuthService refresh rotation token lifetime', () => {
       findMany: jest.Mock;
       groupBy: jest.Mock;
       update: jest.Mock;
+      updateMany: jest.Mock;
     };
   };
 
@@ -52,6 +53,7 @@ describe('AuthService refresh rotation token lifetime', () => {
         findMany: jest.fn().mockResolvedValue([]),
         groupBy: jest.fn().mockResolvedValue([]),
         update: jest.fn().mockResolvedValue({}),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
     };
 

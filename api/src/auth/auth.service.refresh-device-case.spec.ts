@@ -24,6 +24,7 @@ describe('AuthService refresh device header case', () => {
       create: jest.Mock;
       findUnique: jest.Mock;
       update: jest.Mock;
+      updateMany: jest.Mock;
     };
   };
 
@@ -33,6 +34,7 @@ describe('AuthService refresh device header case', () => {
         create: jest.fn().mockResolvedValue({ id: 'rt_new' }),
         findUnique: jest.fn(),
         update: jest.fn().mockResolvedValue({}),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
     };
 
@@ -106,8 +108,8 @@ describe('AuthService refresh device header case', () => {
     ];
     expect(createArg.data.deviceHash).toBe(hashDevice(DEVICE_A));
     expect(createArg.data.familyId).toBe('family_1');
-    expect(prisma.refreshToken.update).toHaveBeenCalledWith({
-      where: { id: 'rt_old' },
+    expect(prisma.refreshToken.updateMany).toHaveBeenCalledWith({
+      where: { id: 'rt_old', revokedAt: null },
       data: {
         revokedAt: expect.any(Date) as unknown,
         replacedById: 'rt_new',

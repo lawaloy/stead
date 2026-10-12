@@ -1,5 +1,11 @@
 import { createAxiosMock } from './axios-mock';
-import { apiClient, configureApiAuth, getActiveGoal } from '../lib/api';
+import {
+  abandonInFlightRefresh,
+  allowTokenRefresh,
+  apiClient,
+  configureApiAuth,
+  getActiveGoal,
+} from '../lib/api';
 
 jest.mock('../lib/base-url', () => ({
   resolveApiBaseUrl: () => 'http://localhost:3000',
@@ -116,6 +122,105 @@ describe('api client refresh single-flight', () => {
       mock.history.post.filter((entry) => entry.url === '/auth/refresh'),
     ).toHaveLength(1);
     expect(onUnauthorized).toHaveBeenCalledWith({ reason: 'expired' });
+  });
+
+  it('does not persist a refresh that finishes after logout abandons it', async () => {
+    const onUnauthorized = jest.fn();
+    const persistSession = jest.fn();
+    configureApiAuth({
+      getToken: async () => 'expired-jwt',
+      getRefreshToken: async () => 'refresh-token',
+      persistSession,
+      onUnauthorized,
+    });
+
+    let releaseRefresh:
+      ((value: [number, typeof refreshedSession]) => void) | undefined;
+    let markRefreshStarted: (() => void) | undefined;
+    const refreshStarted = new Promise<void>((resolve) => {
+      markRefreshStarted = resolve;
+    });
+    const refreshGate = new Promise<[number, typeof refreshedSession]>(
+      (resolve) => {
+        releaseRefresh = resolve;
+      },
+    );
+
+    mock.onGet('/goals/active').replyOnce(401, { message: 'Unauthorized' });
+    mock.onPost('/auth/refresh').reply(() => {
+      markRefreshStarted?.();
+      return refreshGate;
+    });
+
+    const pending = getActiveGoal();
+    await refreshStarted;
+
+    abandonInFlightRefresh();
+    releaseRefresh?.([200, refreshedSession]);
+
+    await expect(pending).rejects.toMatchObject({
+      status: 401,
+      message: 'Your session expired. Sign in again.',
+    });
+    expect(persistSession).not.toHaveBeenCalled();
+    expect(onUnauthorized).toHaveBeenCalledWith({ reason: 'expired' });
+  });
+
+  it('does not persist a refresh that starts after logout abandons the session', async () => {
+    const onUnauthorized = jest.fn();
+    const persistSession = jest.fn();
+    configureApiAuth({
+      getToken: async () => 'expired-jwt',
+      getRefreshToken: async () => 'refresh-token',
+      persistSession,
+      onUnauthorized,
+    });
+
+    abandonInFlightRefresh();
+
+    mock.onGet('/goals/active').replyOnce(401, { message: 'Unauthorized' });
+    mock.onPost('/auth/refresh').reply(200, refreshedSession);
+
+    await expect(getActiveGoal()).rejects.toMatchObject({
+      status: 401,
+      message: 'Your session expired. Sign in again.',
+    });
+    expect(persistSession).not.toHaveBeenCalled();
+    expect(
+      mock.history.post.filter((entry) => entry.url === '/auth/refresh'),
+    ).toHaveLength(0);
+    expect(onUnauthorized).toHaveBeenCalledWith({ reason: 'expired' });
+  });
+
+  it('refreshes again after allowTokenRefresh re-enables the session', async () => {
+    const onUnauthorized = jest.fn();
+    let accessToken: string | null = 'expired-jwt';
+    const persistSession = jest.fn(
+      async (session: { token: string; refreshToken: string }) => {
+        accessToken = session.token;
+      },
+    );
+    configureApiAuth({
+      getToken: async () => accessToken,
+      getRefreshToken: async () => 'refresh-token',
+      persistSession,
+      onUnauthorized,
+    });
+
+    abandonInFlightRefresh();
+    allowTokenRefresh();
+
+    mock.onGet('/goals/active').reply((config) => {
+      if (config.headers?.Authorization === 'Bearer expired-jwt') {
+        return [401, { message: 'Unauthorized' }];
+      }
+      return [200, goalResponse];
+    });
+    mock.onPost('/auth/refresh').reply(200, refreshedSession);
+
+    await expect(getActiveGoal()).resolves.toMatchObject({ id: 'goal_1' });
+    expect(persistSession).toHaveBeenCalledTimes(1);
+    expect(onUnauthorized).not.toHaveBeenCalled();
   });
 
   it('expires the session without calling refresh when no refresh token is stored', async () => {

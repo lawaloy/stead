@@ -26,7 +26,7 @@ describe('AuthService JWT failure after refresh rotation', () => {
         create: jest.fn().mockResolvedValue({ id: 'rt_new' }),
         findUnique: jest.fn(),
         update: jest.fn().mockResolvedValue({}),
-        updateMany: jest.fn(),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
     };
     jwt = { signAsync: jest.fn() };
@@ -89,14 +89,14 @@ describe('AuthService JWT failure after refresh rotation', () => {
     await expect(service.refreshSession(raw)).rejects.toThrow('signing failed');
 
     expect(prisma.refreshToken.create).toHaveBeenCalledTimes(1);
-    expect(prisma.refreshToken.update).toHaveBeenCalledWith({
-      where: { id: 'rt_old' },
+    expect(prisma.refreshToken.updateMany).toHaveBeenCalledWith({
+      where: { id: 'rt_old', revokedAt: null },
       data: {
         revokedAt: expect.any(Date) as unknown,
         replacedById: 'rt_new',
       },
     });
-    expect(prisma.refreshToken.updateMany).not.toHaveBeenCalled();
+    expect(prisma.refreshToken.update).not.toHaveBeenCalled();
     expect(jwt.signAsync).toHaveBeenCalledWith(
       {
         sub: 'user_1',
