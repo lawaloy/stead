@@ -139,7 +139,18 @@ describe('AuthService refresh age and expiry boundaries', () => {
       expiresIn: 900,
     });
     expect(prisma.refreshToken.create).toHaveBeenCalled();
-    expect(prisma.refreshToken.updateMany).not.toHaveBeenCalled();
+    const [[rotation]] = prisma.refreshToken.updateMany.mock
+      .calls as unknown as [
+      [
+        {
+          where: { id: string; revokedAt: null };
+          data: { revokedAt: Date; replacedById: string };
+        },
+      ],
+    ];
+    expect(rotation.where).toEqual({ id: 'rt_old', revokedAt: null });
+    expect(rotation.data.replacedById).toBe('rt_new');
+    expect(rotation.data.revokedAt).toBeInstanceOf(Date);
   });
 
   it('revokes only the row when expiresAt is exactly now', async () => {

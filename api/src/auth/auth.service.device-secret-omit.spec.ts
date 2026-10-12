@@ -197,8 +197,8 @@ describe('AuthService omitted device when device secret is unset', () => {
     ];
     expect(createArg.data.familyId).toBe('family_1');
     expect(createArg.data.deviceHash).toBeNull();
-    expect(prisma.refreshToken.update).toHaveBeenCalledWith({
-      where: { id: 'rt_old' },
+    expect(prisma.refreshToken.updateMany).toHaveBeenCalledWith({
+      where: { id: 'rt_old', revokedAt: null },
       data: {
         revokedAt: expect.any(Date) as unknown,
         replacedById: 'rt_new',
