@@ -12,6 +12,7 @@ describe('AuthService atomic refresh rotation', () => {
   const rawToken = 'original-refresh-token';
   let service: AuthService;
   let transaction: {
+    $executeRaw: jest.Mock;
     refreshToken: {
       updateMany: jest.Mock;
       create: jest.Mock;
@@ -31,6 +32,7 @@ describe('AuthService atomic refresh rotation', () => {
 
   beforeEach(() => {
     transaction = {
+      $executeRaw: jest.fn().mockResolvedValue(1),
       refreshToken: {
         updateMany: jest.fn().mockResolvedValue({ count: 1 }),
         create: jest.fn().mockResolvedValue({ id: 'replacement' }),
@@ -45,6 +47,7 @@ describe('AuthService atomic refresh rotation', () => {
       refreshToken: {
         findUnique: jest.fn().mockResolvedValue({
           id: 'original',
+          userId: 'user',
           familyId: 'family',
           familyCreatedAt: new Date(Date.now() - 60_000),
           revokedAt: null,
@@ -73,6 +76,10 @@ describe('AuthService atomic refresh rotation', () => {
 
     expect(session.token).toBe('access-token');
     expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+    expect(transaction.$executeRaw).toHaveBeenCalledTimes(1);
+    expect(transaction.$executeRaw.mock.invocationCallOrder[0]).toBeLessThan(
+      transaction.refreshToken.updateMany.mock.invocationCallOrder[0],
+    );
     expect(transaction.refreshToken.updateMany).toHaveBeenCalledWith({
       where: {
         id: 'original',
@@ -102,6 +109,7 @@ describe('AuthService atomic refresh rotation', () => {
     transaction.refreshToken.updateMany.mockResolvedValue({ count: 0 });
     prisma.refreshToken.findUnique.mockResolvedValueOnce({
       id: 'original',
+      userId: 'user',
       familyId: 'family',
       familyCreatedAt: new Date(Date.now() - 60_000),
       expiresAt: new Date(Date.now() + 60_000),
@@ -121,10 +129,18 @@ describe('AuthService atomic refresh rotation', () => {
     expect(prisma.refreshToken.findUnique).toHaveBeenLastCalledWith({
       where: { tokenHash: hashRefreshToken(rawToken) },
     });
-    expect(prisma.refreshToken.updateMany).toHaveBeenCalledWith({
+    expect(prisma.$transaction).toHaveBeenCalledTimes(2);
+    expect(transaction.$executeRaw).toHaveBeenCalledTimes(2);
+    const lockCalls = transaction.$executeRaw.mock.calls as unknown as [
+      TemplateStringsArray,
+      bigint,
+    ][];
+    expect(lockCalls[0][1]).toBe(lockCalls[1][1]);
+    expect(transaction.refreshToken.updateMany).toHaveBeenLastCalledWith({
       where: { familyId: 'family', revokedAt: null },
       data: { revokedAt: expect.any(Date) as unknown },
     });
+    expect(prisma.refreshToken.updateMany).not.toHaveBeenCalled();
   });
 
   it.each([null, { revokedAt: null }])(
@@ -133,6 +149,7 @@ describe('AuthService atomic refresh rotation', () => {
       transaction.refreshToken.updateMany.mockResolvedValue({ count: 0 });
       prisma.refreshToken.findUnique.mockResolvedValueOnce({
         id: 'original',
+        userId: 'user',
         familyId: 'family',
         familyCreatedAt: new Date(Date.now() - 60_000),
         expiresAt: new Date(Date.now() + 60_000),
@@ -165,5 +182,16 @@ describe('AuthService atomic refresh rotation', () => {
     );
     expect(jwt.signAsync).toHaveBeenCalledTimes(1);
     expect(prisma.refreshToken.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('does not write or sign credentials when acquiring the shared lock fails', async () => {
+    transaction.$executeRaw.mockRejectedValue(new Error('lock unavailable'));
+
+    await expect(service.refreshSession(rawToken)).rejects.toThrow(
+      'lock unavailable',
+    );
+    expect(transaction.refreshToken.updateMany).not.toHaveBeenCalled();
+    expect(transaction.refreshToken.create).not.toHaveBeenCalled();
+    expect(jwt.signAsync).not.toHaveBeenCalled();
   });
 });

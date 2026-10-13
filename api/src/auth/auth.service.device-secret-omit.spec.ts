@@ -12,6 +12,7 @@ import { hashRefreshToken } from './refresh-token.util';
 describe('AuthService omitted device when device secret is unset', () => {
   let service: AuthService;
   let prisma: {
+    $executeRaw: jest.Mock;
     $transaction: jest.Mock;
     otpCode: {
       count: jest.Mock;
@@ -40,6 +41,7 @@ describe('AuthService omitted device when device secret is unset', () => {
 
   beforeEach(async () => {
     prisma = {
+      $executeRaw: jest.fn().mockResolvedValue(1),
       $transaction: jest.fn(),
       otpCode: {
         count: jest.fn().mockResolvedValue(0),

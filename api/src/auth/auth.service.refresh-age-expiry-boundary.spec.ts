@@ -15,6 +15,7 @@ const FAMILY_MAX_AGE_MS = 90 * 86_400_000;
 describe('AuthService refresh age and expiry boundaries', () => {
   let service: AuthService;
   let prisma: {
+    $executeRaw: jest.Mock;
     $transaction: jest.Mock;
     refreshToken: {
       create: jest.Mock;
@@ -29,6 +30,7 @@ describe('AuthService refresh age and expiry boundaries', () => {
     jest.setSystemTime(FROZEN_NOW);
 
     prisma = {
+      $executeRaw: jest.fn().mockResolvedValue(1),
       $transaction: jest.fn(),
       refreshToken: {
         create: jest.fn().mockResolvedValue({ id: 'rt_new' }),

@@ -165,6 +165,12 @@ request across simultaneous protected-request failures to avoid accidental
 reuse. PostgreSQL-backed tests cover concurrent rotation and rollback after
 replacement-insertion and JWT-signing failures.
 
+Rotation and refresh revocation acquire the same transaction-scoped PostgreSQL
+advisory lock for the user. Device logout, all-devices logout, and family
+revocation therefore wait for an in-flight rotation and revoke its committed
+replacement before returning. Database regressions observe the actual lock wait
+to cover both logout modes during rotation.
+
 Refresh families also have an absolute max age (`AUTH_REFRESH_FAMILY_MAX_AGE`,
 default `90d`) measured from `familyCreatedAt`. Refresh after that age revokes
 the family and returns 401; the customer must OTP again.

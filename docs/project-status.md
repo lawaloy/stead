@@ -52,8 +52,9 @@ unit coverage is not the same as a full mobile-to-database acceptance test.
   boundary.
 - Refresh rotation commits the predecessor claim, replacement, link, and access
   token signing in one transaction. Unit and PostgreSQL e2e scenarios cover
-  concurrent use, family revocation on reuse, and rollback after replacement
-  insertion or signing fails.
+  concurrent use, family revocation on reuse, overlapping device/all-devices
+  logout, and rollback after replacement insertion or signing fails. Rotation
+  and revocation share a transaction-scoped user lock.
 - Mobile unit tests cover phone/OTP helpers, auth feedback, environment and base
   URL selection, session and installation-ID storage, AuthProvider
   login/restore/logout and cache clearing, API-client behavior, session-scoped

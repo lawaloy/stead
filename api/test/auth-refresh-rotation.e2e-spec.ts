@@ -3,6 +3,7 @@ import { JwtService } from '@nestjs/jwt';
 import { Test } from '@nestjs/testing';
 import type { Prisma, RefreshToken } from '@prisma/client';
 import { randomUUID } from 'node:crypto';
+import { setTimeout as delay } from 'node:timers/promises';
 import request from 'supertest';
 import type { App } from 'supertest/types';
 import { AppModule } from '../src/app.module';
@@ -164,4 +165,59 @@ describe('Atomic refresh rotation (PostgreSQL e2e)', () => {
       .send({ refreshToken: session.refreshToken })
       .expect(401);
   });
+
+  it.each([false, true])(
+    'revokes a replacement when logout overlaps rotation (allDevices=%s)',
+    async (allDevices) => {
+      let signingStarted!: () => void;
+      let resumeSigning!: () => void;
+      const signingPaused = new Promise<void>((resolve) => {
+        signingStarted = resolve;
+      });
+      const signingResumed = new Promise<void>((resolve) => {
+        resumeSigning = resolve;
+      });
+      jest.spyOn(jwt, 'signAsync').mockImplementationOnce(async () => {
+        signingStarted();
+        await signingResumed;
+        return 'access-token';
+      });
+
+      const rotation = auth.refreshSession(rawToken);
+      await signingPaused;
+      const logout = auth.revokeSession({ refreshToken: rawToken, allDevices });
+      try {
+        // Observe a real PostgreSQL lock wait rather than relying on a sleep
+        // to place logout between the claim and the rotation's commit.
+        const deadline = Date.now() + 2_000;
+        let blocked = false;
+        while (!blocked && Date.now() < deadline) {
+          const [activity] = await prisma.$queryRaw<{ blocked: boolean }[]>`
+            SELECT EXISTS (
+              SELECT 1 FROM pg_stat_activity
+              WHERE datname = current_database()
+                AND wait_event_type = 'Lock'
+                AND query LIKE '%pg_advisory_xact_lock%'
+            ) AS blocked
+          `;
+          blocked = activity.blocked;
+          if (!blocked) await delay(10);
+        }
+        expect(blocked).toBe(true);
+      } finally {
+        resumeSigning();
+        await Promise.allSettled([rotation, logout]);
+      }
+
+      const [session] = await Promise.all([rotation, logout]);
+      const rows = await prisma.refreshToken.findMany({ where: { familyId } });
+      expect(rows).toHaveLength(2);
+      expect(rows.every((row) => row.revokedAt !== null)).toBe(true);
+      await expect(
+        auth.refreshSession(session.refreshToken),
+      ).rejects.toMatchObject({
+        status: 401,
+      });
+    },
+  );
 });

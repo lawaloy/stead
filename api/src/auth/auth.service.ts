@@ -649,7 +649,7 @@ export class AuthService {
     }
 
     if (existing.revokedAt) {
-      await this.revokeRefreshFamily(existing.familyId);
+      await this.revokeRefreshFamily(existing.familyId, existing.userId);
       throw new UnauthorizedException('Invalid refresh token');
     }
 
@@ -663,7 +663,7 @@ export class AuthService {
 
     const familyMaxAgeMs = parseDurationToMs(this.refreshFamilyMaxAge);
     if (existing.familyCreatedAt.getTime() + familyMaxAgeMs <= Date.now()) {
-      await this.revokeRefreshFamily(existing.familyId);
+      await this.revokeRefreshFamily(existing.familyId, existing.userId);
       throw new UnauthorizedException('Invalid refresh token');
     }
 
@@ -679,6 +679,7 @@ export class AuthService {
     }
 
     const session = await this.prisma.$transaction(async (transaction) => {
+      await this.lockRefreshUser(transaction, existing.userId);
       const now = new Date();
       // The conditional write also locks the predecessor until commit. A
       // concurrent refresh waits, then observes that it has already been used.
@@ -723,7 +724,7 @@ export class AuthService {
       });
       if (current?.revokedAt) {
         // Persist reuse revocation outside the failed rotation transaction.
-        await this.revokeRefreshFamily(existing.familyId);
+        await this.revokeRefreshFamily(existing.familyId, existing.userId);
       }
       throw new UnauthorizedException('Invalid refresh token');
     }
@@ -738,10 +739,7 @@ export class AuthService {
     if (input.allDevices) {
       const userId = await this.resolveUserIdForLogout(input);
       if (userId) {
-        await this.prisma.refreshToken.updateMany({
-          where: { userId, revokedAt: null },
-          data: { revokedAt: new Date() },
-        });
+        await this.revokeRefreshTokens(userId, { userId });
       }
       return { ok: true };
     }
@@ -751,7 +749,7 @@ export class AuthService {
         where: { tokenHash: hashRefreshToken(input.refreshToken) },
       });
       if (existing) {
-        await this.revokeRefreshFamily(existing.familyId);
+        await this.revokeRefreshFamily(existing.familyId, existing.userId);
       }
       return { ok: true };
     }
@@ -866,7 +864,7 @@ export class AuthService {
         select: { familyId: true },
       });
       for (const row of sameDeviceFamilies) {
-        await this.revokeRefreshFamily(row.familyId);
+        await this.revokeRefreshFamily(row.familyId, userId);
       }
     }
 
@@ -888,7 +886,7 @@ export class AuthService {
         (b._min.familyCreatedAt?.getTime() ?? 0),
     );
     for (let i = 0; i < overflow; i++) {
-      await this.revokeRefreshFamily(oldestFirst[i].familyId);
+      await this.revokeRefreshFamily(oldestFirst[i].familyId, userId);
     }
   }
 
@@ -922,11 +920,37 @@ export class AuthService {
     );
   }
 
-  private revokeRefreshFamily(familyId: string) {
-    return this.prisma.refreshToken.updateMany({
-      where: { familyId, revokedAt: null },
-      data: { revokedAt: new Date() },
+  private async lockRefreshUser(
+    transaction: Prisma.TransactionClient,
+    userId: string,
+  ) {
+    // Every rotation and revocation takes this stable lock before touching
+    // refresh rows. Revocation's subsequent statement can then see a successor
+    // committed by a rotation that held the lock first.
+    const lockKey = createHash('sha256')
+      .update(`stead:refresh-user:${userId}`)
+      .digest()
+      .readBigInt64BE();
+    await transaction.$executeRaw`
+      SELECT pg_advisory_xact_lock(${lockKey}::bigint)
+    `;
+  }
+
+  private revokeRefreshTokens(
+    userId: string,
+    where: Prisma.RefreshTokenWhereInput,
+  ) {
+    return this.prisma.$transaction(async (transaction) => {
+      await this.lockRefreshUser(transaction, userId);
+      return transaction.refreshToken.updateMany({
+        where: { ...where, revokedAt: null },
+        data: { revokedAt: new Date() },
+      });
     });
+  }
+
+  private revokeRefreshFamily(familyId: string, userId: string) {
+    return this.revokeRefreshTokens(userId, { familyId });
   }
 
   private retireLiveOtpsForUser(userId: string, consumedAt: Date) {

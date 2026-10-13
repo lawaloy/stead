@@ -20,6 +20,7 @@ const hashDevice = (deviceId: string) =>
 describe('AuthService refresh device header case', () => {
   let service: AuthService;
   let prisma: {
+    $executeRaw: jest.Mock;
     $transaction: jest.Mock;
     refreshToken: {
       create: jest.Mock;
@@ -31,6 +32,7 @@ describe('AuthService refresh device header case', () => {
 
   beforeEach(async () => {
     prisma = {
+      $executeRaw: jest.fn().mockResolvedValue(1),
       $transaction: jest.fn(),
       refreshToken: {
         create: jest.fn().mockResolvedValue({ id: 'rt_new' }),

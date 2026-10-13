@@ -15,6 +15,7 @@ const SEVEN_DAYS_MS = 7 * 86_400_000;
 describe('AuthService refresh rotation token lifetime', () => {
   let service: AuthService;
   let prisma: {
+    $executeRaw: jest.Mock;
     $transaction: jest.Mock;
     otpCode: {
       findFirst: jest.Mock;
@@ -38,6 +39,7 @@ describe('AuthService refresh rotation token lifetime', () => {
     jest.setSystemTime(FROZEN_NOW);
 
     prisma = {
+      $executeRaw: jest.fn().mockResolvedValue(1),
       $transaction: jest.fn(),
       otpCode: {
         findFirst: jest.fn(),

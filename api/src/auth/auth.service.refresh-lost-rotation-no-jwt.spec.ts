@@ -12,6 +12,7 @@ import { hashRefreshToken } from './refresh-token.util';
 describe('AuthService refresh lost rotation does not issue JWT', () => {
   let service: AuthService;
   let prisma: {
+    $executeRaw: jest.Mock;
     $transaction: jest.Mock;
     refreshToken: {
       create: jest.Mock;
@@ -24,6 +25,7 @@ describe('AuthService refresh lost rotation does not issue JWT', () => {
 
   beforeEach(async () => {
     prisma = {
+      $executeRaw: jest.fn().mockResolvedValue(1),
       $transaction: jest.fn(),
       refreshToken: {
         create: jest.fn().mockResolvedValue({ id: 'rt_new' }),

@@ -11,6 +11,8 @@ import { CountriesService } from '../countries/countries.service';
 describe('AuthService family-cap eviction then refresh create failure', () => {
   let service: AuthService;
   let prisma: {
+    $transaction: jest.Mock;
+    $executeRaw: jest.Mock;
     otpCode: {
       findFirst: jest.Mock;
       updateMany: jest.Mock;
@@ -30,6 +32,8 @@ describe('AuthService family-cap eviction then refresh create failure', () => {
 
   beforeEach(async () => {
     prisma = {
+      $transaction: jest.fn(),
+      $executeRaw: jest.fn().mockResolvedValue(1),
       otpCode: {
         findFirst: jest.fn(),
         updateMany: jest.fn(),
@@ -49,6 +53,11 @@ describe('AuthService family-cap eviction then refresh create failure', () => {
       recordEvent: jest.fn(),
       countRecentEvents: jest.fn().mockResolvedValue(0),
     };
+
+    prisma.$transaction.mockImplementation(
+      (operation: (transaction: typeof prisma) => Promise<unknown>) =>
+        operation(prisma),
+    );
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [

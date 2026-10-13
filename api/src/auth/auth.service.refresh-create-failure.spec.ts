@@ -11,6 +11,7 @@ import { hashRefreshToken } from './refresh-token.util';
 describe('AuthService refresh rotation create failure', () => {
   let service: AuthService;
   let prisma: {
+    $executeRaw: jest.Mock;
     $transaction: jest.Mock;
     refreshToken: {
       create: jest.Mock;
@@ -23,6 +24,7 @@ describe('AuthService refresh rotation create failure', () => {
 
   beforeEach(async () => {
     prisma = {
+      $executeRaw: jest.fn().mockResolvedValue(1),
       $transaction: jest.fn(),
       refreshToken: {
         create: jest.fn(),
