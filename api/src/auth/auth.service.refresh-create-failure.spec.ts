@@ -11,6 +11,7 @@ import { hashRefreshToken } from './refresh-token.util';
 describe('AuthService refresh rotation create failure', () => {
   let service: AuthService;
   let prisma: {
+    $transaction: jest.Mock;
     refreshToken: {
       create: jest.Mock;
       findUnique: jest.Mock;
@@ -22,14 +23,20 @@ describe('AuthService refresh rotation create failure', () => {
 
   beforeEach(async () => {
     prisma = {
+      $transaction: jest.fn(),
       refreshToken: {
         create: jest.fn(),
         findUnique: jest.fn(),
         update: jest.fn(),
-        updateMany: jest.fn(),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
     };
     jwt = { signAsync: jest.fn() };
+
+    prisma.$transaction.mockImplementation(
+      (operation: (transaction: typeof prisma) => Promise<unknown>) =>
+        operation(prisma),
+    );
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -94,7 +101,7 @@ describe('AuthService refresh rotation create failure', () => {
 
     expect(prisma.refreshToken.create).toHaveBeenCalledTimes(1);
     expect(prisma.refreshToken.update).not.toHaveBeenCalled();
-    expect(prisma.refreshToken.updateMany).not.toHaveBeenCalled();
+    expect(prisma.refreshToken.updateMany).toHaveBeenCalledTimes(1);
     expect(jwt.signAsync).not.toHaveBeenCalled();
   });
 });

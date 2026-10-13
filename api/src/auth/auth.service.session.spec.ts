@@ -22,6 +22,7 @@ const hashDevice = (deviceId: string) =>
 describe('AuthService session refresh', () => {
   let service: AuthService;
   let prisma: {
+    $transaction: jest.Mock;
     refreshToken: {
       create: jest.Mock;
       findUnique: jest.Mock;
@@ -36,6 +37,7 @@ describe('AuthService session refresh', () => {
 
   beforeEach(async () => {
     prisma = {
+      $transaction: jest.fn(),
       refreshToken: {
         create: jest.fn().mockResolvedValue({ id: 'rt_new' }),
         findUnique: jest.fn(),
@@ -62,6 +64,11 @@ describe('AuthService session refresh', () => {
         return values[key];
       }),
     };
+
+    prisma.$transaction.mockImplementation(
+      (operation: (transaction: typeof prisma) => Promise<unknown>) =>
+        operation(prisma),
+    );
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -135,18 +142,25 @@ describe('AuthService session refresh', () => {
     expect(createArg.data.familyId).toBe('family_1');
     expect(createArg.data.familyCreatedAt).toEqual(familyCreatedAt);
     expect(createArg.data.deviceHash).toBe(hashDevice(DEVICE_A));
-    const [[updateArg]] = prisma.refreshToken.updateMany.mock
-      .calls as unknown as [
+    const [[updateArg]] = prisma.refreshToken.update.mock.calls as unknown as [
       [
         {
-          where: { id: string; revokedAt: null };
-          data: { revokedAt: Date; replacedById: string };
+          where: { id: string };
+          data: { replacedById: string };
         },
       ],
     ];
-    expect(updateArg.where).toEqual({ id: 'rt_old', revokedAt: null });
+    expect(updateArg.where.id).toBe('rt_old');
     expect(updateArg.data.replacedById).toBe('rt_new');
-    expect(updateArg.data.revokedAt).toBeInstanceOf(Date);
+    expect(prisma.refreshToken.updateMany).toHaveBeenCalledWith({
+      where: {
+        id: 'rt_old',
+        revokedAt: null,
+        expiresAt: { gt: expect.any(Date) as unknown },
+        familyCreatedAt: { gt: expect.any(Date) as unknown },
+      },
+      data: { revokedAt: expect.any(Date) as unknown },
+    });
   });
 
   it('rejects refresh when the family exceeds its absolute max age', async () => {
@@ -257,21 +271,21 @@ describe('AuthService session refresh', () => {
     expect(expiredUpdate.data.revokedAt).toBeInstanceOf(Date);
   });
 
-  it('discards a successor when the predecessor is revoked mid-rotation', async () => {
+  it('does not create a successor when the predecessor is revoked mid-rotation', async () => {
     const raw = 'raced-refresh';
-    prisma.refreshToken.findUnique.mockResolvedValue(liveToken(raw));
+    prisma.refreshToken.findUnique.mockResolvedValueOnce(liveToken(raw));
+    prisma.refreshToken.findUnique.mockResolvedValue({ revokedAt: new Date() });
     prisma.refreshToken.updateMany.mockResolvedValue({ count: 0 });
 
     await expect(service.refreshSession(raw)).rejects.toBeInstanceOf(
       UnauthorizedException,
     );
-    expect(prisma.refreshToken.create).toHaveBeenCalled();
-    const [[successorRevoke]] = prisma.refreshToken.update.mock
-      .calls as unknown as [
-      [{ where: { id: string }; data: { revokedAt: Date } }],
-    ];
-    expect(successorRevoke.where.id).toBe('rt_new');
-    expect(successorRevoke.data.revokedAt).toBeInstanceOf(Date);
+    expect(prisma.refreshToken.create).not.toHaveBeenCalled();
+    expect(prisma.refreshToken.update).not.toHaveBeenCalled();
+    expect(prisma.refreshToken.updateMany).toHaveBeenLastCalledWith({
+      where: { familyId: 'family_1', revokedAt: null },
+      data: { revokedAt: expect.any(Date) as unknown },
+    });
   });
 
   it('revokes a family by refresh token on logout', async () => {

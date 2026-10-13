@@ -3,7 +3,7 @@
 <details open>
 <summary><strong>Show or hide document contents</strong></summary>
 
-Last reviewed against the repository: 2026-10-11.
+Last reviewed against the repository: 2026-10-13.
 
 This document separates four states that should not be treated as equivalent:
 
@@ -50,6 +50,10 @@ unit coverage is not the same as a full mobile-to-database acceptance test.
   lifecycle rules, transaction create/list/filter/update/delete and ownership,
   and populated dashboard recalculation against the real Prisma/PostgreSQL
   boundary.
+- Refresh rotation commits the predecessor claim, replacement, link, and access
+  token signing in one transaction. Unit and PostgreSQL e2e scenarios cover
+  concurrent use, family revocation on reuse, and rollback after replacement
+  insertion or signing fails.
 - Mobile unit tests cover phone/OTP helpers, auth feedback, environment and base
   URL selection, session and installation-ID storage, AuthProvider
   login/restore/logout and cache clearing, API-client behavior, session-scoped

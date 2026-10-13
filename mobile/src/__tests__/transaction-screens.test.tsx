@@ -122,7 +122,9 @@ describe('transaction screens', () => {
     expect(
       await screen.findByRole('header', { name: 'Activity' }),
     ).toBeOnTheScreen();
-    expect(screen.getByLabelText('Visible net ₦2,000.00')).toBeOnTheScreen();
+    expect(
+      await screen.findByLabelText('Visible net ₦2,000.00'),
+    ).toBeOnTheScreen();
     expect(screen.getByRole('tab', { name: 'All' })).toBeSelected();
     expect(
       screen.getByRole('button', { name: 'Edit Salary slice transaction' }),

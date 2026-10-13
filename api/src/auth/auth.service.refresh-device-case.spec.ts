@@ -20,6 +20,7 @@ const hashDevice = (deviceId: string) =>
 describe('AuthService refresh device header case', () => {
   let service: AuthService;
   let prisma: {
+    $transaction: jest.Mock;
     refreshToken: {
       create: jest.Mock;
       findUnique: jest.Mock;
@@ -30,6 +31,7 @@ describe('AuthService refresh device header case', () => {
 
   beforeEach(async () => {
     prisma = {
+      $transaction: jest.fn(),
       refreshToken: {
         create: jest.fn().mockResolvedValue({ id: 'rt_new' }),
         findUnique: jest.fn(),
@@ -37,6 +39,11 @@ describe('AuthService refresh device header case', () => {
         updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
     };
+
+    prisma.$transaction.mockImplementation(
+      (operation: (transaction: typeof prisma) => Promise<unknown>) =>
+        operation(prisma),
+    );
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -108,10 +115,9 @@ describe('AuthService refresh device header case', () => {
     ];
     expect(createArg.data.deviceHash).toBe(hashDevice(DEVICE_A));
     expect(createArg.data.familyId).toBe('family_1');
-    expect(prisma.refreshToken.updateMany).toHaveBeenCalledWith({
-      where: { id: 'rt_old', revokedAt: null },
+    expect(prisma.refreshToken.update).toHaveBeenCalledWith({
+      where: { id: 'rt_old' },
       data: {
-        revokedAt: expect.any(Date) as unknown,
         replacedById: 'rt_new',
       },
     });

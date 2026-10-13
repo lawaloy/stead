@@ -152,8 +152,18 @@ lifetime `AUTH_REFRESH_TOKEN_EXPIRES_IN=30d`). Only a SHA-256 hash of the refres
 token is stored.
 
 Each refresh **rotates**: the presented token is revoked and replaced in the same
-family. Presenting an already-revoked refresh token is treated as reuse and
-revokes the entire family.
+family. A single database transaction conditionally claims the still-live,
+unexpired predecessor, inserts its replacement, links the predecessor to the
+replacement, and signs the access JWT. Database or signing failures roll back
+the rotation, leaving the original refresh token usable for retry.
+
+Only one concurrent request can claim a refresh token. Presenting an
+already-revoked refresh token, including losing a concurrent claim to another
+rotation, is treated as reuse and revokes the entire family. That revocation is
+committed separately so rejection cannot roll it back. Mobile shares one refresh
+request across simultaneous protected-request failures to avoid accidental
+reuse. PostgreSQL-backed tests cover concurrent rotation and rollback after
+replacement-insertion and JWT-signing failures.
 
 Refresh families also have an absolute max age (`AUTH_REFRESH_FAMILY_MAX_AGE`,
 default `90d`) measured from `familyCreatedAt`. Refresh after that age revokes

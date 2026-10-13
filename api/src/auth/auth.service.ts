@@ -9,6 +9,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
+import type { Prisma } from '@prisma/client';
 import {
   NOTIFICATION_PUBLISHER,
   type NotificationPublisher,
@@ -677,37 +678,56 @@ export class AuthService {
       }
     }
 
-    const created = await this.createRefreshTokenRow(
-      existing.user.id,
-      existing.familyId,
-      deviceHash ?? existing.deviceHash,
-      existing.familyCreatedAt,
-    );
-
-    // Only win the rotation if the predecessor is still live. Logout or a
-    // parallel refresh can revoke it after the findUnique check; leaving the
-    // successor live would resurrect a session the user just signed out of.
-    const rotated = await this.prisma.refreshToken.updateMany({
-      where: { id: existing.id, revokedAt: null },
-      data: {
-        revokedAt: new Date(),
-        replacedById: created.id,
-      },
-    });
-    if (rotated.count !== 1) {
-      await this.prisma.refreshToken.update({
-        where: { id: created.id },
-        data: { revokedAt: new Date() },
+    const session = await this.prisma.$transaction(async (transaction) => {
+      const now = new Date();
+      // The conditional write also locks the predecessor until commit. A
+      // concurrent refresh waits, then observes that it has already been used.
+      const claimed = await transaction.refreshToken.updateMany({
+        where: {
+          id: existing.id,
+          revokedAt: null,
+          expiresAt: { gt: now },
+          familyCreatedAt: {
+            gt: new Date(now.getTime() - familyMaxAgeMs),
+          },
+        },
+        data: { revokedAt: now },
       });
+      if (claimed.count !== 1) return null;
+
+      const created = await this.createRefreshTokenRow(
+        existing.user.id,
+        existing.familyId,
+        deviceHash ?? existing.deviceHash,
+        existing.familyCreatedAt,
+        transaction,
+      );
+      await transaction.refreshToken.update({
+        where: { id: existing.id },
+        data: { replacedById: created.id },
+      });
+
+      // Signing failures must roll back rotation too, so the caller can retry
+      // its original credential rather than losing access to the new token.
+      const token = await this.signAccessToken(existing.user);
+      return {
+        token,
+        refreshToken: created.rawToken,
+        expiresIn: parseDurationToSeconds(this.accessTokenExpiresIn),
+      };
+    });
+
+    if (!session) {
+      const current = await this.prisma.refreshToken.findUnique({
+        where: { tokenHash },
+      });
+      if (current?.revokedAt) {
+        // Persist reuse revocation outside the failed rotation transaction.
+        await this.revokeRefreshFamily(existing.familyId);
+      }
       throw new UnauthorizedException('Invalid refresh token');
     }
-
-    const token = await this.signAccessToken(existing.user);
-    return {
-      token,
-      refreshToken: created.rawToken,
-      expiresIn: parseDurationToSeconds(this.accessTokenExpiresIn),
-    };
+    return session;
   }
 
   async revokeSession(input: {
@@ -877,9 +897,10 @@ export class AuthService {
     familyId: string,
     deviceHash?: string | null,
     familyCreatedAt: Date = new Date(),
+    client: Pick<Prisma.TransactionClient, 'refreshToken'> = this.prisma,
   ) {
     const rawToken = generateRefreshToken();
-    const row = await this.prisma.refreshToken.create({
+    const row = await client.refreshToken.create({
       data: {
         userId,
         tokenHash: hashRefreshToken(rawToken),
