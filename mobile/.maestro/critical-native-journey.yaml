@@ -95,8 +95,7 @@ appId: com.lawaloy.stead
 - assertVisible: Native journey goal
 - assertVisible: '0%'
 
-# One income of 20% of the goal. Avoid editing pre-filled amounts and avoid a
-# second create (Maestro/RN controlled fields + list refresh are flaky there).
+# Create an income worth 20% of the goal, then correct its amount and note.
 - tapOn:
     id: nav-activity
 - tapOn:
@@ -169,10 +168,96 @@ appId: com.lawaloy.stead
 - tapOn:
     id: nav-activity
 - scrollUntilVisible:
-    element: Delete Native journey income transaction
+    element: Edit Native journey income transaction
     timeout: 40000
     visibilityPercentage: 50
-- tapOn: Delete Native journey income transaction
+- tapOn: Edit Native journey income transaction
+- scrollUntilVisible:
+    element: Edit transaction
+    direction: UP
+    timeout: 40000
+    visibilityPercentage: 50
+- tapOn:
+    id: transaction-edit-amount
+- eraseText: 100
+- inputText: '360000'
+- assertVisible:
+    id: transaction-edit-amount
+    text: '360000'
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - hideKeyboard
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - tapOn: Edit transaction
+- scrollUntilVisible:
+    element:
+      id: transaction-edit-note
+    timeout: 40000
+    visibilityPercentage: 50
+- tapOn:
+    id: transaction-edit-note
+- eraseText: 100
+- inputText: Native journey corrected income
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - hideKeyboard
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - tapOn: Note
+- scrollUntilVisible:
+    element:
+      id: transaction-save
+    timeout: 40000
+    visibilityPercentage: 50
+- tapOn:
+    id: transaction-save
+- extendedWaitUntil:
+    notVisible: Edit transaction
+    timeout: 60000
+- scrollUntilVisible:
+    element: Native journey corrected income
+    timeout: 40000
+    visibilityPercentage: 50
+- assertNotVisible: Native journey income
+- tapOn:
+    id: nav-dashboard
+- extendedWaitUntil:
+    visible: '30%'
+    timeout: 90000
+
+# A real process restart on both platforms must restore the saved credential
+# and reload protected goal/transaction data. Returning to login is a failure.
+- stopApp
+- launchApp:
+    clearState: false
+    clearKeychain: false
+- extendedWaitUntil:
+    visible: Stability Dashboard
+    timeout: 240000
+- extendedWaitUntil:
+    visible: Native journey goal
+    timeout: 90000
+- extendedWaitUntil:
+    visible: '30%'
+    timeout: 90000
+- assertNotVisible: Stead Login
+- tapOn:
+    id: nav-activity
+- scrollUntilVisible:
+    element: Delete Native journey corrected income transaction
+    timeout: 40000
+    visibilityPercentage: 50
+- assertVisible: Native journey corrected income
+- tapOn: Delete Native journey corrected income transaction
 - tapOn: Delete
 - assertVisible: No transactions yet
 
@@ -196,44 +281,17 @@ appId: com.lawaloy.stead
     timeout: 60000
 - assertVisible: Safe To Spend
 
-# Session restore / logout.
-# Android: cold stop+launch keeps SecureStore and should restore the session.
-# iOS+Maestro CI often returns to Stead Login after stopApp (no API calls; token
-# missing at bootstrap). Still cover logout from the live session and a logged-out
-# cold start there.
-- runFlow:
-    when:
-      platform: Android
-    commands:
-      - stopApp
-      - launchApp:
-          clearState: false
-      - extendedWaitUntil:
-          visible: Native journey goal
-          timeout: 90000
-      - tapOn:
-          id: app-logout
-      - extendedWaitUntil:
-          visible: Stead Login
-          timeout: 60000
-      - stopApp
-      - launchApp:
-          clearState: false
-      - extendedWaitUntil:
-          visible: Stead Login
-          timeout: 90000
-- runFlow:
-    when:
-      platform: iOS
-    commands:
-      - tapOn:
-          id: app-logout
-      - extendedWaitUntil:
-          visible: Stead Login
-          timeout: 60000
-      - stopApp
-      - launchApp:
-          clearState: false
-      - extendedWaitUntil:
-          visible: Stead Login
-          timeout: 90000
+# Logout must also survive a process restart on both platforms.
+- tapOn:
+    id: app-logout
+- extendedWaitUntil:
+    visible: Stead Login
+    timeout: 60000
+- stopApp
+- launchApp:
+    clearState: false
+    clearKeychain: false
+- extendedWaitUntil:
+    visible: Stead Login
+    timeout: 240000
+- assertNotVisible: Stability Dashboard

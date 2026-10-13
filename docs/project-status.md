@@ -77,10 +77,14 @@ unit coverage is not the same as a full mobile-to-database acceptance test.
   restore, and unauthenticated access after local logout. See
   [Critical Mobile Journey](critical-mobile-journey.md).
 - Android and iOS Maestro jobs install cached native builds and drive the app
-  through dev-provider OTP, goal setup, transaction correction/deletion,
-  dashboard refresh, session restoration, and logout against the running API
-  and PostgreSQL. The workflow reports on every PR and `main` push, runs native
-  jobs for relevant paths, and runs the full suite daily and on demand.
+  through dev-provider OTP, goal setup, transaction creation, amount/note
+  correction, dashboard recalculation, and deletion against the running API
+  and PostgreSQL. Both platforms must reload the corrected data after a
+  signed-in cold start and remain signed out after a logout and second cold
+  start. Earlier native passes omitted editing and signed-in iOS restoration;
+  the expanded flow's CI results provide evidence for those cases. The workflow
+  reports on every PR and `main` push, runs native jobs for relevant paths, and
+  runs the full suite daily and on demand.
 - Readiness-alert tests cover preference defaults and validation, timezone-aware
   weekly buckets, risk/recovery thresholds, cooldown, deduplicated encrypted
   queueing, generic SMS delivery, mobile response parsing, and accessible

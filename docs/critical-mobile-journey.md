@@ -41,10 +41,17 @@ both supply the isolated settings and manage the API process automatically.
 
 ## Native UI journey
 
-`mobile/.maestro/critical-native-journey.yaml` drives the installed Android or
-iOS app through OTP login, goal setup, transaction creation/correction/deletion,
-dashboard refresh, process restart with session restoration, and logout with a
-second restart. It uses visible development OTP, so it does **not** require a
+`mobile/.maestro/critical-native-journey.yaml` requires the installed Android and
+iOS apps to complete OTP login, goal setup, transaction creation, amount/note
+editing, and deletion. An income initially funds 20% of the goal; editing its
+amount must update the dashboard to 30%. A signed-in process stop and launch
+preserves app state and the iOS keychain, then requires the authenticated
+dashboard, the 30% progress, and the corrected transaction to reload without
+another OTP. After deletion, progress must return to 0%. Logout is followed by
+a second process restart that must stay on the login screen. Both platforms
+execute both restart checks; iOS restoration has no skip or login fallback.
+
+It uses visible development OTP, so it does **not** require a
 Twilio or Termii account. It requires a disposable API database schema and
 `SMS_PROVIDER=dev`, `DEV_EXPOSE_OTP=true`; never use a real customer account or
 production API. The flow clears the app's local state at the beginning and
@@ -55,8 +62,9 @@ job reports on every pull request and `main` push; Android and iOS Maestro run
 when the shared native path policy detects relevant mobile, API, contract, or CI
 changes. The complete suite also runs daily at 16:00 UTC (after morning
 Dependabot, Dependency Maintenance, and Dependency Audit activity) and via
-`workflow_dispatch`. Both platform journeys passed together on mobile
-dependency PR #543 on 2026-10-08. Dedicated `build-android` /
+`workflow_dispatch`. Earlier successful runs covered a narrower flow: they did
+not exercise transaction editing or signed-in iOS cold-start restoration.
+Evidence for those cases must come from runs of the expanded flow. Dedicated `build-android` /
 `build-ios` jobs produce installable binaries (cached by native inputs) and
 hand them to Maestro jobs as artifacts. Android warm boots use a cached AVD
 snapshot; iOS miss builds restore source mtimes and use inode-aware DerivedData
