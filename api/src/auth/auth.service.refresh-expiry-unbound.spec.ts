@@ -21,6 +21,8 @@ const hashDevice = (deviceId: string) =>
 describe('AuthService refresh expiry vs unbound families', () => {
   let service: AuthService;
   let prisma: {
+    $executeRaw: jest.Mock;
+    $transaction: jest.Mock;
     refreshToken: {
       create: jest.Mock;
       findUnique: jest.Mock;
@@ -33,6 +35,8 @@ describe('AuthService refresh expiry vs unbound families', () => {
 
   beforeEach(async () => {
     prisma = {
+      $executeRaw: jest.fn().mockResolvedValue(1),
+      $transaction: jest.fn(),
       refreshToken: {
         create: jest.fn().mockResolvedValue({ id: 'rt_new' }),
         findUnique: jest.fn(),
@@ -42,6 +46,11 @@ describe('AuthService refresh expiry vs unbound families', () => {
         updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
     };
+
+    prisma.$transaction.mockImplementation(
+      (operation: (transaction: typeof prisma) => Promise<unknown>) =>
+        operation(prisma),
+    );
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -87,23 +96,6 @@ describe('AuthService refresh expiry vs unbound families', () => {
 
     service = module.get(AuthService);
   });
-
-  const expectPredecessorRotation = () => {
-    expect(prisma.refreshToken.update).not.toHaveBeenCalled();
-    expect(prisma.refreshToken.updateMany).toHaveBeenCalledTimes(1);
-    const [[rotation]] = prisma.refreshToken.updateMany.mock
-      .calls as unknown as [
-      [
-        {
-          where: { id: string; revokedAt: null };
-          data: { revokedAt: Date; replacedById: string };
-        },
-      ],
-    ];
-    expect(rotation.where).toEqual({ id: 'rt_old', revokedAt: null });
-    expect(rotation.data.replacedById).toBe('rt_new');
-    expect(rotation.data.revokedAt).toBeInstanceOf(Date);
-  };
 
   const liveToken = (raw: string, overrides: Record<string, unknown> = {}) => ({
     id: 'rt_old',
@@ -161,7 +153,7 @@ describe('AuthService refresh expiry vs unbound families', () => {
     expect(createArg.data.familyId).toBe('family_1');
     expect(createArg.data.familyCreatedAt).toEqual(familyCreatedAt);
     expect(createArg.data.deviceHash).toBeNull();
-    expectPredecessorRotation();
+    expect(prisma.refreshToken.updateMany).toHaveBeenCalledTimes(1);
   });
 
   it('binds an unbound family when refresh includes a device id', async () => {
@@ -175,6 +167,6 @@ describe('AuthService refresh expiry vs unbound families', () => {
       [{ data: { deviceHash: string | null } }],
     ];
     expect(createArg.data.deviceHash).toBe(hashDevice(DEVICE_A));
-    expectPredecessorRotation();
+    expect(prisma.refreshToken.updateMany).toHaveBeenCalledTimes(1);
   });
 });

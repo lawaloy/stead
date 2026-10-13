@@ -10,6 +10,8 @@ import { CountriesService } from '../countries/countries.service';
 describe('AuthService logout family revoke failure', () => {
   let service: AuthService;
   let prisma: {
+    $transaction: jest.Mock;
+    $executeRaw: jest.Mock;
     refreshToken: {
       findUnique: jest.Mock;
       updateMany: jest.Mock;
@@ -19,12 +21,19 @@ describe('AuthService logout family revoke failure', () => {
 
   beforeEach(async () => {
     prisma = {
+      $transaction: jest.fn(),
+      $executeRaw: jest.fn().mockResolvedValue(1),
       refreshToken: {
         findUnique: jest.fn(),
         updateMany: jest.fn(),
       },
     };
     jwt = { verifyAsync: jest.fn() };
+
+    prisma.$transaction.mockImplementation(
+      (operation: (transaction: typeof prisma) => Promise<unknown>) =>
+        operation(prisma),
+    );
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [

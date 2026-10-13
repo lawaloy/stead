@@ -19,6 +19,8 @@ const hashDevice = (deviceId: string) =>
 describe('AuthService same-device replace at family cap', () => {
   let service: AuthService;
   let prisma: {
+    $transaction: jest.Mock;
+    $executeRaw: jest.Mock;
     refreshToken: {
       create: jest.Mock;
       findMany: jest.Mock;
@@ -29,6 +31,8 @@ describe('AuthService same-device replace at family cap', () => {
 
   beforeEach(async () => {
     prisma = {
+      $transaction: jest.fn(),
+      $executeRaw: jest.fn().mockResolvedValue(1),
       refreshToken: {
         create: jest.fn().mockResolvedValue({ id: 'rt_new' }),
         findMany: jest.fn(),
@@ -36,6 +40,11 @@ describe('AuthService same-device replace at family cap', () => {
         updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
     };
+
+    prisma.$transaction.mockImplementation(
+      (operation: (transaction: typeof prisma) => Promise<unknown>) =>
+        operation(prisma),
+    );
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [

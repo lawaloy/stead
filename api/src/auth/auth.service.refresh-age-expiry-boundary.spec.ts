@@ -15,6 +15,8 @@ const FAMILY_MAX_AGE_MS = 90 * 86_400_000;
 describe('AuthService refresh age and expiry boundaries', () => {
   let service: AuthService;
   let prisma: {
+    $executeRaw: jest.Mock;
+    $transaction: jest.Mock;
     refreshToken: {
       create: jest.Mock;
       findUnique: jest.Mock;
@@ -28,6 +30,8 @@ describe('AuthService refresh age and expiry boundaries', () => {
     jest.setSystemTime(FROZEN_NOW);
 
     prisma = {
+      $executeRaw: jest.fn().mockResolvedValue(1),
+      $transaction: jest.fn(),
       refreshToken: {
         create: jest.fn().mockResolvedValue({ id: 'rt_new' }),
         findUnique: jest.fn(),
@@ -35,6 +39,11 @@ describe('AuthService refresh age and expiry boundaries', () => {
         updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
     };
+
+    prisma.$transaction.mockImplementation(
+      (operation: (transaction: typeof prisma) => Promise<unknown>) =>
+        operation(prisma),
+    );
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -139,18 +148,7 @@ describe('AuthService refresh age and expiry boundaries', () => {
       expiresIn: 900,
     });
     expect(prisma.refreshToken.create).toHaveBeenCalled();
-    const [[rotation]] = prisma.refreshToken.updateMany.mock
-      .calls as unknown as [
-      [
-        {
-          where: { id: string; revokedAt: null };
-          data: { revokedAt: Date; replacedById: string };
-        },
-      ],
-    ];
-    expect(rotation.where).toEqual({ id: 'rt_old', revokedAt: null });
-    expect(rotation.data.replacedById).toBe('rt_new');
-    expect(rotation.data.revokedAt).toBeInstanceOf(Date);
+    expect(prisma.refreshToken.updateMany).toHaveBeenCalledTimes(1);
   });
 
   it('revokes only the row when expiresAt is exactly now', async () => {

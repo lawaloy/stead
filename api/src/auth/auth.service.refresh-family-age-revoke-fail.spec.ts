@@ -11,6 +11,8 @@ import { hashRefreshToken } from './refresh-token.util';
 describe('AuthService family max-age revoke failure', () => {
   let service: AuthService;
   let prisma: {
+    $transaction: jest.Mock;
+    $executeRaw: jest.Mock;
     refreshToken: {
       create: jest.Mock;
       findUnique: jest.Mock;
@@ -22,6 +24,8 @@ describe('AuthService family max-age revoke failure', () => {
 
   beforeEach(async () => {
     prisma = {
+      $transaction: jest.fn(),
+      $executeRaw: jest.fn().mockResolvedValue(1),
       refreshToken: {
         create: jest.fn(),
         findUnique: jest.fn(),
@@ -30,6 +34,11 @@ describe('AuthService family max-age revoke failure', () => {
       },
     };
     jwt = { signAsync: jest.fn() };
+
+    prisma.$transaction.mockImplementation(
+      (operation: (transaction: typeof prisma) => Promise<unknown>) =>
+        operation(prisma),
+    );
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [

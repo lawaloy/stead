@@ -12,6 +12,8 @@ import { hashRefreshToken } from './refresh-token.util';
 describe('AuthService refresh lost rotation does not issue JWT', () => {
   let service: AuthService;
   let prisma: {
+    $executeRaw: jest.Mock;
+    $transaction: jest.Mock;
     refreshToken: {
       create: jest.Mock;
       findUnique: jest.Mock;
@@ -23,6 +25,8 @@ describe('AuthService refresh lost rotation does not issue JWT', () => {
 
   beforeEach(async () => {
     prisma = {
+      $executeRaw: jest.fn().mockResolvedValue(1),
+      $transaction: jest.fn(),
       refreshToken: {
         create: jest.fn().mockResolvedValue({ id: 'rt_new' }),
         findUnique: jest.fn(),
@@ -31,6 +35,10 @@ describe('AuthService refresh lost rotation does not issue JWT', () => {
       },
     };
     jwt = { signAsync: jest.fn().mockResolvedValue('access_token') };
+    prisma.$transaction.mockImplementation(
+      (operation: (transaction: typeof prisma) => Promise<unknown>) =>
+        operation(prisma),
+    );
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -73,7 +81,7 @@ describe('AuthService refresh lost rotation does not issue JWT', () => {
     service = module.get(AuthService);
   });
 
-  it('revokes the successor and skips JWT when the predecessor is no longer live', async () => {
+  it('does not create a successor or issue a JWT when the predecessor cannot be claimed', async () => {
     const raw = 'raced-refresh';
     prisma.refreshToken.findUnique.mockResolvedValue({
       id: 'rt_old',
@@ -90,18 +98,19 @@ describe('AuthService refresh lost rotation does not issue JWT', () => {
       UnauthorizedException,
     );
 
-    expect(prisma.refreshToken.create).toHaveBeenCalledTimes(1);
+    expect(prisma.refreshToken.create).not.toHaveBeenCalled();
     expect(prisma.refreshToken.updateMany).toHaveBeenCalledWith({
-      where: { id: 'rt_old', revokedAt: null },
+      where: {
+        id: 'rt_old',
+        revokedAt: null,
+        expiresAt: { gt: expect.any(Date) as unknown },
+        familyCreatedAt: { gt: expect.any(Date) as unknown },
+      },
       data: {
         revokedAt: expect.any(Date) as unknown,
-        replacedById: 'rt_new',
       },
     });
-    expect(prisma.refreshToken.update).toHaveBeenCalledWith({
-      where: { id: 'rt_new' },
-      data: { revokedAt: expect.any(Date) as unknown },
-    });
+    expect(prisma.refreshToken.update).not.toHaveBeenCalled();
     expect(jwt.signAsync).not.toHaveBeenCalled();
   });
 });

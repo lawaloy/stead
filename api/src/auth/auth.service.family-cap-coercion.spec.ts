@@ -50,6 +50,8 @@ describe('AuthService refresh family cap coercion', () => {
     };
   }> => {
     const prisma = {
+      $transaction: jest.fn(),
+      $executeRaw: jest.fn().mockResolvedValue(1),
       refreshToken: {
         create: jest.fn().mockResolvedValue({ id: 'rt_new' }),
         findMany: jest.fn().mockResolvedValue([]),
@@ -57,6 +59,11 @@ describe('AuthService refresh family cap coercion', () => {
         updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
     };
+
+    prisma.$transaction.mockImplementation(
+      (operation: (transaction: typeof prisma) => Promise<unknown>) =>
+        operation(prisma),
+    );
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [

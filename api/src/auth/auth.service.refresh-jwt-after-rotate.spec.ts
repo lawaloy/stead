@@ -8,9 +8,11 @@ import { NOTIFICATION_PUBLISHER } from '../notifications/notification-publisher'
 import { CountriesService } from '../countries/countries.service';
 import { hashRefreshToken } from './refresh-token.util';
 
-describe('AuthService JWT failure after refresh rotation', () => {
+describe('AuthService JWT failure during refresh rotation', () => {
   let service: AuthService;
   let prisma: {
+    $executeRaw: jest.Mock;
+    $transaction: jest.Mock;
     refreshToken: {
       create: jest.Mock;
       findUnique: jest.Mock;
@@ -22,6 +24,8 @@ describe('AuthService JWT failure after refresh rotation', () => {
 
   beforeEach(async () => {
     prisma = {
+      $executeRaw: jest.fn().mockResolvedValue(1),
+      $transaction: jest.fn(),
       refreshToken: {
         create: jest.fn().mockResolvedValue({ id: 'rt_new' }),
         findUnique: jest.fn(),
@@ -30,6 +34,11 @@ describe('AuthService JWT failure after refresh rotation', () => {
       },
     };
     jwt = { signAsync: jest.fn() };
+
+    prisma.$transaction.mockImplementation(
+      (operation: (transaction: typeof prisma) => Promise<unknown>) =>
+        operation(prisma),
+    );
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -72,7 +81,7 @@ describe('AuthService JWT failure after refresh rotation', () => {
     service = module.get(AuthService);
   });
 
-  it('revokes the predecessor before a JWT signing failure', async () => {
+  it('propagates a JWT signing failure from inside the rotation transaction', async () => {
     const raw = 'refresh-raw-token-value';
     prisma.refreshToken.findUnique.mockResolvedValue({
       id: 'rt_old',
@@ -89,14 +98,13 @@ describe('AuthService JWT failure after refresh rotation', () => {
     await expect(service.refreshSession(raw)).rejects.toThrow('signing failed');
 
     expect(prisma.refreshToken.create).toHaveBeenCalledTimes(1);
-    expect(prisma.refreshToken.updateMany).toHaveBeenCalledWith({
-      where: { id: 'rt_old', revokedAt: null },
+    expect(prisma.refreshToken.update).toHaveBeenCalledWith({
+      where: { id: 'rt_old' },
       data: {
-        revokedAt: expect.any(Date) as unknown,
         replacedById: 'rt_new',
       },
     });
-    expect(prisma.refreshToken.update).not.toHaveBeenCalled();
+    expect(prisma.refreshToken.updateMany).toHaveBeenCalledTimes(1);
     expect(jwt.signAsync).toHaveBeenCalledWith(
       {
         sub: 'user_1',

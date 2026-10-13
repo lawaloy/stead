@@ -12,6 +12,8 @@ import { hashRefreshToken } from './refresh-token.util';
 describe('AuthService omitted device when device secret is unset', () => {
   let service: AuthService;
   let prisma: {
+    $executeRaw: jest.Mock;
+    $transaction: jest.Mock;
     otpCode: {
       count: jest.Mock;
       create: jest.Mock;
@@ -39,6 +41,8 @@ describe('AuthService omitted device when device secret is unset', () => {
 
   beforeEach(async () => {
     prisma = {
+      $executeRaw: jest.fn().mockResolvedValue(1),
+      $transaction: jest.fn(),
       otpCode: {
         count: jest.fn().mockResolvedValue(0),
         create: jest.fn().mockResolvedValue({ id: 'otp_1' }),
@@ -71,6 +75,11 @@ describe('AuthService omitted device when device secret is unset', () => {
       recordEvent: jest.fn(),
       countRecentEvents: jest.fn().mockResolvedValue(0),
     };
+
+    prisma.$transaction.mockImplementation(
+      (operation: (transaction: typeof prisma) => Promise<unknown>) =>
+        operation(prisma),
+    );
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -197,10 +206,9 @@ describe('AuthService omitted device when device secret is unset', () => {
     ];
     expect(createArg.data.familyId).toBe('family_1');
     expect(createArg.data.deviceHash).toBeNull();
-    expect(prisma.refreshToken.updateMany).toHaveBeenCalledWith({
-      where: { id: 'rt_old', revokedAt: null },
+    expect(prisma.refreshToken.update).toHaveBeenCalledWith({
+      where: { id: 'rt_old' },
       data: {
-        revokedAt: expect.any(Date) as unknown,
         replacedById: 'rt_new',
       },
     });
