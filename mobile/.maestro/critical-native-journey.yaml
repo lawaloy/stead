@@ -239,12 +239,8 @@ appId: com.lawaloy.stead
     when:
       platform: iOS
     commands:
-      # The numeric keyboard has no return key. Tap the visible ScrollView
-      # title, not the Activity navigation tab or a label under the keyboard.
-      - tapOn:
-          text: Activity
-          below:
-            id: nav-activity
+      # The note was centered before typing, so its label is above the keyboard.
+      - tapOn: Note
 - scrollUntilVisible:
     element:
       id: transaction-edit-note
