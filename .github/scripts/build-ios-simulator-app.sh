@@ -43,10 +43,15 @@ xcodebuild \
 APP_PATH="$DERIVED/Build/Products/Debug-iphonesimulator/mobile.app"
 test -d "$APP_PATH"
 codesign --verify "$APP_PATH"
-SIGNED_ENTITLEMENTS="$DERIVED/SteadSimulator.signed-entitlements.plist"
-codesign -d --entitlements - --xml "$APP_PATH" > "$SIGNED_ENTITLEMENTS"
-test "$(plutil -extract application-identifier raw -o - "$SIGNED_ENTITLEMENTS")" = "$SIMULATOR_BUNDLE_ID"
-test "$(plutil -extract keychain-access-groups.0 raw -o - "$SIGNED_ENTITLEMENTS")" = "$SIMULATOR_BUNDLE_ID"
+# Simulator entitlements live in the Mach-O __TEXT section, separate from
+# the macOS ad-hoc signature. Check every architecture in the published app.
+for SIMULATOR_ARCH in $(xcrun lipo -archs "$APP_PATH/mobile"); do
+  EMBEDDED_ENTITLEMENTS="$DERIVED/SteadSimulator.$SIMULATOR_ARCH.entitlements.plist"
+  xcrun otool -arch "$SIMULATOR_ARCH" -X -s __TEXT __entitlements "$APP_PATH/mobile" \
+    | xxd -r -p | tr -d '\000' > "$EMBEDDED_ENTITLEMENTS"
+  test "$(plutil -extract application-identifier raw -o - "$EMBEDDED_ENTITLEMENTS")" = "$SIMULATOR_BUNDLE_ID"
+  test "$(plutil -extract keychain-access-groups.0 raw -o - "$EMBEDDED_ENTITLEMENTS")" = "$SIMULATOR_BUNDLE_ID"
+done
 mkdir -p "$(dirname "$OUT_APP")"
 rm -rf "$OUT_APP"
 ditto "$APP_PATH" "$OUT_APP"
