@@ -45,10 +45,30 @@ test -d "$APP_PATH"
 codesign --verify "$APP_PATH"
 # Simulator entitlements live in the Mach-O __TEXT section, separate from
 # the macOS ad-hoc signature. Check every architecture in the published app.
-for SIMULATOR_ARCH in $(xcrun lipo -archs "$APP_PATH/mobile"); do
+SIMULATOR_ARCHS="$(xcrun lipo -archs "$APP_PATH/mobile")"
+for SIMULATOR_ARCH in $SIMULATOR_ARCHS; do
+  SIMULATOR_BINARY="$APP_PATH/mobile"
+  if [[ "$SIMULATOR_ARCHS" != "$SIMULATOR_ARCH" ]]; then
+    SIMULATOR_BINARY="$DERIVED/SteadSimulator.$SIMULATOR_ARCH.binary"
+    xcrun lipo "$APP_PATH/mobile" -thin "$SIMULATOR_ARCH" -output "$SIMULATOR_BINARY"
+  fi
+  LOAD_COMMANDS="$DERIVED/SteadSimulator.$SIMULATOR_ARCH.load-commands.txt"
   EMBEDDED_ENTITLEMENTS="$DERIVED/SteadSimulator.$SIMULATOR_ARCH.entitlements.plist"
-  xcrun otool -arch "$SIMULATOR_ARCH" -X -s __TEXT __entitlements "$APP_PATH/mobile" \
-    | xxd -r -p | tr -d '\000' > "$EMBEDDED_ENTITLEMENTS"
+  xcrun otool -l "$SIMULATOR_BINARY" > "$LOAD_COMMANDS"
+  node - "$SIMULATOR_BINARY" "$LOAD_COMMANDS" "$EMBEDDED_ENTITLEMENTS" <<'NODE'
+const fs = require('node:fs');
+const [binaryPath, commandsPath, outputPath] = process.argv.slice(2);
+const commands = fs.readFileSync(commandsPath, 'utf8');
+const section = commands.match(/sectname __entitlements\s+segname __TEXT\s+addr \S+\s+size (0x[0-9a-fA-F]+)\s+offset (\d+)/);
+if (!section) throw new Error('Simulator executable has no embedded entitlements');
+const size = Number(section[1]);
+const offset = Number(section[2]);
+const binary = fs.readFileSync(binaryPath);
+if (!Number.isSafeInteger(size) || !Number.isSafeInteger(offset) || size <= 0 || offset + size > binary.length) {
+  throw new Error('Simulator entitlement section is outside the executable');
+}
+fs.writeFileSync(outputPath, binary.subarray(offset, offset + size));
+NODE
   test "$(plutil -extract application-identifier raw -o - "$EMBEDDED_ENTITLEMENTS")" = "$SIMULATOR_BUNDLE_ID"
   test "$(plutil -extract keychain-access-groups.0 raw -o - "$EMBEDDED_ENTITLEMENTS")" = "$SIMULATOR_BUNDLE_ID"
 done
