@@ -190,16 +190,7 @@ appId: com.lawaloy.stead
     retryTapIfNoChange: false
 - eraseText: 100
 - inputText: '360000'
-- runFlow:
-    when:
-      platform: Android
-    commands:
-      - hideKeyboard
-- runFlow:
-    when:
-      platform: iOS
-    commands:
-      - tapOn: 'Amount .*'
+- hideKeyboard
 # Android's IME can obscure the editor in the accessibility tree. Check the
 # entered value only after dismissing the keyboard and exposing the field.
 - scrollUntilVisible:
@@ -225,16 +216,13 @@ appId: com.lawaloy.stead
     retryTapIfNoChange: false
 - eraseText: 100
 - inputText: Native journey corrected income
-- runFlow:
-    when:
-      platform: Android
-    commands:
-      - hideKeyboard
-- runFlow:
-    when:
-      platform: iOS
-    commands:
-      - tapOn: Note
+- hideKeyboard
+- scrollUntilVisible:
+    element:
+      id: transaction-edit-note
+    timeout: 40000
+    visibilityPercentage: 100
+    centerElement: true
 - waitForAnimationToEnd
 - assertVisible:
     id: transaction-edit-note
