@@ -66,7 +66,10 @@ Dependabot, Dependency Maintenance, and Dependency Audit activity) and via
 not exercise transaction editing or signed-in iOS cold-start restoration.
 Evidence for those cases must come from runs of the expanded flow. Dedicated `build-android` /
 `build-ios` jobs produce installable binaries (cached by native inputs) and
-hand them to Maestro jobs as artifacts. Android warm boots use a cached AVD
+hand them to Maestro jobs as artifacts. The iOS simulator build uses ad-hoc
+signing with a bundle-scoped keychain group and checks the resulting signature
+and entitlements before publishing the artifact. This enables SecureStore
+persistence required by the signed-in cold-start check. Android warm boots use a cached AVD
 snapshot; iOS miss builds restore source mtimes and use inode-aware DerivedData
 plus Pods caches. Metro transforms and the Maestro CLI are cached per platform.
 Pull requests also keep `mobile-api-journey` and unit coverage for the same

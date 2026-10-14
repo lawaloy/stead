@@ -182,11 +182,14 @@ appId: com.lawaloy.stead
 - waitForAnimationToEnd
 # Retry only field focus, never the mutation. A dropped simulator touch must
 # not let eraseText/inputText continue in the previously focused input.
+# Tap the right padding of these short pre-filled values so backspace starts
+# at the end and does not leave a suffix behind.
 - retry:
     maxRetries: 2
     commands:
       - tapOn:
           id: transaction-edit-amount
+          point: '95%,50%'
           retryTapIfNoChange: true
       - runFlow:
           when:
@@ -231,6 +234,7 @@ appId: com.lawaloy.stead
     commands:
       - tapOn:
           id: transaction-edit-note
+          point: '95%,50%'
           retryTapIfNoChange: true
       - runFlow:
           when:
