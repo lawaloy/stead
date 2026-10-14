@@ -150,12 +150,16 @@ npm run verify:local -- --platform android --api-port 3001
 npm run test:native:android:managed -- --api-port 3001 --repeat 3
 ```
 
-For Android, `verify:local` automatically creates, cold-boots and stops a
-dedicated emulator from the locked SDK unless `--device` is supplied. The
-managed journey command uses the same lifecycle as CI. It checks boot and
-window focus before fixtures, reports blocking system dialogs as infrastructure
+For Android, `verify:local` finishes its audits, base checks, CodeQL and source
+build before creating, cold-booting and stopping a dedicated emulator from the
+locked SDK, unless `--device` is supplied. Compilation and verification do not
+compete with emulator startup. The
+managed journey command uses the same lifecycle as CI. Each run creates fresh
+AVD user data and removes only that owned directory after stopping its emulator.
+It checks boot and
+window focus through thirty seconds of stable startup before fixtures, reports blocking system dialogs as infrastructure
 failures, retains emulator logs, and never dismisses dialogs automatically.
-Emulator graphics, CPU and memory settings are shared between local and CI.
+Emulator graphics, four CPU cores and memory settings are shared between local and CI.
 An explicit `--device` continues to support a deliberately prepared emulator.
 On a host capable of both pinned native environments, use `--platform all`.
 The Android baseline uses an x86_64 emulator; an Apple Silicon Mac can provide

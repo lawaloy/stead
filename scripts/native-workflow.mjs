@@ -189,7 +189,7 @@ const runAttempt = async (platform, options, tools, app, pool, directory) => {
       await runCommand(
         tools.adb,
         ['-s', tools.device, 'shell', 'dumpsys', 'window'],
-        { quiet: true, signal: options.signal },
+        { quiet: true, stdoutOnly: true, signal: options.signal },
       ),
     );
     if (!healthy)
@@ -394,7 +394,7 @@ export const nativeWorkflow = async (options) => {
           ...options,
           execute: (command, args, config) =>
             runCommand(command, args, { ...config, signal: options.signal }),
-          requireDevice: options.command !== 'build',
+          requireDevice: options.command !== 'build' && !options.prepareOnly,
           requireMaestro: options.command !== 'build',
           requireBuild:
             options.command === 'doctor' ||
@@ -431,6 +431,14 @@ export const nativeWorkflow = async (options) => {
         env: { ...process.env, STEAD_TEST_API_PORT: String(options.apiPort) },
       });
       await scanCodeQL({ signal: options.signal });
+    }
+    if (options.prepareOnly) {
+      const app = options.app
+        ? resolve(options.app)
+        : await buildApp('android', options.signal, options.projectReady);
+      if (!existsSync(app))
+        throw new Error(`Native app artifact is missing: ${app}`);
+      return { app, sourceBuilt: !options.app, metadata: checked[0].metadata };
     }
     if (!options.databaseReady) {
       await runCommand('npm', ['run', 'db:start'], {
@@ -469,7 +477,8 @@ export const nativeWorkflow = async (options) => {
           stdoutOnly: true,
         })
       ).trim(),
-      build: options.app ? 'provided-artifact' : 'source',
+      build:
+        options.sourceBuilt || !options.app ? 'source' : 'provided-artifact',
     };
     try {
       const postgres = await checkPostgresVersion(pool);
@@ -480,7 +489,11 @@ export const nativeWorkflow = async (options) => {
           : await buildApp(platform, options.signal);
         if (!existsSync(app))
           throw new Error(`Native app artifact is missing: ${app}`);
-        const metadata = { ...checked[index].metadata, postgres };
+        const metadata = {
+          ...options.buildMetadata,
+          ...checked[index].metadata,
+          postgres,
+        };
         const attempts = await repeatJourneys(
           options.repeat,
           (attempt) =>

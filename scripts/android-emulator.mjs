@@ -1,4 +1,11 @@
-import { existsSync, mkdirSync, createWriteStream } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  createWriteStream,
+  mkdtempSync,
+  writeFileSync,
+} from 'node:fs';
+import { rm } from 'node:fs/promises';
 import { join, resolve, delimiter } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { setTimeout as delay } from 'node:timers/promises';
@@ -21,8 +28,7 @@ export const assertAndroidUiHealthy = (windows) => {
   return !!focus && focus !== 'null';
 };
 
-export const withAndroidEmulator = async (operation) => {
-  await checkJsToolchain();
+export const androidSdkEnvironment = () => {
   const sdk = repositorySdk();
   sdkReceipt(sdk);
   const home = join(
@@ -30,9 +36,7 @@ export const withAndroidEmulator = async (operation) => {
     '.tmp/android-avds',
     sdkReceipt(sdk).digest.slice(0, 16),
   );
-  const name = 'stead-native-api34';
-  mkdirSync(home, { recursive: true });
-  const env = {
+  return {
     ...process.env,
     ANDROID_HOME: sdk,
     ANDROID_SDK_ROOT: sdk,
@@ -49,6 +53,17 @@ export const withAndroidEmulator = async (operation) => {
       process.env.PATH || process.env.Path || '',
     ].join(delimiter),
   };
+};
+
+export const withAndroidEmulator = async (operation) => {
+  await checkJsToolchain();
+  const env = androidSdkEnvironment();
+  const sdk = env.ANDROID_HOME;
+  mkdirSync(env.ANDROID_AVD_HOME, { recursive: true });
+  const home = mkdtempSync(join(env.ANDROID_AVD_HOME, 'run-'));
+  env.ANDROID_AVD_HOME = home;
+  const name = 'stead-native-api34';
+  mkdirSync(home, { recursive: true });
   const adb = join(
     sdk,
     'platform-tools',
@@ -116,13 +131,13 @@ export const withAndroidEmulator = async (operation) => {
       '-no-boot-anim',
       '-no-audio',
       '-gpu',
-      'swiftshader',
+      TOOLCHAIN.ANDROID_EMULATOR_GPU,
       '-feature',
       '-Vulkan',
       '-cores',
-      '2',
+      TOOLCHAIN.ANDROID_EMULATOR_CORES,
       '-memory',
-      '2560',
+      TOOLCHAIN.ANDROID_EMULATOR_MEMORY,
       '-camera-back',
       'none',
       '-camera-front',
@@ -134,33 +149,66 @@ export const withAndroidEmulator = async (operation) => {
   emulator.stderr.pipe(log, { end: false });
   try {
     return await withCleanup(async () => {
-      const deadline = Date.now() + 360_000;
-      while (Date.now() < deadline) {
-        controller.signal.throwIfAborted();
-        if (emulator.exitCode !== null || emulator.signalCode !== null)
-          throw new Error(
-            'Android emulator exited before boot. See emulator.log.',
-          );
-        const booted = await runCommand(
-          adb,
-          ['-s', device, 'shell', 'getprop', 'sys.boot_completed'],
-          { env, quiet: true, signal: controller.signal },
-        ).catch(() => '');
-        if (booted.trim() === '1') {
-          const windows = await runCommand(
+      try {
+        const deadline = Date.now() + 360_000;
+        let readySince;
+        while (Date.now() < deadline) {
+          controller.signal.throwIfAborted();
+          if (emulator.exitCode !== null || emulator.signalCode !== null)
+            throw new Error(
+              'Android emulator exited before boot. See emulator.log.',
+            );
+          const booted = await runCommand(
             adb,
-            ['-s', device, 'shell', 'dumpsys', 'window'],
+            ['-s', device, 'shell', 'getprop', 'sys.boot_completed'],
             { env, quiet: true, signal: controller.signal },
-          );
-          if (assertAndroidUiHealthy(windows))
-            return operation({ env, device, signal: controller.signal });
+          ).catch(() => '');
+          if (booted.trim() === '1') {
+            const windows = await runCommand(
+              adb,
+              ['-s', device, 'shell', 'dumpsys', 'window'],
+              { env, quiet: true, stdoutOnly: true, signal: controller.signal },
+            );
+            if (assertAndroidUiHealthy(windows)) {
+              readySince ??= Date.now();
+              if (Date.now() - readySince >= 30_000)
+                return operation({ env, device, signal: controller.signal });
+            } else readySince = undefined;
+          } else readySince = undefined;
+          await delay(1000, undefined, { signal: controller.signal });
         }
-        await delay(1000, undefined, { signal: controller.signal });
+        throw new Error(
+          'Android emulator did not become UI-ready within six minutes. See emulator.log.',
+        );
+      } catch (error) {
+        if (!controller.signal.aborted)
+          await Promise.allSettled(
+            [
+              ['windows', ['shell', 'dumpsys', 'window']],
+              ['system', ['logcat', '-d', '-b', 'system']],
+              ['events', ['logcat', '-d', '-b', 'events']],
+            ].map(async ([name, args]) => {
+              const output = await runCommand(adb, ['-s', device, ...args], {
+                env,
+                quiet: true,
+                stdoutOnly: true,
+                signal: AbortSignal.timeout(10_000),
+              });
+              writeFileSync(join(directory, `${name}.log`), output);
+            }),
+          );
+        throw error;
       }
-      throw new Error(
-        'Android emulator did not become UI-ready within six minutes. See emulator.log.',
-      );
-    }, [() => stopOwned(emulator)]);
+    }, [
+      async () => {
+        await stopOwned(emulator);
+        if (!emulator.closed)
+          throw new Error(
+            'Emulator is still running; its owned AVD data is retained.',
+          );
+        await rm(home, { recursive: true, force: true, maxRetries: 10 });
+      },
+    ]);
   } finally {
     log.end();
     process.removeListener('SIGINT', abort);
@@ -169,17 +217,36 @@ export const withAndroidEmulator = async (operation) => {
   }
 };
 
-export const managedAndroidWorkflow = (options) =>
-  withAndroidEmulator(async ({ env, device }) => {
-    const previous = process.env;
-    process.env = env;
-    try {
-      const { nativeWorkflow } = await import('./native-workflow.mjs');
-      return await nativeWorkflow({ ...options, platform: 'android', device });
-    } finally {
-      process.env = previous;
-    }
-  });
+export const managedAndroidWorkflow = async (
+  options,
+  {
+    workflow,
+    emulator = withAndroidEmulator,
+    environment = androidSdkEnvironment(),
+  } = {},
+) => {
+  const previous = process.env;
+  process.env = environment;
+  options = { ...options, platform: 'android' };
+  try {
+    workflow ??= (await import('./native-workflow.mjs')).nativeWorkflow;
+    // Keep compilation and security/unit checks from competing with Android startup.
+    const prepared = await workflow({ ...options, prepareOnly: true });
+    return await emulator(async ({ env, device }) => {
+      process.env = env;
+      return workflow({
+        ...options,
+        command: 'test',
+        app: prepared.app,
+        sourceBuilt: prepared.sourceBuilt,
+        buildMetadata: prepared.metadata,
+        device,
+      });
+    });
+  } finally {
+    process.env = previous;
+  }
+};
 
 if (resolve(process.argv[1] ?? '') === fileURLToPath(import.meta.url)) {
   const { parseNativeArguments } = await import('./native-config.mjs');

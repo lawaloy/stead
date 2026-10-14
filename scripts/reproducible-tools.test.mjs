@@ -19,7 +19,10 @@ import {
   validateSdkModel,
 } from './android-sdk.mjs';
 import { verifyArchive, moveExtractedPackage } from './archive-utils.mjs';
-import { assertAndroidUiHealthy } from './android-emulator.mjs';
+import {
+  assertAndroidUiHealthy,
+  managedAndroidWorkflow,
+} from './android-emulator.mjs';
 import { checkXcodeVersion, prepareIos } from './ios-setup.mjs';
 
 test('SDK archive lock agrees with every shared SDK version and uses immutable URLs and hashes', () => {
@@ -125,6 +128,65 @@ test('system UI crashes fail preflight instead of masquerading as login failures
     assertAndroidUiHealthy('mCurrentFocus=Window{abc com.android.launcher3}'),
     true,
   );
+});
+test('managed verification finishes preparation before boot and preserves source evidence and cleanup', async () => {
+  const before = process.env;
+  const events = [];
+  await assert.rejects(
+    managedAndroidWorkflow(
+      { command: 'verify', repeat: 3 },
+      {
+        environment: {},
+        workflow: async (options) => {
+          if (options.prepareOnly) {
+            events.push('prepare');
+            assert.equal(options.device, undefined);
+            return {
+              app: '/fresh.apk',
+              sourceBuilt: true,
+              metadata: { sdkArchiveLock: 'fixture' },
+            };
+          }
+          events.push('journey');
+          assert.equal(options.command, 'test');
+          assert.equal(options.sourceBuilt, true);
+          assert.equal(options.repeat, 3);
+          assert.equal(options.device, 'emulator-5554');
+          assert.equal(options.buildMetadata.sdkArchiveLock, 'fixture');
+          throw new Error('original journey failure');
+        },
+        emulator: async (operation) => {
+          events.push('boot');
+          try {
+            return await operation({ env: {}, device: 'emulator-5554' });
+          } finally {
+            events.push('stop');
+          }
+        },
+      },
+    ),
+    /original journey failure/,
+  );
+  assert.deepEqual(events, ['prepare', 'boot', 'journey', 'stop']);
+  assert.equal(process.env, before);
+  let booted = false;
+  await assert.rejects(
+    managedAndroidWorkflow(
+      { command: 'verify' },
+      {
+        environment: {},
+        workflow: async () => {
+          throw new Error('build failed');
+        },
+        emulator: async () => {
+          booted = true;
+        },
+      },
+    ),
+    /build failed/,
+  );
+  assert.equal(booted, false);
+  assert.equal(process.env, before);
 });
 test('transient extraction locks are bounded and other filesystem errors are not retried', async () => {
   let calls = 0;
