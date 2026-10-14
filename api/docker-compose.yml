@@ -1,6 +1,6 @@
 services:
   db:
-    image: postgres:16
+    image: ${POSTGRES_IMAGE:?Use the root db:start command to load the shared image pin}
     container_name: stead_db
     environment:
       POSTGRES_USER: stead

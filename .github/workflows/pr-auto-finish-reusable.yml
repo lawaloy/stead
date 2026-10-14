@@ -19,7 +19,7 @@ permissions:
 
 jobs:
   finish:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Generate GitHub App token
         id: app-token
@@ -120,6 +120,10 @@ jobs:
                 })
               ).data;
               const labels = pullRequest.labels.map((label) => label.name);
+              if (pullRequest.draft || pullRequest.state !== 'open') {
+                core.info('Skipping because the PR is draft or no longer open.');
+                return;
+              }
               const trustedDependabot = isTrustedDependabot(pullRequest);
               const trustedMaintenance = isTrustedMaintenance(pullRequest, labels);
               const lane =
@@ -205,6 +209,7 @@ jobs:
                   owner,
                   repo,
                   pull_number,
+                  sha: pullRequest.head.sha,
                   merge_method: 'squash',
                 });
                 core.info(`Merged PR #${pull_number}.`);

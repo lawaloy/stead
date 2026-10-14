@@ -9,7 +9,9 @@ OUT_APP="${OUT_APP:-$MOBILE/.ci/ios/mobile.app}"
 
 test -d "$MOBILE/ios"
 cd "$MOBILE/ios"
-pod install
+export BUNDLE_GEMFILE="$MOBILE/Gemfile"
+export BUNDLE_FROZEN=true
+bundle exec pod install
 
 mkdir -p "$DERIVED"
 defaults write com.apple.dt.XCBuild IgnoreFileSystemDeviceInodeChanges -bool YES
@@ -55,20 +57,7 @@ for SIMULATOR_ARCH in $SIMULATOR_ARCHS; do
   LOAD_COMMANDS="$DERIVED/SteadSimulator.$SIMULATOR_ARCH.load-commands.txt"
   EMBEDDED_ENTITLEMENTS="$DERIVED/SteadSimulator.$SIMULATOR_ARCH.entitlements.plist"
   xcrun otool -l "$SIMULATOR_BINARY" > "$LOAD_COMMANDS"
-  node - "$SIMULATOR_BINARY" "$LOAD_COMMANDS" "$EMBEDDED_ENTITLEMENTS" <<'NODE'
-const fs = require('node:fs');
-const [binaryPath, commandsPath, outputPath] = process.argv.slice(2);
-const commands = fs.readFileSync(commandsPath, 'utf8');
-const section = commands.match(/sectname __entitlements\s+segname __TEXT\s+addr \S+\s+size (0x[0-9a-fA-F]+)\s+offset (\d+)/);
-if (!section) throw new Error('Simulator executable has no embedded entitlements');
-const size = Number(section[1]);
-const offset = Number(section[2]);
-const binary = fs.readFileSync(binaryPath);
-if (!Number.isSafeInteger(size) || !Number.isSafeInteger(offset) || size <= 0 || offset + size > binary.length) {
-  throw new Error('Simulator entitlement section is outside the executable');
-}
-fs.writeFileSync(outputPath, binary.subarray(offset, offset + size));
-NODE
+  node "$ROOT/scripts/ios-simulator-entitlements.mjs" "$SIMULATOR_BINARY" "$LOAD_COMMANDS" "$EMBEDDED_ENTITLEMENTS"
   test "$(plutil -extract application-identifier raw -o - "$EMBEDDED_ENTITLEMENTS")" = "$SIMULATOR_BUNDLE_ID"
   test "$(plutil -extract keychain-access-groups.0 raw -o - "$EMBEDDED_ENTITLEMENTS")" = "$SIMULATOR_BUNDLE_ID"
 done

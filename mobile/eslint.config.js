@@ -25,6 +25,14 @@ const patchedExpoConfig = (
 module.exports = defineConfig([
   ...patchedExpoConfig,
   {
-    ignores: ['.tmp/**', 'dist/**', 'src/contracts/generated/**'],
+    ignores: [
+      '.tmp/**',
+      '.cache/**',
+      '.ci/**',
+      'android/**',
+      'ios/**',
+      'dist/**',
+      'src/contracts/generated/**',
+    ],
   },
 ]);

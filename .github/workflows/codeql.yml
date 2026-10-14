@@ -17,7 +17,7 @@ on:
 jobs:
   analyze:
     name: Analyze (${{ matrix.language }})
-    runs-on: ${{ (matrix.language == 'swift' && 'macos-latest') || 'ubuntu-latest' }}
+    runs-on: ${{ (matrix.language == 'swift' && 'macos-latest') || 'ubuntu-24.04' }}
     permissions:
       # required for all workflows
       security-events: write
@@ -46,6 +46,11 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+      - name: Resolve shared CodeQL version
+        id: toolchain
+        run: |
+          source .github/ci.env
+          echo "version=$CODEQL_VERSION" >> "$GITHUB_OUTPUT"
 
       # Add any setup steps before running the `github/codeql-action/init` action.
       # This includes steps like installing compilers or runtimes (`actions/setup-node`
@@ -57,6 +62,10 @@ jobs:
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v4
         with:
+          tools: https://github.com/github/codeql-action/releases/download/codeql-bundle-v${{ steps.toolchain.outputs.version }}/codeql-bundle-linux64.tar.gz
+          config-file: .github/codeql-config.yml
+          threads: 2
+          ram: 2048
           languages: ${{ matrix.language }}
           build-mode: ${{ matrix.build-mode }}
           # If you wish to specify custom queries, you can do so here or in a config file.

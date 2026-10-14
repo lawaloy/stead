@@ -1,0 +1,9 @@
+source "https://rubygems.org"
+
+# Local builds and CI resolve the same shared toolchain pins.
+versions = File.readlines(File.expand_path("../.github/ci.env", __dir__), chomp: true)
+  .select { |line| line.match?(/\A[A-Z][A-Z0-9_]*=/) }
+  .map { |line| line.split("=", 2) }.to_h
+
+ruby versions.fetch("RUBY_VERSION")
+gem "cocoapods", "=#{versions.fetch('COCOAPODS_VERSION')}"

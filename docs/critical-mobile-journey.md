@@ -55,7 +55,8 @@ It uses visible development OTP, so it does **not** require a
 Twilio or Termii account. It requires a disposable API database schema and
 `SMS_PROVIDER=dev`, `DEV_EXPOSE_OTP=true`; never use a real customer account or
 production API. The flow clears the app's local state at the beginning and
-uses a dedicated test phone (`TEST_PHONE`) supplied by the runner.
+uses a dedicated test phone supplied by the runner. Each attempt gets a fresh
+database schema so a repeated run does not inherit the previous account.
 
 Native simulator jobs live in `.github/workflows/native-ci.yml`. Its `config`
 job reports on every pull request and `main` push; Android and iOS Maestro run
@@ -70,24 +71,22 @@ hand them to Maestro jobs as artifacts. The iOS simulator build uses ad-hoc
 signing with a bundle-scoped keychain group and checks the resulting signature
 and embedded simulator entitlements in each architecture before publishing
 the artifact. This enables SecureStore
-persistence required by the signed-in cold-start check. Android warm boots use a cached AVD
-snapshot; iOS miss builds restore source mtimes and use inode-aware DerivedData
+persistence required by the signed-in cold-start check. Android cold-boots a
+dedicated emulator from the checksum-locked SDK without snapshots; iOS miss
+builds restore source mtimes and use inode-aware DerivedData
 plus Pods caches. Metro transforms and the Maestro CLI are cached per platform.
 Pull requests also keep `mobile-api-journey` and unit coverage for the same
 business journey. It does not prove physical device behavior, carrier SMS
 delivery, TalkBack, or VoiceOver.
 
-To run locally, start the API against a dedicated disposable schema as above,
-install and start a native debug build (`npx expo run:android` on a configured
-Android emulator, or `npx expo run:ios` on macOS with Xcode and an iOS
-simulator), and run
-`maestro test -e TEST_PHONE=0803XXXXXXX .maestro/critical-native-journey.yaml`
-from `mobile/`. Use a different disposable Nigerian test number for each run.
-Android needs `adb reverse tcp:3000 tcp:3000` and
-`adb reverse tcp:8081 tcp:8081` when the app uses `127.0.0.1`. The local
-machine must have Java 17+, the Maestro CLI, the appropriate native SDK, and
-the development API/Metro servers running. iOS simulation requires macOS and
-Xcode; developers without both native toolchains can rely on CI for the
-platform results.
+Local native commands now own the build, isolated database fixtures, API,
+Metro, emulator port forwarding, and Maestro execution. Setup, commands,
+repeat-run evidence, pre-push enforcement, and the remaining macOS boundary
+are documented in
+[Developer Automation](developer-automation.md#native-and-security-setup).
+Native CI delegates to the same runner. Developers should produce local
+evidence for their available platforms. Without a development Mac, explicitly
+report local iOS execution as deferred and require the macOS CI build and
+journey to pass before merging.
 
 </details>
