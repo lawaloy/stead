@@ -140,6 +140,7 @@ const buildApp = async (platform, signal, projectReady = false) => {
       ),
       [
         'app:assembleDebug',
+        '--no-daemon',
         '--max-workers=2',
         '-Pandroid.builder.sdkDownload=false',
         `-PreactNativeArchitectures=${TOOLCHAIN.ANDROID_ARCH}`,
