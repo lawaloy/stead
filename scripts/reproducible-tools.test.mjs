@@ -21,6 +21,7 @@ import {
 import { verifyArchive, moveExtractedPackage } from './archive-utils.mjs';
 import {
   assertAndroidUiHealthy,
+  assertAndroidHostMemory,
   managedAndroidWorkflow,
 } from './android-emulator.mjs';
 import { checkXcodeVersion, prepareIos } from './ios-setup.mjs';
@@ -137,6 +138,7 @@ test('managed verification finishes preparation before boot and preserves source
       { command: 'verify', repeat: 3 },
       {
         environment: {},
+        checkHostResources: () => {},
         workflow: async (options) => {
           if (options.prepareOnly) {
             events.push('prepare');
@@ -175,6 +177,7 @@ test('managed verification finishes preparation before boot and preserves source
       { command: 'verify' },
       {
         environment: {},
+        checkHostResources: () => {},
         workflow: async () => {
           throw new Error('build failed');
         },
@@ -186,6 +189,37 @@ test('managed verification finishes preparation before boot and preserves source
     /build failed/,
   );
   assert.equal(booted, false);
+  assert.equal(process.env, before);
+});
+test('memory-starved native verification fails before checks, builds or emulator allocation', async () => {
+  const required = Number(TOOLCHAIN.ANDROID_EMULATOR_MEMORY) + 1024;
+  assert.deepEqual(assertAndroidHostMemory(required * 1024 ** 2), {
+    availableMiB: required,
+    requiredMiB: required,
+  });
+  assert.throws(
+    () => assertAndroidHostMemory((required - 1) * 1024 ** 2),
+    /Insufficient host memory.*No emulator was started/,
+  );
+  const before = process.env;
+  let worked = false;
+  await assert.rejects(
+    managedAndroidWorkflow(
+      { command: 'verify' },
+      {
+        environment: {},
+        checkHostResources: () => assertAndroidHostMemory(512 * 1024 ** 2),
+        workflow: async () => {
+          worked = true;
+        },
+        emulator: async () => {
+          worked = true;
+        },
+      },
+    ),
+    /Insufficient host memory/,
+  );
+  assert.equal(worked, false);
   assert.equal(process.env, before);
 });
 test('transient extraction locks are bounded and other filesystem errors are not retried', async () => {

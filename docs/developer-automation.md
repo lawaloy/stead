@@ -156,6 +156,12 @@ locked SDK, unless `--device` is supplied. Compilation and verification do not
 compete with emulator startup. The
 managed journey command uses the same lifecycle as CI. Each run creates fresh
 AVD user data and removes only that owned directory after stopping its emulator.
+Managed validation checks available host memory before preparation and again
+before boot: the pinned 4096 MiB guest needs another 1024 MiB of host reserve
+for the API, Metro and Maestro. Insufficient memory fails before emulator
+allocation with an actionable message; close unused applications or pause
+other test runs before retrying. This preflight does not guarantee emulator
+health or attribute every SystemUI failure to memory pressure.
 It checks boot and
 window focus through thirty seconds of stable startup before fixtures, reports blocking system dialogs as infrastructure
 failures, retains emulator logs, and never dismisses dialogs automatically.

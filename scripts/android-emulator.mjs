@@ -28,6 +28,19 @@ export const assertAndroidUiHealthy = (windows) => {
   return !!focus && focus !== 'null';
 };
 
+export const assertAndroidHostMemory = (
+  available = process.availableMemory(),
+) => {
+  const availableMiB = Math.floor(available / 1024 ** 2);
+  // Keep room for the API, Metro and Maestro outside the guest allocation.
+  const requiredMiB = Number(TOOLCHAIN.ANDROID_EMULATOR_MEMORY) + 1024;
+  if (availableMiB < requiredMiB)
+    throw new Error(
+      `Insufficient host memory for Android validation: ${availableMiB} MiB available; ${requiredMiB} MiB required (${TOOLCHAIN.ANDROID_EMULATOR_MEMORY} MiB guest + 1024 MiB host reserve). Close unused applications or pause other test runs, then retry. No emulator was started.`,
+    );
+  return { availableMiB, requiredMiB };
+};
+
 export const androidSdkEnvironment = () => {
   const sdk = repositorySdk();
   sdkReceipt(sdk);
@@ -56,6 +69,7 @@ export const androidSdkEnvironment = () => {
 };
 
 export const withAndroidEmulator = async (operation) => {
+  console.log('Android host memory:', assertAndroidHostMemory());
   await checkJsToolchain();
   const env = androidSdkEnvironment();
   const sdk = env.ANDROID_HOME;
@@ -222,13 +236,15 @@ export const managedAndroidWorkflow = async (
   {
     workflow,
     emulator = withAndroidEmulator,
-    environment = androidSdkEnvironment(),
+    environment,
+    checkHostResources = assertAndroidHostMemory,
   } = {},
 ) => {
   const previous = process.env;
-  process.env = environment;
   options = { ...options, platform: 'android' };
   try {
+    checkHostResources();
+    process.env = environment ?? androidSdkEnvironment();
     workflow ??= (await import('./native-workflow.mjs')).nativeWorkflow;
     // Keep compilation and security/unit checks from competing with Android startup.
     const prepared = await workflow({ ...options, prepareOnly: true });
