@@ -41,14 +41,12 @@ export const assertAndroidHostMemory = (
   return { availableMiB, requiredMiB };
 };
 
+const androidAvdHome = (sdk) =>
+  join(ROOT, '.tmp/android-avds', sdkReceipt(sdk).digest.slice(0, 16));
+
 export const androidSdkEnvironment = () => {
   const sdk = repositorySdk();
-  sdkReceipt(sdk);
-  const home = join(
-    ROOT,
-    '.tmp/android-avds',
-    sdkReceipt(sdk).digest.slice(0, 16),
-  );
+  const home = androidAvdHome(sdk);
   return {
     ...process.env,
     ANDROID_HOME: sdk,
@@ -72,9 +70,10 @@ export const withAndroidEmulator = async (operation) => {
   console.log('Android host memory:', assertAndroidHostMemory());
   await checkJsToolchain();
   const env = androidSdkEnvironment();
-  const sdk = env.ANDROID_HOME;
-  mkdirSync(env.ANDROID_AVD_HOME, { recursive: true });
-  const home = mkdtempSync(join(env.ANDROID_AVD_HOME, 'run-'));
+  const sdk = repositorySdk();
+  const base = androidAvdHome(sdk);
+  mkdirSync(base, { recursive: true });
+  const home = mkdtempSync(join(base, 'run-'));
   env.ANDROID_AVD_HOME = home;
   const name = 'stead-native-api34';
   mkdirSync(home, { recursive: true });
