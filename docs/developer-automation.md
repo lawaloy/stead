@@ -155,7 +155,10 @@ build before creating, cold-booting and stopping a dedicated emulator from the
 locked SDK, unless `--device` is supplied. Compilation and verification do not
 compete with emulator startup. The
 verification build uses Gradle's `--no-daemon` mode so its build JVM exits
-before the emulator starts instead of retaining memory between builds. The
+before the emulator starts instead of retaining memory between builds. Kotlin
+compiles inside that JVM. An init script records its process identifier, and
+the runner waits for the process to exit even after the Gradle client returns.
+A stuck build JVM blocks startup. The
 managed journey command uses the same lifecycle as CI. Each run creates fresh
 AVD user data and removes only that owned directory after stopping its emulator.
 Managed validation checks available host memory before preparation and again

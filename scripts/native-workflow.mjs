@@ -27,6 +27,7 @@ import {
   managedAndroidWorkflow,
 } from './android-emulator.mjs';
 import { iosEnvironment } from './ios-setup.mjs';
+import { buildAndroidGradle } from './native-gradle.mjs';
 import {
   TOOLCHAIN,
   assertToolVersion,
@@ -132,21 +133,11 @@ const buildApp = async (platform, signal, projectReady = false) => {
       wrapper.match(/gradle-([\d.]+)-bin\.zip/)?.[1],
       TOOLCHAIN.GRADLE_VERSION,
     );
-    await runCommand(
-      join(
-        MOBILE,
-        'android',
-        process.platform === 'win32' ? 'gradlew.bat' : 'gradlew',
-      ),
-      [
-        'app:assembleDebug',
-        '--no-daemon',
-        '--max-workers=2',
-        '-Pandroid.builder.sdkDownload=false',
-        `-PreactNativeArchitectures=${TOOLCHAIN.ANDROID_ARCH}`,
-      ],
-      { cwd: join(MOBILE, 'android'), env, signal },
-    );
+    await buildAndroidGradle({
+      directory: join(MOBILE, 'android'),
+      env,
+      signal,
+    });
     const app = join(destination, 'stead-debug.apk');
     copyFileSync(
       join(
