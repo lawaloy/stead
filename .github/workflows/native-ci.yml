@@ -408,9 +408,9 @@ jobs:
       - name: Run iOS native journey
         run: |
           npm run native:setup:ios
-          node scripts/native-workflow.mjs test --platform ios --database-ready --app mobile/.ci/ios/mobile.app
+          node scripts/native-workflow.mjs test --platform ios --database-ready --repeat 3 --app mobile/.ci/ios/mobile.app
       - uses: actions/upload-artifact@v4
-        if: failure()
+        if: always()
         with:
           name: ios-native-journey-logs
           include-hidden-files: true

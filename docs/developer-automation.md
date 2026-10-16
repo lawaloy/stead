@@ -121,6 +121,12 @@ iOS cold-start journey. Initial test setup clears the entire simulator
 keychain; the runner refuses personal simulators. The signed-in restart step
 preserves the keychain and must restore the session.
 
+iOS driver startup has the same four-minute limit locally and in CI, pinned
+as `IOS_DRIVER_STARTUP_TIMEOUT_MS`. Cold simulator XCTest launches have exceeded
+Maestro's two-minute default. This allowance affects driver startup only;
+journey assertions retain their existing limits. CI runs three iOS attempts
+and fails if any attempt fails, retaining the original diagnostics.
+
 `verify:local` and the pre-push hook also run `dependencies:check` with the
 same blocking audit policy used in dependency CI. Registry advisories require
 network access and can change without a source change.

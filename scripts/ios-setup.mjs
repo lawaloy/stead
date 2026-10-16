@@ -6,6 +6,9 @@ import { runCommand } from './process-utils.mjs';
 
 export const iosEnvironment = (env = process.env) => ({
   ...env,
+  // Cold hosted simulators can finish launching XCTest after Maestro's
+  // two-minute default. This bounds driver startup, not app assertions.
+  MAESTRO_DRIVER_STARTUP_TIMEOUT: TOOLCHAIN.IOS_DRIVER_STARTUP_TIMEOUT_MS,
   DEVELOPER_DIR:
     env.DEVELOPER_DIR ||
     `/Applications/Xcode_${TOOLCHAIN.XCODE_VERSION}.app/Contents/Developer`,
@@ -34,12 +37,12 @@ export const prepareIos = async ({
     throw new Error(
       'iOS setup requires a Mac. No simulator execution is claimed on this host.',
     );
-  const developer = iosEnvironment(env).DEVELOPER_DIR;
+  const selected = iosEnvironment(env);
+  const developer = selected.DEVELOPER_DIR;
   if (!exists(developer))
     throw new Error(
       `Install Xcode ${TOOLCHAIN.XCODE_VERSION} (${TOOLCHAIN.XCODE_BUILD}), or set DEVELOPER_DIR to that installation.`,
     );
-  const selected = { ...env, DEVELOPER_DIR: developer };
   checkXcodeVersion(
     await execute('xcodebuild', ['-version'], { env: selected, quiet: true }),
   );
