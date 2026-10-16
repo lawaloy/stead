@@ -31,8 +31,7 @@ workflow, see [Contributing](../CONTRIBUTING.md).
 | `npm run test:native:android:managed`                       | Run the journey with an automatically managed fresh Android emulator.                                         |
 | `npm run test:native:android:container`                     | Build and run Android in CI's controlled Linux/KVM container.                                                 |
 | `npm run security:codeql:local`                             | Run the pinned CodeQL bundle and fail on unsuppressed warnings/errors.                                        |
-| `npm run verify:local -- --platform android`                | Run audits, `verify:full`, CodeQL, a native source build, and UI journeys.                                    |
-| `npm run hooks:install -- --platform android`               | Install the repository's pre-push gate for the selected native platform.                                      |
+| `npm run validate -- --platform android`                    | Run audits, `verify:full`, CodeQL, a native source build, and UI journeys.                                    |
 
 Package-level scripts remain available for focused iteration. Use the root
 gates before pushing; they enforce ordering and test database isolation.
@@ -93,7 +92,7 @@ keychain entitlements. `IOS_DRIVER_STARTUP_TIMEOUT_MS` sets the shared driver
 startup budget; app assertions keep their own limits.
 
 Use `--platform ios` for iOS or `--platform all` where both pinned environments
-are available. Omitting the platform from `verify:local` requires both.
+are available. Omitting the platform from `validate` requires both.
 Unavailable platforms fail rather than skip. Android results provide Android
 evidence only. `--device` selects a prepared Android emulator; `--app <path>`
 reuses an existing artifact and must be reported separately from a source build.
@@ -108,27 +107,25 @@ Evidence stays in ignored directories:
   `memory.json` with peak usage and OOM counters.
 - `.tmp/codeql-validation/`: source snapshot, database, SARIF and finding count.
 
-## Pre-push Defense
+## Local Validation
 
-For CI's controlled Android runner, run and install the gate:
+Run the complete gate explicitly before pushing native changes. For CI's
+controlled Android runner:
 
 ```bash
-npm run verify:local -- --platform android --android-runner container --api-port 3001 --repeat 3
-npm run hooks:install -- --platform android --android-runner container --api-port 3001 --repeat 3
+npm run validate -- --platform android --android-runner container --api-port 3001 --repeat 3
 ```
 
-Omit `--android-runner container` to use a managed host emulator. Installation
-stores tool paths and platform settings in local Git config and refuses to
-replace a custom hooks path. Existing hook users can chain
-`node scripts/pre-push-verification.mjs`, forwarding Git's standard input.
+Omit `--android-runner container` to use a managed host emulator. Use
+`--platform ios` on a Mac. `validate` replaces the previous `verify:local` command.
+Validation runs independently of Git; `git push` does not start tests or
+emulators. Rerun the relevant gate after source changes and report the tested
+commit and platforms in the PR. CI checks still gate merging.
 
-The hook requires a clean checkout of the ref being pushed. It uses CI's
-[native path policy](../.github/native-ci-paths.yml): native changes run
-`verify:local`; other changes run audits, `verify:full` and CodeQL. New branches
-compare against their merge base with `origin/main`; keep that ref current.
-Later pushes also include the branch's full diff from that base. Without
-options, hook installation requires both native platforms and one attempt.
-CI remains an independent gate because Git hooks can be bypassed.
+Earlier checkouts that installed the removed repository hook can clear its
+local configuration with `git config --local --unset core.hooksPath` if
+`git config --get core.hooksPath` reports `.githooks`. Preserve custom hook
+configurations.
 
 A Mac must run the iOS gate before pushing to provide local iOS evidence.
 Without one, require macOS CI results before merging and report that local gap.

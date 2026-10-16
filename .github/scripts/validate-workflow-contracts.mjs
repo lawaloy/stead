@@ -116,7 +116,7 @@ for (const [output, pin] of [
   );
 }
 assert.equal(
-  JSON.parse(rootPackage).scripts['verify:local'],
+  JSON.parse(rootPackage).scripts.validate,
   'node scripts/native-workflow.mjs verify',
   'The complete local gate must use the shared native runner.',
 );

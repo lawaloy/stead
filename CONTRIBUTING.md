@@ -51,9 +51,9 @@ priorities belong in [Project Status](docs/project-status.md).
    npm run verify:full
    ```
 
-   For native-impacting changes, run the native and security gate and install
-   the pre-push guardrail described in
-   [Developer Automation](docs/developer-automation.md#pre-push-defense).
+   For native-impacting changes, run the explicit `npm run validate` gate
+   described in
+   [Developer Automation](docs/developer-automation.md#local-validation).
    Report each native platform actually tested; an Android pass does not
    certify iOS.
 
@@ -102,7 +102,8 @@ priorities belong in [Project Status](docs/project-status.md).
 ## Validation Strategy
 
 Use focused package-level commands while iterating and the appropriate
-`verify:full` / `verify:local` gate for pre-push evidence. The canonical breakdown of automated layers, safety
+`verify:full` / `validate` gate before pushing. Git push does not run tests.
+The canonical breakdown of automated layers, safety
 guarantees, native CI boundaries, and intentionally manual release gates lives
 only in [Developer Automation](docs/developer-automation.md).
 

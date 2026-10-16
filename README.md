@@ -50,10 +50,11 @@ change.
 ```bash
 npm run verify
 npm run verify:full
-npm run verify:local -- --platform android
+npm run validate -- --platform android
 ```
 
-`verify:local` adds CodeQL and actual native builds/UI tests to the base gate.
+`validate` adds dependency audits, CodeQL and actual native builds/UI tests to
+the base gate. Run it explicitly before pushing; Git push does not run tests.
 Select `--platform all` on a Mac configured for both platforms. Platform
 selection reports only the platforms executed.
 
