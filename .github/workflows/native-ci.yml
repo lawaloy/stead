@@ -288,57 +288,26 @@ jobs:
           cache-dependency-path: |
             api/package-lock.json
             mobile/package-lock.json
-      - uses: actions/setup-java@v6
-        with:
-          distribution: temurin
-          java-version: ${{ needs.config.outputs.java_version }}
       - name: Download Android simulator app
         uses: actions/download-artifact@v4
         with:
           name: android-simulator-app
           path: mobile/.ci/android
-      - name: Restore Android Metro transforms
-        uses: actions/cache@v4
-        with:
-          path: mobile/.cache/metro
-          key: metro-android-v1-${{ hashFiles('mobile/package-lock.json', 'mobile/metro.config.js', 'mobile/babel.config.js') }}
-      - name: Cache Maestro CLI
-        uses: actions/cache@v4
-        with:
-          path: ~/.maestro
-          key: maestro-ubuntu-${{ needs.config.outputs.maestro_version }}-${{ needs.config.outputs.maestro_sha256 }}-v3
-      - name: Enable KVM for Android emulator
-        run: |
-          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
-          sudo udevadm control --reload-rules
-          sudo udevadm trigger --name-match=kvm
-      - name: Install dependencies and prepare API
+      - name: Install shared runner command
         run: |
           npm install --global npm@${{ needs.config.outputs.npm_version }}
           npm ci
-          npm ci --prefix api
-          npm ci --prefix mobile
-      - name: Install Maestro
-        run: bash .github/scripts/install-maestro.sh
-      - name: Cache locked Android SDK
-        uses: actions/cache@v4
-        with:
-          path: .tmp/android-sdk
-          key: android-sdk-${{ runner.os }}-${{ hashFiles('.github/android-sdk-lock.json') }}
-      - name: Install locked Android SDK
-        run: npm run tools:install:android -- --accept-licenses
       - name: Run Android native journey
-        run: npm run test:native:android:managed -- --database-ready --app mobile/.ci/android/stead-debug.apk
+        run: npm run test:native:android:container -- --database-ready --app mobile/.ci/android/stead-debug.apk
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
           name: android-native-journey-logs
           include-hidden-files: true
           path: |
-            .tmp/native-validation
-            .tmp/emulator-validation
-            ~/.maestro/tests
-            mobile/.expo
+            .tmp/native-container/**/attempt-*/**
+            .tmp/native-container/**/build.log
+            .tmp/native-container/**/source.json
           retention-days: 7
 
   native-ios:

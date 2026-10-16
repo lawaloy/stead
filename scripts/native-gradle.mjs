@@ -29,7 +29,14 @@ export const waitForBuildExit = async (pid, timeout = 30_000) => {
   }
 };
 
-export const buildAndroidGradle = async ({ directory, env, signal }) => {
+export const buildAndroidGradle = async ({
+  directory,
+  sdk,
+  env,
+  signal,
+  execute = runCommand,
+}) => {
+  if (!sdk) throw new Error('The checked Android SDK is required for Gradle.');
   mkdirSync(join(ROOT, '.tmp'), { recursive: true });
   const state = mkdtempSync(join(ROOT, '.tmp/native-gradle-'));
   const pidFile = join(state, 'build.pid');
@@ -40,7 +47,7 @@ export const buildAndroidGradle = async ({ directory, env, signal }) => {
   );
   await withCleanup(
     () =>
-      runCommand(
+      execute(
         join(
           directory,
           process.platform === 'win32' ? 'gradlew.bat' : 'gradlew',
@@ -60,6 +67,8 @@ export const buildAndroidGradle = async ({ directory, env, signal }) => {
           cwd: directory,
           env: {
             ...env,
+            ANDROID_HOME: sdk,
+            ANDROID_SDK_ROOT: sdk,
             'ORG_GRADLE_PROJECT_kotlin.compiler.execution.strategy':
               'in-process',
           },

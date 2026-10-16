@@ -22,9 +22,32 @@ import { verifyArchive, moveExtractedPackage } from './archive-utils.mjs';
 import {
   assertAndroidUiHealthy,
   assertAndroidHostMemory,
+  waitForAndroidHostMemory,
   managedAndroidWorkflow,
 } from './android-emulator.mjs';
 import { checkXcodeVersion, prepareIos } from './ios-setup.mjs';
+
+test('Android startup waits for reclaimed memory but never lowers its allocation requirement', async () => {
+  const requiredMiB = Number(TOOLCHAIN.ANDROID_EMULATOR_MEMORY) + 1024;
+  let readings = 0;
+  const result = await waitForAndroidHostMemory(
+    () => (++readings === 1 ? requiredMiB - 1 : requiredMiB) * 1024 ** 2,
+    50,
+  );
+  assert.equal(readings, 2);
+  assert.deepEqual(result, { availableMiB: requiredMiB, requiredMiB });
+  await assert.rejects(
+    waitForAndroidHostMemory(() => (requiredMiB - 1) * 1024 ** 2, 20),
+    /Insufficient host memory/,
+  );
+  const failure = new Error('Host resource inspection failed');
+  await assert.rejects(
+    waitForAndroidHostMemory(() => {
+      throw failure;
+    }),
+    (error) => error === failure,
+  );
+});
 
 test('SDK archive lock agrees with every shared SDK version and uses immutable URLs and hashes', () => {
   const { lock } = sdkLock();

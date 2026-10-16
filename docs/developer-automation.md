@@ -25,6 +25,7 @@ environment files, and gives database-backed tests their own schemas.
 | `npm run tools:install:android -- --accept-licenses`        | Installs the checksum-locked SDK into dedicated repository tooling storage.                                                                                                                                 |
 | `npm run native:setup:ios`                                  | Selects the pinned Xcode build and verifies/creates the dedicated pinned simulator on a Mac.                                                                                                                |
 | `npm run test:native:android:managed`                       | Owns a pinned emulator lifecycle and runs the same native journey recipe as CI.                                                                                                                             |
+| `npm run test:native:android:container`                     | Builds the controlled Linux runner and source APK, then runs each attempt in its own KVM container and fresh emulator. Requires a Linux Docker engine exposing `/dev/kvm`.                                  |
 | `npm run native:doctor -- --platform android`               | Checks the pinned Node/npm/Maestro versions, Java, SDK, and a booted API 34 emulator before changing anything.                                                                                              |
 | `npm run native:build:android` / `npm run native:build:ios` | Builds an installable debug APK or signed simulator app from source using the same build recipe as native CI.                                                                                               |
 | `npm run test:native:android` / `npm run test:native:ios`   | Builds the native app, creates a fresh isolated schema, runs the actual Maestro UI journey, and cleans up owned services, schema, and emulator settings.                                                    |
@@ -150,6 +151,38 @@ npm run verify:local -- --platform android --api-port 3001
 npm run test:native:android:managed -- --api-port 3001 --repeat 3
 ```
 
+For the controlled Linux Android runner used by native CI:
+
+```bash
+npm run verify:local -- --platform android --android-runner container --api-port 3001 --repeat 3
+npm run hooks:install -- --platform android --android-runner container --api-port 3001 --repeat 3
+```
+
+This runner requires an x86_64 Linux Docker engine with usable `/dev/kvm`; some
+Windows WSL2 installations expose it, while others do not. Its container base
+image is pinned by digest and Debian packages come from a fixed snapshot.
+The Java archive, Node/npm, SDK archives, Maestro and application dependency
+locks use the shared local/CI pins. The first image build downloads and installs
+those tools; subsequent local runs reuse Docker layers. Native builds finish
+inside the image build before an emulator is allocated. The host still runs
+the base verification and CodeQL gates. CI transfers its separately built APK
+with `--app`; this is recorded as provided-artifact evidence.
+
+Each container attempt gets fresh emulator data, API and Metro processes, and
+an isolated database schema. The database proxy listens only on container
+loopback and forwards to the local Compose database (or CI's local service).
+Containers receive KVM access without privileged mode, a Docker socket mount,
+or published application ports. The runner allows graceful fixture cleanup
+before removing its owned container. Logs, source identity, and the exact tested
+image ID remain under `.tmp/native-container/`. Any failed attempt blocks the
+command; retries never overwrite an earlier failure. The image definition and
+installers belong in Git; built images and downloaded tools do not.
+
+The container freezes userspace and tool versions. KVM, the host kernel,
+available CPU/RAM and Docker engine health remain host requirements. It does
+not provide local iOS execution. A passing container gate certifies only the
+selected Android source and journeys; iOS still requires the separate macOS gate.
+
 For Android, `verify:local` finishes its audits, base checks, CodeQL and source
 build before creating, cold-booting and stopping a dedicated emulator from the
 locked SDK, unless `--device` is supplied. Compilation and verification do not
@@ -162,7 +195,8 @@ A stuck build JVM blocks startup. The
 managed journey command uses the same lifecycle as CI. Each run creates fresh
 AVD user data and removes only that owned directory after stopping its emulator.
 Managed validation checks available host memory before preparation and again
-before boot: the pinned 4096 MiB guest needs another 1024 MiB of host reserve
+before boot. After build cleanup it waits up to thirty seconds for the host to
+reclaim memory, without lowering the allocation requirement. The pinned 4096 MiB guest needs another 1024 MiB of host reserve
 for the API, Metro and Maestro. Insufficient memory fails before emulator
 allocation with an actionable message; close unused applications or pause
 other test runs before retrying. This preflight does not guarantee emulator

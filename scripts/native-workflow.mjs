@@ -91,6 +91,26 @@ export const repeatJourneys = async (count, operation, signal) => {
   return attempts;
 };
 
+export const nativeSourceIdentity = async (options, execute = runCommand) => ({
+  ...(options.source ?? {
+    commit: (
+      await execute('git', ['rev-parse', 'HEAD'], {
+        cwd: ROOT,
+        quiet: true,
+        stdoutOnly: true,
+      })
+    ).trim(),
+    workingTreeClean: !(
+      await execute('git', ['status', '--porcelain'], {
+        cwd: ROOT,
+        quiet: true,
+        stdoutOnly: true,
+      })
+    ).trim(),
+  }),
+  build: options.sourceBuilt || !options.app ? 'source' : 'provided-artifact',
+});
+
 export const prepareIosSimulator = async (id, app, execute = runCommand) => {
   const listing = JSON.parse(
     await execute(
@@ -107,7 +127,7 @@ export const prepareIosSimulator = async (id, app, execute = runCommand) => {
 };
 
 const buildApp = async (platform, signal, projectReady = false) => {
-  await checkNativeToolchain(platform, {
+  const { tools } = await checkNativeToolchain(platform, {
     requireDevice: false,
     requireMaestro: false,
     execute: (command, args, options) =>
@@ -135,6 +155,7 @@ const buildApp = async (platform, signal, projectReady = false) => {
     );
     await buildAndroidGradle({
       directory: join(MOBILE, 'android'),
+      sdk: tools.sdk,
       env,
       signal,
     });
@@ -430,7 +451,11 @@ export const nativeWorkflow = async (options) => {
         : await buildApp('android', options.signal, options.projectReady);
       if (!existsSync(app))
         throw new Error(`Native app artifact is missing: ${app}`);
-      return { app, sourceBuilt: !options.app, metadata: checked[0].metadata };
+      return {
+        app,
+        sourceBuilt: options.sourceBuilt || !options.app,
+        metadata: checked[0].metadata,
+      };
     }
     if (!options.databaseReady) {
       await runCommand('npm', ['run', 'db:start'], {
@@ -454,24 +479,7 @@ export const nativeWorkflow = async (options) => {
       `${Date.now()}-${randomBytes(4).toString('hex')}`,
     );
     const results = [];
-    const source = {
-      commit: (
-        await runCommand('git', ['rev-parse', 'HEAD'], {
-          cwd: ROOT,
-          quiet: true,
-          stdoutOnly: true,
-        })
-      ).trim(),
-      workingTreeClean: !(
-        await runCommand('git', ['status', '--porcelain'], {
-          cwd: ROOT,
-          quiet: true,
-          stdoutOnly: true,
-        })
-      ).trim(),
-      build:
-        options.sourceBuilt || !options.app ? 'source' : 'provided-artifact',
-    };
+    const source = await nativeSourceIdentity(options);
     try {
       const postgres = await checkPostgresVersion(pool);
       for (let index = 0; index < platforms.length; index += 1) {
@@ -535,11 +543,13 @@ export const nativeWorkflow = async (options) => {
 if (resolve(process.argv[1] ?? '') === fileURLToPath(import.meta.url)) {
   const options = parseNativeArguments(process.argv.slice(2));
   const operation =
-    options.command === 'verify' &&
-    options.platform === 'android' &&
-    !options.device
-      ? managedAndroidWorkflow
-      : nativeWorkflow;
+    options.androidRunner === 'container'
+      ? (await import('./android-container.mjs')).containerAndroidWorkflow
+      : options.command === 'verify' &&
+          options.platform === 'android' &&
+          !options.device
+        ? managedAndroidWorkflow
+        : nativeWorkflow;
   operation(options).catch((error) => {
     console.error(`Native verification failed: ${error.message}`);
     process.exitCode = 1;

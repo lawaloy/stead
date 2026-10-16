@@ -74,7 +74,7 @@ assert.match(
 );
 assert.match(
   androidJourney,
-  /native-workflow\.mjs" test --platform android --database-ready/,
+  /android-container\.mjs" --database-ready/,
   'CI Android journeys must reuse the local runner.',
 );
 assert.match(
@@ -156,8 +156,8 @@ assert.match(
 );
 assert.match(
   nativeWorkflow,
-  /npm run test:native:android:managed/,
-  'Native CI must reuse the locally tested managed emulator lifecycle.',
+  /npm run test:native:android:container/,
+  'Native CI must reuse the locally tested controlled container runner.',
 );
 assert.match(
   nativeWorkflow,

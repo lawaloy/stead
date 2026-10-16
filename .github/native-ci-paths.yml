@@ -18,6 +18,7 @@ native:
   - 'contracts/**'
   - '.github/native-ci-paths.yml'
   - '.github/workflows/native-ci.yml'
+  - '.github/native-container/**'
   - '.github/scripts/run-android-native-journey.sh'
   - '.github/scripts/build-ios-simulator-app.sh'
   - '.github/scripts/install-maestro.sh'

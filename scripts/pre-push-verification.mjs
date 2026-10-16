@@ -68,7 +68,8 @@ const setting = async (name, fallback) => {
 export const installHook = async (args) => {
   let platform = 'all',
     port = 3000,
-    repeat = 1;
+    repeat = 1,
+    androidRunner = 'host';
   while (args.length) {
     const name = args.shift(),
       value = args.shift();
@@ -76,9 +77,10 @@ export const installHook = async (args) => {
       platform = value;
     else if (name === '--api-port') port = parsePort(value);
     else if (name === '--repeat') repeat = value;
+    else if (name === '--android-runner') androidRunner = value;
     else
       throw new Error(
-        'Use hooks:install -- --platform android|ios|all --api-port 3000 --repeat 1.',
+        'Use hooks:install -- --platform android|ios|all --api-port 3000 --repeat 1 --android-runner host|container.',
       );
   }
   repeat = parseNativeArguments([
@@ -89,6 +91,8 @@ export const installHook = async (args) => {
     String(port),
     '--repeat',
     String(repeat),
+    '--android-runner',
+    androidRunner,
   ]).repeat;
   const existing = await setting('core.hooksPath', '');
   if (existing && existing !== '.githooks')
@@ -101,6 +105,7 @@ export const installHook = async (args) => {
   await git(['config', '--local', 'stead.nativePlatforms', platform]);
   await git(['config', '--local', 'stead.nativeApiPort', String(port)]);
   await git(['config', '--local', 'stead.nativeRepeat', String(repeat)]);
+  await git(['config', '--local', 'stead.androidRunner', androidRunner]);
   const toolSettings = {
     npmCli: process.env.STEAD_NPM_CLI || process.env.npm_execpath,
     javaHome: process.env.JAVA_HOME,
@@ -111,7 +116,7 @@ export const installHook = async (args) => {
   for (const [name, value] of Object.entries(toolSettings))
     if (value) await git(['config', '--local', `stead.${name}`, value]);
   console.log(
-    `Installed pre-push verification: native platform=${platform}, API port=${port}, attempts=${repeat}. ${platform === 'all' ? 'Both native platforms are required.' : 'The other platform still requires separate verification.'}`,
+    `Installed pre-push verification: native platform=${platform}, Android runner=${androidRunner}, API port=${port}, attempts=${repeat}. ${platform === 'all' ? 'Both native platforms are required.' : 'The other platform still requires separate verification.'}`,
   );
 };
 
@@ -189,6 +194,8 @@ export const verifyPush = async (
         String(port),
         '--repeat',
         String(repeat),
+        '--android-runner',
+        await setting('stead.androidRunner', 'host'),
       ],
       { cwd: ROOT, env },
     );

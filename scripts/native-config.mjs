@@ -92,6 +92,7 @@ export const parseNativeArguments = (args) => {
     metroPort: 8081,
     phone: '08030000001',
     databaseReady: false,
+    androidRunner: 'host',
   };
   const names = new Set([
     'platform',
@@ -101,6 +102,7 @@ export const parseNativeArguments = (args) => {
     'phone',
     'device',
     'app',
+    'android-runner',
   ]);
   while (args.length) {
     const arg = args.shift();
@@ -123,11 +125,24 @@ export const parseNativeArguments = (args) => {
     if (!value || value.startsWith('--'))
       throw new Error(`Missing value for --${name}.`);
     options[
-      { 'api-port': 'apiPort', 'metro-port': 'metroPort' }[name] ?? name
+      {
+        'api-port': 'apiPort',
+        'metro-port': 'metroPort',
+        'android-runner': 'androidRunner',
+      }[name] ?? name
     ] = value;
   }
   if (!['android', 'ios', 'all'].includes(options.platform))
     throw new Error('Platform must be android, ios, or all.');
+  if (!['host', 'container'].includes(options.androidRunner))
+    throw new Error('Android runner must be host or container.');
+  if (
+    options.androidRunner === 'container' &&
+    (options.platform !== 'android' || options.device)
+  )
+    throw new Error(
+      'The container runner requires an explicit Android selection and owns its device.',
+    );
   if (options.platform === 'all' && options.device)
     throw new Error('Select one platform when choosing a device.');
   if (options.platform === 'all' && options.app)

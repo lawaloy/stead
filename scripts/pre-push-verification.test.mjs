@@ -63,6 +63,8 @@ test('later pushes still run native checks for native changes already present on
     '3000',
     '--repeat',
     '3',
+    '--android-runner',
+    'host',
   ]);
 });
 

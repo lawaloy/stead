@@ -41,6 +41,22 @@ export const assertAndroidHostMemory = (
   return { availableMiB, requiredMiB };
 };
 
+export const waitForAndroidHostMemory = async (
+  available = process.availableMemory,
+  timeout = 30_000,
+) => {
+  const deadline = Date.now() + timeout;
+  while (true) {
+    const bytes = available();
+    try {
+      return assertAndroidHostMemory(bytes);
+    } catch (error) {
+      if (Date.now() >= deadline) throw error;
+      await delay(Math.min(1000, deadline - Date.now()));
+    }
+  }
+};
+
 const androidAvdHome = (sdk) =>
   join(ROOT, '.tmp/android-avds', sdkReceipt(sdk).digest.slice(0, 16));
 
@@ -67,7 +83,9 @@ export const androidSdkEnvironment = () => {
 };
 
 export const withAndroidEmulator = async (operation) => {
-  console.log('Android host memory:', assertAndroidHostMemory());
+  // Windows can reclaim build memory shortly after the JVM has exited.
+  // Keep the same allocation threshold and fail if resources do not recover.
+  console.log('Android host memory:', await waitForAndroidHostMemory());
   await checkJsToolchain();
   const env = androidSdkEnvironment();
   const sdk = repositorySdk();
@@ -265,14 +283,17 @@ export const managedAndroidWorkflow = async (
 
 if (resolve(process.argv[1] ?? '') === fileURLToPath(import.meta.url)) {
   const { parseNativeArguments } = await import('./native-config.mjs');
-  managedAndroidWorkflow(
-    parseNativeArguments([
-      'test',
-      '--platform',
-      'android',
-      ...process.argv.slice(2),
-    ]),
-  ).catch((error) => {
+  const options = parseNativeArguments([
+    'test',
+    '--platform',
+    'android',
+    ...process.argv.slice(2),
+  ]);
+  const operation =
+    options.androidRunner === 'container'
+      ? (await import('./android-container.mjs')).containerAndroidWorkflow
+      : managedAndroidWorkflow;
+  operation(options).catch((error) => {
     console.error(error.message);
     process.exitCode = 1;
   });
