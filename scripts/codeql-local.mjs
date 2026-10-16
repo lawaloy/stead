@@ -113,8 +113,8 @@ export const scanCodeQL = async ({ signal } = {}) => {
       '--build-mode=none',
       `--source-root=${source}`,
       `--codescanning-config=${config}`,
-      '--threads=2',
-      '--ram=2048',
+      `--threads=${TOOLCHAIN.CODEQL_THREADS}`,
+      `--ram=${TOOLCHAIN.CODEQL_RAM_MB}`,
     ],
     { cwd: ROOT, signal },
   );
@@ -128,8 +128,8 @@ export const scanCodeQL = async ({ signal } = {}) => {
       'codeql/javascript-queries:codeql-suites/javascript-code-scanning.qls',
       '--format=sarifv2.1.0',
       `--output=${report}`,
-      '--threads=2',
-      '--ram=2048',
+      `--threads=${TOOLCHAIN.CODEQL_THREADS}`,
+      `--ram=${TOOLCHAIN.CODEQL_RAM_MB}`,
     ],
     { cwd: ROOT, signal },
   );

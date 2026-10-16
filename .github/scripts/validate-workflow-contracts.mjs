@@ -97,6 +97,24 @@ assert.match(
   /config-file: \.github\/codeql-config\.yml/,
   'CI must use the local CodeQL source scope.',
 );
+for (const feature of ['OVERLAY_ANALYSIS', 'DIFF_INFORMED_QUERIES'])
+  assert.match(
+    codeqlWorkflow,
+    new RegExp(`CODEQL_ACTION_${feature}: 'false'`),
+    'CI must use full analysis like the local CodeQL CLI.',
+  );
+for (const [output, pin] of [
+  ['ram', 'CODEQL_RAM_MB'],
+  ['threads', 'CODEQL_THREADS'],
+]) {
+  assert.match(codeqlWorkflow, new RegExp(`${output}=\\$${pin}`));
+  assert.ok(
+    codeqlWorkflow.includes(
+      output + ': ${{ steps.toolchain.outputs.' + output + ' }}',
+    ),
+    `CI must consume the shared CodeQL ${output} setting.`,
+  );
+}
 assert.equal(
   JSON.parse(rootPackage).scripts['verify:local'],
   'node scripts/native-workflow.mjs verify',

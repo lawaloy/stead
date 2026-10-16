@@ -2,11 +2,150 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { once } from 'node:events';
 import { createServer, connect } from 'node:net';
-import { forwardLocalDatabase } from './android-container-entry.mjs';
-import { containerRunArguments } from './android-container.mjs';
+import {
+  forwardLocalDatabase,
+  containerMemorySnapshot,
+  saveContainerMemory,
+} from './android-container-entry.mjs';
+import {
+  containerRunArguments,
+  runContainerAttempts,
+  checkContainerEngine,
+} from './android-container.mjs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
 import { parseNativeArguments } from './native-config.mjs';
 import { TOOLCHAIN } from './toolchain.mjs';
 import { nativeSourceIdentity } from './native-workflow.mjs';
+import { runCommand } from './process-utils.mjs';
+import { ROOT } from './toolchain.mjs';
+
+test('container preflight requires a Linux engine with room for the runner and engine reserve', () => {
+  checkContainerEngine(`linux ${10 * 1024 ** 3}`);
+  for (const report of [
+    'linux',
+    'linux NaN',
+    `linux ${9 * 1024 ** 3}`,
+    'windows 17179869184',
+  ])
+    assert.throws(() => checkContainerEngine(report));
+  assert.throws(
+    () => checkContainerEngine('Docker Desktop is manually paused'),
+    /manually paused/,
+  );
+});
+
+test('container evidence records cgroup peak and OOM kills and distinguishes unavailable counters', () => {
+  const directory = mkdtempSync(join(tmpdir(), 'stead memory evidence '));
+  try {
+    assert.deepEqual(containerMemorySnapshot(directory), {
+      currentBytes: null,
+      peakBytes: null,
+      limitBytes: null,
+      events: null,
+    });
+    for (const [name, value] of Object.entries({
+      'memory.current': '1073741824',
+      'memory.peak': '7516192768',
+      'memory.max': '9663676416',
+      'memory.events': 'low 0\nhigh 0\nmax 12\noom 1\noom_kill 1\n',
+    }))
+      writeFileSync(join(directory, name), value);
+    assert.deepEqual(containerMemorySnapshot(directory), {
+      currentBytes: 1073741824,
+      peakBytes: 7516192768,
+      limitBytes: 9663676416,
+      events: { low: 0, high: 0, max: 12, oom: 1, oom_kill: 1 },
+    });
+    const output = join(directory, 'saved.json');
+    assert.throws(
+      () => saveContainerMemory(output, directory),
+      /exhausting its memory budget/,
+    );
+    assert.equal(JSON.parse(readFileSync(output, 'utf8')).events.oom_kill, 1);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test('the real native CLI loads the container backend before rejecting an unsupported database', async () => {
+  await assert.rejects(
+    runCommand(
+      process.execPath,
+      [
+        join(ROOT, 'scripts/native-workflow.mjs'),
+        'verify',
+        '--platform',
+        'android',
+        '--android-runner',
+        'container',
+      ],
+      {
+        cwd: ROOT,
+        quiet: true,
+        env: { ...process.env, STEAD_NATIVE_DATABASE_URL: 'unsupported' },
+      },
+    ),
+    /remove STEAD_NATIVE_DATABASE_URL/,
+  );
+});
+
+test('container repeats preserve a middle failure, finish later diagnostics and still reject the command', async () => {
+  const output = mkdtempSync(join(tmpdir(), 'stead container attempts '));
+  const executed = [];
+  try {
+    await assert.rejects(
+      runContainerAttempts(
+        3,
+        async (attempt) => {
+          executed.push(attempt);
+          if (attempt === 2) throw new Error('Journey assertion failed');
+        },
+        { output },
+      ),
+      /2: Journey assertion failed/,
+    );
+    assert.deepEqual(executed, [1, 2, 3]);
+    assert.deepEqual(
+      JSON.parse(readFileSync(join(output, 'attempts.json'), 'utf8')),
+      [
+        { attempt: 1, status: 'passed' },
+        { attempt: 2, status: 'failed', error: 'Journey assertion failed' },
+        { attempt: 3, status: 'passed' },
+      ],
+    );
+  } finally {
+    rmSync(output, { recursive: true, force: true });
+  }
+});
+
+test('cancelling container repeats records completed work and stops subsequent attempts', async () => {
+  const output = mkdtempSync(join(tmpdir(), 'stead container cancellation '));
+  const controller = new AbortController();
+  const reason = new Error('Stop requested');
+  const executed = [];
+  try {
+    await assert.rejects(
+      runContainerAttempts(
+        3,
+        async (attempt) => {
+          executed.push(attempt);
+          controller.abort(reason);
+        },
+        { output, signal: controller.signal },
+      ),
+      (error) => error === reason,
+    );
+    assert.deepEqual(executed, [1]);
+    assert.deepEqual(
+      JSON.parse(readFileSync(join(output, 'attempts.json'), 'utf8')),
+      [{ attempt: 1, status: 'passed' }],
+    );
+  } finally {
+    rmSync(output, { recursive: true, force: true });
+  }
+});
 
 test('an isolated image preserves source identity and distinguishes source-built and transferred APK evidence without Git', async () => {
   const source = { commit: 'a'.repeat(40), workingTreeClean: false };
@@ -127,6 +266,8 @@ test('the container limits access to KVM and keeps the same Node patch as the ho
   });
   assert.ok(args.includes('--init'));
   assert.ok(args.includes('--device=/dev/kvm'));
+  assert.ok(args.includes('--memory=9g'));
+  assert.ok(args.includes('--memory-swap=9g'));
   assert.deepEqual(args.slice(-4), [
     '--api-port',
     '3001',

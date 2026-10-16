@@ -159,7 +159,12 @@ npm run hooks:install -- --platform android --android-runner container --api-por
 ```
 
 This runner requires an x86_64 Linux Docker engine with usable `/dev/kvm`; some
-Windows WSL2 installations expose it, while others do not. Its container base
+Windows WSL2 installations expose it, while others do not. It needs at least
+10 GiB of engine memory: the runner has a 9 GiB limit covering the
+4 GiB guest, emulator overhead, Metro, Maestro and API, with 1 GiB engine reserve.
+Each attempt retains cgroup memory peak, limit and OOM counters in `memory.json`;
+an OOM kill fails the attempt even if the journey otherwise succeeds.
+The container base
 image is pinned by digest and Debian packages come from a fixed snapshot.
 The Java archive, Node/npm, SDK archives, Maestro and application dependency
 locks use the shared local/CI pins. The first image build downloads and installs
@@ -174,8 +179,10 @@ loopback and forwards to the local Compose database (or CI's local service).
 Containers receive KVM access without privileged mode, a Docker socket mount,
 or published application ports. The runner allows graceful fixture cleanup
 before removing its owned container. Logs, source identity, and the exact tested
-image ID remain under `.tmp/native-container/`. Any failed attempt blocks the
-command; retries never overwrite an earlier failure. The image definition and
+image ID remain under `.tmp/native-container/`. Requested repeats collect
+diagnostic evidence even after a failed attempt and retain every outcome in
+`attempts.json`; any failure still blocks the command. Cancellation stops
+subsequent attempts. The image definition and
 installers belong in Git; built images and downloaded tools do not.
 
 The container freezes userspace and tool versions. KVM, the host kernel,
@@ -222,6 +229,10 @@ and finding count under `.tmp/codeql-validation/`.
 CodeQL extracts a snapshot of tracked and non-ignored untracked working-tree
 files, including current edits and excluding installed tools and build caches.
 This gives local extraction the same source-only checkout boundary as CI.
+Both scans use the shared CodeQL memory and thread settings in `.github/ci.env`.
+CI disables incremental overlays and diff-informed queries so it runs full
+analysis like the local CLI; GitHub feature rollouts cannot select a different
+query execution mode.
 PostgreSQL uses an immutable Docker image locally and in Linux CI. macOS CI
 builds the same exact PostgreSQL source release with a committed checksum;
 native runs reject a different server patch version before allocating fixtures.

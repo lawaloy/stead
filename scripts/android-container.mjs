@@ -13,6 +13,42 @@ import { snapshotSource, scanCodeQL, checkCodeQL } from './codeql-local.mjs';
 import { assertAndroidHostMemory } from './android-emulator.mjs';
 import { parseNativeArguments } from './native-config.mjs';
 import { runCommand, spawnOwned, withCleanup } from './process-utils.mjs';
+import { repeatJourneys } from './native-attempts.mjs';
+
+const CONTAINER_MEMORY_GIB = 9;
+export const checkContainerEngine = (report) => {
+  const [os, bytes] = report.trim().split(/\s+/);
+  if (os !== 'linux')
+    throw new Error(
+      `Android/KVM validation requires a running, unpaused Linux Docker engine. Docker reported: ${report || 'no operating system'}`,
+    );
+  if (
+    Number(bytes) < (CONTAINER_MEMORY_GIB + 1) * 1024 ** 3 ||
+    !Number.isSafeInteger(Number(bytes))
+  )
+    throw new Error(
+      `The Docker engine needs at least ${CONTAINER_MEMORY_GIB + 1} GiB memory (${CONTAINER_MEMORY_GIB} GiB runner and 1 GiB engine reserve). Docker reported: ${report}`,
+    );
+};
+
+export const runContainerAttempts = async (
+  count,
+  operation,
+  { output, signal },
+) => {
+  const attempts = await repeatJourneys(count, operation, signal);
+  writeFileSync(
+    join(output, 'attempts.json'),
+    JSON.stringify(attempts, null, 2),
+  );
+  signal?.throwIfAborted();
+  const failures = attempts.filter((attempt) => attempt.status === 'failed');
+  if (failures.length)
+    throw new Error(
+      `Android container attempts failed: ${failures.map((attempt) => `${attempt.attempt}: ${attempt.error}`).join('; ')}. See ${output}`,
+    );
+  return attempts;
+};
 
 export const containerRunArguments = ({ name, image, apiPort, phone }) => [
   'run',
@@ -20,8 +56,8 @@ export const containerRunArguments = ({ name, image, apiPort, phone }) => [
   name,
   '--init',
   '--device=/dev/kvm',
-  '--memory=7g',
-  '--memory-swap=7g',
+  `--memory=${CONTAINER_MEMORY_GIB}g`,
+  `--memory-swap=${CONTAINER_MEMORY_GIB}g`,
   '--add-host=host.docker.internal:host-gateway',
   image,
   '--api-port',
@@ -82,16 +118,17 @@ export const containerAndroidWorkflow = async (options) => {
   try {
     assertAndroidHostMemory();
     await checkJsToolchain();
-    const os = (
-      await runCommand('docker', ['info', '--format', '{{.OSType}}'], {
-        quiet: true,
-        signal,
-      })
+    const engine = (
+      await runCommand(
+        'docker',
+        ['info', '--format', '{{.OSType}} {{.MemTotal}}'],
+        {
+          quiet: true,
+          signal,
+        },
+      )
     ).trim();
-    if (os !== 'linux')
-      throw new Error(
-        `Android/KVM validation requires a running, unpaused Linux Docker engine. Docker reported: ${os || 'no operating system'}`,
-      );
+    checkContainerEngine(engine);
     await runCommand(
       'docker',
       [
@@ -195,48 +232,63 @@ export const containerAndroidWorkflow = async (options) => {
     }
     if (!options.databaseReady)
       await runCommand('npm', ['run', 'db:start'], { cwd: ROOT, signal });
-    for (let attempt = 1; attempt <= options.repeat; attempt++) {
-      signal.throwIfAborted();
-      const name = `stead-native-android-${randomBytes(8).toString('hex')}`;
-      const directory = join(output, `attempt-${attempt}`);
-      mkdirSync(directory, { recursive: true });
-      let passed = false;
-      await withCleanup(async () => {
-        await loggedDocker(
-          containerRunArguments({
-            name,
-            image: imageId,
-            apiPort: options.apiPort,
-            phone: options.phone,
-          }),
-          join(directory, 'container.log'),
-          signal,
-        );
-        passed = true;
-      }, [
-        async () => {
-          // Allow the shared runner to drop its schema and stop services before removal.
-          await withCleanup(async () => {
-            await runCommand('docker', ['stop', '--time', '30', name], {
-              quiet: true,
-            }).catch((error) => {
-              if (passed) throw error;
-            });
-            for (const kind of ['native-validation', 'emulator-validation'])
+    await runContainerAttempts(
+      options.repeat,
+      async (attempt) => {
+        signal.throwIfAborted();
+        const name = `stead-native-android-${randomBytes(8).toString('hex')}`;
+        const directory = join(output, `attempt-${attempt}`);
+        mkdirSync(directory, { recursive: true });
+        let passed = false;
+        await withCleanup(async () => {
+          await loggedDocker(
+            containerRunArguments({
+              name,
+              image: imageId,
+              apiPort: options.apiPort,
+              phone: options.phone,
+            }),
+            join(directory, 'container.log'),
+            signal,
+          );
+          passed = true;
+        }, [
+          async () => {
+            // Allow the shared runner to drop its schema and stop services before removal.
+            await withCleanup(async () => {
+              await runCommand('docker', ['stop', '--time', '30', name], {
+                quiet: true,
+              }).catch((error) => {
+                if (passed) throw error;
+              });
+              for (const kind of ['native-validation', 'emulator-validation'])
+                await runCommand(
+                  'docker',
+                  ['cp', `${name}:/stead/.tmp/${kind}`, directory],
+                  { quiet: true },
+                ).catch((error) => {
+                  if (passed) throw error;
+                });
               await runCommand(
                 'docker',
-                ['cp', `${name}:/stead/.tmp/${kind}`, directory],
+                [
+                  'cp',
+                  `${name}:/stead/.tmp/container-memory.json`,
+                  join(directory, 'memory.json'),
+                ],
                 { quiet: true },
               ).catch((error) => {
                 if (passed) throw error;
               });
-          }, [
-            () =>
-              runCommand('docker', ['rm', '--force', name], { quiet: true }),
-          ]);
-        },
-      ]);
-    }
+            }, [
+              () =>
+                runCommand('docker', ['rm', '--force', name], { quiet: true }),
+            ]);
+          },
+        ]);
+      },
+      { output, signal },
+    );
   } finally {
     process.removeListener('SIGINT', abort);
     process.removeListener('SIGTERM', abort);

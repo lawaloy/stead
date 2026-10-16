@@ -28,6 +28,8 @@ import {
 } from './android-emulator.mjs';
 import { iosEnvironment } from './ios-setup.mjs';
 import { buildAndroidGradle } from './native-gradle.mjs';
+import { repeatJourneys } from './native-attempts.mjs';
+export { repeatJourneys } from './native-attempts.mjs';
 import {
   TOOLCHAIN,
   assertToolVersion,
@@ -68,27 +70,6 @@ export const withOwnedSchema = async (pool, schema, operation) => {
   }
   if (failure) throw failure;
   return result;
-};
-
-export const repeatJourneys = async (count, operation, signal) => {
-  const attempts = [];
-  for (let index = 0; index < count; index += 1) {
-    if (signal?.aborted) break;
-    try {
-      attempts.push({
-        attempt: index + 1,
-        status: 'passed',
-        ...(await operation(index + 1)),
-      });
-    } catch (error) {
-      attempts.push({
-        attempt: index + 1,
-        status: 'failed',
-        error: error.message,
-      });
-    }
-  }
-  return attempts;
 };
 
 export const nativeSourceIdentity = async (options, execute = runCommand) => ({
