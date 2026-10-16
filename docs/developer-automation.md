@@ -45,7 +45,7 @@ gates before pushing; they enforce ordering and test database isolation.
   `e2e_native_<random>` schema. Local `.env` files do not select the native backend.
 - Journeys reject occupied ports without stopping their owners. Use
   `STEAD_TEST_API_PORT=3001` for the API-client journey or `--api-port 3001`
-  for native commands and hook installation. Native debug apps require Metro
+  for native commands. Native debug apps require Metro
   port 8081; stop an existing Metro session first.
 - Managed runs remove only their owned emulator data and services. Native
   Android validation rejects physical devices; iOS setup clears the dedicated
