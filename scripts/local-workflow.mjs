@@ -4,6 +4,7 @@ import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawn } from 'node:child_process';
 import { setTimeout as delay } from 'node:timers/promises';
+import { TOOLCHAIN } from './toolchain.mjs';
 
 const SCRIPT_PATH = fileURLToPath(import.meta.url);
 const ROOT = resolve(dirname(SCRIPT_PATH), '..');
@@ -14,16 +15,27 @@ const COMPOSE_FILE = join(API_DIR, 'docker-compose.yml');
 const DATABASE_BASE = 'postgresql://stead:stead@127.0.0.1:5432/stead';
 const E2E_DATABASE_URL = `${DATABASE_BASE}?schema=e2e`;
 const JOURNEY_DATABASE_URL = `${DATABASE_BASE}?schema=e2e_mobile`;
-const JOURNEY_API_URL = 'http://127.0.0.1:3000';
+const JOURNEY_PORT = Number(process.env.STEAD_TEST_API_PORT || 3000);
+if (
+  !Number.isInteger(JOURNEY_PORT) ||
+  JOURNEY_PORT < 1024 ||
+  JOURNEY_PORT > 65535
+) {
+  throw new Error(
+    'STEAD_TEST_API_PORT must be an integer between 1024 and 65535.',
+  );
+}
+const JOURNEY_API_URL = `http://127.0.0.1:${JOURNEY_PORT}`;
 
 export const testEnvironment = (
   databaseUrl,
   inheritedEnvironment = process.env,
+  { port = 3000 } = {},
 ) => {
   const environment = {
     ...inheritedEnvironment,
     DATABASE_URL: databaseUrl,
-    PORT: '3000',
+    PORT: String(port),
     NODE_ENV: 'test',
     JWT_SECRET: 'stead-local-test-jwt-secret',
     NOTIFICATION_PAYLOAD_ENCRYPTION_KEY:
@@ -32,6 +44,7 @@ export const testEnvironment = (
       'stead-local-test-device-identifier-key-1234567890',
     SMS_PROVIDER: 'dev',
     DEV_EXPOSE_OTP: 'true',
+    AUTH_INSPECTION_OPERATOR_USER_IDS: '',
   };
   delete environment.E2E_DATABASE_URL;
   return environment;
@@ -167,7 +180,25 @@ export const initializeLocalEnvironment = (
 };
 
 const compose = (args, options) =>
-  run('docker', ['compose', '-f', COMPOSE_FILE, ...args], options);
+  run(
+    'docker',
+    [
+      'compose',
+      '--env-file',
+      join(ROOT, '.github/ci.env'),
+      '-f',
+      COMPOSE_FILE,
+      ...args,
+    ],
+    {
+      ...options,
+      env: {
+        ...process.env,
+        ...options?.env,
+        POSTGRES_IMAGE: TOOLCHAIN.POSTGRES_IMAGE,
+      },
+    },
+  );
 
 const waitForDatabase = async () => {
   for (let attempt = 1; attempt <= 30; attempt += 1) {
@@ -258,12 +289,14 @@ const runJourney = async ({ databaseReady = false } = {}) => {
   const endpoint = `${JOURNEY_API_URL}/auth/countries`;
   if (await endpointResponds(endpoint)) {
     throw new Error(
-      'Port 3000 is already serving an application. Stop it before running the isolated journey.',
+      `Port ${JOURNEY_PORT} is already serving an application. Stop it or select another STEAD_TEST_API_PORT before running the isolated journey.`,
     );
   }
 
   if (!databaseReady) await startDatabase();
-  const env = testEnvironment(JOURNEY_DATABASE_URL);
+  const env = testEnvironment(JOURNEY_DATABASE_URL, process.env, {
+    port: JOURNEY_PORT,
+  });
   await migrate(JOURNEY_DATABASE_URL);
   await run('npm', ['run', 'build'], { cwd: API_DIR, env });
 

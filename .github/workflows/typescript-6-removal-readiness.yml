@@ -11,19 +11,32 @@ permissions:
 jobs:
   compatibility-removal:
     name: Compatibility removal readiness
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Resolve shared toolchain
+        id: toolchain
+        run: |
+          source .github/ci.env
+          {
+            echo "node_version=$NODE_VERSION"
+            echo "npm_version=$NPM_VERSION"
+            echo "semver_version=$SEMVER_VERSION"
+          } >> "$GITHUB_OUTPUT"
+
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: ${{ steps.toolchain.outputs.node_version }}
+
+      - name: Pin npm
+        run: npm install --global npm@${{ steps.toolchain.outputs.npm_version }}
 
       - name: Install readiness checker dependency
-        run: npm --prefix "$RUNNER_TEMP/typescript-6-removal-readiness" install semver@latest
+        run: npm --prefix "$RUNNER_TEMP/typescript-6-removal-readiness" install semver@${{ steps.toolchain.outputs.semver_version }}
 
       - name: Check TypeScript 6 removal support
         env:

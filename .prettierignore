@@ -6,3 +6,7 @@
 api/src/contracts/generated
 mobile/src/contracts/generated
 mobile/vendor
+/mobile/android/
+/mobile/ios/
+/mobile/.ci/
+/mobile/.cache/

@@ -4,5 +4,5 @@
     "strict": true,
     "types": ["jest", "node"]
   },
-  "exclude": ["dist"]
+  "exclude": ["dist", "android", "ios", ".ci", ".cache", ".tmp"]
 }

@@ -33,7 +33,7 @@ concurrency:
 jobs:
   api:
     name: api-audit
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     defaults:
       run:
         working-directory: api
@@ -73,7 +73,7 @@ jobs:
 
   mobile:
     name: mobile-audit
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     defaults:
       run:
         working-directory: mobile

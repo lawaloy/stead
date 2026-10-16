@@ -17,7 +17,12 @@ on:
 jobs:
   analyze:
     name: Analyze (${{ matrix.language }})
-    runs-on: ${{ (matrix.language == 'swift' && 'macos-latest') || 'ubuntu-latest' }}
+    runs-on: ${{ (matrix.language == 'swift' && 'macos-latest') || 'ubuntu-24.04' }}
+    env:
+      # Match the local full-source scan instead of GitHub-controlled overlay
+      # and diff-query feature rollouts, which use a different memory profile.
+      CODEQL_ACTION_OVERLAY_ANALYSIS: 'false'
+      CODEQL_ACTION_DIFF_INFORMED_QUERIES: 'false'
     permissions:
       # required for all workflows
       security-events: write
@@ -46,6 +51,15 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+      - name: Resolve shared CodeQL version
+        id: toolchain
+        run: |
+          source .github/ci.env
+          {
+            echo "version=$CODEQL_VERSION"
+            echo "ram=$CODEQL_RAM_MB"
+            echo "threads=$CODEQL_THREADS"
+          } >> "$GITHUB_OUTPUT"
 
       # Add any setup steps before running the `github/codeql-action/init` action.
       # This includes steps like installing compilers or runtimes (`actions/setup-node`
@@ -57,6 +71,10 @@ jobs:
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v4
         with:
+          tools: https://github.com/github/codeql-action/releases/download/codeql-bundle-v${{ steps.toolchain.outputs.version }}/codeql-bundle-linux64.tar.gz
+          config-file: .github/codeql-config.yml
+          threads: ${{ steps.toolchain.outputs.threads }}
+          ram: ${{ steps.toolchain.outputs.ram }}
           languages: ${{ matrix.language }}
           build-mode: ${{ matrix.build-mode }}
           # If you wish to specify custom queries, you can do so here or in a config file.

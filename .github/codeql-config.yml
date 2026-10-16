@@ -1,0 +1,14 @@
+name: Stead source analysis
+# The same extraction scope is used locally and by GitHub code scanning.
+paths-ignore:
+  - '**/node_modules'
+  - .tmp
+  - api/dist
+  - api/coverage
+  - mobile/android
+  - mobile/ios
+  - mobile/.ci
+  - mobile/.cache
+  - mobile/.expo
+  - mobile/dist
+  - mobile/coverage

@@ -21,7 +21,7 @@ a pilot is maintained only in [Project Status](docs/project-status.md).
 Prerequisites:
 
 - Git
-- Node.js 24.15+ on the 24.x line
+- Node.js and npm at the exact versions in [`.github/ci.env`](.github/ci.env)
 - Docker with its daemon running
 
 ```bash
@@ -50,7 +50,12 @@ change.
 ```bash
 npm run verify
 npm run verify:full
+npm run verify:local -- --platform android
 ```
+
+`verify:local` adds CodeQL and actual native builds/UI tests to the base gate.
+Select `--platform all` on a Mac configured for both platforms. Platform
+selection reports only the platforms executed.
 
 The command behavior, individual test commands, environment safety, and manual
 release gates are documented in

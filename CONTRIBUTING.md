@@ -43,13 +43,19 @@ priorities belong in [Project Status](docs/project-status.md).
 5. Make one cohesive change. Add or update tests at the narrowest useful
    boundary, and update the authoritative documentation when behavior, status,
    contracts, or operations change.
-6. Apply safe automatic fixes and run the full local gate:
+6. Apply safe automatic fixes and run the base local gate:
 
    ```bash
    npm run format
    npm run lint:fix
    npm run verify:full
    ```
+
+   For native-impacting changes, run the native and security gate and install
+   the pre-push guardrail described in
+   [Developer Automation](docs/developer-automation.md#pre-push-defense).
+   Report each native platform actually tested; an Android pass does not
+   certify iOS.
 
 7. Review the diff and commit it using the
    [commit message convention](.github/commit-convention.md):
@@ -95,8 +101,8 @@ priorities belong in [Project Status](docs/project-status.md).
 
 ## Validation Strategy
 
-Use focused package-level commands while iterating and `npm run verify:full`
-for pre-push evidence. The canonical breakdown of automated layers, safety
+Use focused package-level commands while iterating and the appropriate
+`verify:full` / `verify:local` gate for pre-push evidence. The canonical breakdown of automated layers, safety
 guarantees, native CI boundaries, and intentionally manual release gates lives
 only in [Developer Automation](docs/developer-automation.md).
 

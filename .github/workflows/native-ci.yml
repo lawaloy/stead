@@ -4,9 +4,8 @@ name: native-ci
 # The config job skips expensive native jobs when they are irrelevant.
 # Scheduled and manual runs always execute the full suite. Native binaries are
 # built in dedicated jobs and handed to Maestro jobs as artifacts (build once
-# → test). Warm Android boots use a cached AVD
-# snapshot; iOS uses mtime/inode-aware DerivedData + Pods caches when the
-# .app misses.
+# → test). Android boots a dedicated AVD from checksum-locked SDK archives;
+# iOS uses mtime/inode-aware DerivedData + Pods caches when the .app misses.
 
 on:
   workflow_dispatch:
@@ -30,13 +29,24 @@ permissions:
 
 jobs:
   config:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     outputs:
       run_native: ${{ steps.decision.outputs.run_native }}
       node_version: ${{ steps.versions.outputs.node_version }}
       npm_version: ${{ steps.versions.outputs.npm_version }}
       android_api_level: ${{ steps.versions.outputs.android_api_level }}
       ios_runner: ${{ steps.versions.outputs.ios_runner }}
+      maestro_version: ${{ steps.versions.outputs.maestro_version }}
+      maestro_sha256: ${{ steps.versions.outputs.maestro_sha256 }}
+      java_version: ${{ steps.versions.outputs.java_version }}
+      ruby_version: ${{ steps.versions.outputs.ruby_version }}
+      bundler_version: ${{ steps.versions.outputs.bundler_version }}
+      postgres_version: ${{ steps.versions.outputs.postgres_version }}
+      postgres_image: ${{ steps.versions.outputs.postgres_image }}
+      emulator_build: ${{ steps.versions.outputs.emulator_build }}
+      image_target: ${{ steps.versions.outputs.image_target }}
+      android_arch: ${{ steps.versions.outputs.android_arch }}
+      android_profile: ${{ steps.versions.outputs.android_profile }}
     steps:
       - uses: actions/checkout@v4
       - name: Detect native-impacting changes
@@ -61,15 +71,28 @@ jobs:
         run: |
           set -eu
           source .github/ci.env
-          echo "node_version=$NODE_VERSION" >> "$GITHUB_OUTPUT"
-          echo "npm_version=$NPM_VERSION" >> "$GITHUB_OUTPUT"
-          echo "android_api_level=$ANDROID_API_LEVEL" >> "$GITHUB_OUTPUT"
-          echo "ios_runner=$IOS_RUNNER" >> "$GITHUB_OUTPUT"
+          {
+            echo "node_version=$NODE_VERSION"
+            echo "npm_version=$NPM_VERSION"
+            echo "android_api_level=$ANDROID_API_LEVEL"
+            echo "ios_runner=$IOS_RUNNER"
+            echo "maestro_version=$MAESTRO_VERSION"
+            echo "maestro_sha256=$MAESTRO_SHA256"
+            echo "java_version=$JAVA_VERSION"
+            echo "ruby_version=$RUBY_VERSION"
+            echo "bundler_version=$BUNDLER_VERSION"
+            echo "postgres_version=$POSTGRES_VERSION"
+            echo "postgres_image=$POSTGRES_IMAGE"
+            echo "emulator_build=$ANDROID_EMULATOR_BUILD"
+            echo "image_target=$ANDROID_IMAGE_TARGET"
+            echo "android_arch=$ANDROID_ARCH"
+            echo "android_profile=$ANDROID_PROFILE"
+          } >> "$GITHUB_OUTPUT"
 
   build-android:
     needs: config
     if: needs.config.outputs.run_native == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
@@ -78,10 +101,10 @@ jobs:
           node-version: ${{ needs.config.outputs.node_version }}
           cache: npm
           cache-dependency-path: mobile/package-lock.json
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v6
         with:
           distribution: temurin
-          java-version: '17'
+          java-version: ${{ needs.config.outputs.java_version }}
       - name: Cache Gradle dependencies and build outputs
         uses: gradle/actions/setup-gradle@v5
       - name: Restore Android simulator app
@@ -89,21 +112,28 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: mobile/.ci/android/stead-debug.apk
-          # The build recipe lives inline in this workflow and its toolchain
-          # pins in ci.env, so both are part of the key: a build-only change
+          # The shared build recipe, dependency lockfiles, and toolchain
+          # pins are part of the key: a build-only change
           # must not reuse an APK produced by the old recipe.
-          key: android-simulator-app-v3-${{ hashFiles('mobile/package-lock.json', 'mobile/app.json', 'mobile/assets/**', 'mobile/app/**', 'mobile/src/**', '.github/ci.env', '.github/workflows/native-ci.yml') }}
-      - name: Build Android simulator app
+          key: android-simulator-app-v3-${{ hashFiles('package.json', 'package-lock.json', 'mobile/package-lock.json', 'mobile/app.json', 'mobile/assets/**', 'mobile/app/**', 'mobile/src/**', '.github/ci.env', '.github/workflows/native-ci.yml', 'scripts/native-*.mjs', 'scripts/android-*.mjs', 'scripts/archive-utils.mjs', '.github/android-sdk-lock.json', 'scripts/ios-setup.mjs', 'scripts/process-utils.mjs', 'scripts/local-workflow.mjs', 'scripts/ios-simulator-entitlements.mjs', 'scripts/toolchain.mjs', 'mobile/Gemfile', 'mobile/Gemfile.lock') }}
+      - name: Install Android build dependencies
         if: steps.android-app-cache.outputs.cache-hit != 'true'
         run: |
           npm install --global npm@${{ needs.config.outputs.npm_version }}
+          npm ci
           npm ci --prefix mobile
-          cd mobile
-          CI=1 npx expo prebuild --platform android --no-install
-          cd android
-          ./gradlew app:assembleDebug
-          mkdir -p ../.ci/android
-          cp app/build/outputs/apk/debug/app-debug.apk ../.ci/android/stead-debug.apk
+      - name: Cache locked Android SDK
+        if: steps.android-app-cache.outputs.cache-hit != 'true'
+        uses: actions/cache@v4
+        with:
+          path: .tmp/android-sdk
+          key: android-sdk-${{ runner.os }}-${{ hashFiles('.github/android-sdk-lock.json') }}
+      - name: Install locked Android SDK
+        if: steps.android-app-cache.outputs.cache-hit != 'true'
+        run: npm run tools:install:android -- --accept-licenses
+      - name: Build Android simulator app
+        if: steps.android-app-cache.outputs.cache-hit != 'true'
+        run: npm run native:build:android
       - name: Save Android simulator app
         if: steps.android-app-cache.outputs.cache-hit != 'true'
         uses: actions/cache/save@v4
@@ -131,6 +161,18 @@ jobs:
           node-version: ${{ needs.config.outputs.node_version }}
           cache: npm
           cache-dependency-path: mobile/package-lock.json
+      - name: Install shared runner dependencies
+        run: |
+          npm install --global npm@${{ needs.config.outputs.npm_version }}
+          npm ci
+      - name: Select pinned Xcode and simulator
+        run: npm run native:setup:ios
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: ${{ needs.config.outputs.ruby_version }}
+          bundler: ${{ needs.config.outputs.bundler_version }}
+          bundler-cache: true
+          working-directory: mobile
       # Resolved before the app-cache restore so the cached .app is keyed on
       # the Xcode that built it (runner images can change Xcode in place).
       - name: Resolve Xcode version
@@ -143,7 +185,7 @@ jobs:
           path: mobile/.ci/ios/mobile.app
           # Include the build script, toolchain pins, and this workflow so a
           # build-only change must rebuild instead of reusing a stale .app.
-          key: ios-simulator-app-${{ needs.config.outputs.ios_runner }}-${{ steps.xcode.outputs.version }}-v3-${{ hashFiles('mobile/package-lock.json', 'mobile/app.json', 'mobile/assets/**', 'mobile/app/**', 'mobile/src/**', '.github/scripts/build-ios-simulator-app.sh', '.github/ci.env', '.github/workflows/native-ci.yml') }}
+          key: ios-simulator-app-${{ needs.config.outputs.ios_runner }}-${{ steps.xcode.outputs.version }}-v3-${{ hashFiles('package.json', 'package-lock.json', 'mobile/package-lock.json', 'mobile/app.json', 'mobile/assets/**', 'mobile/app/**', 'mobile/src/**', '.github/scripts/build-ios-simulator-app.sh', '.github/ci.env', '.github/workflows/native-ci.yml', 'scripts/native-*.mjs', 'scripts/android-*.mjs', 'scripts/archive-utils.mjs', '.github/android-sdk-lock.json', 'scripts/ios-setup.mjs', 'scripts/process-utils.mjs', 'scripts/local-workflow.mjs', 'scripts/ios-simulator-entitlements.mjs', 'scripts/toolchain.mjs', 'mobile/Gemfile', 'mobile/Gemfile.lock') }}
       - name: Restore source mtimes for incremental Xcode
         if: steps.ios-app-cache.outputs.cache-hit != 'true'
         uses: chetan/git-restore-mtime-action@v2
@@ -151,11 +193,12 @@ jobs:
         if: steps.ios-app-cache.outputs.cache-hit != 'true'
         run: |
           npm install --global npm@${{ needs.config.outputs.npm_version }}
+          npm ci
           npm ci --prefix mobile
       - name: Prebuild iOS project
         if: steps.ios-app-cache.outputs.cache-hit != 'true'
         working-directory: mobile
-        run: CI=1 npx expo prebuild --platform ios --no-install
+        run: CI=1 EXPO_NO_DOTENV=1 npx expo prebuild --platform ios --no-install
       - name: Cache CocoaPods
         if: steps.ios-app-cache.outputs.cache-hit != 'true'
         id: pods-cache
@@ -164,7 +207,7 @@ jobs:
           path: |
             mobile/ios/Pods
             ~/Library/Caches/CocoaPods
-          key: ios-pods-${{ needs.config.outputs.ios_runner }}-${{ hashFiles('mobile/ios/Podfile.lock', 'mobile/package-lock.json') }}
+          key: ios-pods-${{ needs.config.outputs.ios_runner }}-${{ hashFiles('mobile/ios/Podfile.lock', 'mobile/package-lock.json', 'mobile/Gemfile.lock') }}
           restore-keys: |
             ios-pods-${{ needs.config.outputs.ios_runner }}-
       - name: Set DerivedData path
@@ -175,16 +218,16 @@ jobs:
         if: steps.ios-app-cache.outputs.cache-hit != 'true'
         uses: irgaly/xcode-cache@v1
         with:
-          key: ios-dd-${{ needs.config.outputs.ios_runner }}-${{ steps.xcode.outputs.version }}-${{ hashFiles('mobile/package-lock.json', 'mobile/app.json', 'mobile/ios/Podfile.lock') }}-${{ github.sha }}
+          key: ios-dd-${{ needs.config.outputs.ios_runner }}-${{ steps.xcode.outputs.version }}-${{ hashFiles('package.json', 'package-lock.json', 'mobile/package-lock.json', 'mobile/app.json', 'mobile/ios/Podfile.lock') }}-${{ github.sha }}
           restore-keys: |
-            ios-dd-${{ needs.config.outputs.ios_runner }}-${{ steps.xcode.outputs.version }}-${{ hashFiles('mobile/package-lock.json', 'mobile/app.json', 'mobile/ios/Podfile.lock') }}-
+            ios-dd-${{ needs.config.outputs.ios_runner }}-${{ steps.xcode.outputs.version }}-${{ hashFiles('package.json', 'package-lock.json', 'mobile/package-lock.json', 'mobile/app.json', 'mobile/ios/Podfile.lock') }}-
             ios-dd-${{ needs.config.outputs.ios_runner }}-${{ steps.xcode.outputs.version }}-
           deriveddata-directory: ${{ steps.derived.outputs.path }}
       - name: Build iOS simulator app
         if: steps.ios-app-cache.outputs.cache-hit != 'true'
         env:
           DERIVED_DATA_PATH: ${{ steps.derived.outputs.path }}
-        run: bash .github/scripts/build-ios-simulator-app.sh
+        run: npm run native:build:ios -- --project-ready
       - name: Save iOS simulator app
         if: steps.ios-app-cache.outputs.cache-hit != 'true'
         uses: actions/cache/save@v4
@@ -211,11 +254,11 @@ jobs:
 
   native-android:
     needs: [config, build-android]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 45
     services:
       postgres:
-        image: postgres:16
+        image: ${{ needs.config.outputs.postgres_image }}
         env:
           POSTGRES_USER: stead
           POSTGRES_PASSWORD: stead
@@ -250,90 +293,21 @@ jobs:
         with:
           name: android-simulator-app
           path: mobile/.ci/android
-      - name: Restore Android Metro transforms
-        uses: actions/cache@v4
-        with:
-          path: mobile/.cache/metro
-          key: metro-android-v1-${{ hashFiles('mobile/package-lock.json', 'mobile/metro.config.js', 'mobile/babel.config.js') }}
-      - name: Cache Maestro CLI
-        uses: actions/cache@v4
-        with:
-          path: ~/.maestro
-          key: maestro-ubuntu-v1
-      - name: Enable KVM for Android emulator
-        run: |
-          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
-          sudo udevadm control --reload-rules
-          sudo udevadm trigger --name-match=kvm
-      - name: Install dependencies and prepare API
+      - name: Install shared runner command
         run: |
           npm install --global npm@${{ needs.config.outputs.npm_version }}
-          npm ci --prefix api
-          npm ci --prefix mobile
-          cd api
-          npx prisma migrate deploy
-          npm run build
-      - name: Start API and Metro
-        run: |
-          NODE_ENV=test node api/dist/src/main.js > "$RUNNER_TEMP/stead-api.log" 2>&1 &
-          for attempt in $(seq 1 60); do
-            if curl --fail --silent http://127.0.0.1:3000/auth/countries > /dev/null; then break; fi
-            sleep 2
-          done
-          curl --fail http://127.0.0.1:3000/auth/countries > /dev/null
-          (cd mobile && NODE_OPTIONS=--dns-result-order=ipv4first npx expo start --localhost) > "$RUNNER_TEMP/stead-metro.log" 2>&1 &
-          for attempt in $(seq 1 90); do
-            if curl --fail --silent http://127.0.0.1:8081/status | grep -q 'packager-status:running'; then break; fi
-            sleep 2
-          done
-          curl --fail http://127.0.0.1:8081/status | grep -q 'packager-status:running'
-          # Prewarm the exact bundle the app requests (see the iOS job for why the
-          # URL must go through Expo's virtual entry). Query string mirrors
-          # DevServerHelper.createBundleURL in RN 0.86.
-          nohup curl --fail --silent --show-error --retry 3 \
-            'http://127.0.0.1:8081/.expo/.virtual-metro-entry.bundle?platform=android&dev=true&lazy=true&minify=false&app=com.lawaloy.stead&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server' \
-            --output "$RUNNER_TEMP/stead-android.bundle" \
-            > "$RUNNER_TEMP/stead-metro-prewarm.log" 2>&1 &
-      - name: Install Maestro
-        run: bash .github/scripts/install-maestro.sh
-      - name: AVD cache
-        uses: actions/cache@v4
-        id: avd-cache
-        with:
-          path: |
-            ~/.android/avd/*
-            ~/.android/adb*
-          key: avd-${{ needs.config.outputs.android_api_level }}-x86_64-v1
-      - name: Create AVD and generate snapshot
-        if: steps.avd-cache.outputs.cache-hit != 'true'
-        uses: reactivecircus/android-emulator-runner@v2
-        with:
-          api-level: ${{ needs.config.outputs.android_api_level }}
-          arch: x86_64
-          force-avd-creation: false
-          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
-          disable-animations: false
-          script: echo "Generated AVD snapshot for caching."
+          npm ci
       - name: Run Android native journey
-        uses: reactivecircus/android-emulator-runner@v2
-        with:
-          api-level: ${{ needs.config.outputs.android_api_level }}
-          arch: x86_64
-          force-avd-creation: false
-          emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
-          disable-animations: true
-          working-directory: mobile
-          script: bash ../.github/scripts/run-android-native-journey.sh
+        run: npm run test:native:android:container -- --database-ready --app mobile/.ci/android/stead-debug.apk
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
           name: android-native-journey-logs
+          include-hidden-files: true
           path: |
-            ${{ runner.temp }}/stead-api.log
-            ${{ runner.temp }}/stead-metro.log
-            ${{ runner.temp }}/stead-metro-prewarm.log
-            ~/.maestro/tests
-            mobile/.expo
+            .tmp/native-container/**/attempt-*/**
+            .tmp/native-container/**/build.log
+            .tmp/native-container/**/source.json
           retention-days: 7
 
   native-ios:
@@ -358,6 +332,20 @@ jobs:
           cache-dependency-path: |
             api/package-lock.json
             mobile/package-lock.json
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: ${{ needs.config.outputs.java_version }}
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: ${{ needs.config.outputs.ruby_version }}
+          bundler: ${{ needs.config.outputs.bundler_version }}
+          bundler-cache: true
+          working-directory: mobile
+      - name: Install shared runner dependencies
+        run: |
+          npm install --global npm@${{ needs.config.outputs.npm_version }}
+          npm ci
       - name: Download iOS simulator app
         uses: actions/download-artifact@v4
         with:
@@ -389,93 +377,45 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.maestro
-          key: maestro-macos-v1
-      - name: Start PostgreSQL 16
-        uses: ikalnytskyi/action-setup-postgres@v8
+          key: maestro-macos-${{ needs.config.outputs.maestro_version }}-${{ needs.config.outputs.maestro_sha256 }}-v3
+      - name: Cache pinned PostgreSQL binaries
+        uses: actions/cache@v4
         with:
-          username: stead
-          password: stead
-          database: stead
-          postgres-version: '16'
+          path: .tmp/tools/postgres
+          key: postgres-source-${{ runner.os }}-${{ runner.arch }}-${{ needs.config.outputs.postgres_version }}-${{ hashFiles('.github/ci.env', '.github/scripts/install-native-postgres.sh') }}
+      - name: Install pinned PostgreSQL
+        run: bash .github/scripts/install-native-postgres.sh
+      - name: Start isolated PostgreSQL
+        env:
+          PGPASSWORD: stead
+        run: |
+          node --input-type=module -e "import { assertPortAvailable } from './scripts/process-utils.mjs'; await assertPortAvailable(5432)"
+          PG_TEST_DATA="$RUNNER_TEMP/stead-native-postgres"
+          PG_TEST_PASSWORD="$RUNNER_TEMP/stead-native-postgres-password"
+          printf '%s\n' 'stead' > "$PG_TEST_PASSWORD"
+          chmod 600 "$PG_TEST_PASSWORD"
+          initdb --pgdata="$PG_TEST_DATA" --username=stead --pwfile="$PG_TEST_PASSWORD" --auth=scram-sha-256 --encoding=UTF8 --locale=en_US.UTF-8
+          pg_ctl -D "$PG_TEST_DATA" -l "$RUNNER_TEMP/stead-native-postgres.log" -o '-h 127.0.0.1 -p 5432' -w start
+          createdb -h 127.0.0.1 -U stead stead
       - name: Install dependencies and prepare API
         run: |
           npm install --global npm@${{ needs.config.outputs.npm_version }}
+          npm ci
           npm ci --prefix api
           npm ci --prefix mobile
-          cd api
-          npx prisma migrate deploy
-          npm run build
-      - name: Start API and Metro
-        run: |
-          NODE_ENV=test node api/dist/src/main.js > "$RUNNER_TEMP/stead-api.log" 2>&1 &
-          for attempt in $(seq 1 60); do
-            if curl --fail --silent http://127.0.0.1:3000/auth/countries > /dev/null; then break; fi
-            sleep 2
-          done
-          curl --fail http://127.0.0.1:3000/auth/countries > /dev/null
-          (cd mobile && NODE_OPTIONS=--dns-result-order=ipv4first npx expo start --localhost) > "$RUNNER_TEMP/stead-metro.log" 2>&1 &
-          for attempt in $(seq 1 90); do
-            if curl --fail --silent http://127.0.0.1:8081/status | grep -q 'packager-status:running'; then break; fi
-            sleep 2
-          done
-          curl --fail http://127.0.0.1:8081/status | grep -q 'packager-status:running'
       - name: Install Maestro
         run: bash .github/scripts/install-maestro.sh
-      - name: Install app on simulator
-        run: |
-          set -eu
-          DEVICE_ID="$(xcrun simctl list devices available -j | jq -r '[.devices[] | .[] | select(.name == "iPhone 17")] | last | .udid')"
-          test -n "$DEVICE_ID" && test "$DEVICE_ID" != null
-          xcrun simctl boot "$DEVICE_ID" || true
-          xcrun simctl bootstatus "$DEVICE_ID" -b
-          APP_PATH=mobile/.ci/ios/mobile.app
-          test -d "$APP_PATH"
-          test -f "$APP_PATH/Info.plist"
-          # Cold simulator boots can need a beat before install succeeds.
-          for attempt in 1 2 3 4 5; do
-            if xcrun simctl install "$DEVICE_ID" "$APP_PATH"; then
-              break
-            fi
-            if [[ "$attempt" -eq 5 ]]; then
-              echo "simctl install failed after retries" >&2
-              ls -la "$APP_PATH" >&2 || true
-              exit 1
-            fi
-            sleep 5
-          done
-          # Ensure Metro has built the exact bundle the app will request before
-          # Maestro launches, so the app's request is served from Metro's cache.
-          # The app asks for Expo's virtual entry (.expo/.virtual-metro-entry), which
-          # @expo/metro-config rewrites to node_modules/expo-router/entry and fills in
-          # transform options (transform.routerRoot=app plus the Hermes options).
-          # Requesting expo-router/entry directly skipped that rewrite, so the prewarm
-          # had no transform.routerRoot, Metro treated the app's request as a different
-          # bundle and transformed every module again (up to ~160s), and the app gave up
-          # with "Could not connect to development server".
-          # Query string mirrors RCTBundleURLProvider in RN 0.86.
-          BUNDLE_ID="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$APP_PATH/Info.plist")"
-          test -n "$BUNDLE_ID"
-          curl --fail --silent --show-error --retry 5 --retry-delay 2 \
-            "http://127.0.0.1:8081/.expo/.virtual-metro-entry.bundle?platform=ios&dev=true&lazy=true&minify=false&inlineSourceMap=false&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-server&app=${BUNDLE_ID}" \
-            --output "$RUNNER_TEMP/stead-ios.bundle" \
-            > "$RUNNER_TEMP/stead-metro-prewarm.log" 2>&1 \
-            || {
-              cat "$RUNNER_TEMP/stead-metro-prewarm.log" >&2 || true
-              cat "$RUNNER_TEMP/stead-metro.log" >&2 || true
-              exit 1
-            }
-          test -s "$RUNNER_TEMP/stead-ios.bundle"
       - name: Run iOS native journey
-        working-directory: mobile
-        run: maestro test -e TEST_PHONE=08030000001 .maestro/critical-native-journey.yaml
+        run: |
+          npm run native:setup:ios
+          node scripts/native-workflow.mjs test --platform ios --database-ready --repeat 3 --app mobile/.ci/ios/mobile.app
       - uses: actions/upload-artifact@v4
-        if: failure()
+        if: always()
         with:
           name: ios-native-journey-logs
+          include-hidden-files: true
           path: |
-            ${{ runner.temp }}/stead-api.log
-            ${{ runner.temp }}/stead-metro.log
-            ${{ runner.temp }}/stead-metro-prewarm.log
+            .tmp/native-validation
             ~/.maestro/tests
             mobile/.expo
             mobile/.ci/ios

@@ -16,22 +16,28 @@ permissions:
 
 jobs:
   config:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     outputs:
       node_version: ${{ steps.versions.outputs.node_version }}
       npm_version: ${{ steps.versions.outputs.npm_version }}
+      postgres_version: ${{ steps.versions.outputs.postgres_version }}
+      postgres_image: ${{ steps.versions.outputs.postgres_image }}
     steps:
       - uses: actions/checkout@v4
       - id: versions
         run: |
           set -eu
           source .github/ci.env
-          echo "node_version=$NODE_VERSION" >> "$GITHUB_OUTPUT"
-          echo "npm_version=$NPM_VERSION" >> "$GITHUB_OUTPUT"
+          {
+            echo "node_version=$NODE_VERSION"
+            echo "npm_version=$NPM_VERSION"
+            echo "postgres_version=$POSTGRES_VERSION"
+            echo "postgres_image=$POSTGRES_IMAGE"
+          } >> "$GITHUB_OUTPUT"
 
   format:
     needs: config
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -60,7 +66,7 @@ jobs:
 
   lint:
     needs: config
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     defaults:
       run:
         working-directory: api
@@ -113,10 +119,10 @@ jobs:
   test:
     name: api-test
     needs: config
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     services:
       postgres:
-        image: postgres:16
+        image: ${{ needs.config.outputs.postgres_image }}
         env:
           POSTGRES_USER: stead
           POSTGRES_PASSWORD: stead
@@ -162,16 +168,20 @@ jobs:
       - name: Unit tests
         run: npm run test -- --ci --runInBand
 
+      - name: Install shared runner dependencies
+        working-directory: .
+        run: npm ci
+
       - name: Database-backed API end-to-end tests
         working-directory: .
         run: node scripts/local-workflow.mjs test:e2e --database-ready
 
   mobile-api-journey:
     needs: config
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     services:
       postgres:
-        image: postgres:16
+        image: ${{ needs.config.outputs.postgres_image }}
         env:
           POSTGRES_USER: stead
           POSTGRES_PASSWORD: stead
@@ -210,6 +220,7 @@ jobs:
 
       - name: Install API and mobile dependencies
         run: |
+          npm ci
           npm --prefix api ci
           npm --prefix mobile ci
 
@@ -217,7 +228,7 @@ jobs:
         run: node scripts/local-workflow.mjs test:journey --database-ready
 
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: config
     defaults:
       run:
@@ -267,7 +278,7 @@ jobs:
 
   mobile-test:
     needs: config
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     defaults:
       run:
         working-directory: mobile

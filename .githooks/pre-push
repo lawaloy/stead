@@ -1,0 +1,11 @@
+#!/usr/bin/env sh
+# Validate the committed content before Git uploads it.
+if command -v node >/dev/null 2>&1; then
+  exec node scripts/pre-push-verification.mjs
+fi
+# WSL can use the native Windows toolchain when Linux Node is absent.
+if command -v node.exe >/dev/null 2>&1; then
+  exec node.exe scripts/pre-push-verification.mjs
+fi
+echo "Install the Node version in .nvmrc before running pre-push verification." >&2
+exit 1
