@@ -28,6 +28,7 @@ workflow, see [Contributing](../CONTRIBUTING.md).
 | `npm run native:doctor -- --platform android`               | Check the native toolchain and a booted emulator. Use `ios` on a Mac.                                         |
 | `npm run native:build:android` / `npm run native:build:ios` | Build a debug APK or signed simulator app using CI's recipe.                                                  |
 | `npm run test:native:android` / `npm run test:native:ios`   | Build and run the Maestro journey on a prepared emulator or dedicated iOS simulator.                          |
+| `npm run test:native:ios:remote`                            | From Windows/Linux/macOS, push a temporary integration branch and run iOS on GitHub's Mac.                    |
 | `npm run test:native:android:managed`                       | Run the journey with an automatically managed fresh Android emulator.                                         |
 | `npm run test:native:android:container`                     | Build and run Android in CI's controlled Linux/KVM container.                                                 |
 | `npm run security:codeql:local`                             | Run the pinned CodeQL bundle and fail on unsuppressed warnings/errors.                                        |
@@ -127,8 +128,28 @@ local configuration with `git config --local --unset core.hooksPath` if
 `git config --get core.hooksPath` reports `.githooks`. Preserve custom hook
 configurations.
 
-A Mac must run the iOS gate before pushing to provide local iOS evidence.
-Without one, require macOS CI results before merging and report that local gap.
+Without a Mac, run `npm run test:native:ios:remote` before opening a PR.
+Requires Git with `merge-tree --write-tree` support and an authenticated
+[GitHub CLI](https://cli.github.com/) (`gh auth login`). Commit all source changes
+first. The command merges HEAD with fetched `main` in Git's object database,
+pushes that integration commit to a unique `validation/ios-*` branch, and
+dispatches the existing native workflow with `platform=ios`. Your checkout and
+index stay unchanged. Ignored files, including local `.env`, are not uploaded.
+
+GitHub's standard macOS runner builds the app and runs all three journeys with
+CI's pins, setup and assertions. This is remote execution after a temporary push,
+not Windows-local iOS testing. The command requires a public repository, where
+[standard runner compute is free](https://docs.github.com/en/actions/reference/runners/github-hosted-runners).
+Logs, screenshots, source/base/tree SHAs and the run URL are saved under
+`.tmp/ios-remote/`. Missing evidence, failed/skipped iOS jobs, changed HEAD or
+moving `main` fail validation. Rerun after either branch changes; this evidence
+does not replace PR checks.
+
+Successful runs delete only their own unchanged temporary ref. Failed or
+interrupted runs retain it for investigation; the run URL permits inspection or
+cancellation. Remove the recorded branch with `git push origin --delete <branch>`
+when finished. Interrupting the local command does not cancel the remote run.
+
 GitHub permissions, events, caches, artifacts, PR automation, dependency review
 and branch protection require GitHub execution. Portable workflow/setup tests
 cover contracts, not those integrations. Hosted runner image updates also

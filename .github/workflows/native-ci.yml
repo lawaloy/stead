@@ -2,13 +2,19 @@ name: native-ci
 
 # Every PR and main-branch push produces a stable native-ci readiness signal.
 # The config job skips expensive native jobs when they are irrelevant.
-# Scheduled and manual runs always execute the full suite. Native binaries are
+# Scheduled runs execute the full suite; manual runs can select a platform. Native binaries are
 # built in dedicated jobs and handed to Maestro jobs as artifacts (build once
 # → test). Android boots a dedicated AVD from checksum-locked SDK archives;
 # iOS uses mtime/inode-aware DerivedData + Pods caches when the .app misses.
 
 on:
   workflow_dispatch:
+    inputs:
+      platform:
+        description: Native platforms to validate
+        type: choice
+        options: [all, ios, android]
+        default: all
   # After Dependabot + Dependency Maintenance (13:00 UTC) and Dependency
   # Audit (13:30 UTC), leave room for PR CI and auto-merge onto main before
   # the daily native smoke. Main pushes also produce the readiness signal.
@@ -91,7 +97,7 @@ jobs:
 
   build-android:
     needs: config
-    if: needs.config.outputs.run_native == 'true'
+    if: needs.config.outputs.run_native == 'true' && inputs.platform != 'ios'
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     steps:
@@ -149,7 +155,7 @@ jobs:
 
   build-ios:
     needs: config
-    if: needs.config.outputs.run_native == 'true'
+    if: needs.config.outputs.run_native == 'true' && inputs.platform != 'android'
     runs-on: ${{ needs.config.outputs.ios_runner }}
     timeout-minutes: 45
     steps:

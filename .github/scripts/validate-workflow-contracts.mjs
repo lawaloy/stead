@@ -194,6 +194,22 @@ assert.match(
 );
 assert.match(
   nativeWorkflow,
+  /options: \[all, ios, android\]/,
+  'Manual native preflight must support iOS without allocating Android runners.',
+);
+for (const [job, excluded] of [
+  ['build-android', 'ios'],
+  ['build-ios', 'android'],
+])
+  assert.match(
+    nativeWorkflow,
+    new RegExp(
+      `${job}:\\n\\s+needs: config\\n\\s+if: .*inputs\\.platform != '${excluded}'`,
+    ),
+    `Manual platform selection must control ${job}.`,
+  );
+assert.match(
+  nativeWorkflow,
   /working-directory: mobile\n/,
   'iOS bundler must use the committed mobile Gemfile.',
 );

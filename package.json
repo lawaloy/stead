@@ -29,6 +29,7 @@
     "native:build:ios": "node scripts/native-workflow.mjs build --platform ios",
     "test:native:android": "node scripts/native-workflow.mjs test --platform android",
     "test:native:ios": "node scripts/native-workflow.mjs test --platform ios",
+    "test:native:ios:remote": "node scripts/ios-remote.mjs",
     "validate": "node scripts/native-workflow.mjs verify",
     "security:codeql:local": "node scripts/codeql-local.mjs",
     "dependencies:check": "node scripts/dependency-checks.mjs",
