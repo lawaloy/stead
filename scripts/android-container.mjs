@@ -7,11 +7,9 @@ import {
 import { finished } from 'node:stream/promises';
 import { join, resolve } from 'node:path';
 import { randomBytes } from 'node:crypto';
-import { fileURLToPath } from 'node:url';
 import { ROOT, TOOLCHAIN, checkJsToolchain } from './toolchain.mjs';
 import { snapshotSource, scanCodeQL, checkCodeQL } from './codeql-local.mjs';
 import { assertAndroidHostMemory } from './android-emulator.mjs';
-import { parseNativeArguments } from './native-config.mjs';
 import { runCommand, spawnOwned, withCleanup } from './process-utils.mjs';
 import { repeatJourneys } from './native-attempts.mjs';
 
@@ -295,16 +293,3 @@ export const containerAndroidWorkflow = async (options) => {
     console.log(`Android container evidence: ${output}`);
   }
 };
-
-if (resolve(process.argv[1] ?? '') === fileURLToPath(import.meta.url))
-  containerAndroidWorkflow(
-    parseNativeArguments([
-      'test',
-      '--platform',
-      'android',
-      ...process.argv.slice(2),
-    ]),
-  ).catch((error) => {
-    console.error(`Android container verification failed: ${error.message}`);
-    process.exitCode = 1;
-  });

@@ -81,9 +81,25 @@ export const bundleUrl = (platform, port, appId) => {
 };
 
 export const parseNativeArguments = (args) => {
-  const command = args.shift() ?? 'doctor';
+  const command = args.shift() ?? 'help';
+  if (['help', '--help', 'remote-ios'].includes(command)) {
+    if (args.length) throw new Error(`${command} takes no additional options.`);
+    return { command: command === '--help' ? 'help' : command };
+  }
+  if (command === 'setup') {
+    if (!(
+      (args.length === 2 && args[0] === '--platform' && args[1] === 'ios') ||
+      (args.length === 1 && args[0] === '--platform=ios')
+    ))
+      throw new Error(
+        'Setup supports only --platform ios. Use tools:install:android for Android SDK installation.',
+      );
+    return { command, platform: 'ios' };
+  }
   if (!['doctor', 'build', 'test', 'verify'].includes(command))
-    throw new Error('Expected doctor, build, test, or verify.');
+    throw new Error(
+      'Expected doctor, build, test, verify, setup, or remote-ios. Use npm run native for help.',
+    );
   const options = {
     command,
     platform: command === 'verify' ? 'all' : 'android',
@@ -134,14 +150,16 @@ export const parseNativeArguments = (args) => {
   }
   if (!['android', 'ios', 'all'].includes(options.platform))
     throw new Error('Platform must be android, ios, or all.');
-  if (!['host', 'container'].includes(options.androidRunner))
-    throw new Error('Android runner must be host or container.');
+  if (!['host', 'managed', 'container'].includes(options.androidRunner))
+    throw new Error('Android runner must be host, managed, or container.');
   if (
-    options.androidRunner === 'container' &&
-    (options.platform !== 'android' || options.device)
+    options.androidRunner !== 'host' &&
+    (options.platform !== 'android' ||
+      options.device ||
+      !['test', 'verify'].includes(command))
   )
     throw new Error(
-      'The container runner requires an explicit Android selection and owns its device.',
+      'Managed and container runners require Android test/verify, own their device, and cannot select --device.',
     );
   if (options.platform === 'all' && options.device)
     throw new Error('Select one platform when choosing a device.');
