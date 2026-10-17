@@ -77,8 +77,7 @@ export const remoteIos = async ({
   const featureCommit = commit(await git('rev-parse', 'HEAD'));
   const repository = githubRepository(await git('remote', 'get-url', 'origin'));
   const gh = (...args) => command('gh', [...args, '--repo', repository]);
-  // The connector has no dispatch operation. The developer CLI uses gh's own
-  // credential store; no token is read, printed or passed on the command line.
+  // Use gh's credential store; no token is read, printed or passed on the command line.
   const info = JSON.parse(
     await command('gh', [
       'repo',
@@ -271,7 +270,7 @@ export const remoteIos = async ({
     log(
       `PASS: iOS build and all three journeys. Remote evidence: ${evidence.url}`,
     );
-    log(`Saved logs and screenshots: ${directory}`);
+    log(`Saved logs and available debug artifacts: ${directory}`);
     return evidence;
   } catch (error) {
     evidence.status = 'failed';
@@ -287,7 +286,7 @@ export const remoteIos = async ({
 if (resolve(process.argv[1] ?? '') === fileURLToPath(import.meta.url)) {
   if (process.argv.length > 2) {
     console.log(
-      'Usage: npm run test:native:ios:remote\nRequires a clean committed checkout, Git, and authenticated GitHub CLI (gh auth login).\nPushes a temporary integration branch; runs iOS on GitHub macOS, then downloads evidence.',
+      'Usage: npm run native -- remote-ios\nRequires a clean committed checkout, Git, and authenticated GitHub CLI (gh auth login).\nPushes a temporary integration branch; runs iOS on GitHub macOS, then downloads evidence.',
     );
     if (process.argv.slice(2).some((arg) => arg !== '--help'))
       process.exitCode = 1;

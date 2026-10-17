@@ -6,8 +6,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { rm } from 'node:fs/promises';
-import { join, resolve, delimiter } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { join, delimiter } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 import { ROOT, TOOLCHAIN, checkJsToolchain } from './toolchain.mjs';
 import { repositorySdk, sdkReceipt } from './android-sdk.mjs';
@@ -280,21 +279,3 @@ export const managedAndroidWorkflow = async (
     process.env = previous;
   }
 };
-
-if (resolve(process.argv[1] ?? '') === fileURLToPath(import.meta.url)) {
-  const { parseNativeArguments } = await import('./native-config.mjs');
-  const options = parseNativeArguments([
-    'test',
-    '--platform',
-    'android',
-    ...process.argv.slice(2),
-  ]);
-  const operation =
-    options.androidRunner === 'container'
-      ? (await import('./android-container.mjs')).containerAndroidWorkflow
-      : managedAndroidWorkflow;
-  operation(options).catch((error) => {
-    console.error(error.message);
-    process.exitCode = 1;
-  });
-}

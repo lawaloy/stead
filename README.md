@@ -58,7 +58,7 @@ the base gate. Run it explicitly before pushing; Git push does not run tests.
 Select `--platform all` on a Mac configured for both platforms. Platform
 selection reports only the platforms executed.
 
-Without a Mac, `npm run test:native:ios:remote` pushes a temporary validation
+Without a Mac, `npm run native -- remote-ios` pushes a temporary validation
 branch and runs the iOS build and journeys on GitHub macOS before opening a PR.
 See Developer Automation for authentication, evidence and cleanup behavior.
 

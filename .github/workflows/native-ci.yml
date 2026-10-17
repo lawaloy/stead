@@ -139,7 +139,7 @@ jobs:
         run: npm run tools:install:android -- --accept-licenses
       - name: Build Android simulator app
         if: steps.android-app-cache.outputs.cache-hit != 'true'
-        run: npm run native:build:android
+        run: npm run native -- build --platform android
       - name: Save Android simulator app
         if: steps.android-app-cache.outputs.cache-hit != 'true'
         uses: actions/cache/save@v4
@@ -172,7 +172,7 @@ jobs:
           npm install --global npm@${{ needs.config.outputs.npm_version }}
           npm ci
       - name: Select pinned Xcode and simulator
-        run: npm run native:setup:ios
+        run: npm run native -- setup --platform ios
       - uses: ruby/setup-ruby@v1
         with:
           ruby-version: ${{ needs.config.outputs.ruby_version }}
@@ -233,7 +233,7 @@ jobs:
         if: steps.ios-app-cache.outputs.cache-hit != 'true'
         env:
           DERIVED_DATA_PATH: ${{ steps.derived.outputs.path }}
-        run: npm run native:build:ios -- --project-ready
+        run: npm run native -- build --platform ios --project-ready
       - name: Save iOS simulator app
         if: steps.ios-app-cache.outputs.cache-hit != 'true'
         uses: actions/cache/save@v4
@@ -304,7 +304,7 @@ jobs:
           npm install --global npm@${{ needs.config.outputs.npm_version }}
           npm ci
       - name: Run Android native journey
-        run: npm run test:native:android:container -- --database-ready --app mobile/.ci/android/stead-debug.apk
+        run: npm run native -- test --platform android --android-runner container --database-ready --app mobile/.ci/android/stead-debug.apk
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
@@ -413,8 +413,8 @@ jobs:
         run: bash .github/scripts/install-maestro.sh
       - name: Run iOS native journey
         run: |
-          npm run native:setup:ios
-          node scripts/native-workflow.mjs test --platform ios --database-ready --repeat 3 --app mobile/.ci/ios/mobile.app
+          npm run native -- setup --platform ios
+          npm run native -- test --platform ios --database-ready --repeat 3 --app mobile/.ci/ios/mobile.app
       - uses: actions/upload-artifact@v4
         if: always()
         with:

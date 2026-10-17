@@ -2,4 +2,4 @@
 # CI and local verification use the same service/fixture/device lifecycle.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
-node "$ROOT/scripts/android-container.mjs" --database-ready --app "$ROOT/mobile/.ci/android/stead-debug.apk"
+node "$ROOT/scripts/native-workflow.mjs" test --platform android --android-runner container --database-ready --app "$ROOT/mobile/.ci/android/stead-debug.apk"

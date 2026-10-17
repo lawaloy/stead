@@ -80,7 +80,83 @@ import {
   withOwnedSchema,
   repeatJourneys,
   prepareIosSimulator,
+  runNativeCommand,
 } from './native-workflow.mjs';
+
+test('one native entry point preserves prepared, managed, container, build, setup and remote ownership', async () => {
+  const calls = [];
+  const handlers = Object.fromEntries(
+    ['local', 'managed', 'container', 'setup', 'remote'].map((name) => [
+      name,
+      async (options) => calls.push({ name, options }),
+    ]),
+  );
+  for (const [args, expected] of [
+    [['doctor', '--platform', 'ios'], 'local'],
+    [['build', '--platform', 'android', '--project-ready'], 'local'],
+    [['test', '--platform', 'ios', '--repeat', '3'], 'local'],
+    [['test', '--device', 'emulator-5554'], 'local'],
+    [['test', '--android-runner', 'managed'], 'managed'],
+    [
+      [
+        'test',
+        '--android-runner',
+        'container',
+        '--database-ready',
+        '--app',
+        'source.apk',
+      ],
+      'container',
+    ],
+    [['verify', '--platform', 'android'], 'managed'],
+    [['verify', '--platform', 'ios'], 'local'],
+    [['setup', '--platform', 'ios'], 'setup'],
+    [['remote-ios'], 'remote'],
+  ]) {
+    const original = [...args];
+    await runNativeCommand(args, handlers);
+    assert.equal(calls.at(-1).name, expected);
+    assert.deepEqual(
+      args,
+      original,
+      'dispatch must not mutate caller arguments',
+    );
+    if (args[0] === 'test' && args.includes('--app')) {
+      assert.equal(calls.at(-1).options.app, 'source.apk');
+      assert.equal(calls.at(-1).options.databaseReady, true);
+    }
+  }
+  assert.equal(calls[2].options.repeat, 3);
+  assert.equal(calls[1].options.projectReady, true);
+});
+
+test('ambiguous native actions fail before any device, remote push or setup operation', async () => {
+  let executions = 0;
+  const handlers = Object.fromEntries(
+    ['local', 'managed', 'container', 'setup', 'remote'].map((name) => [
+      name,
+      async () => {
+        executions++;
+      },
+    ]),
+  );
+  for (const args of [
+    ['remote-ios', '--repeat', '1'],
+    ['remote-ios', '--platform', 'android'],
+    ['setup'],
+    ['setup', '--platform', 'android'],
+    ['setup', '--platform', 'ios', '--device', 'personal'],
+    ['test', '--platform', 'ios', '--android-runner', 'managed'],
+    ['test', '--android-runner', 'managed', '--device', 'emulator-5554'],
+    ['build', '--android-runner', 'container'],
+    ['doctor', '--android-runner', 'managed'],
+    ['unknown'],
+    ['help', '--platform', 'ios'],
+  ])
+    await assert.rejects(runNativeCommand(args, handlers));
+  assert.equal(executions, 0);
+  assert.deepEqual(parseNativeArguments([]), { command: 'help' });
+});
 
 test('repeated iOS runs query current state and do not boot an already running simulator', async () => {
   let state = 'Shutdown',

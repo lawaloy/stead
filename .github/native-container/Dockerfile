@@ -34,5 +34,5 @@ COPY . .
 RUN --mount=type=cache,target=/root/.gradle,sharing=locked \
     if test -f .stead-app.apk; then \
       mkdir -p mobile/.ci/android && cp .stead-app.apk mobile/.ci/android/stead-debug.apk; \
-    else npm run native:build:android; fi
+    else npm run native -- build --platform android; fi
 ENTRYPOINT ["node", "scripts/android-container-entry.mjs"]

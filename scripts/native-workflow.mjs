@@ -520,17 +520,50 @@ export const nativeWorkflow = async (options) => {
   }
 };
 
-if (resolve(process.argv[1] ?? '') === fileURLToPath(import.meta.url)) {
-  const options = parseNativeArguments(process.argv.slice(2));
+export const runNativeCommand = async (args, handlers = {}) => {
+  const options = parseNativeArguments([...args]);
+  if (options.command === 'help') {
+    console.log(`Usage: npm run native -- <command> [options]
+
+  setup --platform ios                         Prepare pinned Xcode/simulator (Mac)
+  doctor --platform android|ios                Inspect a prepared device/toolchain
+  build --platform android|ios                 Build the simulator app
+  test --platform android|ios                  Test a prepared emulator/simulator
+  test --platform android --android-runner managed|container
+                                              Build and test an owned emulator
+  remote-ios                                  Test on GitHub macOS from any host
+
+Options: --repeat <1-20>, --api-port <port>, --app <artifact>, --device <Android emulator>
+Run npm run validate -- --platform android|ios|all for the complete local gate.`);
+    return;
+  }
+  if (options.command === 'remote-ios')
+    return (handlers.remote ?? (await import('./ios-remote.mjs')).remoteIos)();
+  if (options.command === 'setup')
+    return (
+      handlers.setup ??
+      (() =>
+        runCommand(process.execPath, [join(ROOT, 'scripts/ios-setup.mjs')], {
+          cwd: ROOT,
+        }))
+    )();
+  const managed =
+    options.androidRunner === 'managed' ||
+    (options.command === 'verify' &&
+      options.platform === 'android' &&
+      !options.device);
   const operation =
     options.androidRunner === 'container'
-      ? (await import('./android-container.mjs')).containerAndroidWorkflow
-      : options.command === 'verify' &&
-          options.platform === 'android' &&
-          !options.device
-        ? managedAndroidWorkflow
-        : nativeWorkflow;
-  operation(options).catch((error) => {
+      ? (handlers.container ??
+        (await import('./android-container.mjs')).containerAndroidWorkflow)
+      : managed
+        ? (handlers.managed ?? managedAndroidWorkflow)
+        : (handlers.local ?? nativeWorkflow);
+  return operation(options);
+};
+
+if (resolve(process.argv[1] ?? '') === fileURLToPath(import.meta.url)) {
+  runNativeCommand(process.argv.slice(2)).catch((error) => {
     console.error(`Native verification failed: ${error.message}`);
     process.exitCode = 1;
   });
