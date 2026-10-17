@@ -328,10 +328,9 @@ const runAttempt = async (platform, options, tools, app, pool, directory) => {
           device,
           '--platform',
           platform,
-          '--format',
-          'JUNIT',
-          '--output',
-          join(directory, 'results.xml'),
+          // Requesting a report switches Maestro to its suite runner, which
+          // hides live command progress even for this single-flow journey.
+          '--no-ansi',
           '--debug-output',
           join(directory, 'maestro'),
           '-e',

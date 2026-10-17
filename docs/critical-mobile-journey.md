@@ -81,7 +81,7 @@ delivery, TalkBack, or VoiceOver.
 
 Local native commands now own the build, isolated database fixtures, API,
 Metro, emulator port forwarding, and Maestro execution. Setup, commands,
-repeat-run evidence, pre-push enforcement, and the remaining macOS boundary
+repeat-run evidence, explicit local validation, and the remaining macOS boundary
 are documented in
 [Developer Automation](developer-automation.md#native-and-security-setup).
 Native CI delegates to the same runner. Developers should produce local
