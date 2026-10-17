@@ -79,40 +79,19 @@ export const remoteIos = async ({
   const gh = (...args) => command('gh', [...args, '--repo', repository]);
   // Use gh's credential store; no token is read, printed or passed on the command line.
   const info = JSON.parse(
-    await command('gh', [
-      'repo',
-      'view',
-      repository,
-      '--json',
-      'isPrivate,defaultBranchRef',
-    ]),
+    await command('gh', ['repo', 'view', repository, '--json', 'isPrivate']),
   );
   if (info.isPrivate)
     throw new Error(
       'This free preflight requires a public repository with standard GitHub-hosted runners.',
     );
-  if (info.defaultBranchRef?.name !== 'main')
-    throw new Error('This preflight expects main to be the default branch.');
-  await git('fetch', '--no-tags', 'origin', 'main');
-  const baseCommit = commit(await git('rev-parse', 'FETCH_HEAD'));
-  // Merge in Git's object database, leaving the checkout and index untouched.
-  // merge-tree exits nonzero on conflicts: never test a tree with conflict markers.
-  const tree = commit(
-    await git('merge-tree', '--write-tree', featureCommit, baseCommit),
-  );
-  const testedCommit = commit(
-    await command(
-      'git',
-      ['commit-tree', tree, '-p', featureCommit, '-p', baseCommit],
-      { input: 'Temporary iOS preflight against main\n' },
-    ),
-  );
+  const tree = commit(await git('rev-parse', `${featureCommit}^{tree}`));
+  const testedCommit = featureCommit;
   const remoteBranch = `validation/ios-${token}`;
   const directory = join(root, '.tmp', 'ios-remote', token);
   const evidence = {
     repository,
     featureCommit,
-    baseCommit,
     tree,
     testedCommit,
     remoteBranch,
@@ -133,9 +112,7 @@ export const remoteIos = async ({
     );
     evidence.status = 'uploaded';
     record();
-    log(
-      `Uploaded ${featureCommit.slice(0, 8)} + main ${baseCommit.slice(0, 8)} to ${remoteBranch}.`,
-    );
+    log(`Uploaded commit ${featureCommit.slice(0, 8)} to ${remoteBranch}.`);
     log('Starting iOS build and three simulator journeys on GitHub macOS.');
     await gh(
       'workflow',
@@ -249,13 +226,6 @@ export const remoteIos = async ({
       throw new Error(
         'Local HEAD changed during validation. Rerun for the current commit.',
       );
-    const currentBase = (
-      await git('ls-remote', '--exit-code', 'origin', 'refs/heads/main')
-    ).split(/\s+/)[0];
-    if (currentBase !== baseCommit)
-      throw new Error(
-        'main changed during validation. Rerun against its latest commit.',
-      );
     evidence.status = 'passed';
     record();
     // Delete only the ref we created, and only if it still points at our commit.
@@ -286,7 +256,7 @@ export const remoteIos = async ({
 if (resolve(process.argv[1] ?? '') === fileURLToPath(import.meta.url)) {
   if (process.argv.length > 2) {
     console.log(
-      'Usage: npm run native -- remote-ios\nRequires a clean committed checkout, Git, and authenticated GitHub CLI (gh auth login).\nPushes a temporary integration branch; runs iOS on GitHub macOS, then downloads evidence.',
+      'Usage: npm run native -- remote-ios\nRequires a clean committed checkout, Git, and authenticated GitHub CLI (gh auth login).\nPushes your HEAD to a temporary branch; runs iOS on GitHub macOS, then downloads evidence.',
     );
     if (process.argv.slice(2).some((arg) => arg !== '--help'))
       process.exitCode = 1;

@@ -131,23 +131,23 @@ Native subcommands replace the previous per-platform npm wrappers. Run
 alias; focused lint, format, test and build commands remain available.
 
 Without a Mac, run `npm run native -- remote-ios` before opening a PR.
-Requires Git with `merge-tree --write-tree` support and an authenticated
+Requires Git and an authenticated
 [GitHub CLI](https://cli.github.com/) (`gh auth login`). Commit all source changes
-first. The command merges HEAD with fetched `main` in Git's object database,
-pushes that integration commit to a unique `validation/ios-*` branch, and
-dispatches the existing native workflow with `platform=ios`. Your checkout and
-index stay unchanged. The temporary ref lets GitHub select the combined snapshot
-without moving your feature branch. Ignored files, including local `.env`, are
-not uploaded.
+first. The command pushes exactly HEAD to a unique `validation/ios-*` branch and
+dispatches the existing native workflow with `platform=ios`. Your feature branch,
+checkout and index stay unchanged. The disposable ref lets GitHub fetch that
+snapshot before you publish your feature branch. Ignored files, including local
+`.env`, are not uploaded. Merge or rebase `main` yourself when needed, then rerun
+validation; the command never combines branches automatically.
 
 GitHub's standard macOS runner builds the app and runs all three journeys with
 CI's pins, setup and assertions. This is remote execution after a temporary push,
 not Windows-local iOS testing. The command requires a public repository, where
 [standard runner compute is free](https://docs.github.com/en/actions/reference/runners/github-hosted-runners).
-Logs, screenshots, source/base/tree SHAs and the run URL are saved under
-`.tmp/ios-remote/`. Missing evidence, failed/skipped iOS jobs, changed HEAD or
-moving `main` fail validation. Rerun after either branch changes; this evidence
-does not replace PR checks.
+Logs, available debug artifacts, source/tree SHAs and the run URL are saved under
+`.tmp/ios-remote/`. Missing evidence, failed/skipped iOS jobs or changed source
+fail validation. Rerun after changing your branch, including merges and rebases.
+PR checks separately validate integration with `main`.
 
 Successful runs delete only their own unchanged temporary ref. Failed or
 interrupted runs retain it for investigation; the run URL permits inspection or

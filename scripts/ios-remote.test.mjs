@@ -9,7 +9,7 @@ import { runCommand } from './process-utils.mjs';
 const feature = 'a'.repeat(40),
   base = 'b'.repeat(40),
   tree = 'c'.repeat(40),
-  tested = 'd'.repeat(40);
+  tested = feature;
 const branch = 'validation/ios-test';
 const fixture = (overrides = {}) => {
   const calls = [],
@@ -17,7 +17,7 @@ const fixture = (overrides = {}) => {
   let inspected = 0,
     clock = 0;
   const run = {
-    headSha: tested,
+    headSha: overrides.commit ?? tested,
     headBranch: branch,
     event: 'workflow_dispatch',
     status: 'completed',
@@ -39,19 +39,13 @@ const fixture = (overrides = {}) => {
   const execute = async (command, args, options) => {
     calls.push({ command, args, options });
     if (command === 'git') {
+      if (overrides.executeGit) return overrides.executeGit(args, options);
       if (args[0] === 'status') return overrides.dirty ? ' M source.js' : '';
       if (args[0] === 'remote') return 'https://github.com/owner/repo.git';
       if (args[0] === 'rev-parse') {
-        if (args[1] === 'FETCH_HEAD') return base;
+        if (args[1].endsWith('^{tree}')) return tree;
         return inspected++ && overrides.changedHead ? base : feature;
       }
-      if (args[0] === 'merge-tree') {
-        if (overrides.conflict) throw new Error('merge conflict');
-        return tree;
-      }
-      if (args[0] === 'commit-tree') return tested;
-      if (args[0] === 'ls-remote')
-        return `${overrides.changedMain ? feature : base}\trefs/heads/main`;
       return '';
     }
     assert.equal(command, 'gh');
@@ -61,11 +55,10 @@ const fixture = (overrides = {}) => {
         'view',
         'owner/repo',
         '--json',
-        'isPrivate,defaultBranchRef',
+        'isPrivate',
       ]);
       return JSON.stringify({
         isPrivate: !!overrides.private,
-        defaultBranchRef: { name: 'main' },
       });
     }
     if (args[0] === 'workflow') {
@@ -74,7 +67,7 @@ const fixture = (overrides = {}) => {
     }
     if (args[1] === 'list')
       return JSON.stringify([
-        { databaseId: 123, headSha: tested, url: run.url },
+        { databaseId: 123, headSha: overrides.commit ?? tested, url: run.url },
       ]);
     if (args.includes('--log')) return 'Assert dashboard visible ... COMPLETED';
     if (args[1] === 'view') return JSON.stringify(run);
@@ -98,12 +91,12 @@ const fixture = (overrides = {}) => {
   return { start, calls, saved, result };
 };
 
-test('remote iOS validates an integration commit, collects evidence, and deletes only its owned ref', async () => {
+test('remote iOS tests exactly HEAD, collects evidence, and deletes only its owned ref', async () => {
   const f = fixture();
   const result = await f.start();
   assert.equal(result.status, 'passed');
   assert.equal(result.featureCommit, feature);
-  assert.equal(result.baseCommit, base);
+  assert.equal(result.baseCommit, undefined);
   assert.equal(result.tree, tree);
   assert.equal(result.testedCommit, tested);
   assert.equal(result.remoteBranchDeleted, true);
@@ -136,14 +129,19 @@ test('remote iOS validates an integration commit, collects evidence, and deletes
     ],
   );
   assert.ok(f.saved.get('workflow.log').includes('COMPLETED'));
+  assert.ok(
+    !f.calls.some(
+      ({ command, args }) =>
+        command === 'git' &&
+        ['fetch', 'merge', 'rebase', 'merge-tree', 'commit-tree'].includes(
+          args[0],
+        ),
+    ),
+  );
 });
 
-test('dirty checkouts, private repositories and merge conflicts never upload source', async () => {
-  for (const scenario of [
-    { dirty: true },
-    { private: true },
-    { conflict: true },
-  ]) {
+test('dirty checkouts and private repositories never upload source', async () => {
+  for (const scenario of [{ dirty: true }, { private: true }]) {
     const f = fixture(scenario);
     await assert.rejects(f.start());
     assert.ok(
@@ -156,7 +154,7 @@ test('failed, cancelled, unrelated, skipped and incomplete native runs never pro
   for (const run of [
     { conclusion: 'failure' },
     { conclusion: 'cancelled' },
-    { headSha: feature },
+    { headSha: base },
     { headBranch: 'other' },
     { event: 'pull_request' },
     { jobs: [] },
@@ -176,10 +174,9 @@ test('failed, cancelled, unrelated, skipped and incomplete native runs never pro
   }
 });
 
-test('changed source, moving main and missing evidence fail and retain the remote ref', async () => {
+test('changed source and missing evidence fail and retain the remote ref', async () => {
   for (const scenario of [
     { changedHead: true },
-    { changedMain: true },
     { artifactFailure: true },
     { dispatchFailure: true },
   ]) {
@@ -215,8 +212,8 @@ test('repository URL parsing accepts GitHub HTTPS and SSH without accepting othe
     assert.throws(() => githubRepository(url));
 });
 
-test('real git integration trees include both branches without modifying checkout or index; conflicts fail', async () => {
-  const directory = mkdtempSync(join(tmpdir(), 'stead-ios-integration-'));
+test('a diverged main is never combined with the real checked-out feature commit', async () => {
+  const directory = mkdtempSync(join(tmpdir(), 'stead-ios-snapshot-'));
   const git = async (...args) =>
     (
       await runCommand('git', args, {
@@ -232,42 +229,39 @@ test('real git integration trees include both branches without modifying checkou
     writeFileSync(join(directory, 'shared'), 'original\n');
     await git('add', '.');
     await git('commit', '-m', 'base');
-    const original = await git('rev-parse', 'HEAD');
     await git('switch', '-c', 'feature');
-    writeFileSync(join(directory, 'feature'), 'feature\n');
+    writeFileSync(join(directory, 'shared'), 'feature version\n');
     await git('add', '.');
     await git('commit', '-m', 'feature');
     const featureCommit = await git('rev-parse', 'HEAD');
     await git('switch', 'main');
-    writeFileSync(join(directory, 'main'), 'main\n');
+    writeFileSync(join(directory, 'shared'), 'conflicting main version\n');
     await git('add', '.');
     await git('commit', '-m', 'main');
-    const baseCommit = await git('rev-parse', 'HEAD');
     await git('switch', 'feature');
-    const merged = await git(
-      'merge-tree',
-      '--write-tree',
-      featureCommit,
-      baseCommit,
+    const f = fixture({
+      commit: featureCommit,
+      executeGit: async (args) => {
+        if (args[0] === 'remote') return 'https://github.com/owner/repo.git';
+        if (args[0] === 'push') return '';
+        assert.ok(
+          ['status', 'rev-parse'].includes(args[0]),
+          'validation must only inspect the checkout',
+        );
+        return git(...args);
+      },
+    });
+    const result = await f.start();
+    assert.equal(result.testedCommit, featureCommit);
+    assert.equal(
+      result.tree,
+      await git('rev-parse', `${featureCommit}^{tree}`),
     );
-    assert.equal(await git('show', `${merged}:feature`), 'feature');
-    assert.equal(await git('show', `${merged}:main`), 'main');
     assert.equal(await git('rev-parse', 'HEAD'), featureCommit);
     assert.equal(await git('status', '--porcelain'), '');
-    assert.equal(readFileSync(join(directory, 'shared'), 'utf8'), 'original\n');
-    writeFileSync(join(directory, 'shared'), 'feature version\n');
-    await git('add', '.');
-    await git('commit', '-m', 'conflict feature');
-    const conflict = await git('rev-parse', 'HEAD');
-    await git('switch', '-c', 'conflicting-main', original);
-    writeFileSync(join(directory, 'shared'), 'main version\n');
-    await git('add', '.');
-    await git('commit', '-m', 'conflict main');
-    await assert.rejects(git('merge-tree', '--write-tree', conflict, 'HEAD'));
-    assert.equal(await git('status', '--porcelain'), '');
     assert.equal(
-      readFileSync(join(directory, 'shared'), 'utf8'),
-      'main version\n',
+      readFileSync(join(directory, 'shared'), 'utf8').trim(),
+      'feature version',
     );
   } finally {
     rmSync(directory, { recursive: true, force: true });
