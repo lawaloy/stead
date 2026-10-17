@@ -28,7 +28,7 @@ import {
 } from './android-emulator.mjs';
 import { iosEnvironment } from './ios-setup.mjs';
 import { buildAndroidGradle } from './native-gradle.mjs';
-import { repeatJourneys } from './native-attempts.mjs';
+import { repeatJourneys, runMaestroCommand } from './native-attempts.mjs';
 export { repeatJourneys } from './native-attempts.mjs';
 import {
   TOOLCHAIN,
@@ -320,7 +320,7 @@ const runAttempt = async (platform, options, tools, app, pool, directory) => {
       }
       const device =
         platform === 'android' ? tools.device : tools.simulator.udid;
-      await runCommand(
+      await runMaestroCommand(
         tools.maestro,
         [
           'test',

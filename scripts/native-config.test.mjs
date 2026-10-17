@@ -20,6 +20,49 @@ import {
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { runMaestroCommand } from './native-attempts.mjs';
+
+test('a hung Maestro process is stopped and reported as a failed attempt', async () => {
+  const attempts = await repeatJourneys(2, async (attempt) => {
+    if (attempt === 1)
+      await runMaestroCommand(
+        process.execPath,
+        ['-e', 'setInterval(() => {}, 1000)'],
+        { quiet: true },
+        { timeoutMs: 200 },
+      );
+  });
+  assert.deepEqual(
+    attempts.map((attempt) => attempt.status),
+    ['failed', 'passed'],
+  );
+  assert.match(
+    attempts[0].error,
+    /Maestro exceeded its 200 ms process deadline/,
+  );
+});
+
+test('the Maestro deadline preserves caller cancellation and validates its budget before spawning', async () => {
+  const controller = new AbortController();
+  const reason = new Error('User cancelled validation');
+  controller.abort(reason);
+  await assert.rejects(
+    runMaestroCommand(
+      'unused',
+      [],
+      { signal: controller.signal },
+      {
+        execute: async (_command, _args, { signal }) => signal.throwIfAborted(),
+      },
+    ),
+    (error) => error === reason,
+  );
+  for (const timeoutMs of [0, -1, NaN])
+    await assert.rejects(
+      runMaestroCommand('unused', [], {}, { timeoutMs }),
+      /positive integer/,
+    );
+});
 
 test('Android build preflight rejects missing packages and different SDK revisions', () => {
   const sdk = mkdtempSync(join(tmpdir(), 'stead sdk '));

@@ -52,6 +52,9 @@ gates before pushing; they enforce ordering and test database isolation.
   step preserves credentials and verifies session restoration.
 - Repeats use fresh fixtures and retain every result. Any failed attempt or
   container OOM kill fails the command, even if later attempts pass.
+- Each Maestro process has the shared 12-minute deadline in `.github/ci.env`.
+  A driver/JVM hang fails the attempt and stops its process tree so cleanup and
+  evidence collection can finish. App assertion timeouts remain independent.
 
 ## Native and Security Setup
 
