@@ -8,30 +8,29 @@ workflow, see [Contributing](../CONTRIBUTING.md).
 
 ## Command Matrix
 
-| Command                                                     | Purpose                                                                                                       |
-| ----------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
-| `npm run bootstrap`                                         | Install all dependencies, initialize missing env files, start PostgreSQL, and apply development migrations.   |
-| `npm run env:init`                                          | Create missing env files from examples and generate three independent API secrets. Preserve existing files.   |
-| `npm run db:start` / `npm run db:stop`                      | Start and wait for PostgreSQL, or stop it while preserving its volume.                                        |
-| `npm run dev:prepare`                                       | Initialize missing env files, start PostgreSQL, and migrate the development database.                         |
-| `npm run dev:api` / `npm run dev:mobile`                    | Start the API or Expo using its package's `.env`.                                                             |
-| `npm run verify`                                            | Check tool versions, formatting, workflows, automation tests, lint, contracts, types, unit tests, and builds. |
-| `npm run test:e2e:local`                                    | Migrate the isolated `e2e` schema and run API e2e tests with safe test settings.                              |
-| `npm run test:journey:local`                                | Migrate `e2e_mobile`, start the API, run the real mobile API-client journey, and stop the API.                |
-| `npm run verify:full`                                       | Run `verify`, API e2e tests, and the API-client journey.                                                      |
-| `npm run dependencies:check`                                | Run root, API, and mobile audits with the committed expiring exceptions.                                      |
-| `npm run mobile:compatibility:check`                        | Check Expo dependencies and run the pinned Expo Doctor against online maintenance metadata.                   |
-| `npm run workflows:check`                                   | Run workflow contracts, actionlint, and ShellCheck in a pinned container.                                     |
-| `npm run tools:install:maestro`                             | Install the checksum-verified Maestro release into ignored repository storage.                                |
-| `npm run tools:install:android -- --accept-licenses`        | Install the checksum-locked Android SDK after reviewing its license.                                          |
-| `npm run native:setup:ios`                                  | Select pinned Xcode and prepare the dedicated simulator on macOS.                                             |
-| `npm run native:doctor -- --platform android`               | Check the native toolchain and a booted emulator. Use `ios` on a Mac.                                         |
-| `npm run native:build:android` / `npm run native:build:ios` | Build a debug APK or signed simulator app using CI's recipe.                                                  |
-| `npm run test:native:android` / `npm run test:native:ios`   | Build and run the Maestro journey on a prepared emulator or dedicated iOS simulator.                          |
-| `npm run test:native:android:managed`                       | Run the journey with an automatically managed fresh Android emulator.                                         |
-| `npm run test:native:android:container`                     | Build and run Android in CI's controlled Linux/KVM container.                                                 |
-| `npm run security:codeql:local`                             | Run the pinned CodeQL bundle and fail on unsuppressed warnings/errors.                                        |
-| `npm run validate -- --platform android`                    | Run audits, `verify:full`, CodeQL, a native source build, and UI journeys.                                    |
+| Command                                              | Purpose                                                                                                       |
+| ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `npm run bootstrap`                                  | Install all dependencies, initialize missing env files, start PostgreSQL, and apply development migrations.   |
+| `npm run env:init`                                   | Create missing env files from examples and generate three independent API secrets. Preserve existing files.   |
+| `npm run db:start` / `npm run db:stop`               | Start and wait for PostgreSQL, or stop it while preserving its volume.                                        |
+| `npm run dev:prepare`                                | Initialize missing env files, start PostgreSQL, and migrate the development database.                         |
+| `npm run dev:api` / `npm run dev:mobile`             | Start the API or Expo using its package's `.env`.                                                             |
+| `npm run verify`                                     | Check tool versions, formatting, workflows, automation tests, lint, contracts, types, unit tests, and builds. |
+| `npm run test:e2e:local`                             | Migrate the isolated `e2e` schema and run API e2e tests with safe test settings.                              |
+| `npm run test:journey:local`                         | Migrate `e2e_mobile`, start the API, run the real mobile API-client journey, and stop the API.                |
+| `npm run verify:full`                                | Run `verify`, API e2e tests, and the API-client journey.                                                      |
+| `npm run dependencies:check`                         | Run root, API, and mobile audits with the committed expiring exceptions.                                      |
+| `npm run mobile:compatibility:check`                 | Check Expo dependencies and run the pinned Expo Doctor against online maintenance metadata.                   |
+| `npm run workflows:check`                            | Run workflow contracts, actionlint, and ShellCheck in a pinned container.                                     |
+| `npm run tools:install:maestro`                      | Install the checksum-verified Maestro release into ignored repository storage.                                |
+| `npm run tools:install:android -- --accept-licenses` | Install the checksum-locked Android SDK after reviewing its license.                                          |
+| `npm run native -- setup --platform ios`             | Select pinned Xcode and prepare the dedicated simulator on macOS.                                             |
+| `npm run native -- doctor --platform android`        | Check the native toolchain and a booted emulator. Use `ios` on a Mac.                                         |
+| `npm run native -- build --platform android`         | Build a simulator app using CI's recipe. Use `ios` on a Mac.                                                  |
+| `npm run native -- test --platform android`          | Run the journey on a prepared device. Select `--android-runner managed` or `container` to own the emulator.   |
+| `npm run native -- remote-ios`                       | From Windows/Linux/macOS, push a temporary integration branch and run iOS on GitHub's Mac.                    |
+| `npm run security:codeql:local`                      | Run the pinned CodeQL bundle and fail on unsuppressed warnings/errors.                                        |
+| `npm run validate -- --platform android`             | Run audits, `verify:full`, CodeQL, a native source build, and UI journeys.                                    |
 
 Package-level scripts remain available for focused iteration. Use the root
 gates before pushing; they enforce ordering and test database isolation.
@@ -53,6 +52,9 @@ gates before pushing; they enforce ordering and test database isolation.
   step preserves credentials and verifies session restoration.
 - Repeats use fresh fixtures and retain every result. Any failed attempt or
   container OOM kill fails the command, even if later attempts pass.
+- Each Maestro process has the shared 12-minute deadline in `.github/ci.env`.
+  A driver/JVM hang fails the attempt and stops its process tree so cleanup and
+  evidence collection can finish. App assertion timeouts remain independent.
 
 ## Native and Security Setup
 
@@ -85,7 +87,7 @@ Host CPU/RAM, KVM, kernel and Docker health remain external requirements.
 
 **iOS:** macOS is required for Xcode and simulator execution; Windows, WSL and
 Docker cannot run this gate. Install the pinned Xcode/runtime, Ruby and Bundler,
-then run `bundle install` in `mobile/` and `npm run native:setup:ios` at the root.
+then run `bundle install` in `mobile/` and `npm run native -- setup --platform ios` at the root.
 Setup selects Xcode without changing the machine default and creates the
 dedicated simulator. Builds use locked CocoaPods and validate simulator
 keychain entitlements. `IOS_DRIVER_STARTUP_TIMEOUT_MS` sets the shared driver
@@ -127,8 +129,34 @@ local configuration with `git config --local --unset core.hooksPath` if
 `git config --get core.hooksPath` reports `.githooks`. Preserve custom hook
 configurations.
 
-A Mac must run the iOS gate before pushing to provide local iOS evidence.
-Without one, require macOS CI results before merging and report that local gap.
+Native subcommands replace the previous per-platform npm wrappers. Run
+`npm run native` for usage. `verify` retains all stages of the removed `check`
+alias; focused lint, format, test and build commands remain available.
+
+Without a Mac, run `npm run native -- remote-ios` before opening a PR.
+Requires Git and an authenticated
+[GitHub CLI](https://cli.github.com/) (`gh auth login`). Commit all source changes
+first. The command pushes exactly HEAD to a unique `validation/ios-*` branch and
+dispatches the existing native workflow with `platform=ios`. Your feature branch,
+checkout and index stay unchanged. The disposable ref lets GitHub fetch that
+snapshot before you publish your feature branch. Ignored files, including local
+`.env`, are not uploaded. Merge or rebase `main` yourself when needed, then rerun
+validation; the command never combines branches automatically.
+
+GitHub's standard macOS runner builds the app and runs all three journeys with
+CI's pins, setup and assertions. This is remote execution after a temporary push,
+not Windows-local iOS testing. The command requires a public repository, where
+[standard runner compute is free](https://docs.github.com/en/actions/reference/runners/github-hosted-runners).
+Logs, available debug artifacts, source/tree SHAs and the run URL are saved under
+`.tmp/ios-remote/`. Missing evidence, failed/skipped iOS jobs or changed source
+fail validation. Rerun after changing your branch, including merges and rebases.
+PR checks separately validate integration with `main`.
+
+Successful runs delete only their own unchanged temporary ref. Failed or
+interrupted runs retain it for investigation; the run URL permits inspection or
+cancellation. Remove the recorded branch with `git push origin --delete <branch>`
+when finished. Interrupting the local command does not cancel the remote run.
+
 GitHub permissions, events, caches, artifacts, PR automation, dependency review
 and branch protection require GitHub execution. Portable workflow/setup tests
 cover contracts, not those integrations. Hosted runner image updates also

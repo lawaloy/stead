@@ -59,22 +59,22 @@ assert.match(
 );
 assert.match(
   nativeWorkflow,
-  /npm run native:build:android/,
+  /npm run native -- build --platform android/,
   'CI Android builds must reuse the local build command.',
 );
 assert.match(
   nativeWorkflow,
-  /npm run native:build:ios -- --project-ready/,
+  /npm run native -- build --platform ios --project-ready/,
   'CI iOS builds must reuse the local build command after prebuild.',
 );
 assert.match(
   nativeWorkflow,
-  /node scripts\/native-workflow\.mjs test --platform ios --database-ready/,
+  /npm run native -- test --platform ios --database-ready/,
   'CI iOS journeys must reuse the local runner.',
 );
 assert.match(
   androidJourney,
-  /android-container\.mjs" --database-ready/,
+  /native-workflow\.mjs" test --platform android --android-runner container --database-ready/,
   'CI Android journeys must reuse the local runner.',
 );
 assert.match(
@@ -119,6 +119,11 @@ assert.equal(
   JSON.parse(rootPackage).scripts.validate,
   'node scripts/native-workflow.mjs verify',
   'The complete local gate must use the shared native runner.',
+);
+assert.equal(
+  JSON.parse(rootPackage).scripts.native,
+  'node scripts/native-workflow.mjs',
+  'Native subcommands must share one public entry point.',
 );
 assert.match(
   ciWorkflow,
@@ -174,7 +179,7 @@ assert.match(
 );
 assert.match(
   nativeWorkflow,
-  /npm run test:native:android:container/,
+  /npm run native -- test --platform android --android-runner container/,
   'Native CI must reuse the locally tested controlled container runner.',
 );
 assert.match(
@@ -189,9 +194,25 @@ assert.doesNotMatch(
 );
 assert.match(
   nativeWorkflow,
-  /npm run native:setup:ios/,
+  /npm run native -- setup --platform ios/,
   'iOS CI must select the pinned Xcode and runtime.',
 );
+assert.match(
+  nativeWorkflow,
+  /options: \[all, ios, android\]/,
+  'Manual native preflight must support iOS without allocating Android runners.',
+);
+for (const [job, excluded] of [
+  ['build-android', 'ios'],
+  ['build-ios', 'android'],
+])
+  assert.match(
+    nativeWorkflow,
+    new RegExp(
+      `${job}:\\n\\s+needs: config\\n\\s+if: .*inputs\\.platform != '${excluded}'`,
+    ),
+    `Manual platform selection must control ${job}.`,
+  );
 assert.match(
   nativeWorkflow,
   /working-directory: mobile\n/,
