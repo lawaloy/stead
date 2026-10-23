@@ -230,6 +230,14 @@ for (const job of ['build-ios', 'native-ios']) {
 }
 assert.match(
   nativeWorkflow,
+  /ios_pilot:\n\s+description:.*\n\s+type: boolean\n\s+default: false/,
+  'The experimental iOS pilot must be opt-in.',
+);
+const iosJourney = nativeWorkflow.split('  native-ios:\n')[1];
+assert.doesNotMatch(iosJourney, /setup-java|install-maestro|Cache Maestro/);
+assert.match(iosJourney, /Detox compatibility pilot/);
+assert.match(
+  nativeWorkflow,
   /working-directory: mobile\n/,
   'iOS bundler must use the committed mobile Gemfile.',
 );

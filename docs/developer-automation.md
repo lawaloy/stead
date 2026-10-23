@@ -44,7 +44,7 @@ gates before pushing; they enforce ordering and test database isolation.
   `e2e_native_<random>` schema. Local `.env` files do not select the native backend.
 - Journeys reject occupied ports without stopping their owners. Use
   `STEAD_TEST_API_PORT=3001` for the API-client journey or `--api-port 3001`
-  for native commands. Native debug apps require Metro
+  for native commands. Android debug apps require Metro
   port 8081; stop an existing Metro session first.
 - Managed runs remove only their owned emulator data and services. Native
   Android validation rejects physical devices; iOS setup clears the dedicated
@@ -90,7 +90,10 @@ Docker cannot run this gate. Install the pinned Xcode/runtime, Ruby and Bundler,
 then run `bundle install` in `mobile/` and `npm run native -- setup --platform ios` at the root.
 Setup selects Xcode without changing the machine default and creates the
 dedicated simulator. Builds use locked CocoaPods and validate simulator
-keychain entitlements. `IOS_DRIVER_STARTUP_TIMEOUT_MS` sets the shared driver
+keychain entitlements. The experimental Detox pilot uses a Release simulator
+app with bundled JavaScript and no Metro server. Its API URL is fixed at build
+time: use the same `--api-port` for build and test. Tool versions and separate
+three-minute preparation/four-minute execution deadlines are shared with CI. `IOS_DRIVER_STARTUP_TIMEOUT_MS` sets the shared driver
 startup budget; app assertions keep their own limits.
 
 Use `--platform ios` for iOS or `--platform all` where both pinned environments
@@ -141,9 +144,25 @@ and portable checks remain active; passing them provides no native iOS evidence.
 The existing iOS sources and manual macOS commands are retained for replacement
 work. Windows/WSL still cannot execute iOS simulator tests.
 
-Re-enable the switch only after a replacement journey passes repeated fresh
-simulator runs, preserves the financial and signed-in cold-start assertions,
-and reports failures within a bounded execution time.
+An experimental Detox probe is available through `native -- test --platform ios`.
+It covers launch, exact keyboard input, an app-native alert and signed-in process
+restoration against an isolated real API. It does **not** cover the full financial
+journey and is not a replacement merge gate yet. On Windows, dispatch `native-ci`
+on the feature branch with `platform=ios` and `ios_pilot=true`; execution uses a
+free standard hosted Mac. No temporary validation branch or new npm command is
+needed. Ordinary PR/main runs still skip iOS while the switch is false. The pilot
+currently adds three moderate `stream-json` advisories through Detox tooling;
+they remain unexcepted and block merging. Its fixed major version changes the
+parser API, so an untested override is not applied.
+
+Before re-enabling iOS, qualify the exact app/framework versions on fresh hosts
+without retries, then port separate authentication, financial CRUD (including
+editing/recalculation) and signed-in restoration scenarios. Preserve all failed
+attempts. An unresolved React Native input defect must remain a product blocker.
+Detox 20.51.1 uses real keyboard events with a built-in 50 ms interval; a pilot
+pass does not establish that the fast-input React Native race is fixed. Retain
+separate native input regression evidence. Do not add setters, prefilled fields
+or extra typing delays to make that regression pass.
 
 GitHub permissions, events, caches, artifacts, PR automation, dependency review
 and branch protection require GitHub execution. Portable workflow/setup tests

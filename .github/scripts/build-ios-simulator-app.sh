@@ -13,6 +13,11 @@ export BUNDLE_GEMFILE="$MOBILE/Gemfile"
 export BUNDLE_FROZEN=true
 bundle exec pod install
 
+export EXPO_NO_DOTENV=1
+export EXPO_PUBLIC_API_URL="${EXPO_PUBLIC_API_URL:-http://127.0.0.1:3000}"
+# Exercise keyboard entry rather than the old prefilled phone workaround.
+export EXPO_PUBLIC_E2E_PHONE=
+
 mkdir -p "$DERIVED"
 defaults write com.apple.dt.XCBuild IgnoreFileSystemDeviceInodeChanges -bool YES
 
@@ -29,7 +34,7 @@ SIMULATOR_ENTITLEMENTS="$DERIVED/SteadSimulator.entitlements"
 xcodebuild \
   -workspace mobile.xcworkspace \
   -scheme mobile \
-  -configuration Debug \
+  -configuration Release \
   -sdk iphonesimulator \
   -destination 'generic/platform=iOS Simulator' \
   -derivedDataPath "$DERIVED" \
@@ -42,8 +47,11 @@ xcodebuild \
   IgnoreFileSystemDeviceInodeChanges=YES \
   build
 
-APP_PATH="$DERIVED/Build/Products/Debug-iphonesimulator/mobile.app"
+APP_PATH="$DERIVED/Build/Products/Release-iphonesimulator/mobile.app"
 test -d "$APP_PATH"
+test -s "$APP_PATH/main.jsbundle"
+node -e 'require("node:fs").writeFileSync(process.argv[1], JSON.stringify({configuration:"Release", apiUrl:process.env.EXPO_PUBLIC_API_URL, bundledJavaScript:true, phoneSeeded:false, sourceCommit:require("node:child_process").execFileSync("git", ["rev-parse", "HEAD"], {encoding:"utf8"}).trim()}))' "$APP_PATH/stead-e2e-build.json"
+codesign --force --sign - --entitlements "$SIMULATOR_ENTITLEMENTS" "$APP_PATH"
 codesign --verify "$APP_PATH"
 # Simulator entitlements live in the Mach-O __TEXT section, separate from
 # the macOS ad-hoc signature. Check every architecture in the published app.

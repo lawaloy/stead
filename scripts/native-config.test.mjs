@@ -122,7 +122,6 @@ test('a different Java patch or distribution cannot pass native preflight', asyn
 import {
   withOwnedSchema,
   repeatJourneys,
-  prepareIosSimulator,
   runNativeCommand,
 } from './native-workflow.mjs';
 
@@ -199,39 +198,6 @@ test('ambiguous native actions fail before any device, remote push or setup oper
     await assert.rejects(runNativeCommand(args, handlers));
   assert.equal(executions, 0);
   assert.deepEqual(parseNativeArguments([]), { command: 'help' });
-});
-
-test('repeated iOS runs query current state and do not boot an already running simulator', async () => {
-  let state = 'Shutdown',
-    boots = 0,
-    installs = 0;
-  const execute = async (command, args) => {
-    assert.equal(command, 'xcrun');
-    if (args[1] === 'list')
-      return JSON.stringify({
-        devices: {
-          [TOOLCHAIN.IOS_RUNTIME]: [
-            {
-              name: 'Stead Native iPhone 17',
-              udid: 'test',
-              isAvailable: true,
-              state,
-            },
-          ],
-        },
-      });
-    if (args[1] === 'boot') {
-      if (state === 'Booted') throw new Error('cannot boot twice');
-      state = 'Booted';
-      boots++;
-    }
-    if (args[1] === 'install') installs++;
-    return '';
-  };
-  await prepareIosSimulator('test', 'mobile.app', execute);
-  await prepareIosSimulator('test', 'mobile.app', execute);
-  assert.equal(boots, 1);
-  assert.equal(installs, 2);
 });
 
 test('native fixtures cannot target remote databases or modify an unowned schema', () => {

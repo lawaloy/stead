@@ -20,13 +20,14 @@ import {
   bundleUrl,
   parseNativeArguments,
 } from './native-config.mjs';
-import { checkNativeToolchain, selectIosDevice } from './native-toolchain.mjs';
+import { checkNativeToolchain } from './native-toolchain.mjs';
 import { checkCodeQL, scanCodeQL } from './codeql-local.mjs';
 import {
   assertAndroidUiHealthy,
   managedAndroidWorkflow,
 } from './android-emulator.mjs';
 import { iosEnvironment } from './ios-setup.mjs';
+import { runIosDetox, hashIosApp, assertIosBuild } from './ios-detox.mjs';
 import { buildAndroidGradle } from './native-gradle.mjs';
 import { repeatJourneys, runMaestroCommand } from './native-attempts.mjs';
 export { repeatJourneys } from './native-attempts.mjs';
@@ -92,22 +93,12 @@ export const nativeSourceIdentity = async (options, execute = runCommand) => ({
   build: options.sourceBuilt || !options.app ? 'source' : 'provided-artifact',
 });
 
-export const prepareIosSimulator = async (id, app, execute = runCommand) => {
-  const listing = JSON.parse(
-    await execute(
-      'xcrun',
-      ['simctl', 'list', 'devices', 'available', '--json'],
-      { quiet: true, stdoutOnly: true },
-    ),
-  );
-  const current = selectIosDevice(listing, id);
-  if (current.state !== 'Booted')
-    await execute('xcrun', ['simctl', 'boot', id]);
-  await execute('xcrun', ['simctl', 'bootstatus', id, '-b']);
-  await execute('xcrun', ['simctl', 'install', id, app]);
-};
-
-const buildApp = async (platform, signal, projectReady = false) => {
+const buildApp = async (
+  platform,
+  signal,
+  projectReady = false,
+  apiPort = 3000,
+) => {
   const { tools } = await checkNativeToolchain(platform, {
     requireDevice: false,
     requireMaestro: false,
@@ -115,7 +106,12 @@ const buildApp = async (platform, signal, projectReady = false) => {
       runCommand(command, args, { ...options, signal }),
   });
   let env = { ...process.env, CI: '1', EXPO_NO_DOTENV: '1' };
-  if (platform === 'ios') env = iosEnvironment(env);
+  if (platform === 'ios')
+    env = iosEnvironment({
+      ...env,
+      EXPO_PUBLIC_API_URL: `http://127.0.0.1:${apiPort}`,
+      EXPO_PUBLIC_E2E_PHONE: '',
+    });
   if (!projectReady)
     await runCommand(
       process.execPath,
@@ -205,7 +201,7 @@ const runAttempt = async (platform, options, tools, app, pool, directory) => {
       'Android emulator is not boot-ready. Restore emulator health before starting another attempt.',
     );
   await assertPortAvailable(options.apiPort);
-  await assertPortAvailable(options.metroPort);
+  if (platform === 'android') await assertPortAvailable(options.metroPort);
   const schema = newSchema();
   const base = process.env.STEAD_NATIVE_DATABASE_URL || BASE_DATABASE;
   const databaseUrl = nativeDatabaseUrl(base, schema);
@@ -213,6 +209,7 @@ const runAttempt = async (platform, options, tools, app, pool, directory) => {
   if (platform === 'ios') env = iosEnvironment(env);
   const apiUrl = `http://127.0.0.1:${options.apiPort}`;
   const metroUrl = `http://127.0.0.1:${options.metroPort}`;
+  const build = platform === 'ios' ? assertIosBuild(app, apiUrl) : undefined;
   mkdirSync(directory, { recursive: true });
   return withOwnedSchema(pool, schema, async () => {
     let api, metro;
@@ -235,6 +232,20 @@ const runAttempt = async (platform, options, tools, app, pool, directory) => {
       await waitForEndpoint(`${apiUrl}/auth/countries`, api, {
         signal: options.signal,
       });
+      const appId = JSON.parse(readFileSync(join(MOBILE, 'app.json'), 'utf8'))
+        .expo[platform === 'android' ? 'android' : 'ios'][
+        platform === 'android' ? 'package' : 'bundleIdentifier'
+      ];
+      if (platform === 'ios') {
+        const result = await runIosDetox({
+          app,
+          directory,
+          env,
+          signal: options.signal,
+          phone: options.phone,
+        });
+        return { schema, directory, build, ...result };
+      }
       metro = logService(
         process.execPath,
         [EXPO, 'start', '--localhost', '--port', String(options.metroPort)],
@@ -257,10 +268,6 @@ const runAttempt = async (platform, options, tools, app, pool, directory) => {
           response.ok &&
           (await response.text()).includes('packager-status:running'),
       });
-      const appId = JSON.parse(readFileSync(join(MOBILE, 'app.json'), 'utf8'))
-        .expo[platform === 'android' ? 'android' : 'ios'][
-        platform === 'android' ? 'package' : 'bundleIdentifier'
-      ];
       const bundle = await fetch(
         bundleUrl(platform, options.metroPort, appId),
         {
@@ -312,14 +319,8 @@ const runAttempt = async (platform, options, tools, app, pool, directory) => {
           }
         }
         await adb(['install', '-r', app]);
-      } else {
-        const id = tools.simulator.udid;
-        await prepareIosSimulator(id, app, (command, args, config) =>
-          runCommand(command, args, { ...config, env, signal: options.signal }),
-        );
       }
-      const device =
-        platform === 'android' ? tools.device : tools.simulator.udid;
+      const device = tools.device;
       await runMaestroCommand(
         tools.maestro,
         [
@@ -387,8 +388,11 @@ export const nativeWorkflow = async (options) => {
           ...options,
           execute: (command, args, config) =>
             runCommand(command, args, { ...config, signal: options.signal }),
-          requireDevice: options.command !== 'build' && !options.prepareOnly,
-          requireMaestro: options.command !== 'build',
+          requireDevice:
+            (platform === 'android' || options.command === 'doctor') &&
+            options.command !== 'build' &&
+            !options.prepareOnly,
+          requireMaestro: platform === 'android' && options.command !== 'build',
           requireBuild:
             options.command === 'doctor' ||
             options.command === 'build' ||
@@ -406,12 +410,13 @@ export const nativeWorkflow = async (options) => {
     if (options.command === 'build') {
       for (const platform of platforms)
         console.log(
-          `Built ${await buildApp(platform, options.signal, options.projectReady)}`,
+          `Built ${await buildApp(platform, options.signal, options.projectReady, options.apiPort)}`,
         );
       return;
     }
     await assertPortAvailable(options.apiPort);
-    await assertPortAvailable(options.metroPort);
+    if (platforms.includes('android'))
+      await assertPortAvailable(options.metroPort);
     if (options.command === 'verify') {
       await checkCodeQL({ signal: options.signal });
       await runCommand('npm', ['run', 'dependencies:check'], {
@@ -466,7 +471,7 @@ export const nativeWorkflow = async (options) => {
         const platform = platforms[index];
         const app = options.app
           ? resolve(options.app)
-          : await buildApp(platform, options.signal);
+          : await buildApp(platform, options.signal, false, options.apiPort);
         if (!existsSync(app))
           throw new Error(`Native app artifact is missing: ${app}`);
         const metadata = {
@@ -486,14 +491,16 @@ export const nativeWorkflow = async (options) => {
               join(output, platform, `attempt-${attempt}`),
             ),
           options.signal,
+          { stopOnFailure: platform === 'ios' },
         );
-        const artifact = platform === 'android' ? app : join(app, 'mobile');
+        const artifactSha256 =
+          platform === 'ios'
+            ? hashIosApp(app)
+            : createHash('sha256').update(readFileSync(app)).digest('hex');
         results.push({
           ...metadata,
           app,
-          artifactSha256: createHash('sha256')
-            .update(readFileSync(artifact))
-            .digest('hex'),
+          artifactSha256,
           attempts,
         });
         mkdirSync(output, { recursive: true });

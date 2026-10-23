@@ -342,11 +342,7 @@ test('Xcode release and build are checked separately from simulator runtime', as
     host: 'darwin',
     env: { MAESTRO_DRIVER_STARTUP_TIMEOUT: '1' },
     exists: () => true,
-    execute: async (command, args, options) => {
-      assert.equal(
-        options.env.MAESTRO_DRIVER_STARTUP_TIMEOUT,
-        TOOLCHAIN.IOS_DRIVER_STARTUP_TIMEOUT_MS,
-      );
+    execute: async (command, args) => {
       if (command === 'xcodebuild')
         return `Xcode ${TOOLCHAIN.XCODE_VERSION}\nBuild version ${TOOLCHAIN.XCODE_BUILD}`;
       if (args.includes('runtimes'))
@@ -365,5 +361,5 @@ test('Xcode release and build are checked separately from simulator runtime', as
     },
   });
   assert.ok(env.DEVELOPER_DIR.includes(TOOLCHAIN.XCODE_VERSION));
-  assert.equal(env.MAESTRO_DRIVER_STARTUP_TIMEOUT, '240000');
+  assert.equal(env.MAESTRO_DRIVER_STARTUP_TIMEOUT, '1');
 });

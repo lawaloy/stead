@@ -34,7 +34,12 @@ export const runMaestroCommand = async (
   }
 };
 
-export const repeatJourneys = async (count, operation, signal) => {
+export const repeatJourneys = async (
+  count,
+  operation,
+  signal,
+  { stopOnFailure = false } = {},
+) => {
   const attempts = [];
   for (let index = 0; index < count; index += 1) {
     if (signal?.aborted) break;
@@ -50,6 +55,7 @@ export const repeatJourneys = async (count, operation, signal) => {
         status: 'failed',
         error: error.message,
       });
+      if (stopOnFailure) break;
     }
   }
   return attempts;

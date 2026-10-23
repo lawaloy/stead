@@ -6,9 +6,6 @@ import { runCommand } from './process-utils.mjs';
 
 export const iosEnvironment = (env = process.env) => ({
   ...env,
-  // Cold hosted simulators can finish launching XCTest after Maestro's
-  // two-minute default. This bounds driver startup, not app assertions.
-  MAESTRO_DRIVER_STARTUP_TIMEOUT: TOOLCHAIN.IOS_DRIVER_STARTUP_TIMEOUT_MS,
   DEVELOPER_DIR:
     env.DEVELOPER_DIR ||
     `/Applications/Xcode_${TOOLCHAIN.XCODE_VERSION}.app/Contents/Developer`,
