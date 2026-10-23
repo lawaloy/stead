@@ -78,6 +78,7 @@ const fixture = (overrides = {}) => {
   const start = () =>
     remoteIos({
       root: '/unused',
+      iosEnabled: true,
       execute,
       token: 'test',
       log: () => {},
@@ -90,6 +91,22 @@ const fixture = (overrides = {}) => {
   const result = () => JSON.parse(saved.get('result.json'));
   return { start, calls, saved, result };
 };
+
+test('disabled iOS validation stops before invoking Git or GitHub', async () => {
+  for (const config of [{}, { iosEnabled: false }]) {
+    let calls = 0;
+    await assert.rejects(
+      remoteIos({
+        ...config,
+        execute: async () => {
+          calls++;
+        },
+      }),
+      /temporarily disabled/,
+    );
+    assert.equal(calls, 0);
+  }
+});
 
 test('remote iOS tests exactly HEAD, collects evidence, and deletes only its owned ref', async () => {
   const f = fixture();

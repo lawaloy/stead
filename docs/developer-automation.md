@@ -28,7 +28,7 @@ workflow, see [Contributing](../CONTRIBUTING.md).
 | `npm run native -- doctor --platform android`        | Check the native toolchain and a booted emulator. Use `ios` on a Mac.                                         |
 | `npm run native -- build --platform android`         | Build a simulator app using CI's recipe. Use `ios` on a Mac.                                                  |
 | `npm run native -- test --platform android`          | Run the journey on a prepared device. Select `--android-runner managed` or `container` to own the emulator.   |
-| `npm run native -- remote-ios`                       | From Windows/Linux/macOS, push a temporary integration branch and run iOS on GitHub's Mac.                    |
+| `npm run native -- remote-ios`                       | Temporarily disabled; exits before uploading code or starting a run.                                          |
 | `npm run security:codeql:local`                      | Run the pinned CodeQL bundle and fail on unsuppressed warnings/errors.                                        |
 | `npm run validate -- --platform android`             | Run audits, `verify:full`, CodeQL, a native source build, and UI journeys.                                    |
 
@@ -133,29 +133,17 @@ Native subcommands replace the previous per-platform npm wrappers. Run
 `npm run native` for usage. `verify` retains all stages of the removed `check`
 alias; focused lint, format, test and build commands remain available.
 
-Without a Mac, run `npm run native -- remote-ios` before opening a PR.
-Requires Git and an authenticated
-[GitHub CLI](https://cli.github.com/) (`gh auth login`). Commit all source changes
-first. The command pushes exactly HEAD to a unique `validation/ios-*` branch and
-dispatches the existing native workflow with `platform=ios`. Your feature branch,
-checkout and index stay unchanged. The disposable ref lets GitHub fetch that
-snapshot before you publish your feature branch. Ignored files, including local
-`.env`, are not uploaded. Merge or rebase `main` yourself when needed, then rerun
-validation; the command never combines branches automatically.
+Native iOS CI is temporarily disabled by `IOS_NATIVE_ENABLED=false` in
+[`.github/ci.env`](../.github/ci.env). Both iOS jobs skip before allocating a
+macOS runner, and the workflow summary records the missing coverage.
+`npm run native -- remote-ios` fails before invoking Git or GitHub. Android CI
+and portable checks remain active; passing them provides no native iOS evidence.
+The existing iOS sources and manual macOS commands are retained for replacement
+work. Windows/WSL still cannot execute iOS simulator tests.
 
-GitHub's standard macOS runner builds the app and runs all three journeys with
-CI's pins, setup and assertions. This is remote execution after a temporary push,
-not Windows-local iOS testing. The command requires a public repository, where
-[standard runner compute is free](https://docs.github.com/en/actions/reference/runners/github-hosted-runners).
-Logs, available debug artifacts, source/tree SHAs and the run URL are saved under
-`.tmp/ios-remote/`. Missing evidence, failed/skipped iOS jobs or changed source
-fail validation. Rerun after changing your branch, including merges and rebases.
-PR checks separately validate integration with `main`.
-
-Successful runs delete only their own unchanged temporary ref. Failed or
-interrupted runs retain it for investigation; the run URL permits inspection or
-cancellation. Remove the recorded branch with `git push origin --delete <branch>`
-when finished. Interrupting the local command does not cancel the remote run.
+Re-enable the switch only after a replacement journey passes repeated fresh
+simulator runs, preserves the financial and signed-in cold-start assertions,
+and reports failures within a bounded execution time.
 
 GitHub permissions, events, caches, artifacts, PR automation, dependency review
 and branch protection require GitHub execution. Portable workflow/setup tests

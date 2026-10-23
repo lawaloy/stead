@@ -2,7 +2,8 @@ name: native-ci
 
 # Every PR and main-branch push produces a stable native-ci readiness signal.
 # The config job skips expensive native jobs when they are irrelevant.
-# Scheduled runs execute the full suite; manual runs can select a platform. Native binaries are
+# iOS builds/journeys are temporarily disabled by IOS_NATIVE_ENABLED in ci.env.
+# Scheduled runs execute the enabled suite; manual runs can select a platform. Native binaries are
 # built in dedicated jobs and handed to Maestro jobs as artifacts (build once
 # → test). Android boots a dedicated AVD from checksum-locked SDK archives;
 # iOS uses mtime/inode-aware DerivedData + Pods caches when the .app misses.
@@ -42,6 +43,7 @@ jobs:
       npm_version: ${{ steps.versions.outputs.npm_version }}
       android_api_level: ${{ steps.versions.outputs.android_api_level }}
       ios_runner: ${{ steps.versions.outputs.ios_runner }}
+      ios_enabled: ${{ steps.versions.outputs.ios_enabled }}
       maestro_version: ${{ steps.versions.outputs.maestro_version }}
       maestro_sha256: ${{ steps.versions.outputs.maestro_sha256 }}
       java_version: ${{ steps.versions.outputs.java_version }}
@@ -82,6 +84,7 @@ jobs:
             echo "npm_version=$NPM_VERSION"
             echo "android_api_level=$ANDROID_API_LEVEL"
             echo "ios_runner=$IOS_RUNNER"
+            echo "ios_enabled=$IOS_NATIVE_ENABLED"
             echo "maestro_version=$MAESTRO_VERSION"
             echo "maestro_sha256=$MAESTRO_SHA256"
             echo "java_version=$JAVA_VERSION"
@@ -94,6 +97,9 @@ jobs:
             echo "android_arch=$ANDROID_ARCH"
             echo "android_profile=$ANDROID_PROFILE"
           } >> "$GITHUB_OUTPUT"
+          if [[ "$IOS_NATIVE_ENABLED" != "true" ]]; then
+            echo "Native iOS builds and journeys are temporarily disabled. No iOS validation is claimed; Android remains enabled." >> "$GITHUB_STEP_SUMMARY"
+          fi
 
   build-android:
     needs: config
@@ -155,7 +161,7 @@ jobs:
 
   build-ios:
     needs: config
-    if: needs.config.outputs.run_native == 'true' && inputs.platform != 'android'
+    if: needs.config.outputs.run_native == 'true' && needs.config.outputs.ios_enabled == 'true' && inputs.platform != 'android'
     runs-on: ${{ needs.config.outputs.ios_runner }}
     timeout-minutes: 45
     steps:
@@ -318,6 +324,7 @@ jobs:
 
   native-ios:
     needs: [config, build-ios]
+    if: needs.config.outputs.ios_enabled == 'true'
     runs-on: ${{ needs.config.outputs.ios_runner }}
     timeout-minutes: 45
     env:
