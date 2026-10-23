@@ -1,4 +1,4 @@
-import { createHash, randomUUID } from 'node:crypto';
+import { createHash } from 'node:crypto';
 import {
   existsSync,
   mkdirSync,
@@ -11,10 +11,14 @@ import { join, delimiter } from 'node:path';
 import { ROOT, TOOLCHAIN } from './toolchain.mjs';
 import { phoneDisplay } from './native-config.mjs';
 import { runCommand } from './process-utils.mjs';
+import {
+  createIosSimulator,
+  bootIosSimulator,
+  IOS_SIMULATOR_UUID as UUID,
+} from './ios-setup.mjs';
 
 const MOBILE = join(ROOT, 'mobile');
 const CLI = join(MOBILE, 'node_modules/detox/local-cli/cli.js');
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 // Include JavaScript, dylibs, resources, and symlinks, not only the small launcher.
 export const hashIosApp = (app) => {
@@ -147,24 +151,9 @@ export const runIosDetox = async (
         join(ROOT, '.github/scripts/install-applesimutils.sh'),
       ]);
       await run(process.execPath, [CLI, 'build-framework-cache', '--detox']);
-      device = (
-        await run(
-          'xcrun',
-          [
-            'simctl',
-            'create',
-            `Stead Native Detox ${randomUUID()}`,
-            'com.apple.CoreSimulator.SimDeviceType.iPhone-17',
-            TOOLCHAIN.IOS_RUNTIME,
-          ],
-          { quiet: true, stdoutOnly: true },
-        )
-      ).trim();
-      if (!UUID.test(device))
-        throw new Error('simctl did not return an owned simulator UUID.');
+      device = await createIosSimulator(run);
       env.STEAD_DETOX_DEVICE = device;
-      await run('xcrun', ['simctl', 'boot', device]);
-      await run('xcrun', ['simctl', 'bootstatus', device, '-b']);
+      await bootIosSimulator(device, run);
     });
     await phase('execution', testTimeoutMs, async (run) => {
       const output = await run(process.execPath, [

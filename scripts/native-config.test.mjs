@@ -153,6 +153,7 @@ test('one native entry point preserves prepared, managed, container, build, setu
     [['verify', '--platform', 'android'], 'managed'],
     [['verify', '--platform', 'ios'], 'local'],
     [['setup', '--platform', 'ios'], 'setup'],
+    [['setup', '--platform', 'ios', '--probe'], 'setup'],
     [['remote-ios'], 'remote'],
   ]) {
     const original = [...args];
@@ -188,6 +189,7 @@ test('ambiguous native actions fail before any device, remote push or setup oper
     ['setup'],
     ['setup', '--platform', 'android'],
     ['setup', '--platform', 'ios', '--device', 'personal'],
+    ['setup', '--platform', 'ios', '--probe', '--probe'],
     ['test', '--platform', 'ios', '--android-runner', 'managed'],
     ['test', '--android-runner', 'managed', '--device', 'emulator-5554'],
     ['build', '--android-runner', 'container'],

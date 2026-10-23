@@ -87,6 +87,8 @@ export const parseNativeArguments = (args) => {
     return { command: command === '--help' ? 'help' : command };
   }
   if (command === 'setup') {
+    const probe = args.at(-1) === '--probe';
+    if (probe) args.pop();
     if (!(
       (args.length === 2 && args[0] === '--platform' && args[1] === 'ios') ||
       (args.length === 1 && args[0] === '--platform=ios')
@@ -94,7 +96,7 @@ export const parseNativeArguments = (args) => {
       throw new Error(
         'Setup supports only --platform ios. Use tools:install:android for Android SDK installation.',
       );
-    return { command, platform: 'ios' };
+    return { command, platform: 'ios', ...(probe ? { probe: true } : {}) };
   }
   if (!['doctor', 'build', 'test', 'verify'].includes(command))
     throw new Error(

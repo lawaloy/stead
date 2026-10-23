@@ -41,54 +41,40 @@ both supply the isolated settings and manage the API process automatically.
 
 ## Native UI journey
 
-`mobile/.maestro/critical-native-journey.yaml` requires the installed Android and
-iOS apps to complete OTP login, goal setup, transaction creation, amount/note
-editing, and deletion. An income initially funds 20% of the goal; editing its
-amount must update the dashboard to 30%. A signed-in process stop and launch
-preserves app state and the iOS keychain, then requires the authenticated
-dashboard, the 30% progress, and the corrected transaction to reload without
-another OTP. After deletion, progress must return to 0%. Logout is followed by
-a second process restart that must stay on the login screen. Both platforms
-execute both restart checks; iOS restoration has no skip or login fallback.
+Android runs `mobile/.maestro/critical-native-journey.yaml` against the real API
+and PostgreSQL. It covers dev OTP login, goal setup, transaction creation,
+amount/note editing, deletion, and dashboard recalculation from 20% to 30% to 0%.
+A signed-in process restart must reload the corrected data without another OTP;
+after logout, a second restart must remain signed out.
 
-It uses visible development OTP, so it does **not** require a
-Twilio or Termii account. It requires a disposable API database schema and
-`SMS_PROVIDER=dev`, `DEV_EXPOSE_OTP=true`; never use a real customer account or
-production API. The flow clears the app's local state at the beginning and
-uses a dedicated test phone supplied by the runner. Each attempt gets a fresh
-database schema so a repeated run does not inherit the previous account.
+Automatic iOS validation remains paused by `IOS_NATIVE_ENABLED=false`.
+`mobile/e2e/compatibility.test.cjs` is an experimental Detox probe for bundled
+app launch, exact keyboard input, an app-native alert, and signed-in process
+restoration. It does not implement the financial journey and has not qualified
+a replacement merge gate. Earlier native passes omitted editing and signed-in
+iOS restoration; they do not establish those cases' coverage.
 
-Native simulator jobs live in `.github/workflows/native-ci.yml`. Its `config`
-job reports on every pull request and `main` push; Android Maestro runs
-when the shared native path policy detects relevant mobile, API, contract, or CI
-changes. iOS builds and journeys are temporarily disabled by
-`IOS_NATIVE_ENABLED=false`; their retained implementation provides no CI
-validation while paused. The enabled suite also runs daily at 16:00 UTC (after morning
-Dependabot, Dependency Maintenance, and Dependency Audit activity) and via
-`workflow_dispatch`. Earlier successful runs covered a narrower flow: they did
-not exercise transaction editing or signed-in iOS cold-start restoration.
-Evidence for those cases must come from runs of the expanded flow. Dedicated `build-android` /
-`build-ios` jobs produce installable binaries (cached by native inputs) and
-hand them to Maestro jobs as artifacts. The iOS simulator build uses ad-hoc
-signing with a bundle-scoped keychain group and checks the resulting signature
-and embedded simulator entitlements in each architecture before publishing
-the artifact. This enables SecureStore
-persistence required by the signed-in cold-start check. Android cold-boots a
-dedicated emulator from the checksum-locked SDK without snapshots; iOS miss
-builds restore source mtimes and use inode-aware DerivedData
-plus Pods caches. Metro transforms and the Maestro CLI are cached per platform.
-Pull requests also keep `mobile-api-journey` and unit coverage for the same
-business journey. It does not prove physical device behavior, carrier SMS
-delivery, TalkBack, or VoiceOver.
+The iOS replacement must eventually cover the complete financial assertions
+above, including corrected values after restoration. Qualify the framework on
+fresh hosts without retries before porting the full journey. A compatibility
+pass does not establish that the known fast-input React Native defect is fixed.
 
-Local native commands now own the build, isolated database fixtures, API,
-Metro, emulator port forwarding, and Maestro execution. Setup, commands,
-repeat-run evidence, explicit local validation, and the remaining macOS boundary
-are documented in
-[Developer Automation](developer-automation.md#native-and-security-setup).
-Native CI delegates to the same runner. Developers should produce local
-evidence for their available platforms. While iOS CI is paused,
-`npm run native -- remote-ios` also stops before upload. Report native iOS
-coverage as unavailable; Android and portable checks cannot substitute for it.
+Native fixtures use only a disposable local database schema and test phone with
+`SMS_PROVIDER=dev` and `DEV_EXPOSE_OTP=true`. Each attempt gets a fresh schema;
+never use real customer accounts or a production API. iOS attempts own and clean
+up fresh simulators while preserving their credentials across the restart step.
+The bundled Release simulator app validates keychain entitlements and does not
+need Metro during execution. Android continues to use its Debug app and Metro.
+
+`.github/workflows/native-ci.yml` delegates to the same root runner used locally.
+Android runs for relevant PR/main changes, daily, and on demand. The iOS probe
+requires explicit manual opt-in and provides only the coverage actually
+executed. Commands, version pins, evidence, deadlines and the Windows/macOS
+boundary are documented in [Developer Automation](developer-automation.md).
+`native -- remote-ios` remains disabled until replacement qualification.
+
+Simulator passes do not establish physical-device behavior, carrier SMS
+delivery, TalkBack, or VoiceOver. API-client and component tests provide their
+own boundaries; passing them does not substitute for native iOS evidence.
 
 </details>

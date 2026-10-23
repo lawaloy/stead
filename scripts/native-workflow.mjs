@@ -532,7 +532,7 @@ export const runNativeCommand = async (args, handlers = {}) => {
   if (options.command === 'help') {
     console.log(`Usage: npm run native -- <command> [options]
 
-  setup --platform ios                         Prepare pinned Xcode/simulator (Mac)
+  setup --platform ios [--probe]               Select Xcode; optionally probe fresh simulator boot
   doctor --platform android|ios                Inspect a prepared device/toolchain
   build --platform android|ios                 Build the simulator app
   test --platform android|ios                  Test a prepared emulator/simulator
@@ -550,9 +550,14 @@ Run npm run validate -- --platform android|ios|all for the complete local gate.`
     return (
       handlers.setup ??
       (() =>
-        runCommand(process.execPath, [join(ROOT, 'scripts/ios-setup.mjs')], {
-          cwd: ROOT,
-        }))
+        runCommand(
+          process.execPath,
+          [
+            join(ROOT, 'scripts/ios-setup.mjs'),
+            ...(options.probe ? ['--probe'] : []),
+          ],
+          { cwd: ROOT },
+        ))
     )();
   const managed =
     options.androidRunner === 'managed' ||

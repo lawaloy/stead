@@ -155,6 +155,16 @@ currently adds three moderate `stream-json` advisories through Detox tooling;
 they remain unexcepted and block merging. Its fixed major version changes the
 parser API, so an untested override is not applied.
 
+For a cheap simulator readiness check on a Mac, run
+`npm run native -- setup --platform ios --probe`. The equivalent manual
+`native-ci` input `ios_boot_only=true` compares both pinned free runner types
+without an app build, API or test framework. It retains boot status, memory and
+load diagnostics and cleans only its owned simulator. The boot deadline remains
+three minutes. Fix this boundary before interpreting any framework result.
+After a successful readiness check, `ios_pilot=true` can reuse `ios_app_run`
+with the exact `ios_app_sha256`; results explicitly identify this as a provided
+artifact experiment, not a source build of the selected head.
+
 Before re-enabling iOS, qualify the exact app/framework versions on fresh hosts
 without retries, then port separate authentication, financial CRUD (including
 editing/recalculation) and signed-in restoration scenarios. Preserve all failed

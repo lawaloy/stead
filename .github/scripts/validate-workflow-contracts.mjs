@@ -236,6 +236,14 @@ assert.match(
 const iosJourney = nativeWorkflow.split('  native-ios:\n')[1];
 assert.doesNotMatch(iosJourney, /setup-java|install-maestro|Cache Maestro/);
 assert.match(iosJourney, /Detox compatibility pilot/);
+const runtimeProbe = nativeWorkflow.split('  ios-runtime-preflight:\n')[1];
+assert.match(runtimeProbe, /inputs\.ios_boot_only == true/);
+assert.match(runtimeProbe, /native -- setup --platform ios --probe/);
+assert.doesNotMatch(
+  runtimeProbe,
+  /--prefix (api|mobile)|native -- (build|test)/,
+  'Runtime diagnostics must not build the app or start its backend.',
+);
 assert.match(
   nativeWorkflow,
   /working-directory: mobile\n/,

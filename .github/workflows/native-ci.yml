@@ -20,6 +20,16 @@ on:
         description: Run the experimental Detox compatibility probe (does not enable automatic iOS CI)
         type: boolean
         default: false
+      ios_boot_only:
+        description: Compare simulator boot on free Mac runners without building the app
+        type: boolean
+        default: false
+      ios_app_run:
+        description: Optional prior run with the simulator app (compatibility evidence only)
+        type: string
+      ios_app_sha256:
+        description: Required mobile.app.zip SHA-256 when reusing a prior app
+        type: string
   # After Dependabot + Dependency Maintenance (13:00 UTC) and Dependency
   # Audit (13:30 UTC), leave room for PR CI and auto-merge onto main before
   # the daily native smoke. Main pushes also produce the readiness signal.
@@ -36,6 +46,7 @@ concurrency:
 
 permissions:
   contents: read
+  actions: read
   pull-requests: read
 
 jobs:
@@ -47,6 +58,7 @@ jobs:
       npm_version: ${{ steps.versions.outputs.npm_version }}
       android_api_level: ${{ steps.versions.outputs.android_api_level }}
       ios_runner: ${{ steps.versions.outputs.ios_runner }}
+      ios_comparison_runner: ${{ steps.versions.outputs.ios_comparison_runner }}
       ios_enabled: ${{ steps.versions.outputs.ios_enabled }}
       maestro_version: ${{ steps.versions.outputs.maestro_version }}
       maestro_sha256: ${{ steps.versions.outputs.maestro_sha256 }}
@@ -88,6 +100,7 @@ jobs:
             echo "npm_version=$NPM_VERSION"
             echo "android_api_level=$ANDROID_API_LEVEL"
             echo "ios_runner=$IOS_RUNNER"
+            echo "ios_comparison_runner=$IOS_COMPARISON_RUNNER"
             echo "ios_enabled=$IOS_NATIVE_ENABLED"
             echo "maestro_version=$MAESTRO_VERSION"
             echo "maestro_sha256=$MAESTRO_SHA256"
@@ -165,7 +178,7 @@ jobs:
 
   build-ios:
     needs: config
-    if: needs.config.outputs.run_native == 'true' && (needs.config.outputs.ios_enabled == 'true' || inputs.ios_pilot == true) && inputs.platform != 'android'
+    if: needs.config.outputs.run_native == 'true' && (needs.config.outputs.ios_enabled == 'true' || inputs.ios_pilot == true) && inputs.platform != 'android' && inputs.ios_boot_only != true && inputs.ios_app_run == ''
     runs-on: ${{ needs.config.outputs.ios_runner }}
     timeout-minutes: 45
     steps:
@@ -328,7 +341,7 @@ jobs:
 
   native-ios:
     needs: [config, build-ios]
-    if: needs.config.outputs.ios_enabled == 'true' || inputs.ios_pilot == true
+    if: always() && !cancelled() && needs.config.result == 'success' && (needs.config.outputs.ios_enabled == 'true' || inputs.ios_pilot == true) && (needs.build-ios.result == 'success' || inputs.ios_app_run != '') && inputs.ios_boot_only != true
     runs-on: ${{ needs.config.outputs.ios_runner }}
     timeout-minutes: 20
     env:
@@ -364,6 +377,16 @@ jobs:
         with:
           name: ios-simulator-app
           path: mobile/.ci/ios
+          run-id: ${{ inputs.ios_app_run || github.run_id }}
+          github-token: ${{ github.token }}
+      - name: Verify reused iOS app
+        if: inputs.ios_app_run != ''
+        env:
+          APP_SHA256: ${{ inputs.ios_app_sha256 }}
+        run: |
+          [[ "$APP_SHA256" =~ ^[a-f0-9]{64}$ ]] || { echo "Supply the prior mobile.app.zip SHA-256"; exit 1; }
+          printf '%s  %s\n' "$APP_SHA256" mobile/.ci/ios/mobile.app.zip | shasum -a 256 --check
+          echo "Reused app: compatibility experiment only; no source-build evidence for the selected head." >> "$GITHUB_STEP_SUMMARY"
       - name: Unpack iOS simulator app
         run: |
           set -eu
@@ -418,4 +441,36 @@ jobs:
           path: |
             .tmp/native-validation
             mobile/.ci/ios
+          retention-days: 7
+
+  ios-runtime-preflight:
+    needs: config
+    if: github.event_name == 'workflow_dispatch' && inputs.ios_boot_only == true
+    strategy:
+      fail-fast: false
+      matrix:
+        runner:
+          [
+            '${{ needs.config.outputs.ios_runner }}',
+            '${{ needs.config.outputs.ios_comparison_runner }}',
+          ]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ needs.config.outputs.node_version }}
+      - name: Install shared command
+        run: |
+          npm install --global npm@${{ needs.config.outputs.npm_version }}
+          npm ci
+      - name: Probe pinned runtime without the app or backend
+        run: npm run native -- setup --platform ios --probe
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ios-runtime-${{ matrix.runner }}
+          path: .tmp/native-validation/ios-boot-*
+          include-hidden-files: true
           retention-days: 7
