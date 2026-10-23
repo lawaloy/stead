@@ -8,6 +8,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { join, delimiter } from 'node:path';
+import { setTimeout as delay } from 'node:timers/promises';
 import { ROOT, TOOLCHAIN } from './toolchain.mjs';
 import { phoneDisplay } from './native-config.mjs';
 import { runCommand } from './process-utils.mjs';
@@ -42,7 +43,107 @@ export const detoxEnvironment = ({ env, app, directory, phone }) => ({
   STEAD_DETOX_ARTIFACTS: join(directory, 'detox'),
   STEAD_DETOX_PHONE: phone,
   STEAD_DETOX_PHONE_DISPLAY: phoneDisplay(phone),
+  STEAD_DETOX_LIFECYCLE: join(directory, 'lifecycle.ndjson'),
+  STEAD_DETOX_TEST_TIMEOUT_MS: TOOLCHAIN.IOS_DETOX_TIMEOUT_MS,
 });
+
+// Written by the test body and afterAll, independently of Detox's log format.
+const lifecycleStages = (path) => {
+  const lines = readFileSync(path, 'utf8').split('\n');
+  lines.pop(); // A concurrent append may not have written its trailing newline yet.
+  const stages = lines.map((line) => JSON.parse(line).phase);
+  if (
+    stages.length > 2 ||
+    stages.some((stage, i) => stage !== ['execution', 'reporting'][i])
+  )
+    throw new Error('Invalid Detox lifecycle evidence.');
+  return stages;
+};
+
+const runDetoxSession = async ({
+  directory,
+  env,
+  signal,
+  execute,
+  phase,
+  startupTimeoutMs,
+  testTimeoutMs,
+  reportTimeoutMs,
+  onTestStart,
+}) => {
+  const owner = new AbortController();
+  let completion, outcome;
+  const waitFor = async (stage, phaseSignal) => {
+    for (;;) {
+      phaseSignal.throwIfAborted();
+      if (stage && lifecycleStages(env.STEAD_DETOX_LIFECYCLE).includes(stage))
+        return;
+      if (outcome) {
+        if (outcome.error) throw outcome.error;
+        if (!stage) return outcome.output;
+        throw new Error(`Detox exited before the ${stage} lifecycle event.`);
+      }
+      await delay(50, undefined, { signal: phaseSignal });
+    }
+  };
+  try {
+    await phase(
+      'framework-startup',
+      startupTimeoutMs,
+      async (_run, phaseSignal) => {
+        // Refuse stale evidence rather than reusing an earlier attempt's markers.
+        writeFileSync(env.STEAD_DETOX_LIFECYCLE, '', { flag: 'wx' });
+        completion = Promise.resolve()
+          .then(() =>
+            execute(
+              process.execPath,
+              [
+                ...TEST_ARGS,
+                '--json',
+                '--outputFile',
+                join(directory, 'summary.json'),
+              ],
+              {
+                cwd: MOBILE,
+                env,
+                signal: signal
+                  ? AbortSignal.any([signal, owner.signal])
+                  : owner.signal,
+              },
+            ),
+          )
+          .then(
+            (output) => (outcome = { output }),
+            (error) => (outcome = { error }),
+          );
+        await waitFor('execution', phaseSignal);
+      },
+    );
+    await phase('execution', testTimeoutMs, async (_run, phaseSignal) => {
+      onTestStart();
+      await waitFor('reporting', phaseSignal);
+    });
+    return await phase(
+      'reporting',
+      reportTimeoutMs,
+      async (_run, phaseSignal) => {
+        const output = await waitFor(undefined, phaseSignal);
+        writeFileSync(join(directory, 'detox.log'), output);
+        assertDetoxResult(
+          JSON.parse(readFileSync(join(directory, 'summary.json'), 'utf8')),
+        );
+      },
+    );
+  } catch (error) {
+    owner.abort();
+    await completion;
+    if (outcome?.error && outcome.error !== error)
+      throw new Error(`${error.message}\n${outcome.error.message}`, {
+        cause: error,
+      });
+    throw error;
+  }
+};
 
 // Jest discovery loads the real runner/config but never initializes a simulator.
 export const checkDetoxRunner = async ({
@@ -153,12 +254,15 @@ export const runIosDetox = async (
     ).version,
     prepareTimeoutMs = Number(TOOLCHAIN.IOS_DETOX_PREPARE_TIMEOUT_MS),
     bootTimeoutMs = Number(TOOLCHAIN.IOS_SIMULATOR_BOOT_TIMEOUT_MS),
+    startupTimeoutMs = Number(TOOLCHAIN.IOS_DETOX_STARTUP_TIMEOUT_MS),
     testTimeoutMs = Number(TOOLCHAIN.IOS_DETOX_TIMEOUT_MS),
+    reportTimeoutMs = Number(TOOLCHAIN.IOS_DETOX_REPORT_TIMEOUT_MS),
     cleanupTimeoutMs = 15000,
   } = {},
 ) => {
   mkdirSync(directory, { recursive: true });
   env = detoxEnvironment({ env, app, directory, phone });
+  env.STEAD_DETOX_TEST_TIMEOUT_MS = String(testTimeoutMs);
   const version = detoxVersion;
   const expected = JSON.parse(
     readFileSync(join(MOBILE, 'package.json'), 'utf8'),
@@ -191,8 +295,11 @@ export const runIosDetox = async (
           }),
         phaseSignal,
       );
-      timing.status = 'passed';
-      console.log(`[iOS pilot] PASS ${name} (${Date.now() - started} ms)`);
+      // afterAll means execution finished, not that its assertions passed.
+      timing.status = name === 'execution' ? 'completed' : 'passed';
+      console.log(
+        `[iOS pilot] ${name === 'execution' ? 'COMPLETE' : 'PASS'} ${name} (${Date.now() - started} ms)${name === 'execution' ? '; awaiting Jest result' : ''}`,
+      );
       return result;
     } catch (error) {
       const failure =
@@ -231,24 +338,48 @@ export const runIosDetox = async (
     await phase('backend', 90000, (execute, signal) =>
       beforeTest({ execute, signal }),
     );
-    await phase('execution', testTimeoutMs, async (run) => {
-      appTests = 'failed';
-      const output = await run(process.execPath, [
-        ...TEST_ARGS,
-        '--json',
-        '--outputFile',
-        join(directory, 'summary.json'),
-      ]);
-      writeFileSync(join(directory, 'detox.log'), output);
-      assertDetoxResult(
-        JSON.parse(readFileSync(join(directory, 'summary.json'), 'utf8')),
-      );
-      appTests = 'passed';
+    await runDetoxSession({
+      directory,
+      env,
+      signal,
+      execute,
+      phase,
+      startupTimeoutMs,
+      testTimeoutMs,
+      reportTimeoutMs,
+      onTestStart: () => {
+        appTests = 'failed';
+      },
     });
+    appTests = 'passed';
   } catch (error) {
     failure = error;
     writeFileSync(join(directory, 'failure.log'), error.stack || String(error));
   } finally {
+    const execution = timings.find(({ phase }) => phase === 'execution');
+    if (execution?.status === 'completed') {
+      let summary;
+      try {
+        summary = JSON.parse(
+          readFileSync(join(directory, 'summary.json'), 'utf8'),
+        );
+      } catch {
+        // A killed runner may never produce a verdict. Keep it unverified.
+      }
+      if (summary) {
+        try {
+          assertDetoxResult(summary);
+          execution.status = 'passed';
+          appTests = 'passed';
+          console.log('[iOS pilot] PASS execution: Jest result verified');
+        } catch {
+          execution.status = 'failed';
+          console.error(
+            '[iOS pilot] FAIL execution: Jest reported failed or missing assertions',
+          );
+        }
+      }
+    }
     if (failure && IOS_SIMULATOR_UUID.test(device || '')) {
       try {
         const output = await execute(

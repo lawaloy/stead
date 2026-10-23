@@ -1,7 +1,7 @@
 module.exports = {
   rootDir: '..',
   testMatch: ['<rootDir>/e2e/compatibility.test.cjs'],
-  testTimeout: 120000,
+  testTimeout: Number(process.env.STEAD_DETOX_TEST_TIMEOUT_MS || 120000),
   maxWorkers: 1,
   globalSetup: 'detox/runners/jest/globalSetup',
   globalTeardown: 'detox/runners/jest/globalTeardown',

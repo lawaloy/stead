@@ -94,8 +94,12 @@ app with bundled JavaScript and no Metro server. Its API URL is fixed at build
 time: use the same `--api-port` for build and test. Tool preparation and simulator
 readiness each have a three-minute deadline. Preparation includes isolated database
 migrations using the installed Prisma CLI, before simulator boot. Readiness must
-pass before API startup (90 seconds), followed by four minutes for Detox execution.
-App assertions keep their own limits; CI also bounds the pilot step to 12 minutes.
+pass before API startup (90 seconds). Detox/Jest startup and app installation have
+four minutes, followed by two minutes for the UI scenario and one minute for
+reporting/teardown. Test-body and afterAll events separate these deadlines, so
+startup cannot consume the scenario's allowance. Missing events, missing results,
+and failures in any phase fail the attempt. CI also bounds the entire pilot step
+to 12 minutes; these phase budgets do not extend that overall cap.
 
 Use `--platform ios` for iOS or `--platform all` where both pinned environments
 are available. Omitting the platform from `validate` requires both.

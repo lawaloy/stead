@@ -1,4 +1,5 @@
-const { describe, it } = require('@jest/globals');
+const { describe, it, afterAll } = require('@jest/globals');
+const { appendFileSync } = require('node:fs');
 const { device, element, by, expect: expectUi, waitFor } = require('detox');
 const { execFileSync } = require('node:child_process');
 
@@ -9,9 +10,16 @@ const step = async (name, operation) => {
   console.log(`[iOS pilot] PASS ${name} (${Date.now() - started} ms)`);
 };
 const visible = (target) => waitFor(target).toBeVisible().withTimeout(15000);
+const markPhase = (phase) =>
+  appendFileSync(
+    process.env.STEAD_DETOX_LIFECYCLE,
+    JSON.stringify({ phase }) + '\n',
+  );
 
 describe('Stead iOS framework compatibility (not the full financial journey)', () => {
+  afterAll(() => markPhase('reporting'));
   it('launches, types exact values, handles a native alert, and restores a session', async () => {
+    markPhase('execution');
     await step('App launches without Detox injection', async () => {
       const output = execFileSync(
         'xcrun',

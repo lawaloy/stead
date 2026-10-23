@@ -1,6 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
+import {
+  mkdtempSync,
+  writeFileSync,
+  readFileSync,
+  rmSync,
+  appendFileSync,
+} from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { createRequire } from 'node:module';
@@ -14,6 +20,18 @@ import {
 } from './ios-detox.mjs';
 import { repeatJourneys } from './native-attempts.mjs';
 import { ROOT, TOOLCHAIN } from './toolchain.mjs';
+import { runCommand } from './process-utils.mjs';
+
+const mark = (directory, phase) =>
+  appendFileSync(
+    join(directory, 'lifecycle.ndjson'),
+    JSON.stringify({ phase }) + '\n',
+  );
+const complete = (directory) => {
+  mark(directory, 'execution');
+  mark(directory, 'reporting');
+  writeFileSync(join(directory, 'summary.json'), JSON.stringify(passed()));
+};
 
 const passed = () => ({
   success: true,
@@ -93,8 +111,10 @@ test('driver failure retains its cause, stops repeats, and cleans only the owned
             checkRunner: async () => {},
             execute: async (command, args, options) => {
               if (args[1] === 'create') return owned;
-              if (args.includes('test'))
+              if (args.includes('test')) {
+                mark(directory, 'execution');
                 throw new Error('exact typed value differs');
+              }
               if (['shutdown', 'delete'].includes(args[1])) {
                 cleanup.push(args);
                 assert.equal(options.signal.aborted, false);
@@ -132,7 +152,8 @@ test('hung execution has a separate deadline and still releases its owned simula
           testTimeoutMs: 20,
           execute: async (command, args, options) => {
             if (args[1] === 'create') return owned;
-            if (args.includes('test'))
+            if (args.includes('test')) {
+              mark(directory, 'execution');
               await new Promise((resolve, reject) =>
                 options.signal.addEventListener(
                   'abort',
@@ -140,6 +161,7 @@ test('hung execution has a separate deadline and still releases its owned simula
                   { once: true },
                 ),
               );
+            }
             if (args[1] === 'delete') deleted = true;
             return '';
           },
@@ -166,11 +188,7 @@ test('a hung shutdown cannot prevent deletion or leave successful evidence', asy
           cleanupTimeoutMs: 20,
           execute: async (command, args, options) => {
             if (args[1] === 'create') return owned;
-            if (args.includes('test'))
-              writeFileSync(
-                join(directory, 'summary.json'),
-                JSON.stringify(passed()),
-              );
+            if (args.includes('test')) complete(directory);
             if (args[1] === 'shutdown')
               await new Promise((resolve, reject) =>
                 options.signal.addEventListener(
@@ -230,10 +248,7 @@ test('migrations precede boot, readiness precedes API startup and assertions, an
           if (args.includes('test')) {
             order.push('assertions');
             assert.equal(options.env.STEAD_DETOX_DEVICE, owned);
-            writeFileSync(
-              join(directory, 'summary.json'),
-              JSON.stringify(passed()),
-            );
+            complete(directory);
           }
           if (['shutdown', 'delete'].includes(args[1]))
             throw new Error('Do not tear down the disposable VM simulator');
@@ -250,7 +265,9 @@ test('migrations precede boot, readiness precedes API startup and assertions, an
         ['preparation', 'passed'],
         ['readiness', 'passed'],
         ['backend', 'passed'],
+        ['framework-startup', 'passed'],
         ['execution', 'passed'],
+        ['reporting', 'passed'],
       ],
     );
   } finally {
@@ -317,8 +334,10 @@ test('a hosted assertion failure cannot be hidden by deferred simulator cleanup'
           execute: async (_command, args) => {
             if (args.includes('devices')) return hostedDevices();
             if (args[1] === 'create') return owned;
-            if (args.includes('test'))
+            if (args.includes('test')) {
+              mark(directory, 'execution');
               throw new Error('Exact keyboard input differs');
+            }
             return '';
           },
         },
@@ -394,6 +413,196 @@ test('the actual Detox CLI launches the locked mobile Jest and discovers the pil
       }),
       signal: AbortSignal.timeout(30000),
     });
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+// Use actual child processes: a simulated delayed native worker must not borrow
+// from the UI deadline, and cancellation must stop the process before cleanup.
+test('real child startup can exceed the UI budget without shortening the scenario', async () => {
+  const directory = mkdtempSync(join(tmpdir(), 'stead-detox-startup-'));
+  try {
+    const result = await runIosDetox(
+      { app: '/unused.app', directory, env: process.env, phone: '08030000001' },
+      {
+        detoxVersion: '20.51.1',
+        checkRunner: async () => {},
+        startupTimeoutMs: 5000,
+        testTimeoutMs: 200,
+        reportTimeoutMs: 5000,
+        execute: async (command, args, options) => {
+          if (args[1] === 'create') return owned;
+          if (!args.includes('test')) return '';
+          return runCommand(
+            process.execPath,
+            [
+              '-e',
+              `
+            const fs = require('node:fs');
+            const mark = phase => fs.appendFileSync(process.env.STEAD_DETOX_LIFECYCLE, JSON.stringify({phase})+'\\n');
+            setTimeout(() => {
+              mark('execution');
+              setTimeout(() => {
+                mark('reporting');
+                fs.writeFileSync(process.argv[1], process.argv[2]);
+              }, 20);
+            }, 400);
+          `,
+              join(directory, 'summary.json'),
+              JSON.stringify(passed()),
+            ],
+            { ...options, quiet: true },
+          );
+        },
+      },
+    );
+    assert.equal(result.appTests, 'passed');
+    assert.ok(
+      result.timings.find((x) => x.phase === 'framework-startup').elapsedMs >
+        200,
+    );
+    assert.ok(
+      result.timings.find((x) => x.phase === 'execution').elapsedMs < 200,
+    );
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+for (const stalled of ['framework-startup', 'execution', 'reporting']) {
+  test(`a real child hung in ${stalled} fails that phase and stops before cleanup`, async () => {
+    const directory = mkdtempSync(join(tmpdir(), 'stead-detox-hang-'));
+    let closed = false,
+      cleaned = false;
+    try {
+      await assert.rejects(
+        runIosDetox(
+          {
+            app: '/unused.app',
+            directory,
+            env: process.env,
+            phone: '08030000001',
+          },
+          {
+            detoxVersion: '20.51.1',
+            checkRunner: async () => {},
+            startupTimeoutMs: stalled === 'framework-startup' ? 500 : 5000,
+            testTimeoutMs: stalled === 'execution' ? 200 : 5000,
+            reportTimeoutMs: 200,
+            execute: async (command, args, options) => {
+              if (args[1] === 'create') return owned;
+              if (args[1] === 'shutdown') {
+                assert.equal(closed, true);
+                cleaned = true;
+              }
+              if (!args.includes('test')) return '';
+              try {
+                return await runCommand(
+                  process.execPath,
+                  [
+                    '-e',
+                    `
+                const fs = require('node:fs');
+                const mark = phase => fs.appendFileSync(process.env.STEAD_DETOX_LIFECYCLE, JSON.stringify({phase})+'\\n');
+                if (process.argv[1] !== 'framework-startup') mark('execution');
+                if (process.argv[1] === 'reporting') mark('reporting');
+                setInterval(() => {}, 1000);
+              `,
+                    stalled,
+                  ],
+                  { ...options, quiet: true },
+                );
+              } finally {
+                closed = true;
+              }
+            },
+          },
+        ),
+        new RegExp(`${stalled} exceeded`),
+      );
+      assert.equal(cleaned, true);
+      const evidence = JSON.parse(
+        readFileSync(join(directory, 'timing.json'), 'utf8'),
+      );
+      assert.equal(evidence.passed, false);
+      assert.equal(
+        evidence.appTests,
+        stalled === 'framework-startup' ? 'not-run' : 'failed',
+      );
+      assert.equal(evidence.timings.at(-1).phase, stalled);
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
+}
+
+test('successful exit and Jest JSON cannot replace missing lifecycle evidence', async () => {
+  const directory = mkdtempSync(join(tmpdir(), 'stead-detox-missing-event-'));
+  try {
+    await assert.rejects(
+      runIosDetox(
+        { app: '/unused.app', directory, env: {}, phone: '08030000001' },
+        {
+          detoxVersion: '20.51.1',
+          checkRunner: async () => {},
+          execute: async (_command, args) => {
+            if (args[1] === 'create') return owned;
+            if (args.includes('test'))
+              writeFileSync(
+                join(directory, 'summary.json'),
+                JSON.stringify(passed()),
+              );
+            return '';
+          },
+        },
+      ),
+      /exited before the execution lifecycle event/,
+    );
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test('finishing the test body cannot report a failed Jest assertion as passed execution', async () => {
+  const directory = mkdtempSync(join(tmpdir(), 'stead-detox-verdict-'));
+  try {
+    await assert.rejects(
+      runIosDetox(
+        { app: '/unused.app', directory, env: {}, phone: '08030000001' },
+        {
+          detoxVersion: '20.51.1',
+          checkRunner: async () => {},
+          execute: async (_command, args) => {
+            if (args[1] === 'create') return owned;
+            if (args.includes('test')) {
+              complete(directory);
+              writeFileSync(
+                join(directory, 'summary.json'),
+                JSON.stringify({
+                  ...passed(),
+                  success: false,
+                  numPassedTests: 0,
+                  numFailedTests: 1,
+                }),
+              );
+              throw new Error('actual Jest assertion failed');
+            }
+            return '';
+          },
+        },
+      ),
+      /actual Jest assertion failed/,
+    );
+    const evidence = JSON.parse(
+      readFileSync(join(directory, 'timing.json'), 'utf8'),
+    );
+    assert.equal(evidence.appTests, 'failed');
+    assert.equal(
+      evidence.timings.find((x) => x.phase === 'execution').status,
+      'failed',
+    );
+    assert.equal(evidence.passed, false);
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }
