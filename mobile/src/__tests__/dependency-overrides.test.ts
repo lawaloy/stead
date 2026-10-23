@@ -67,7 +67,7 @@ const lockfileDependencyCandidates = (
 };
 
 describe('dependency overrides', () => {
-  it('pins top-level audit remediations in package metadata and lockfile', () => {
+  it('keeps audit overrides on every installed copy after deduplication', () => {
     const packageJson = readJson<{
       overrides: Record<string, string | Record<string, string>>;
     }>('package.json');
@@ -81,11 +81,16 @@ describe('dependency overrides', () => {
 
     for (const [packageName, version] of Object.entries(pins)) {
       expect(packageJson.overrides[packageName]).toBe(version);
-      expect(packageLock.packages[`node_modules/${packageName}`]).toMatchObject(
-        {
-          version,
-        },
+      // npm may nest a package or remove it when its last consumer upgrades.
+      // Hoisting is not a security contract; every remaining copy must be patched.
+      const copies = Object.entries(packageLock.packages).filter(
+        ([path]) =>
+          path === `node_modules/${packageName}` ||
+          path.endsWith(`/node_modules/${packageName}`),
       );
+      for (const [, metadata] of copies) {
+        expect(metadata.version).toBe(version);
+      }
     }
   });
 
