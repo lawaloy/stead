@@ -92,8 +92,9 @@ dedicated simulator. Builds use locked CocoaPods and validate simulator
 keychain entitlements. The experimental Detox pilot uses a Release simulator
 app with bundled JavaScript and no Metro server. Its API URL is fixed at build
 time: use the same `--api-port` for build and test. Tool preparation and simulator
-readiness each have a three-minute deadline. Readiness must pass before migrations
-and API startup (90 seconds), followed by four minutes for Detox execution.
+readiness each have a three-minute deadline. Preparation includes isolated database
+migrations using the installed Prisma CLI, before simulator boot. Readiness must
+pass before API startup (90 seconds), followed by four minutes for Detox execution.
 App assertions keep their own limits; CI also bounds the pilot step to 12 minutes.
 
 Use `--platform ios` for iOS or `--platform all` where both pinned environments

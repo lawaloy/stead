@@ -218,15 +218,27 @@ const runAttempt = async (platform, options, tools, app, pool, directory) => {
     const adb = (args, config = {}) =>
       runCommand(tools.adb, ['-s', tools.device, ...args], config);
     return withCleanup(async () => {
-      const prepareBackend = async ({
+      const prepareFixtures = async ({
         execute = runCommand,
         signal = options.signal,
       } = {}) => {
-        await execute('npm', ['exec', '--', 'prisma', 'migrate', 'deploy'], {
-          cwd: API,
-          env,
-          signal,
-        });
+        await execute(
+          platform === 'ios' ? process.execPath : 'npm',
+          platform === 'ios'
+            ? [
+                join(API, 'node_modules/prisma/build/index.js'),
+                'migrate',
+                'deploy',
+              ]
+            : ['exec', '--', 'prisma', 'migrate', 'deploy'],
+          {
+            cwd: API,
+            env,
+            signal,
+          },
+        );
+      };
+      const prepareBackend = async ({ signal = options.signal } = {}) => {
         api = logService(
           process.execPath,
           ['dist/src/main.js'],
@@ -244,10 +256,12 @@ const runAttempt = async (platform, options, tools, app, pool, directory) => {
           env,
           signal: options.signal,
           phone: options.phone,
+          beforeBoot: prepareFixtures,
           beforeTest: prepareBackend,
         });
         return { schema, directory, build, ...result };
       }
+      await prepareFixtures();
       await prepareBackend();
       const appId = JSON.parse(readFileSync(join(MOBILE, 'app.json'), 'utf8'))
         .expo.android.package;

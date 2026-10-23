@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
+import { createRequire } from 'node:module';
 import {
   checkDetoxRunner,
   detoxEnvironment,
@@ -12,7 +13,7 @@ import {
   runIosDetox,
 } from './ios-detox.mjs';
 import { repeatJourneys } from './native-attempts.mjs';
-import { TOOLCHAIN } from './toolchain.mjs';
+import { ROOT, TOOLCHAIN } from './toolchain.mjs';
 
 const passed = () => ({
   success: true,
@@ -203,7 +204,7 @@ test('a hung shutdown cannot prevent deletion or leave successful evidence', asy
   }
 });
 
-test('readiness precedes backend startup and real assertions; hosted disposal does not change their result', async () => {
+test('migrations precede boot, readiness precedes API startup and assertions, and hosted disposal preserves their result', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'stead-detox-hosted-'));
   const order = [];
   try {
@@ -213,6 +214,7 @@ test('readiness precedes backend startup and real assertions; hosted disposal do
         directory,
         env: { GITHUB_ACTIONS: 'true', RUNNER_ENVIRONMENT: 'github-hosted' },
         phone: '08030000001',
+        beforeBoot: async () => order.push('migrations'),
         beforeTest: async ({ signal }) => {
           assert.equal(signal.aborted, false);
           order.push('backend');
@@ -239,7 +241,7 @@ test('readiness precedes backend startup and real assertions; hosted disposal do
         },
       },
     );
-    assert.deepEqual(order, ['ready', 'backend', 'assertions']);
+    assert.deepEqual(order, ['migrations', 'ready', 'backend', 'assertions']);
     assert.equal(result.appTests, 'passed');
     assert.equal(result.cleanup.status, 'deferred');
     assert.deepEqual(
@@ -395,4 +397,47 @@ test('the actual Detox CLI launches the locked mobile Jest and discovers the pil
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }
+});
+
+test('the committed pilot configuration drives an automated app launch without interactive Xcode input', async () => {
+  const requireMobile = createRequire(join(ROOT, 'mobile/package.json'));
+  const config = requireMobile('./e2e/detox.config.cjs');
+  const RuntimeDevice = requireMobile(
+    'detox/src/devices/runtime/RuntimeDevice',
+  );
+  const calls = [];
+  const device = new RuntimeDevice(
+    {
+      appsConfig: {
+        stead: { ...config.apps.stead, bundleId: 'com.lawaloy.stead' },
+      },
+      behaviorConfig: config.behavior,
+      deviceConfig: config.devices.owned,
+      eventEmitter: { emit: async (name) => calls.push(name) },
+      sessionConfig: { server: 'ws://localhost:8099', sessionId: 'test' },
+      runtimeErrorComposer: {},
+    },
+    {
+      validateDeviceConfig() {},
+      getExternalId: () => owned,
+      terminate: async () => calls.push('terminate'),
+      launchApp: async () => {
+        calls.push('launch');
+        return 123;
+      },
+      waitUntilReady: async () => calls.push('ready'),
+      waitForActive: async () => calls.push('active'),
+      waitForAppLaunch: async () =>
+        assert.fail('The CI pilot must not wait for interactive Xcode launch'),
+    },
+  );
+  await device.selectApp('stead');
+  await device.launchApp({ newInstance: true });
+  assert.deepEqual(calls, [
+    'terminate',
+    'launch',
+    'ready',
+    'active',
+    'appReady',
+  ]);
 });

@@ -17,7 +17,7 @@ module.exports = {
   },
   configurations: { 'ios.pilot': { device: 'owned', app: 'stead' } },
   behavior: {
-    launchApp: 'manual',
+    launchApp: 'auto',
     init: { reinstallApp: true },
     cleanup: { shutdownDevice: false },
   },

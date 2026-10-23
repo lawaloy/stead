@@ -135,7 +135,15 @@ export const assertDetoxResult = (summary) => {
 };
 
 export const runIosDetox = async (
-  { app, directory, env, signal, phone, beforeTest = async () => {} },
+  {
+    app,
+    directory,
+    env,
+    signal,
+    phone,
+    beforeBoot = async () => {},
+    beforeTest = async () => {},
+  },
   {
     execute = runCommand,
     checkRunner = checkDetoxRunner,
@@ -188,9 +196,12 @@ export const runIosDetox = async (
     } catch (error) {
       const failure =
         deadline.signal.aborted && !signal?.aborted
-          ? new Error(`iOS ${name} exceeded ${timeoutMs} ms.`, {
-              cause: error,
-            })
+          ? new Error(
+              `iOS ${name} exceeded ${timeoutMs} ms.\n${error.message}`,
+              {
+                cause: error,
+              },
+            )
           : error;
       timing.error = failure.message;
       console.error(`[iOS pilot] FAIL ${name}: ${failure.message}`);
@@ -201,12 +212,13 @@ export const runIosDetox = async (
     }
   };
   try {
-    await phase('preparation', prepareTimeoutMs, async (run) => {
+    await phase('preparation', prepareTimeoutMs, async (run, signal) => {
       await checkRunner({ env, execute: run });
       await run('bash', [
         join(ROOT, '.github/scripts/install-applesimutils.sh'),
       ]);
       await run(process.execPath, [CLI, 'build-framework-cache', '--detox']);
+      await beforeBoot({ execute: run, signal });
     });
     await phase('readiness', bootTimeoutMs, async (run) => {
       allocation = await acquireIosSimulator(run, env);
