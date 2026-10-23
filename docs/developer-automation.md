@@ -156,6 +156,10 @@ currently adds three moderate `stream-json` advisories through Detox tooling;
 they remain unexcepted and block merging. Its fixed major version changes the
 parser API, so an untested override is not applied.
 
+The portable automation suite invokes the real Detox CLI with Jest's `--listTests`
+to verify launcher, arguments and spec discovery without a simulator. The pilot
+repeats this check before allocation. It validates wiring, not native execution.
+
 For a cheap simulator readiness check on a Mac, run
 `npm run native -- setup --platform ios --probe`. The equivalent manual
 `native-ci` input `ios_boot_only=true` compares both pinned free runner types

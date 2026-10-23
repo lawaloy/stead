@@ -414,12 +414,19 @@ jobs:
           test -f "$PWD/mobile.app/Info.plist"
           echo "Unpacked $PWD/mobile.app"
       - name: Cache pinned PostgreSQL binaries
-        uses: actions/cache@v4
+        id: postgres-cache
+        uses: actions/cache/restore@v4
         with:
           path: .tmp/tools/postgres
           key: postgres-source-${{ runner.os }}-${{ runner.arch }}-${{ needs.config.outputs.postgres_version }}-${{ hashFiles('.github/ci.env', '.github/scripts/install-native-postgres.sh') }}
       - name: Install pinned PostgreSQL
         run: bash .github/scripts/install-native-postgres.sh
+      - name: Save verified PostgreSQL binaries before app tests
+        if: steps.postgres-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: .tmp/tools/postgres
+          key: ${{ steps.postgres-cache.outputs.cache-primary-key }}
       - name: Start isolated PostgreSQL
         env:
           PGPASSWORD: stead

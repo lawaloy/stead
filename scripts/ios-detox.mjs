@@ -19,6 +19,59 @@ import {
 
 const MOBILE = join(ROOT, 'mobile');
 const CLI = join(MOBILE, 'node_modules/detox/local-cli/cli.js');
+const TEST_ARGS = [
+  CLI,
+  'test',
+  '--config-path',
+  join(MOBILE, 'e2e/detox.config.cjs'),
+  '--configuration',
+  'ios.pilot',
+  '--retries',
+  '0',
+];
+
+export const detoxEnvironment = ({ env, app, directory, phone }) => ({
+  ...env,
+  PATH: [
+    join(ROOT, '.tmp/tools/applesimutils', TOOLCHAIN.APPLESIMUTILS_VERSION),
+    join(MOBILE, 'node_modules/.bin'),
+    env.PATH || env.Path || '',
+  ].join(delimiter),
+  STEAD_DETOX_APP: app,
+  STEAD_DETOX_ARTIFACTS: join(directory, 'detox'),
+  STEAD_DETOX_PHONE: phone,
+  STEAD_DETOX_PHONE_DISPLAY: phoneDisplay(phone),
+});
+
+// Jest discovery loads the real runner/config but never initializes a simulator.
+export const checkDetoxRunner = async ({
+  env,
+  execute = runCommand,
+  signal,
+}) => {
+  const output = await execute(
+    process.execPath,
+    [...TEST_ARGS, '--listTests'],
+    {
+      cwd: MOBILE,
+      env: {
+        ...env,
+        STEAD_DETOX_DEVICE: '00000000-0000-4000-8000-000000000001',
+      },
+      signal,
+    },
+  );
+  const expected = join(MOBILE, 'e2e/compatibility.test.cjs').replaceAll(
+    '\\',
+    '/',
+  );
+  if (
+    !output
+      .split(/\r?\n/)
+      .some((line) => line.trim().replaceAll('\\', '/') === expected)
+  )
+    throw new Error('Detox/Jest did not discover the compatibility pilot.');
+};
 
 // Include JavaScript, dylibs, resources, and symlinks, not only the small launcher.
 export const hashIosApp = (app) => {
@@ -85,6 +138,7 @@ export const runIosDetox = async (
   { app, directory, env, signal, phone, beforeTest = async () => {} },
   {
     execute = runCommand,
+    checkRunner = checkDetoxRunner,
     detoxVersion = JSON.parse(
       readFileSync(join(MOBILE, 'node_modules/detox/package.json'), 'utf8'),
     ).version,
@@ -95,19 +149,7 @@ export const runIosDetox = async (
   } = {},
 ) => {
   mkdirSync(directory, { recursive: true });
-  const tools = join(
-    ROOT,
-    '.tmp/tools/applesimutils',
-    TOOLCHAIN.APPLESIMUTILS_VERSION,
-  );
-  env = {
-    ...env,
-    PATH: `${tools}${delimiter}${env.PATH || ''}`,
-    STEAD_DETOX_APP: app,
-    STEAD_DETOX_ARTIFACTS: join(directory, 'detox'),
-    STEAD_DETOX_PHONE: phone,
-    STEAD_DETOX_PHONE_DISPLAY: phoneDisplay(phone),
-  };
+  env = detoxEnvironment({ env, app, directory, phone });
   const version = detoxVersion;
   const expected = JSON.parse(
     readFileSync(join(MOBILE, 'package.json'), 'utf8'),
@@ -135,7 +177,7 @@ export const runIosDetox = async (
           execute(command, args, {
             cwd: MOBILE,
             ...options,
-            env,
+            env: options.env || env,
             signal: phaseSignal,
           }),
         phaseSignal,
@@ -160,6 +202,7 @@ export const runIosDetox = async (
   };
   try {
     await phase('preparation', prepareTimeoutMs, async (run) => {
+      await checkRunner({ env, execute: run });
       await run('bash', [
         join(ROOT, '.github/scripts/install-applesimutils.sh'),
       ]);
@@ -178,16 +221,7 @@ export const runIosDetox = async (
     await phase('execution', testTimeoutMs, async (run) => {
       appTests = 'failed';
       const output = await run(process.execPath, [
-        CLI,
-        'test',
-        '--config-path',
-        'e2e/detox.config.cjs',
-        '--configuration',
-        'ios.pilot',
-        '--workers',
-        '1',
-        '--retries',
-        '0',
+        ...TEST_ARGS,
         '--json',
         '--outputFile',
         join(directory, 'summary.json'),

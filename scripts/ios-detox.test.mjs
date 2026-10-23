@@ -4,6 +4,8 @@ import { mkdtempSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import {
+  checkDetoxRunner,
+  detoxEnvironment,
   assertDetoxResult,
   assertIosBuild,
   hashIosApp,
@@ -87,6 +89,7 @@ test('driver failure retains its cause, stops repeats, and cleans only the owned
           { app: '/unused.app', directory, env: {}, phone: '08030000001' },
           {
             detoxVersion: '20.51.1',
+            checkRunner: async () => {},
             execute: async (command, args, options) => {
               if (args[1] === 'create') return owned;
               if (args.includes('test'))
@@ -123,6 +126,7 @@ test('hung execution has a separate deadline and still releases its owned simula
         { app: '/unused.app', directory, env: {}, phone: '08030000001' },
         {
           detoxVersion: '20.51.1',
+          checkRunner: async () => {},
           prepareTimeoutMs: 1000,
           testTimeoutMs: 20,
           execute: async (command, args, options) => {
@@ -157,6 +161,7 @@ test('a hung shutdown cannot prevent deletion or leave successful evidence', asy
         { app: '/unused.app', directory, env: {}, phone: '08030000001' },
         {
           detoxVersion: '20.51.1',
+          checkRunner: async () => {},
           cleanupTimeoutMs: 20,
           execute: async (command, args, options) => {
             if (args[1] === 'create') return owned;
@@ -215,6 +220,7 @@ test('readiness precedes backend startup and real assertions; hosted disposal do
       },
       {
         detoxVersion: '20.51.1',
+        checkRunner: async () => {},
         execute: async (_command, args, options) => {
           if (args.includes('devices')) return hostedDevices();
           if (args[1] === 'create') return owned;
@@ -265,6 +271,7 @@ test('hosted readiness failure never starts the backend or app tests and remains
         },
         {
           detoxVersion: '20.51.1',
+          checkRunner: async () => {},
           execute: async (_command, args) => {
             if (args.includes('devices')) return hostedDevices();
             if (args[1] === 'create') return owned;
@@ -304,6 +311,7 @@ test('a hosted assertion failure cannot be hidden by deferred simulator cleanup'
         },
         {
           detoxVersion: '20.51.1',
+          checkRunner: async () => {},
           execute: async (_command, args) => {
             if (args.includes('devices')) return hostedDevices();
             if (args[1] === 'create') return owned;
@@ -342,6 +350,7 @@ test('backend startup failure is distinct from readiness and prevents app-test e
         },
         {
           detoxVersion: '20.51.1',
+          checkRunner: async () => {},
           execute: async (_command, args) => {
             if (args[1] === 'create') return owned;
             if (args.includes('test'))
@@ -366,6 +375,23 @@ test('backend startup failure is distinct from readiness and prevents app-test e
         ['backend', 'failed'],
       ],
     );
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test('the actual Detox CLI launches the locked mobile Jest and discovers the pilot without a simulator', async () => {
+  const directory = mkdtempSync(join(tmpdir(), 'stead-detox-discovery-'));
+  try {
+    await checkDetoxRunner({
+      env: detoxEnvironment({
+        env: process.env,
+        app: '/unused.app',
+        directory,
+        phone: '08030000001',
+      }),
+      signal: AbortSignal.timeout(30000),
+    });
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }

@@ -61,9 +61,6 @@ jobs:
       - name: Validate workflow contracts
         run: npm run workflows:check
 
-      - name: Test developer automation
-        run: npm run automation:test
-
   lint:
     needs: config
     runs-on: ubuntu-24.04
@@ -223,6 +220,11 @@ jobs:
           npm ci
           npm --prefix api ci
           npm --prefix mobile ci
+
+      # Includes real Detox/Jest discovery, so run after mobile dev dependencies
+      # are installed rather than in the root-only formatting job.
+      - name: Test developer automation
+        run: npm run automation:test
 
       - name: Exercise live mobile API client journey
         run: node scripts/local-workflow.mjs test:journey --database-ready
