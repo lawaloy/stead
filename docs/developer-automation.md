@@ -47,9 +47,8 @@ gates before pushing; they enforce ordering and test database isolation.
   for native commands. Android debug apps require Metro
   port 8081; stop an existing Metro session first.
 - Managed runs remove only their owned emulator data and services. Native
-  Android validation rejects physical devices; iOS setup clears the dedicated
-  simulator's keychain and refuses personal simulators. The signed-in restart
-  step preserves credentials and verifies session restoration.
+  Android validation rejects physical devices. The iOS pilot uses an owned
+  simulator; its signed-in restart preserves credentials.
 - Repeats use fresh fixtures and retain every result. Any failed attempt or
   container OOM kill fails the command, even if later attempts pass.
 - Each Maestro process has the shared 12-minute deadline in `.github/ci.env`.
@@ -92,9 +91,10 @@ Setup selects Xcode without changing the machine default and creates the
 dedicated simulator. Builds use locked CocoaPods and validate simulator
 keychain entitlements. The experimental Detox pilot uses a Release simulator
 app with bundled JavaScript and no Metro server. Its API URL is fixed at build
-time: use the same `--api-port` for build and test. Tool versions and separate
-three-minute preparation/four-minute execution deadlines are shared with CI. `IOS_DRIVER_STARTUP_TIMEOUT_MS` sets the shared driver
-startup budget; app assertions keep their own limits.
+time: use the same `--api-port` for build and test. Tool preparation and simulator
+readiness each have a three-minute deadline. Readiness must pass before migrations
+and API startup (90 seconds), followed by four minutes for Detox execution.
+App assertions keep their own limits; CI also bounds the pilot step to 12 minutes.
 
 Use `--platform ios` for iOS or `--platform all` where both pinned environments
 are available. Omitting the platform from `validate` requires both.
@@ -102,8 +102,8 @@ Unavailable platforms fail rather than skip. Android results provide Android
 evidence only. `--device` selects a prepared Android emulator; `--app <path>`
 reuses an existing artifact and must be reported separately from a source build.
 
-Native journeys print each Maestro command's status live. The single-flow
-runner uses plain output because Maestro's JUnit mode suppresses step progress.
+Android journeys print each Maestro command's status live. The iOS pilot prints
+phase and journey milestones with their outcomes and elapsed time.
 Evidence stays in ignored directories:
 
 - `.tmp/native-validation/`: service logs, bundle, Maestro command results and
@@ -149,8 +149,9 @@ It covers launch, exact keyboard input, an app-native alert and signed-in proces
 restoration against an isolated real API. It does **not** cover the full financial
 journey and is not a replacement merge gate yet. On Windows, dispatch `native-ci`
 on the feature branch with `platform=ios` and `ios_pilot=true`; execution uses a
-free standard hosted Mac. No temporary validation branch or new npm command is
-needed. Ordinary PR/main runs still skip iOS while the switch is false. The pilot
+free standard hosted Mac. Set `ios_pilot_runs=3` to qualify the same artifact on
+three independent fresh VMs in parallel; every run must pass. No temporary
+validation branch or new npm command is needed. Ordinary PR/main runs still skip iOS while the switch is false. The pilot
 currently adds three moderate `stream-json` advisories through Detox tooling;
 they remain unexcepted and block merging. Its fixed major version changes the
 parser API, so an untested override is not applied.
@@ -159,8 +160,14 @@ For a cheap simulator readiness check on a Mac, run
 `npm run native -- setup --platform ios --probe`. The equivalent manual
 `native-ci` input `ios_boot_only=true` compares both pinned free runner types
 without an app build, API or test framework. It retains boot status, memory and
-load diagnostics and cleans only its owned simulator. The boot deadline remains
-three minutes. Fix this boundary before interpreting any framework result.
+load diagnostics. Hosted VMs reuse an image-provisioned device only when its type
+and runtime match the pins, otherwise creating one. Persistent/local hosts always
+create a fresh device. Readiness and cleanup have separate results. Persistent/local
+hosts must shut down and delete their owned simulator; cleanup failure fails the
+command without changing readiness or assertion outcomes. On GitHub-hosted VMs,
+simulator disposal is deferred explicitly to GitHub's job teardown. Self-hosted
+runners and `CI=true` alone never select this policy. The boot deadline remains
+three minutes.
 After a successful readiness check, `ios_pilot=true` can reuse `ios_app_run`
 with the exact `ios_app_sha256`; results explicitly identify this as a provided
 artifact experiment, not a source build of the selected head.

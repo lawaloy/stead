@@ -90,6 +90,9 @@ export const prepareIos = async ({
 export const IOS_SIMULATOR_UUID =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+const disposableHost = (env) =>
+  env.GITHUB_ACTIONS === 'true' && env.RUNNER_ENVIRONMENT === 'github-hosted';
+
 export const createIosSimulator = async (execute) => {
   const device = (
     await execute(
@@ -109,9 +112,72 @@ export const createIosSimulator = async (execute) => {
   return device;
 };
 
-export const bootIosSimulator = async (device, execute) => {
-  await execute('xcrun', ['simctl', 'boot', device]);
+export const acquireIosSimulator = async (execute, env) => {
+  if (disposableHost(env)) {
+    const { devices } = JSON.parse(
+      await execute(
+        'xcrun',
+        ['simctl', 'list', 'devices', 'available', '--json'],
+        { quiet: true, stdoutOnly: true },
+      ),
+    );
+    const provisioned = (devices[TOOLCHAIN.IOS_RUNTIME] || []).find(
+      (device) =>
+        device.isAvailable &&
+        IOS_SIMULATOR_UUID.test(device.udid) &&
+        device.name === 'iPhone 17' &&
+        (device.deviceTypeIdentifier ===
+          'com.apple.CoreSimulator.SimDeviceType.iPhone-17' ||
+          (!device.deviceTypeIdentifier && device.name === 'iPhone 17')),
+    );
+    if (provisioned) return { ...provisioned, origin: 'hosted-image' };
+  }
+  return {
+    udid: await createIosSimulator(execute),
+    state: 'Shutdown',
+    origin: 'created',
+  };
+};
+
+export const bootIosSimulator = async (device, execute, state = 'Shutdown') => {
+  if (!['Booted', 'Booting'].includes(state))
+    await execute('xcrun', ['simctl', 'boot', device]);
   await execute('xcrun', ['simctl', 'bootstatus', device, '-b']);
+};
+
+// Only GitHub-hosted jobs have a disposable VM. CI=true alone must never
+// disable cleanup on a developer Mac or a persistent self-hosted runner.
+export const cleanupIosSimulator = async (
+  device,
+  { env, execute = runCommand, timeoutMs = 15000 },
+) => {
+  if (!IOS_SIMULATOR_UUID.test(device || ''))
+    return { status: 'not-needed', errors: [] };
+  if (disposableHost(env))
+    return {
+      status: 'deferred',
+      owner: 'github-hosted-vm',
+      reason:
+        'GitHub decommissions this job VM, including its owned simulator.',
+      errors: [],
+    };
+  const errors = [];
+  for (const action of ['shutdown', 'delete']) {
+    try {
+      await execute('xcrun', ['simctl', action, device], {
+        env,
+        quiet: true,
+        signal: AbortSignal.timeout(timeoutMs),
+      });
+    } catch (error) {
+      errors.push(`${action}: ${error.message}`);
+    }
+  }
+  return {
+    status: errors.length ? 'failed' : 'passed',
+    owner: 'runner',
+    errors,
+  };
 };
 
 export const probeIosBoot = async ({
@@ -143,7 +209,7 @@ export const probeIosBoot = async ({
       }
     }
   };
-  let device, failure;
+  let device, failure, allocation;
   await snapshot('beforeBoot');
   const deadline = new AbortController();
   const timer = setTimeout(() => deadline.abort(), timeoutMs);
@@ -151,8 +217,9 @@ export const probeIosBoot = async ({
   const run = (command, args, options = {}) =>
     execute(command, args, { ...options, env, signal: deadline.signal });
   try {
-    device = await createIosSimulator(run);
-    await bootIosSimulator(device, run);
+    allocation = await acquireIosSimulator(run, env);
+    device = allocation.udid;
+    await bootIosSimulator(device, run, allocation.state);
   } catch (error) {
     failure = deadline.signal.aborted
       ? new Error(`Simulator boot exceeded ${timeoutMs} ms: ${error.message}`)
@@ -162,29 +229,32 @@ export const probeIosBoot = async ({
   }
   const bootElapsedMs = Date.now() - started;
   await snapshot('afterBoot');
-  if (IOS_SIMULATOR_UUID.test(device || '')) {
-    for (const action of ['shutdown', 'delete']) {
-      try {
-        await execute('xcrun', ['simctl', action, device], {
-          env,
-          quiet: true,
-          signal: AbortSignal.timeout(cleanupTimeoutMs),
-        });
-      } catch (error) {
-        failure = failure
-          ? new AggregateError(
-              [failure, error],
-              `${failure.message}; ${action}: ${error.message}`,
-            )
-          : error;
-      }
-    }
-  }
+  const readiness = {
+    status: failure ? 'failed' : 'passed',
+    error: failure?.message,
+  };
+  const cleanup = await cleanupIosSimulator(device, {
+    env,
+    execute,
+    timeoutMs: cleanupTimeoutMs,
+  });
+  if (cleanup.status === 'failed')
+    failure = new Error(
+      [
+        failure?.message,
+        `Simulator cleanup failed: ${cleanup.errors.join('; ')}`,
+      ]
+        .filter(Boolean)
+        .join('; '),
+    );
   const result = {
     device,
+    simulatorOrigin: allocation?.origin,
     runtime: TOOLCHAIN.IOS_RUNTIME,
     timeoutMs,
     bootElapsedMs,
+    readiness,
+    cleanup,
     passed: !failure,
     failure: failure?.message,
     diagnostics,

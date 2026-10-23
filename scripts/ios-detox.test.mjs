@@ -10,6 +10,7 @@ import {
   runIosDetox,
 } from './ios-detox.mjs';
 import { repeatJourneys } from './native-attempts.mjs';
+import { TOOLCHAIN } from './toolchain.mjs';
 
 const passed = () => ({
   success: true,
@@ -21,6 +22,19 @@ const passed = () => ({
   testResults: [{ assertionResults: [{ status: 'passed' }] }],
 });
 const owned = '00000000-0000-4000-8000-000000000001';
+const hostedDevices = () =>
+  JSON.stringify({
+    devices: {
+      [TOOLCHAIN.IOS_RUNTIME]: [
+        {
+          udid: owned,
+          name: 'iPhone 17',
+          isAvailable: true,
+          state: 'Shutdown',
+        },
+      ],
+    },
+  });
 
 test('pilot refuses empty, skipped, or failed Jest evidence', () => {
   assertDetoxResult(passed());
@@ -173,6 +187,184 @@ test('a hung shutdown cannot prevent deletion or leave successful evidence', asy
     assert.equal(
       JSON.parse(readFileSync(join(directory, 'timing.json'), 'utf8')).passed,
       false,
+    );
+    const evidence = JSON.parse(
+      readFileSync(join(directory, 'timing.json'), 'utf8'),
+    );
+    assert.equal(evidence.appTests, 'passed');
+    assert.equal(evidence.cleanup.status, 'failed');
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test('readiness precedes backend startup and real assertions; hosted disposal does not change their result', async () => {
+  const directory = mkdtempSync(join(tmpdir(), 'stead-detox-hosted-'));
+  const order = [];
+  try {
+    const result = await runIosDetox(
+      {
+        app: '/unused.app',
+        directory,
+        env: { GITHUB_ACTIONS: 'true', RUNNER_ENVIRONMENT: 'github-hosted' },
+        phone: '08030000001',
+        beforeTest: async ({ signal }) => {
+          assert.equal(signal.aborted, false);
+          order.push('backend');
+        },
+      },
+      {
+        detoxVersion: '20.51.1',
+        execute: async (_command, args, options) => {
+          if (args.includes('devices')) return hostedDevices();
+          if (args[1] === 'create') return owned;
+          if (args[1] === 'bootstatus') order.push('ready');
+          if (args.includes('test')) {
+            order.push('assertions');
+            assert.equal(options.env.STEAD_DETOX_DEVICE, owned);
+            writeFileSync(
+              join(directory, 'summary.json'),
+              JSON.stringify(passed()),
+            );
+          }
+          if (['shutdown', 'delete'].includes(args[1]))
+            throw new Error('Do not tear down the disposable VM simulator');
+          return '';
+        },
+      },
+    );
+    assert.deepEqual(order, ['ready', 'backend', 'assertions']);
+    assert.equal(result.appTests, 'passed');
+    assert.equal(result.cleanup.status, 'deferred');
+    assert.deepEqual(
+      result.timings.map(({ phase, status }) => [phase, status]),
+      [
+        ['preparation', 'passed'],
+        ['readiness', 'passed'],
+        ['backend', 'passed'],
+        ['execution', 'passed'],
+      ],
+    );
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test('hosted readiness failure never starts the backend or app tests and remains a failure', async () => {
+  const directory = mkdtempSync(join(tmpdir(), 'stead-detox-not-ready-'));
+  try {
+    await assert.rejects(
+      runIosDetox(
+        {
+          app: '/unused.app',
+          directory,
+          env: { GITHUB_ACTIONS: 'true', RUNNER_ENVIRONMENT: 'github-hosted' },
+          phone: '08030000001',
+          beforeTest: async () =>
+            assert.fail('backend started before readiness'),
+        },
+        {
+          detoxVersion: '20.51.1',
+          execute: async (_command, args) => {
+            if (args.includes('devices')) return hostedDevices();
+            if (args[1] === 'create') return owned;
+            if (args[1] === 'bootstatus')
+              throw new Error('Data migration is stuck');
+            if (args.includes('test'))
+              assert.fail('App tests started before readiness');
+            return '';
+          },
+        },
+      ),
+      /Data migration is stuck/,
+    );
+    const evidence = JSON.parse(
+      readFileSync(join(directory, 'timing.json'), 'utf8'),
+    );
+    assert.equal(evidence.passed, false);
+    assert.equal(evidence.appTests, 'not-run');
+    assert.equal(evidence.cleanup.status, 'deferred');
+    assert.equal(evidence.timings.at(-1).phase, 'readiness');
+    assert.equal(evidence.timings.at(-1).status, 'failed');
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test('a hosted assertion failure cannot be hidden by deferred simulator cleanup', async () => {
+  const directory = mkdtempSync(join(tmpdir(), 'stead-detox-assertion-'));
+  try {
+    await assert.rejects(
+      runIosDetox(
+        {
+          app: '/unused.app',
+          directory,
+          env: { GITHUB_ACTIONS: 'true', RUNNER_ENVIRONMENT: 'github-hosted' },
+          phone: '08030000001',
+        },
+        {
+          detoxVersion: '20.51.1',
+          execute: async (_command, args) => {
+            if (args.includes('devices')) return hostedDevices();
+            if (args[1] === 'create') return owned;
+            if (args.includes('test'))
+              throw new Error('Exact keyboard input differs');
+            return '';
+          },
+        },
+      ),
+      /Exact keyboard input differs/,
+    );
+    const evidence = JSON.parse(
+      readFileSync(join(directory, 'timing.json'), 'utf8'),
+    );
+    assert.equal(evidence.passed, false);
+    assert.equal(evidence.appTests, 'failed');
+    assert.equal(evidence.cleanup.status, 'deferred');
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test('backend startup failure is distinct from readiness and prevents app-test execution', async () => {
+  const directory = mkdtempSync(join(tmpdir(), 'stead-detox-backend-'));
+  try {
+    await assert.rejects(
+      runIosDetox(
+        {
+          app: '/unused.app',
+          directory,
+          env: {},
+          phone: '08030000001',
+          beforeTest: async () => {
+            throw new Error('API migration failed');
+          },
+        },
+        {
+          detoxVersion: '20.51.1',
+          execute: async (_command, args) => {
+            if (args[1] === 'create') return owned;
+            if (args.includes('test'))
+              assert.fail('App tests require a ready backend');
+            return '';
+          },
+        },
+      ),
+      /API migration failed/,
+    );
+    const evidence = JSON.parse(
+      readFileSync(join(directory, 'timing.json'), 'utf8'),
+    );
+    assert.equal(evidence.passed, false);
+    assert.equal(evidence.appTests, 'not-run');
+    assert.equal(evidence.cleanup.status, 'passed');
+    assert.deepEqual(
+      evidence.timings.map(({ phase, status }) => [phase, status]),
+      [
+        ['preparation', 'passed'],
+        ['readiness', 'passed'],
+        ['backend', 'failed'],
+      ],
     );
   } finally {
     rmSync(directory, { recursive: true, force: true });

@@ -218,24 +218,25 @@ const runAttempt = async (platform, options, tools, app, pool, directory) => {
     const adb = (args, config = {}) =>
       runCommand(tools.adb, ['-s', tools.device, ...args], config);
     return withCleanup(async () => {
-      await runCommand('npm', ['exec', '--', 'prisma', 'migrate', 'deploy'], {
-        cwd: API,
-        env,
-        signal: options.signal,
-      });
-      api = logService(
-        process.execPath,
-        ['dist/src/main.js'],
-        join(directory, 'api.log'),
-        { cwd: API, env, signal: options.signal },
-      );
-      await waitForEndpoint(`${apiUrl}/auth/countries`, api, {
-        signal: options.signal,
-      });
-      const appId = JSON.parse(readFileSync(join(MOBILE, 'app.json'), 'utf8'))
-        .expo[platform === 'android' ? 'android' : 'ios'][
-        platform === 'android' ? 'package' : 'bundleIdentifier'
-      ];
+      const prepareBackend = async ({
+        execute = runCommand,
+        signal = options.signal,
+      } = {}) => {
+        await execute('npm', ['exec', '--', 'prisma', 'migrate', 'deploy'], {
+          cwd: API,
+          env,
+          signal,
+        });
+        api = logService(
+          process.execPath,
+          ['dist/src/main.js'],
+          join(directory, 'api.log'),
+          { cwd: API, env, signal },
+        );
+        await waitForEndpoint(`${apiUrl}/auth/countries`, api, {
+          signal,
+        });
+      };
       if (platform === 'ios') {
         const result = await runIosDetox({
           app,
@@ -243,9 +244,13 @@ const runAttempt = async (platform, options, tools, app, pool, directory) => {
           env,
           signal: options.signal,
           phone: options.phone,
+          beforeTest: prepareBackend,
         });
         return { schema, directory, build, ...result };
       }
+      await prepareBackend();
+      const appId = JSON.parse(readFileSync(join(MOBILE, 'app.json'), 'utf8'))
+        .expo.android.package;
       metro = logService(
         process.execPath,
         [EXPO, 'start', '--localhost', '--port', String(options.metroPort)],

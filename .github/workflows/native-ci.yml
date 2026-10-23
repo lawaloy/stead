@@ -20,6 +20,11 @@ on:
         description: Run the experimental Detox compatibility probe (does not enable automatic iOS CI)
         type: boolean
         default: false
+      ios_pilot_runs:
+        description: Independent fresh-host pilot runs (all must pass; no retries)
+        type: choice
+        options: ['1', '3']
+        default: '1'
       ios_boot_only:
         description: Compare simulator boot on free Mac runners without building the app
         type: boolean
@@ -343,6 +348,10 @@ jobs:
     needs: [config, build-ios]
     if: always() && !cancelled() && needs.config.result == 'success' && (needs.config.outputs.ios_enabled == 'true' || inputs.ios_pilot == true) && (needs.build-ios.result == 'success' || inputs.ios_app_run != '') && inputs.ios_boot_only != true
     runs-on: ${{ needs.config.outputs.ios_runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        attempt: ${{ fromJSON(inputs.ios_pilot == true && inputs.ios_pilot_runs == '3' && '[1,2,3]' || '[1]') }}
     timeout-minutes: 20
     env:
       DATABASE_URL: postgresql://stead:stead@127.0.0.1:5432/stead?schema=e2e_native
@@ -430,13 +439,14 @@ jobs:
           npm ci --prefix api
           npm ci --prefix mobile
       - name: Run iOS Detox compatibility pilot
+        timeout-minutes: 12
         run: |
           npm run native -- setup --platform ios
           npm run native -- test --platform ios --database-ready --app mobile/.ci/ios/mobile.app
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: ios-native-journey-logs
+          name: ios-native-journey-logs-${{ matrix.attempt }}
           include-hidden-files: true
           path: |
             .tmp/native-validation

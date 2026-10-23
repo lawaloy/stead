@@ -12,9 +12,9 @@ import { ROOT, TOOLCHAIN } from './toolchain.mjs';
 import { phoneDisplay } from './native-config.mjs';
 import { runCommand } from './process-utils.mjs';
 import {
-  createIosSimulator,
+  acquireIosSimulator,
   bootIosSimulator,
-  IOS_SIMULATOR_UUID as UUID,
+  cleanupIosSimulator,
 } from './ios-setup.mjs';
 
 const MOBILE = join(ROOT, 'mobile');
@@ -82,13 +82,14 @@ export const assertDetoxResult = (summary) => {
 };
 
 export const runIosDetox = async (
-  { app, directory, env, signal, phone },
+  { app, directory, env, signal, phone, beforeTest = async () => {} },
   {
     execute = runCommand,
     detoxVersion = JSON.parse(
       readFileSync(join(MOBILE, 'node_modules/detox/package.json'), 'utf8'),
     ).version,
     prepareTimeoutMs = Number(TOOLCHAIN.IOS_DETOX_PREPARE_TIMEOUT_MS),
+    bootTimeoutMs = Number(TOOLCHAIN.IOS_SIMULATOR_BOOT_TIMEOUT_MS),
     testTimeoutMs = Number(TOOLCHAIN.IOS_DETOX_TIMEOUT_MS),
     cleanupTimeoutMs = 15000,
   } = {},
@@ -113,7 +114,8 @@ export const runIosDetox = async (
   ).devDependencies.detox;
   if (version !== expected)
     throw new Error(`Install locked Detox ${expected}; found ${version}.`);
-  let device, failure;
+  let device, failure, cleanup, allocation;
+  let appTests = 'not-run';
   const timings = [];
   const phase = async (name, timeoutMs, operation) => {
     if (!Number.isSafeInteger(timeoutMs) || timeoutMs <= 0)
@@ -124,25 +126,36 @@ export const runIosDetox = async (
       ? AbortSignal.any([signal, deadline.signal])
       : deadline.signal;
     const started = Date.now();
+    const timing = { phase: name, timeoutMs, status: 'failed' };
     console.log(`[iOS pilot] START ${name} (deadline ${timeoutMs} ms)`);
     try {
-      return await operation((command, args, options = {}) =>
-        execute(command, args, {
-          cwd: MOBILE,
-          ...options,
-          env,
-          signal: phaseSignal,
-        }),
+      phaseSignal.throwIfAborted();
+      const result = await operation(
+        (command, args, options = {}) =>
+          execute(command, args, {
+            cwd: MOBILE,
+            ...options,
+            env,
+            signal: phaseSignal,
+          }),
+        phaseSignal,
       );
+      timing.status = 'passed';
+      console.log(`[iOS pilot] PASS ${name} (${Date.now() - started} ms)`);
+      return result;
     } catch (error) {
-      if (deadline.signal.aborted && !signal?.aborted)
-        throw new Error(`iOS ${name} exceeded ${timeoutMs} ms.`, {
-          cause: error,
-        });
-      throw error;
+      const failure =
+        deadline.signal.aborted && !signal?.aborted
+          ? new Error(`iOS ${name} exceeded ${timeoutMs} ms.`, {
+              cause: error,
+            })
+          : error;
+      timing.error = failure.message;
+      console.error(`[iOS pilot] FAIL ${name}: ${failure.message}`);
+      throw failure;
     } finally {
       clearTimeout(timer);
-      timings.push({ phase: name, elapsedMs: Date.now() - started, timeoutMs });
+      timings.push({ ...timing, elapsedMs: Date.now() - started });
     }
   };
   try {
@@ -151,11 +164,19 @@ export const runIosDetox = async (
         join(ROOT, '.github/scripts/install-applesimutils.sh'),
       ]);
       await run(process.execPath, [CLI, 'build-framework-cache', '--detox']);
-      device = await createIosSimulator(run);
-      env.STEAD_DETOX_DEVICE = device;
-      await bootIosSimulator(device, run);
     });
+    await phase('readiness', bootTimeoutMs, async (run) => {
+      allocation = await acquireIosSimulator(run, env);
+      device = allocation.udid;
+      console.log(`[iOS pilot] Simulator ${device} (${allocation.origin})`);
+      env.STEAD_DETOX_DEVICE = device;
+      await bootIosSimulator(device, run, allocation.state);
+    });
+    await phase('backend', 90000, (execute, signal) =>
+      beforeTest({ execute, signal }),
+    );
     await phase('execution', testTimeoutMs, async (run) => {
+      appTests = 'failed';
       const output = await run(process.execPath, [
         CLI,
         'test',
@@ -175,34 +196,43 @@ export const runIosDetox = async (
       assertDetoxResult(
         JSON.parse(readFileSync(join(directory, 'summary.json'), 'utf8')),
       );
+      appTests = 'passed';
     });
   } catch (error) {
     failure = error;
     writeFileSync(join(directory, 'failure.log'), error.stack || String(error));
   } finally {
-    // Evidence/cleanup get their own budget; never relabel an assertion as a test timeout.
-    if (UUID.test(device || '')) {
-      for (const action of ['shutdown', 'delete']) {
-        try {
-          await execute('xcrun', ['simctl', action, device], {
-            env,
-            signal: AbortSignal.timeout(cleanupTimeoutMs),
-            quiet: true,
-          });
-        } catch (error) {
-          failure = failure
-            ? new AggregateError(
-                [failure, error],
-                `${failure.message}; simulator ${action} failed: ${error.message}`,
-              )
-            : error;
-        }
-      }
-    }
+    cleanup = await cleanupIosSimulator(device, {
+      env,
+      execute,
+      timeoutMs: cleanupTimeoutMs,
+    });
+    if (cleanup.status === 'failed')
+      failure = new Error(
+        [
+          failure?.message,
+          `Simulator cleanup failed: ${cleanup.errors.join('; ')}`,
+        ]
+          .filter(Boolean)
+          .join('; '),
+      );
+    console.log(
+      `[iOS pilot] Cleanup ${cleanup.status}: ${cleanup.reason || cleanup.errors.join('; ') || cleanup.owner || 'no device allocated'}`,
+    );
     writeFileSync(
       join(directory, 'timing.json'),
       JSON.stringify(
-        { framework: 'detox', version, device, timings, passed: !failure },
+        {
+          framework: 'detox',
+          version,
+          device,
+          simulatorOrigin: allocation?.origin,
+          timings,
+          appTests,
+          cleanup,
+          passed: !failure,
+          failure: failure?.message,
+        },
         null,
         2,
       ),
@@ -213,7 +243,10 @@ export const runIosDetox = async (
     framework: 'detox',
     version,
     device,
+    simulatorOrigin: allocation?.origin,
     timings,
+    appTests,
+    cleanup,
     coverage: 'compatibility-pilot',
   };
 };
