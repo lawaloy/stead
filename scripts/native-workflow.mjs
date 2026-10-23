@@ -28,6 +28,7 @@ import {
 } from './android-emulator.mjs';
 import { iosEnvironment } from './ios-setup.mjs';
 import { runIosDetox, hashIosApp, assertIosBuild } from './ios-detox.mjs';
+import { assertSimulatorSigning } from './ios-simulator-entitlements.mjs';
 import { buildAndroidGradle } from './native-gradle.mjs';
 import { repeatJourneys, runMaestroCommand } from './native-attempts.mjs';
 export { repeatJourneys } from './native-attempts.mjs';
@@ -210,6 +211,8 @@ const runAttempt = async (platform, options, tools, app, pool, directory) => {
   const apiUrl = `http://127.0.0.1:${options.apiPort}`;
   const metroUrl = `http://127.0.0.1:${options.metroPort}`;
   const build = platform === 'ios' ? assertIosBuild(app, apiUrl) : undefined;
+  if (platform === 'ios')
+    assertSimulatorSigning(readFileSync(join(app, 'mobile')));
   mkdirSync(directory, { recursive: true });
   return withOwnedSchema(pool, schema, async () => {
     let api, metro;

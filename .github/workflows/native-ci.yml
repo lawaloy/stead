@@ -413,6 +413,14 @@ jobs:
           fi
           test -f "$PWD/mobile.app/Info.plist"
           echo "Unpacked $PWD/mobile.app"
+      - name: Prepare simulator host signature
+        run: |
+          # Re-sign only this job's downloaded copy; preserve embedded __TEXT
+          # simulator entitlements, without putting them in the host signature.
+          codesign --force --sign - mobile/.ci/ios/mobile.app
+          codesign --verify --deep mobile/.ci/ios/mobile.app
+          node scripts/ios-simulator-entitlements.mjs --check-signature mobile/.ci/ios/mobile.app/mobile
+          echo "Downloaded app prepared with a plain host signature. The ZIP hash identifies the input; results.json records the prepared app hash." >> "$GITHUB_STEP_SUMMARY"
       - name: Cache pinned PostgreSQL binaries
         id: postgres-cache
         uses: actions/cache/restore@v4

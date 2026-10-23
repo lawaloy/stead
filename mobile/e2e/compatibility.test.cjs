@@ -1,5 +1,6 @@
 const { describe, it } = require('@jest/globals');
 const { device, element, by, expect: expectUi, waitFor } = require('detox');
+const { execFileSync } = require('node:child_process');
 
 const step = async (name, operation) => {
   const started = Date.now();
@@ -11,6 +12,19 @@ const visible = (target) => waitFor(target).toBeVisible().withTimeout(15000);
 
 describe('Stead iOS framework compatibility (not the full financial journey)', () => {
   it('launches, types exact values, handles a native alert, and restores a session', async () => {
+    await step('App launches without Detox injection', async () => {
+      const output = execFileSync(
+        'xcrun',
+        ['simctl', 'launch', device.id, 'com.lawaloy.stead'],
+        {
+          encoding: 'utf8',
+          timeout: 30000,
+        },
+      );
+      if (!/com\.lawaloy\.stead: \d+/.test(output))
+        throw new Error(`Simulator did not return an app process: ${output}`);
+      await device.terminateApp();
+    });
     await step('Bundled app opens without Metro', async () => {
       await device.launchApp({ newInstance: true });
       await visible(element(by.text('Stead Login')));

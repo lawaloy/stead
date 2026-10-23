@@ -160,6 +160,11 @@ parser API, so an untested override is not applied.
 The portable automation suite invokes the real Detox CLI with Jest's `--listTests`
 to verify launcher, arguments and spec discovery without a simulator. The pilot
 repeats this check before allocation. It validates wiring, not native execution.
+Portable signing checks inspect every Mach-O architecture and reject iOS keychain
+entitlements in the host signature. The simulator build embeds those grants in
+`__TEXT` and uses a plain host signature. CI re-signs only its downloaded copy;
+the ZIP hash identifies the input, and results record the prepared app hash.
+The pilot checks launch without Detox injection before the instrumented journey.
 
 For a cheap simulator readiness check on a Mac, run
 `npm run native -- setup --platform ios --probe`. The equivalent manual

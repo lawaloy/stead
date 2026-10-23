@@ -15,6 +15,7 @@ import {
   acquireIosSimulator,
   bootIosSimulator,
   cleanupIosSimulator,
+  IOS_SIMULATOR_UUID,
 } from './ios-setup.mjs';
 
 const MOBILE = join(ROOT, 'mobile');
@@ -248,6 +249,33 @@ export const runIosDetox = async (
     failure = error;
     writeFileSync(join(directory, 'failure.log'), error.stack || String(error));
   } finally {
+    if (failure && IOS_SIMULATOR_UUID.test(device || '')) {
+      try {
+        const output = await execute(
+          'xcrun',
+          [
+            'simctl',
+            'spawn',
+            device,
+            'log',
+            'show',
+            '--last',
+            '3m',
+            '--style',
+            'compact',
+            '--predicate',
+            'process == "SpringBoard" OR process == "runningboardd" OR process == "amfid" OR eventMessage CONTAINS "com.lawaloy.stead"',
+          ],
+          { env, quiet: true, signal: AbortSignal.timeout(15000) },
+        );
+        writeFileSync(join(directory, 'launch-diagnostics.log'), output);
+      } catch (error) {
+        writeFileSync(
+          join(directory, 'launch-diagnostics.log'),
+          `Diagnostic collection failed: ${error.message}`,
+        );
+      }
+    }
     cleanup = await cleanupIosSimulator(device, {
       env,
       execute,

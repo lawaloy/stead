@@ -21,9 +21,9 @@ export EXPO_PUBLIC_E2E_PHONE=
 mkdir -p "$DERIVED"
 defaults write com.apple.dt.XCBuild IgnoreFileSystemDeviceInodeChanges -bool YES
 
-# The simulator still enforces keychain entitlements. An unsigned app makes
-# SecureStore fail with -34018 and silently leaves sessions process-local.
-# Use an ad-hoc simulator identity and a bundle-scoped keychain access group.
+# Simulator keychain grants must be embedded by the linker. Xcode generates
+# __entitlements and __ents_der from this bundle-scoped dictionary; the final
+# host code signature below deliberately carries no iOS entitlements.
 SIMULATOR_BUNDLE_ID="$(node -p "JSON.parse(require('node:fs').readFileSync('../app.json', 'utf8')).expo.ios.bundleIdentifier")"
 SIMULATOR_ENTITLEMENTS="$DERIVED/SteadSimulator.entitlements"
 /usr/libexec/PlistBuddy -c 'Clear dict' "$SIMULATOR_ENTITLEMENTS"
@@ -51,8 +51,11 @@ APP_PATH="$DERIVED/Build/Products/Release-iphonesimulator/mobile.app"
 test -d "$APP_PATH"
 test -s "$APP_PATH/main.jsbundle"
 node -e 'require("node:fs").writeFileSync(process.argv[1], JSON.stringify({configuration:"Release", apiUrl:process.env.EXPO_PUBLIC_API_URL, bundledJavaScript:true, phoneSeeded:false, sourceCommit:require("node:child_process").execFileSync("git", ["rev-parse", "HEAD"], {encoding:"utf8"}).trim()}))' "$APP_PATH/stead-e2e-build.json"
-codesign --force --sign - --entitlements "$SIMULATOR_ENTITLEMENTS" "$APP_PATH"
-codesign --verify "$APP_PATH"
+# iOS entitlements are already linked into __TEXT. The host macOS signature
+# must not carry them: SpringBoard otherwise refuses to launch the simulator app.
+codesign --force --sign - "$APP_PATH"
+codesign --verify --deep "$APP_PATH"
+node "$ROOT/scripts/ios-simulator-entitlements.mjs" --check-signature "$APP_PATH/mobile"
 # Simulator entitlements live in the Mach-O __TEXT section, separate from
 # the macOS ad-hoc signature. Check every architecture in the published app.
 SIMULATOR_ARCHS="$(xcrun lipo -archs "$APP_PATH/mobile")"
