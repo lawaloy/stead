@@ -215,6 +215,21 @@ for (const [job, excluded] of [
   );
 assert.match(
   nativeWorkflow,
+  /echo "ios_enabled=\$IOS_NATIVE_ENABLED"/,
+  'Native iOS CI must read its enable switch from shared configuration.',
+);
+for (const job of ['build-ios', 'native-ios']) {
+  const section = nativeWorkflow
+    .split(`  ${job}:\n`)[1]
+    ?.split(/\n  [a-z][\w-]*:/)[0];
+  assert.match(
+    section ?? '',
+    /if: .*needs\.config\.outputs\.ios_enabled == 'true'/,
+    `The iOS enable switch must gate ${job}.`,
+  );
+}
+assert.match(
+  nativeWorkflow,
   /working-directory: mobile\n/,
   'iOS bundler must use the committed mobile Gemfile.',
 );

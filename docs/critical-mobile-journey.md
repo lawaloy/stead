@@ -59,9 +59,11 @@ uses a dedicated test phone supplied by the runner. Each attempt gets a fresh
 database schema so a repeated run does not inherit the previous account.
 
 Native simulator jobs live in `.github/workflows/native-ci.yml`. Its `config`
-job reports on every pull request and `main` push; Android and iOS Maestro run
+job reports on every pull request and `main` push; Android Maestro runs
 when the shared native path policy detects relevant mobile, API, contract, or CI
-changes. The complete suite also runs daily at 16:00 UTC (after morning
+changes. iOS builds and journeys are temporarily disabled by
+`IOS_NATIVE_ENABLED=false`; their retained implementation provides no CI
+validation while paused. The enabled suite also runs daily at 16:00 UTC (after morning
 Dependabot, Dependency Maintenance, and Dependency Audit activity) and via
 `workflow_dispatch`. Earlier successful runs covered a narrower flow: they did
 not exercise transaction editing or signed-in iOS cold-start restoration.
@@ -85,8 +87,8 @@ repeat-run evidence, explicit local validation, and the remaining macOS boundary
 are documented in
 [Developer Automation](developer-automation.md#native-and-security-setup).
 Native CI delegates to the same runner. Developers should produce local
-evidence for their available platforms. Without a development Mac, explicitly
-report local iOS execution as deferred and require the macOS CI build and
-journey to pass before merging.
+evidence for their available platforms. While iOS CI is paused,
+`npm run native -- remote-ios` also stops before upload. Report native iOS
+coverage as unavailable; Android and portable checks cannot substitute for it.
 
 </details>

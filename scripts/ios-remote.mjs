@@ -3,7 +3,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 import { fileURLToPath } from 'node:url';
-import { ROOT } from './toolchain.mjs';
+import { ROOT, TOOLCHAIN } from './toolchain.mjs';
 import { runCommand } from './process-utils.mjs';
 
 const WORKFLOW = 'native-ci.yml';
@@ -47,6 +47,7 @@ export const assertIosRun = (run, expected) => {
 
 export const remoteIos = async ({
   root = ROOT,
+  iosEnabled = TOOLCHAIN.IOS_NATIVE_ENABLED === 'true',
   execute = runCommand,
   sleep = delay,
   log = console.log,
@@ -57,6 +58,10 @@ export const remoteIos = async ({
     writeFileSync(join(directory, name), value);
   },
 } = {}) => {
+  if (!iosEnabled)
+    throw new Error(
+      'Native iOS CI is temporarily disabled while its Maestro journey is replaced. No code was uploaded and no run was started. See docs/developer-automation.md.',
+    );
   const command = async (name, args, options = {}) =>
     (
       await execute(name, args, {
