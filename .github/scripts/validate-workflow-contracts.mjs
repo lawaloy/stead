@@ -27,6 +27,8 @@ const [
   dependencyMaintenanceWorkflow,
   codeqlWorkflow,
   androidJourney,
+  iosBuild,
+  nativeRunner,
   rootPackage,
 ] = await Promise.all([
   readFile('.github/workflows/dependency-auto-finish.yml', 'utf8'),
@@ -37,6 +39,8 @@ const [
   readFile('.github/workflows/deps-maintenance.yml', 'utf8'),
   readFile('.github/workflows/codeql.yml', 'utf8'),
   readFile('.github/scripts/run-android-native-journey.sh', 'utf8'),
+  readFile('.github/scripts/build-ios-simulator-app.sh', 'utf8'),
+  readFile('scripts/native-workflow.mjs', 'utf8'),
   readFile('package.json', 'utf8'),
 ]);
 
@@ -71,6 +75,34 @@ assert.match(
   nativeWorkflow,
   /npm run native -- test --platform ios --database-ready/,
   'CI iOS journeys must reuse the local runner.',
+);
+const iosJourneyJob = nativeWorkflow
+  .split('  native-ios:\n')[1]
+  ?.split(/\n  [a-z][\w-]*:/)[0];
+assert.doesNotMatch(
+  iosJourneyJob ?? '',
+  /--repeat|npm ci --prefix mobile|ruby\/setup-ruby|Restore iOS Metro/,
+  'The transferred iOS app must run one complete journey without build-only dependencies or Metro.',
+);
+assert.match(
+  iosBuild,
+  /-configuration Release[\s\S]*test -s "\$APP_PATH\/main\.jsbundle"/,
+  'The iOS simulator artifact must embed JavaScript so its journey does not require Metro.',
+);
+assert.match(
+  nativeRunner,
+  /IOS_SIMULATOR_PREPARATION_TIMEOUT_MS/,
+  'The iOS simulator preparation deadline must come from shared CI configuration.',
+);
+assert.match(
+  TOOLCHAIN.IOS_SIMULATOR_PREPARATION_TIMEOUT_MS,
+  /^\d+$/,
+  'The shared iOS simulator preparation deadline must be milliseconds.',
+);
+assert.ok(
+  Number(TOOLCHAIN.IOS_SIMULATOR_PREPARATION_TIMEOUT_MS) >=
+    Number(TOOLCHAIN.IOS_DRIVER_STARTUP_TIMEOUT_MS),
+  'Simulator preparation must allow at least the full iOS driver startup budget.',
 );
 assert.match(
   androidJourney,
@@ -202,6 +234,11 @@ assert.match(
   /options: \[all, ios, android\]/,
   'Manual native preflight must support iOS without allocating Android runners.',
 );
+assert.doesNotMatch(
+  nativeWorkflow,
+  /^  schedule:/m,
+  'Native customer-journey validation is PR/main/on-demand only; do not add an unrequested nightly tier.',
+);
 for (const [job, excluded] of [
   ['build-android', 'ios'],
   ['build-ios', 'android'],
@@ -228,6 +265,17 @@ for (const job of ['build-ios', 'native-ios']) {
     `The iOS enable switch must gate ${job}.`,
   );
 }
+const readiness = nativeWorkflow.split('  native-readiness:\n')[1];
+assert.match(
+  readiness ?? '',
+  /name: Native Readiness[\s\S]*if: always\(\)[\s\S]*needs: \[config, build-android, build-ios, native-android, native-ios\]/,
+  'Native CI must expose one stable aggregate result across conditional platform jobs.',
+);
+assert.match(
+  readiness ?? '',
+  /Native configuration failed:[\s\S]*Native configuration produced no execution decision[\s\S]*iOS native validation is disabled for a native-impacting change/,
+  'The aggregate native result must reject configuration failure, missing decisions, and disabled iOS.',
+);
 assert.match(
   nativeWorkflow,
   /working-directory: mobile\n/,

@@ -29,7 +29,7 @@ SIMULATOR_ENTITLEMENTS="$DERIVED/SteadSimulator.entitlements"
 xcodebuild \
   -workspace mobile.xcworkspace \
   -scheme mobile \
-  -configuration Debug \
+  -configuration Release \
   -sdk iphonesimulator \
   -destination 'generic/platform=iOS Simulator' \
   -derivedDataPath "$DERIVED" \
@@ -42,8 +42,11 @@ xcodebuild \
   IgnoreFileSystemDeviceInodeChanges=YES \
   build
 
-APP_PATH="$DERIVED/Build/Products/Debug-iphonesimulator/mobile.app"
+APP_PATH="$DERIVED/Build/Products/Release-iphonesimulator/mobile.app"
 test -d "$APP_PATH"
+# The journey runner must not need Metro. Keeping the JavaScript bundle inside
+# the simulator app materially reduces memory pressure on the small hosted Mac.
+test -s "$APP_PATH/main.jsbundle"
 codesign --verify "$APP_PATH"
 # Simulator entitlements live in the Mach-O __TEXT section, separate from
 # the macOS ad-hoc signature. Check every architecture in the published app.

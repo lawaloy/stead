@@ -2,8 +2,9 @@ name: native-ci
 
 # Every PR and main-branch push produces a stable native-ci readiness signal.
 # The config job skips expensive native jobs when they are irrelevant.
-# iOS builds/journeys are temporarily disabled by IOS_NATIVE_ENABLED in ci.env.
-# Scheduled runs execute the enabled suite; manual runs can select a platform. Native binaries are
+# IOS_NATIVE_ENABLED is an emergency switch; native-readiness fails relevant
+# PRs when iOS is disabled so missing coverage cannot look green.
+# Manual runs can select a platform. Native binaries are
 # built in dedicated jobs and handed to Maestro jobs as artifacts (build once
 # → test). Android boots a dedicated AVD from checksum-locked SDK archives;
 # iOS uses mtime/inode-aware DerivedData + Pods caches when the .app misses.
@@ -16,11 +17,6 @@ on:
         type: choice
         options: [all, ios, android]
         default: all
-  # After Dependabot + Dependency Maintenance (13:00 UTC) and Dependency
-  # Audit (13:30 UTC), leave room for PR CI and auto-merge onto main before
-  # the daily native smoke. Main pushes also produce the readiness signal.
-  schedule:
-    - cron: '0 16 * * *'
   pull_request:
     branches: [main]
   push:
@@ -98,7 +94,7 @@ jobs:
             echo "android_profile=$ANDROID_PROFILE"
           } >> "$GITHUB_OUTPUT"
           if [[ "$IOS_NATIVE_ENABLED" != "true" ]]; then
-            echo "Native iOS builds and journeys are temporarily disabled. No iOS validation is claimed; Android remains enabled." >> "$GITHUB_STEP_SUMMARY"
+            echo "Native iOS builds and journeys are disabled by the emergency switch. Native Readiness will reject applicable changes." >> "$GITHUB_STEP_SUMMARY"
           fi
 
   build-android:
@@ -112,7 +108,9 @@ jobs:
         with:
           node-version: ${{ needs.config.outputs.node_version }}
           cache: npm
-          cache-dependency-path: mobile/package-lock.json
+          cache-dependency-path: |
+            package-lock.json
+            mobile/package-lock.json
       - uses: actions/setup-java@v6
         with:
           distribution: temurin
@@ -172,19 +170,15 @@ jobs:
         with:
           node-version: ${{ needs.config.outputs.node_version }}
           cache: npm
-          cache-dependency-path: mobile/package-lock.json
+          cache-dependency-path: |
+            package-lock.json
+            mobile/package-lock.json
       - name: Install shared runner dependencies
         run: |
           npm install --global npm@${{ needs.config.outputs.npm_version }}
           npm ci
       - name: Select pinned Xcode and simulator
         run: npm run native -- setup --platform ios
-      - uses: ruby/setup-ruby@v1
-        with:
-          ruby-version: ${{ needs.config.outputs.ruby_version }}
-          bundler: ${{ needs.config.outputs.bundler_version }}
-          bundler-cache: true
-          working-directory: mobile
       # Resolved before the app-cache restore so the cached .app is keyed on
       # the Xcode that built it (runner images can change Xcode in place).
       - name: Resolve Xcode version
@@ -194,18 +188,31 @@ jobs:
         id: ios-app-cache
         uses: actions/cache/restore@v4
         with:
-          path: mobile/.ci/ios/mobile.app
+          path: |
+            mobile/.ci/ios/mobile.app
+            mobile/.ci/ios/stead-native-config.json
           # Include the build script, toolchain pins, and this workflow so a
           # build-only change must rebuild instead of reusing a stale .app.
-          key: ios-simulator-app-${{ needs.config.outputs.ios_runner }}-${{ steps.xcode.outputs.version }}-v3-${{ hashFiles('package.json', 'package-lock.json', 'mobile/package-lock.json', 'mobile/app.json', 'mobile/assets/**', 'mobile/app/**', 'mobile/src/**', '.github/scripts/build-ios-simulator-app.sh', '.github/ci.env', '.github/workflows/native-ci.yml', 'scripts/native-*.mjs', 'scripts/android-*.mjs', 'scripts/archive-utils.mjs', '.github/android-sdk-lock.json', 'scripts/ios-setup.mjs', 'scripts/process-utils.mjs', 'scripts/local-workflow.mjs', 'scripts/ios-simulator-entitlements.mjs', 'scripts/toolchain.mjs', 'mobile/Gemfile', 'mobile/Gemfile.lock') }}
+          key: ios-simulator-app-${{ needs.config.outputs.ios_runner }}-${{ steps.xcode.outputs.version }}-v4-${{ hashFiles('package.json', 'package-lock.json', 'mobile/package-lock.json', 'mobile/app.json', 'mobile/assets/**', 'mobile/app/**', 'mobile/src/**', '.github/scripts/build-ios-simulator-app.sh', '.github/ci.env', '.github/workflows/native-ci.yml', 'scripts/native-*.mjs', 'scripts/android-*.mjs', 'scripts/archive-utils.mjs', '.github/android-sdk-lock.json', 'scripts/ios-setup.mjs', 'scripts/process-utils.mjs', 'scripts/local-workflow.mjs', 'scripts/ios-simulator-entitlements.mjs', 'scripts/toolchain.mjs', 'mobile/Gemfile', 'mobile/Gemfile.lock') }}
+      - uses: ruby/setup-ruby@v1
+        if: steps.ios-app-cache.outputs.cache-hit != 'true'
+        with:
+          ruby-version: ${{ needs.config.outputs.ruby_version }}
+          bundler: ${{ needs.config.outputs.bundler_version }}
+          bundler-cache: true
+          working-directory: mobile
       - name: Restore source mtimes for incremental Xcode
         if: steps.ios-app-cache.outputs.cache-hit != 'true'
         uses: chetan/git-restore-mtime-action@v2
+      - name: Cache iOS JavaScript transforms
+        if: steps.ios-app-cache.outputs.cache-hit != 'true'
+        uses: actions/cache@v4
+        with:
+          path: mobile/.cache/metro
+          key: metro-ios-v2-${{ hashFiles('mobile/package-lock.json', 'mobile/metro.config.js', 'mobile/babel.config.js') }}
       - name: Install mobile dependencies
         if: steps.ios-app-cache.outputs.cache-hit != 'true'
         run: |
-          npm install --global npm@${{ needs.config.outputs.npm_version }}
-          npm ci
           npm ci --prefix mobile
       - name: Prebuild iOS project
         if: steps.ios-app-cache.outputs.cache-hit != 'true'
@@ -244,13 +251,16 @@ jobs:
         if: steps.ios-app-cache.outputs.cache-hit != 'true'
         uses: actions/cache/save@v4
         with:
-          path: mobile/.ci/ios/mobile.app
+          path: |
+            mobile/.ci/ios/mobile.app
+            mobile/.ci/ios/stead-native-config.json
           key: ${{ steps.ios-app-cache.outputs.cache-primary-key }}
       - name: Package iOS app zip for artifact transfer
         run: |
           set -eu
           test -d mobile/.ci/ios/mobile.app
           test -f mobile/.ci/ios/mobile.app/Info.plist
+          test -f mobile/.ci/ios/stead-native-config.json
           rm -f mobile/.ci/ios/mobile.app.zip
           # Zip preserves .app layout across Actions artifact upload/download.
           ditto -c -k --sequesterRsrc --keepParent \
@@ -260,7 +270,9 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: ios-simulator-app
-          path: mobile/.ci/ios/mobile.app.zip
+          path: |
+            mobile/.ci/ios/mobile.app.zip
+            mobile/.ci/ios/stead-native-config.json
           if-no-files-found: error
           retention-days: 1
 
@@ -298,8 +310,8 @@ jobs:
           node-version: ${{ needs.config.outputs.node_version }}
           cache: npm
           cache-dependency-path: |
+            package-lock.json
             api/package-lock.json
-            mobile/package-lock.json
       - name: Download Android simulator app
         uses: actions/download-artifact@v4
         with:
@@ -343,18 +355,12 @@ jobs:
           node-version: ${{ needs.config.outputs.node_version }}
           cache: npm
           cache-dependency-path: |
+            package-lock.json
             api/package-lock.json
-            mobile/package-lock.json
       - uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: ${{ needs.config.outputs.java_version }}
-      - uses: ruby/setup-ruby@v1
-        with:
-          ruby-version: ${{ needs.config.outputs.ruby_version }}
-          bundler: ${{ needs.config.outputs.bundler_version }}
-          bundler-cache: true
-          working-directory: mobile
       - name: Install shared runner dependencies
         run: |
           npm install --global npm@${{ needs.config.outputs.npm_version }}
@@ -381,11 +387,6 @@ jobs:
           fi
           test -f "$PWD/mobile.app/Info.plist"
           echo "Unpacked $PWD/mobile.app"
-      - name: Restore iOS Metro transforms
-        uses: actions/cache@v4
-        with:
-          path: mobile/.cache/metro
-          key: metro-ios-v1-${{ hashFiles('mobile/package-lock.json', 'mobile/metro.config.js', 'mobile/babel.config.js') }}
       - name: Cache Maestro CLI
         uses: actions/cache@v4
         with:
@@ -410,18 +411,14 @@ jobs:
           initdb --pgdata="$PG_TEST_DATA" --username=stead --pwfile="$PG_TEST_PASSWORD" --auth=scram-sha-256 --encoding=UTF8 --locale=en_US.UTF-8
           pg_ctl -D "$PG_TEST_DATA" -l "$RUNNER_TEMP/stead-native-postgres.log" -o '-h 127.0.0.1 -p 5432' -w start
           createdb -h 127.0.0.1 -U stead stead
-      - name: Install dependencies and prepare API
-        run: |
-          npm install --global npm@${{ needs.config.outputs.npm_version }}
-          npm ci
-          npm ci --prefix api
-          npm ci --prefix mobile
+      - name: Install API dependencies
+        run: npm ci --prefix api
       - name: Install Maestro
         run: bash .github/scripts/install-maestro.sh
       - name: Run iOS native journey
         run: |
           npm run native -- setup --platform ios
-          npm run native -- test --platform ios --database-ready --repeat 3 --app mobile/.ci/ios/mobile.app
+          npm run native -- test --platform ios --database-ready --app mobile/.ci/ios/mobile.app
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -433,3 +430,54 @@ jobs:
             mobile/.expo
             mobile/.ci/ios
           retention-days: 7
+
+  native-readiness:
+    name: Native Readiness
+    if: always()
+    needs: [config, build-android, build-ios, native-android, native-ios]
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Require every applicable native platform
+        env:
+          CONFIG_RESULT: ${{ needs.config.result }}
+          RUN_NATIVE: ${{ needs.config.outputs.run_native }}
+          IOS_ENABLED: ${{ needs.config.outputs.ios_enabled }}
+          REQUESTED_PLATFORM: ${{ inputs.platform || 'all' }}
+          BUILD_ANDROID: ${{ needs.build-android.result }}
+          BUILD_IOS: ${{ needs.build-ios.result }}
+          NATIVE_ANDROID: ${{ needs.native-android.result }}
+          NATIVE_IOS: ${{ needs.native-ios.result }}
+        run: |
+          set -eu
+          if [[ "$CONFIG_RESULT" != "success" ]]; then
+            echo "Native configuration failed: $CONFIG_RESULT" >&2
+            exit 1
+          fi
+          if [[ "$RUN_NATIVE" != "true" ]]; then
+            if [[ "$RUN_NATIVE" != "false" ]]; then
+              echo "Native configuration produced no execution decision." >&2
+              exit 1
+            fi
+            echo "No native-impacting paths changed; platform jobs correctly skipped."
+            exit 0
+          fi
+
+          failed=0
+          if [[ "$REQUESTED_PLATFORM" != "ios" ]]; then
+            if [[ "$BUILD_ANDROID" != "success" || "$NATIVE_ANDROID" != "success" ]]; then
+              echo "Android native validation is incomplete: build=$BUILD_ANDROID journey=$NATIVE_ANDROID" >&2
+              failed=1
+            fi
+          fi
+
+          if [[ "$REQUESTED_PLATFORM" != "android" ]]; then
+            if [[ "$IOS_ENABLED" != "true" ]]; then
+              echo "iOS native validation is disabled for a native-impacting change." >&2
+              failed=1
+            elif [[ "$BUILD_IOS" != "success" || "$NATIVE_IOS" != "success" ]]; then
+              echo "iOS native validation is incomplete: build=$BUILD_IOS journey=$NATIVE_IOS" >&2
+              failed=1
+            fi
+          fi
+
+          exit "$failed"

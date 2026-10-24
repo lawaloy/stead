@@ -27,6 +27,7 @@ const fixture = (overrides = {}) => {
       'config',
       'build-ios',
       'native-ios',
+      'Native Readiness',
       'build-android',
       'native-android',
     ].map((name) => ({
@@ -93,19 +94,17 @@ const fixture = (overrides = {}) => {
 };
 
 test('disabled iOS validation stops before invoking Git or GitHub', async () => {
-  for (const config of [{}, { iosEnabled: false }]) {
-    let calls = 0;
-    await assert.rejects(
-      remoteIos({
-        ...config,
-        execute: async () => {
-          calls++;
-        },
-      }),
-      /temporarily disabled/,
-    );
-    assert.equal(calls, 0);
-  }
+  let calls = 0;
+  await assert.rejects(
+    remoteIos({
+      iosEnabled: false,
+      execute: async () => {
+        calls++;
+      },
+    }),
+    /disabled by its emergency switch/,
+  );
+  assert.equal(calls, 0);
 });
 
 test('remote iOS tests exactly HEAD, collects evidence, and deletes only its owned ref', async () => {

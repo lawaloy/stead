@@ -34,7 +34,12 @@ export const assertIosRun = (run, expected) => {
     throw new Error(
       `iOS validation did not pass (${run.conclusion || run.status}).`,
     );
-  for (const name of ['config', 'build-ios', 'native-ios']) {
+  for (const name of [
+    'config',
+    'build-ios',
+    'native-ios',
+    'Native Readiness',
+  ]) {
     const job = run.jobs.find((job) => job.name === name);
     if (job?.status !== 'completed' || job.conclusion !== 'success')
       throw new Error(`Required job ${name} did not pass.`);
@@ -60,7 +65,7 @@ export const remoteIos = async ({
 } = {}) => {
   if (!iosEnabled)
     throw new Error(
-      'Native iOS CI is temporarily disabled while its Maestro journey is replaced. No code was uploaded and no run was started. See docs/developer-automation.md.',
+      'Native iOS CI is disabled by its emergency switch. No code was uploaded and no run was started. See docs/developer-automation.md.',
     );
   const command = async (name, args, options = {}) =>
     (
@@ -118,7 +123,9 @@ export const remoteIos = async ({
     evidence.status = 'uploaded';
     record();
     log(`Uploaded commit ${featureCommit.slice(0, 8)} to ${remoteBranch}.`);
-    log('Starting iOS build and three simulator journeys on GitHub macOS.');
+    log(
+      'Starting the iOS build and complete simulator journey on GitHub macOS.',
+    );
     await gh(
       'workflow',
       'run',
@@ -243,7 +250,7 @@ export const remoteIos = async ({
     evidence.remoteBranchDeleted = true;
     record();
     log(
-      `PASS: iOS build and all three journeys. Remote evidence: ${evidence.url}`,
+      `PASS: iOS build and complete journey. Remote evidence: ${evidence.url}`,
     );
     log(`Saved logs and available debug artifacts: ${directory}`);
     return evidence;
