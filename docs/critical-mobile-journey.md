@@ -61,11 +61,10 @@ database schema so a repeated run does not inherit the previous account.
 Native simulator jobs live in `.github/workflows/native-ci.yml`. Its `config`
 job reports on every pull request and `main` push; Android Maestro runs
 when the shared native path policy detects relevant mobile, API, contract, or CI
-changes. iOS builds and journeys are temporarily disabled by
-`IOS_NATIVE_ENABLED=false`; their retained implementation provides no CI
-validation while paused. The enabled suite also runs daily at 16:00 UTC (after morning
-Dependabot, Dependency Maintenance, and Dependency Audit activity) and via
-`workflow_dispatch`. Earlier successful runs covered a narrower flow: they did
+changes, and iOS runs the same complete journey. `Native Readiness` requires
+both applicable platforms and fails rather than treating disabled iOS as
+success. The suite also supports an explicit `workflow_dispatch`; there is no
+separate nightly or release variant. Earlier successful runs covered a narrower flow: they did
 not exercise transaction editing or signed-in iOS cold-start restoration.
 Evidence for those cases must come from runs of the expanded flow. Dedicated `build-android` /
 `build-ios` jobs produce installable binaries (cached by native inputs) and
@@ -77,6 +76,9 @@ persistence required by the signed-in cold-start check. Android cold-boots a
 dedicated emulator from the checksum-locked SDK without snapshots; iOS miss
 builds restore source mtimes and use inode-aware DerivedData
 plus Pods caches. Metro transforms and the Maestro CLI are cached per platform.
+The iOS build embeds JavaScript so its journey runner does not install mobile
+dependencies or run Metro alongside PostgreSQL, the API, Maestro, and the
+simulator.
 Pull requests also keep `mobile-api-journey` and unit coverage for the same
 business journey. It does not prove physical device behavior, carrier SMS
 delivery, TalkBack, or VoiceOver.
@@ -87,8 +89,8 @@ repeat-run evidence, explicit local validation, and the remaining macOS boundary
 are documented in
 [Developer Automation](developer-automation.md#native-and-security-setup).
 Native CI delegates to the same runner. Developers should produce local
-evidence for their available platforms. While iOS CI is paused,
-`npm run native -- remote-ios` also stops before upload. Report native iOS
-coverage as unavailable; Android and portable checks cannot substitute for it.
+evidence for their available platforms. Developers without a Mac can run
+`npm run native -- remote-ios` from a clean committed checkout to validate the
+exact commit on GitHub-hosted macOS and download its evidence.
 
 </details>

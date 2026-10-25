@@ -57,12 +57,11 @@ though its job contexts are not stored as required ruleset checks.
 3. Review the repository-role bypass actors and retain only intentional
    emergency access.
 4. Re-run this audit after each ruleset change and update the verification date.
-5. `native-ci` now starts on every PR and `main` push and uses its `config` job
-   to decide whether the expensive platform jobs are relevant. Before making it
-   required, add one stable aggregate readiness job that depends on the
-   conditional Android/iOS jobs and reports success when they legitimately
-   skip. Requiring `native-android` or `native-ios` directly would leave
-   unrelated PRs waiting for contexts that do not run.
+5. Require `Native Readiness`, the stable aggregate job that depends on the
+   conditional Android/iOS jobs. It succeeds when native paths legitimately do
+   not apply and fails when an applicable platform is disabled, missing, or
+   unsuccessful. Do not require `native-android` or `native-ios` directly;
+   unrelated PRs do not run those jobs.
 
 ## Merge Queue (Optional)
 

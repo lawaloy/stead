@@ -84,7 +84,7 @@ unit coverage is not the same as a full mobile-to-database acceptance test.
   start. Earlier native passes omitted editing and signed-in iOS restoration;
   the expanded flow's CI results provide evidence for those cases. The workflow
   reports on every PR and `main` push, runs native jobs for relevant paths, and
-  runs the full suite daily and on demand.
+  supports explicit on-demand iOS validation from non-macOS development hosts.
 - Readiness-alert tests cover preference defaults and validation, timezone-aware
   weekly buckets, risk/recovery thresholds, cooldown, deduplicated encrypted
   queueing, generic SMS delivery, mobile response parsing, and accessible
@@ -98,8 +98,9 @@ unit coverage is not the same as a full mobile-to-database acceptance test.
 - Physical-device acceptance remains separate from the passing Android/iOS
   simulator journeys, including carrier SMS, secure storage, background/restart
   behavior, TalkBack, and VoiceOver.
-- Before making native CI required on `main`, add a stable aggregate readiness
-  job that succeeds when platform jobs pass or legitimately skip. See
+- Require the aggregate `Native Readiness` check on `main`; it succeeds for
+  unrelated paths but refuses missing, disabled, or failed applicable platform
+  coverage. See
   [Branch Protection Checklist](branch-protection-checklist.md#urgent-follow-up).
 - There is no live Twilio or Termii integration test.
 - There are no load, soak, failover, broad accessibility-audit, or

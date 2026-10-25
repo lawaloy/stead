@@ -8,7 +8,7 @@ import {
   copyFileSync,
 } from 'node:fs';
 import { createHash, randomBytes } from 'node:crypto';
-import { join, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   ROOT,
@@ -48,6 +48,7 @@ const API = join(ROOT, 'api');
 const MOBILE = join(ROOT, 'mobile');
 const EXPO = join(MOBILE, 'node_modules', 'expo', 'bin', 'cli');
 const BASE_DATABASE = 'postgresql://stead:stead@127.0.0.1:5432/stead';
+const IOS_NATIVE_CONFIG = 'stead-native-config.json';
 
 export const withOwnedSchema = async (pool, schema, operation) => {
   assertOwnedSchema(schema);
@@ -92,7 +93,12 @@ export const nativeSourceIdentity = async (options, execute = runCommand) => ({
   build: options.sourceBuilt || !options.app ? 'source' : 'provided-artifact',
 });
 
-export const prepareIosSimulator = async (id, app, execute = runCommand) => {
+export const prepareIosSimulator = async (
+  id,
+  app,
+  execute = runCommand,
+  appId,
+) => {
   const listing = JSON.parse(
     await execute(
       'xcrun',
@@ -105,9 +111,81 @@ export const prepareIosSimulator = async (id, app, execute = runCommand) => {
     await execute('xcrun', ['simctl', 'boot', id]);
   await execute('xcrun', ['simctl', 'bootstatus', id, '-b']);
   await execute('xcrun', ['simctl', 'install', id, app]);
+  if (!appId) return { recovered: false };
+  try {
+    await execute('xcrun', [
+      'simctl',
+      'launch',
+      '--terminate-running-process',
+      id,
+      appId,
+    ]);
+  } catch (firstLaunchError) {
+    // bootstatus can report ready while SpringBoard/FBS is still unhealthy.
+    // Recreate simulator state once before Maestro so an infrastructure-only
+    // launch failure does not consume the customer-journey attempt.
+    await execute('xcrun', ['simctl', 'shutdown', id]).catch(() => {});
+    await execute('xcrun', ['simctl', 'erase', id]);
+    await execute('xcrun', ['simctl', 'boot', id]);
+    await execute('xcrun', ['simctl', 'bootstatus', id, '-b']);
+    await execute('xcrun', ['simctl', 'install', id, app]);
+    try {
+      await execute('xcrun', [
+        'simctl',
+        'launch',
+        '--terminate-running-process',
+        id,
+        appId,
+      ]);
+    } catch (recoveryError) {
+      throw new AggregateError(
+        [firstLaunchError, recoveryError],
+        'The iOS simulator could not launch the app before Maestro, including after one erase-and-reboot recovery.',
+      );
+    }
+    await execute('xcrun', ['simctl', 'terminate', id, appId]).catch(() => {});
+    return { recovered: true };
+  }
+  await execute('xcrun', ['simctl', 'terminate', id, appId]).catch(() => {});
+  return { recovered: false };
 };
 
-const buildApp = async (platform, signal, projectReady = false) => {
+export const hasEmbeddedIosBundle = (app, exists = existsSync) =>
+  exists(join(app, 'main.jsbundle'));
+
+export const readIosArtifactConfig = (app, read = readFileSync) => {
+  const path = join(dirname(app), IOS_NATIVE_CONFIG);
+  let config;
+  try {
+    config = JSON.parse(read(path, 'utf8'));
+  } catch (error) {
+    throw new Error(
+      `The iOS simulator app is missing valid ${IOS_NATIVE_CONFIG} build metadata. Rebuild it with the repository iOS build command.`,
+      { cause: error },
+    );
+  }
+  if (typeof config.apiUrl !== 'string' || typeof config.phone !== 'string')
+    throw new Error(
+      `The iOS simulator app has invalid ${IOS_NATIVE_CONFIG} build metadata.`,
+    );
+  return config;
+};
+
+export const assertIosArtifactConfig = (app, options) => {
+  const actual = readIosArtifactConfig(app);
+  const expected = {
+    apiUrl: `http://127.0.0.1:${options.apiPort}`,
+    phone: options.phone,
+  };
+  if (actual.apiUrl !== expected.apiUrl || actual.phone !== expected.phone)
+    throw new Error(
+      `The iOS simulator app was built for ${actual.apiUrl} and test phone ${actual.phone}, but this run requires ${expected.apiUrl} and ${expected.phone}. Rebuild the app with matching native options.`,
+    );
+  return actual;
+};
+
+const buildApp = async (platform, options, projectReady = false) => {
+  const { signal } = options;
   const { tools } = await checkNativeToolchain(platform, {
     requireDevice: false,
     requireMaestro: false,
@@ -115,7 +193,12 @@ const buildApp = async (platform, signal, projectReady = false) => {
       runCommand(command, args, { ...options, signal }),
   });
   let env = { ...process.env, CI: '1', EXPO_NO_DOTENV: '1' };
-  if (platform === 'ios') env = iosEnvironment(env);
+  if (platform === 'ios')
+    env = iosEnvironment({
+      ...env,
+      EXPO_PUBLIC_API_URL: `http://127.0.0.1:${options.apiPort}`,
+      EXPO_PUBLIC_E2E_PHONE: options.phone,
+    });
   if (!projectReady)
     await runCommand(
       process.execPath,
@@ -161,7 +244,19 @@ const buildApp = async (platform, signal, projectReady = false) => {
     [join(ROOT, '.github/scripts/build-ios-simulator-app.sh')],
     { cwd: ROOT, env, signal },
   );
-  return join(destination, 'mobile.app');
+  const app = join(destination, 'mobile.app');
+  writeFileSync(
+    join(destination, IOS_NATIVE_CONFIG),
+    `${JSON.stringify(
+      {
+        apiUrl: `http://127.0.0.1:${options.apiPort}`,
+        phone: options.phone,
+      },
+      null,
+      2,
+    )}\n`,
+  );
+  return app;
 };
 
 const logService = (command, args, path, options) => {
@@ -205,7 +300,7 @@ const runAttempt = async (platform, options, tools, app, pool, directory) => {
       'Android emulator is not boot-ready. Restore emulator health before starting another attempt.',
     );
   await assertPortAvailable(options.apiPort);
-  await assertPortAvailable(options.metroPort);
+  if (platform === 'android') await assertPortAvailable(options.metroPort);
   const schema = newSchema();
   const base = process.env.STEAD_NATIVE_DATABASE_URL || BASE_DATABASE;
   const databaseUrl = nativeDatabaseUrl(base, schema);
@@ -235,48 +330,51 @@ const runAttempt = async (platform, options, tools, app, pool, directory) => {
       await waitForEndpoint(`${apiUrl}/auth/countries`, api, {
         signal: options.signal,
       });
-      metro = logService(
-        process.execPath,
-        [EXPO, 'start', '--localhost', '--port', String(options.metroPort)],
-        join(directory, 'metro.log'),
-        {
-          cwd: MOBILE,
-          signal: options.signal,
-          env: {
-            ...env,
-            NODE_ENV: 'development',
-            NODE_OPTIONS: [env.NODE_OPTIONS, '--dns-result-order=ipv4first']
-              .filter(Boolean)
-              .join(' '),
-          },
-        },
-      );
-      await waitForEndpoint(`${metroUrl}/status`, metro, {
-        signal: options.signal,
-        accept: async (response) =>
-          response.ok &&
-          (await response.text()).includes('packager-status:running'),
-      });
       const appId = JSON.parse(readFileSync(join(MOBILE, 'app.json'), 'utf8'))
         .expo[platform === 'android' ? 'android' : 'ios'][
         platform === 'android' ? 'package' : 'bundleIdentifier'
       ];
-      const bundle = await fetch(
-        bundleUrl(platform, options.metroPort, appId),
-        {
-          signal: AbortSignal.any([
-            AbortSignal.timeout(240_000),
-            options.signal,
-          ]),
-        },
-      );
-      if (!bundle.ok)
-        throw new Error(
-          `Metro bundle prewarm failed with HTTP ${bundle.status}. See metro.log.`,
+      let iosPreparation;
+      if (platform === 'android') {
+        metro = logService(
+          process.execPath,
+          [EXPO, 'start', '--localhost', '--port', String(options.metroPort)],
+          join(directory, 'metro.log'),
+          {
+            cwd: MOBILE,
+            signal: options.signal,
+            env: {
+              ...env,
+              NODE_ENV: 'development',
+              NODE_OPTIONS: [env.NODE_OPTIONS, '--dns-result-order=ipv4first']
+                .filter(Boolean)
+                .join(' '),
+            },
+          },
         );
-      const bytes = Buffer.from(await bundle.arrayBuffer());
-      if (!bytes.length) throw new Error('Metro returned an empty bundle.');
-      writeFileSync(join(directory, 'prewarm.bundle'), bytes);
+        await waitForEndpoint(`${metroUrl}/status`, metro, {
+          signal: options.signal,
+          accept: async (response) =>
+            response.ok &&
+            (await response.text()).includes('packager-status:running'),
+        });
+        const bundle = await fetch(
+          bundleUrl(platform, options.metroPort, appId),
+          {
+            signal: AbortSignal.any([
+              AbortSignal.timeout(240_000),
+              options.signal,
+            ]),
+          },
+        );
+        if (!bundle.ok)
+          throw new Error(
+            `Metro bundle prewarm failed with HTTP ${bundle.status}. See metro.log.`,
+          );
+        const bytes = Buffer.from(await bundle.arrayBuffer());
+        if (!bytes.length) throw new Error('Metro returned an empty bundle.');
+        writeFileSync(join(directory, 'prewarm.bundle'), bytes);
+      }
       if (platform === 'android') {
         for (const key of [
           'window_animation_scale',
@@ -314,9 +412,24 @@ const runAttempt = async (platform, options, tools, app, pool, directory) => {
         await adb(['install', '-r', app]);
       } else {
         const id = tools.simulator.udid;
-        await prepareIosSimulator(id, app, (command, args, config) =>
-          runCommand(command, args, { ...config, env, signal: options.signal }),
+        const simulatorDeadline = AbortSignal.timeout(
+          Number(TOOLCHAIN.IOS_SIMULATOR_PREPARATION_TIMEOUT_MS),
         );
+        iosPreparation = await prepareIosSimulator(
+          id,
+          app,
+          (command, args, config) =>
+            runCommand(command, args, {
+              ...config,
+              env,
+              signal: AbortSignal.any([options.signal, simulatorDeadline]),
+            }),
+          appId,
+        );
+        if (iosPreparation.recovered)
+          console.warn(
+            'Recovered the iOS simulator after its first pre-Maestro app launch failed.',
+          );
       }
       const device =
         platform === 'android' ? tools.device : tools.simulator.udid;
@@ -339,7 +452,13 @@ const runAttempt = async (platform, options, tools, app, pool, directory) => {
         ],
         { cwd: MOBILE, env, signal: options.signal },
       );
-      return { schema, directory };
+      return {
+        schema,
+        directory,
+        ...(iosPreparation?.recovered
+          ? { iosSimulatorRecovery: 'erase-and-reboot-before-maestro' }
+          : {}),
+      };
     }, [
       () => stopOwned(metro),
       () => stopOwned(api),
@@ -406,12 +525,13 @@ export const nativeWorkflow = async (options) => {
     if (options.command === 'build') {
       for (const platform of platforms)
         console.log(
-          `Built ${await buildApp(platform, options.signal, options.projectReady)}`,
+          `Built ${await buildApp(platform, options, options.projectReady)}`,
         );
       return;
     }
     await assertPortAvailable(options.apiPort);
-    await assertPortAvailable(options.metroPort);
+    if (platforms.includes('android'))
+      await assertPortAvailable(options.metroPort);
     if (options.command === 'verify') {
       await checkCodeQL({ signal: options.signal });
       await runCommand('npm', ['run', 'dependencies:check'], {
@@ -428,7 +548,7 @@ export const nativeWorkflow = async (options) => {
     if (options.prepareOnly) {
       const app = options.app
         ? resolve(options.app)
-        : await buildApp('android', options.signal, options.projectReady);
+        : await buildApp('android', options, options.projectReady);
       if (!existsSync(app))
         throw new Error(`Native app artifact is missing: ${app}`);
       return {
@@ -466,9 +586,14 @@ export const nativeWorkflow = async (options) => {
         const platform = platforms[index];
         const app = options.app
           ? resolve(options.app)
-          : await buildApp(platform, options.signal);
+          : await buildApp(platform, options);
         if (!existsSync(app))
           throw new Error(`Native app artifact is missing: ${app}`);
+        if (platform === 'ios' && !hasEmbeddedIosBundle(app))
+          throw new Error(
+            'The iOS simulator app must contain main.jsbundle. Rebuild it with the repository iOS build command; iOS journey runners do not start Metro.',
+          );
+        if (platform === 'ios') assertIosArtifactConfig(app, options);
         const metadata = {
           ...options.buildMetadata,
           ...checked[index].metadata,

@@ -14,8 +14,9 @@ The API path is automated: PostgreSQL-backed e2e tests cover OTP persistence,
 idempotent request recovery, dev-provider delivery, verification, retry, and
 dead-letter behavior. Mobile schemas, rotating session storage, and expiry
 feedback have unit coverage. The integrated Expo web path has passed against a
-running local API, and CI runs the OTP-to-logout journey on Android and iOS
-simulators. Live-provider delivery and physical-device acceptance remain.
+running local API, and native-impacting pull requests run the OTP-to-logout
+journey on Android and iOS simulators. Live-provider delivery and
+physical-device acceptance remain.
 
 ## P0: Local Expo Web Auth Acceptance Pass
 

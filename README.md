@@ -58,9 +58,9 @@ the base gate. Run it explicitly before pushing; Git push does not run tests.
 Select `--platform all` on a Mac configured for both platforms. Platform
 selection reports only the platforms executed.
 
-Native iOS CI and `npm run native -- remote-ios` are temporarily disabled while
-the Maestro iOS journey is replaced. Android CI and the portable checks remain
-active. A passing gate currently provides no native iOS validation.
+Native-impacting pull requests run the complete customer journey on Android and
+iOS. From a clean committed checkout, `npm run native -- remote-ios` validates
+the exact current commit on GitHub-hosted macOS before a PR is opened.
 
 The command behavior, individual test commands, environment safety, and manual
 release gates are documented in

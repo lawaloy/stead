@@ -163,6 +163,7 @@ export const checkNativeToolchain = async (
     execute = runCommand,
     env = process.env,
     host = process.platform,
+    exists = existsSync,
   } = {},
 ) => {
   if (!['android', 'ios'].includes(platform))
@@ -304,38 +305,40 @@ export const checkNativeToolchain = async (
     checkXcodeVersion(xcode);
     metadata.xcode = TOOLCHAIN.XCODE_VERSION;
     metadata.xcodeBuild = TOOLCHAIN.XCODE_BUILD;
-    const ruby = (
-      await execute('ruby', ['-e', 'print RUBY_VERSION'], {
-        quiet: true,
-        env,
-        stdoutOnly: true,
-      })
-    ).trim();
-    if (ruby !== TOOLCHAIN.RUBY_VERSION)
-      throw new Error(
-        `Use Ruby ${TOOLCHAIN.RUBY_VERSION} to match CI (found ${ruby}).`,
-      );
-    const bundler = (
-      await execute('bundle', ['--version'], { quiet: true, env })
-    ).trim();
-    if (bundler !== `Bundler version ${TOOLCHAIN.BUNDLER_VERSION}`)
-      throw new Error(
-        `Use Bundler ${TOOLCHAIN.BUNDLER_VERSION} to match CI (found ${bundler}).`,
-      );
-    const pods = (
-      await execute('bundle', ['exec', 'pod', '--version'], {
-        quiet: true,
-        env: { ...env, BUNDLE_GEMFILE: join(ROOT, 'mobile/Gemfile') },
-        cwd: join(ROOT, 'mobile'),
-      })
-    ).trim();
-    if (pods !== TOOLCHAIN.COCOAPODS_VERSION)
-      throw new Error(
-        `Use CocoaPods ${TOOLCHAIN.COCOAPODS_VERSION} to match CI (found ${pods}).`,
-      );
-    metadata.cocoapods = pods;
-    metadata.ruby = ruby;
-    metadata.bundler = TOOLCHAIN.BUNDLER_VERSION;
+    if (requireBuild) {
+      const ruby = (
+        await execute('ruby', ['-e', 'print RUBY_VERSION'], {
+          quiet: true,
+          env,
+          stdoutOnly: true,
+        })
+      ).trim();
+      if (ruby !== TOOLCHAIN.RUBY_VERSION)
+        throw new Error(
+          `Use Ruby ${TOOLCHAIN.RUBY_VERSION} to match CI (found ${ruby}).`,
+        );
+      const bundler = (
+        await execute('bundle', ['--version'], { quiet: true, env })
+      ).trim();
+      if (bundler !== `Bundler version ${TOOLCHAIN.BUNDLER_VERSION}`)
+        throw new Error(
+          `Use Bundler ${TOOLCHAIN.BUNDLER_VERSION} to match CI (found ${bundler}).`,
+        );
+      const pods = (
+        await execute('bundle', ['exec', 'pod', '--version'], {
+          quiet: true,
+          env: { ...env, BUNDLE_GEMFILE: join(ROOT, 'mobile/Gemfile') },
+          cwd: join(ROOT, 'mobile'),
+        })
+      ).trim();
+      if (pods !== TOOLCHAIN.COCOAPODS_VERSION)
+        throw new Error(
+          `Use CocoaPods ${TOOLCHAIN.COCOAPODS_VERSION} to match CI (found ${pods}).`,
+        );
+      metadata.cocoapods = pods;
+      metadata.ruby = ruby;
+      metadata.bundler = TOOLCHAIN.BUNDLER_VERSION;
+    }
     if (requireDevice) {
       const listing = JSON.parse(
         await execute(
@@ -349,8 +352,12 @@ export const checkNativeToolchain = async (
       metadata.iosRuntime = tools.simulator.runtime;
     }
   }
-  for (const directory of requireDevice ? ['api', 'mobile'] : ['mobile']) {
-    if (!existsSync(join(ROOT, directory, 'node_modules')))
+  const dependencyDirectories = new Set();
+  if (requireDevice) dependencyDirectories.add('api');
+  if (requireBuild || platform === 'android')
+    dependencyDirectories.add('mobile');
+  for (const directory of dependencyDirectories) {
+    if (!exists(join(ROOT, directory, 'node_modules')))
       throw new Error(
         `Install ${directory} dependencies with npm run setup first.`,
       );

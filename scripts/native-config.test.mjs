@@ -123,6 +123,9 @@ import {
   withOwnedSchema,
   repeatJourneys,
   prepareIosSimulator,
+  hasEmbeddedIosBundle,
+  readIosArtifactConfig,
+  assertIosArtifactConfig,
   runNativeCommand,
 } from './native-workflow.mjs';
 
@@ -232,6 +235,80 @@ test('repeated iOS runs query current state and do not boot an already running s
   await prepareIosSimulator('test', 'mobile.app', execute);
   assert.equal(boots, 1);
   assert.equal(installs, 2);
+});
+
+test('iOS preparation recovers one failed app launch before handing the simulator to Maestro', async () => {
+  let state = 'Shutdown',
+    launches = 0,
+    erases = 0,
+    installs = 0;
+  const execute = async (_command, args) => {
+    if (args[1] === 'list')
+      return JSON.stringify({
+        devices: {
+          [TOOLCHAIN.IOS_RUNTIME]: [
+            {
+              name: 'Stead Native iPhone 17',
+              udid: 'test',
+              isAvailable: true,
+              state,
+            },
+          ],
+        },
+      });
+    if (args[1] === 'boot') state = 'Booted';
+    if (args[1] === 'shutdown') state = 'Shutdown';
+    if (args[1] === 'erase') erases++;
+    if (args[1] === 'install') installs++;
+    if (args[1] === 'launch' && ++launches === 1)
+      throw new Error('FBS refused the first launch');
+    return '';
+  };
+  assert.deepEqual(
+    await prepareIosSimulator('test', 'mobile.app', execute, 'com.test.app'),
+    { recovered: true },
+  );
+  assert.equal(launches, 2);
+  assert.equal(erases, 1);
+  assert.equal(installs, 2);
+});
+
+test('iOS journey artifacts must carry their JavaScript bundle', () => {
+  const app = mkdtempSync(join(tmpdir(), 'stead-ios-app-'));
+  try {
+    assert.equal(hasEmbeddedIosBundle(app), false);
+    writeFileSync(join(app, 'main.jsbundle'), 'embedded');
+    assert.equal(hasEmbeddedIosBundle(app), true);
+  } finally {
+    rmSync(app, { recursive: true, force: true });
+  }
+});
+
+test('iOS journey artifacts must match their embedded API and fixture configuration', () => {
+  const directory = mkdtempSync(join(tmpdir(), 'stead-ios-artifact-'));
+  const app = join(directory, 'mobile.app');
+  const options = { apiPort: 3000, phone: '08030000001' };
+  try {
+    mkdirSync(app);
+    assert.throws(() => readIosArtifactConfig(app), /build metadata/);
+    writeFileSync(
+      join(directory, 'stead-native-config.json'),
+      JSON.stringify({
+        apiUrl: 'http://127.0.0.1:3000',
+        phone: '08030000001',
+      }),
+    );
+    assert.deepEqual(assertIosArtifactConfig(app, options), {
+      apiUrl: 'http://127.0.0.1:3000',
+      phone: '08030000001',
+    });
+    assert.throws(
+      () => assertIosArtifactConfig(app, { ...options, apiPort: 3001 }),
+      /was built for.*run requires/,
+    );
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
 });
 
 test('native fixtures cannot target remote databases or modify an unowned schema', () => {
@@ -480,4 +557,53 @@ test('iOS cannot report successful preflight on Windows or Linux', async () => {
       /requires macOS/,
     );
   assert.equal(executions, 0);
+});
+
+test('testing a built iOS artifact does not require Ruby, Bundler, CocoaPods, or mobile dependencies', async () => {
+  const commands = [];
+  const dependencyChecks = [];
+  const metadata = await checkNativeToolchain('ios', {
+    host: 'darwin',
+    requireBuild: false,
+    requireDevice: true,
+    requireMaestro: true,
+    env: {
+      STEAD_JAVA_BIN: 'java',
+      STEAD_MAESTRO_BIN: 'maestro',
+      DEVELOPER_DIR: '/Applications/Xcode.app/Contents/Developer',
+    },
+    exists: (path) => {
+      dependencyChecks.push(path);
+      return path === join(ROOT, 'api', 'node_modules');
+    },
+    execute: async (command, args) => {
+      commands.push([command, ...args]);
+      if (command === 'npm') return TOOLCHAIN.NPM_VERSION;
+      if (command === 'java')
+        return `OpenJDK Runtime Environment Temurin-${TOOLCHAIN.JAVA_VERSION}`;
+      if (command === 'maestro') return TOOLCHAIN.MAESTRO_VERSION;
+      if (command === 'xcodebuild')
+        return `Xcode ${TOOLCHAIN.XCODE_VERSION}\nBuild version ${TOOLCHAIN.XCODE_BUILD}`;
+      if (command === 'xcrun')
+        return JSON.stringify({
+          devices: {
+            [TOOLCHAIN.IOS_RUNTIME]: [
+              {
+                name: 'Stead Native iPhone 17',
+                udid: 'stead-test',
+                isAvailable: true,
+                state: 'Shutdown',
+              },
+            ],
+          },
+        });
+      throw new Error(`Unexpected build-only tool: ${command}`);
+    },
+  });
+  assert.equal(metadata.metadata.device, 'stead-test');
+  assert.equal(
+    commands.some(([command]) => ['ruby', 'bundle'].includes(command)),
+    false,
+  );
+  assert.deepEqual(dependencyChecks, [join(ROOT, 'api', 'node_modules')]);
 });
