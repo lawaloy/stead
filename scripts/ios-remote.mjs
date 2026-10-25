@@ -8,6 +8,27 @@ import { runCommand } from './process-utils.mjs';
 
 const WORKFLOW = 'native-ci.yml';
 const SHA = /^[a-f0-9]{40}$/;
+const TRANSIENT_GITHUB_ERROR =
+  /TLS handshake timeout|ETIMEDOUT|ECONNRESET|connection reset|temporary failure|Bad Gateway|Service Unavailable|Gateway Timeout|\b50[234]\b/i;
+
+export const retryGitHubRead = async (
+  operation,
+  { attempts = 4, sleep = delay } = {},
+) => {
+  let failure;
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try {
+      return await operation();
+    } catch (error) {
+      failure = error;
+      if (attempt === attempts || !TRANSIENT_GITHUB_ERROR.test(error.message))
+        throw error;
+      await sleep(2 ** (attempt - 1) * 1_000);
+    }
+  }
+  throw failure;
+};
+
 export const githubRepository = (url) => {
   const match = url.match(
     /^(?:https:\/\/github\.com\/|git@github\.com:)([\w.-]+\/[\w.-]+?)(?:\.git)?$/,
@@ -87,9 +108,13 @@ export const remoteIos = async ({
   const featureCommit = commit(await git('rev-parse', 'HEAD'));
   const repository = githubRepository(await git('remote', 'get-url', 'origin'));
   const gh = (...args) => command('gh', [...args, '--repo', repository]);
+  const ghRead = (...args) => retryGitHubRead(() => gh(...args), { sleep });
   // Use gh's credential store; no token is read, printed or passed on the command line.
   const info = JSON.parse(
-    await command('gh', ['repo', 'view', repository, '--json', 'isPrivate']),
+    await retryGitHubRead(
+      () => command('gh', ['repo', 'view', repository, '--json', 'isPrivate']),
+      { sleep },
+    ),
   );
   if (info.isPrivate)
     throw new Error(
@@ -139,7 +164,7 @@ export const remoteIos = async ({
     const discoveryDeadline = now() + 120_000;
     while (!run && now() < discoveryDeadline) {
       const runs = JSON.parse(
-        await gh(
+        await ghRead(
           'run',
           'list',
           '--workflow',
@@ -174,7 +199,7 @@ export const remoteIos = async ({
     let previous;
     while (true) {
       run = JSON.parse(
-        await gh(
+        await ghRead(
           'run',
           'view',
           String(evidence.runId),
@@ -208,7 +233,7 @@ export const remoteIos = async ({
         save(
           directory,
           'workflow.log',
-          await gh('run', 'view', String(evidence.runId), '--log'),
+          await ghRead('run', 'view', String(evidence.runId), '--log'),
         ),
       async () =>
         gh(

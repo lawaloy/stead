@@ -3,7 +3,7 @@ import test from 'node:test';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { githubRepository, remoteIos } from './ios-remote.mjs';
+import { githubRepository, remoteIos, retryGitHubRead } from './ios-remote.mjs';
 import { runCommand } from './process-utils.mjs';
 
 const feature = 'a'.repeat(40),
@@ -15,6 +15,7 @@ const fixture = (overrides = {}) => {
   const calls = [],
     saved = new Map();
   let inspected = 0,
+    runViews = 0,
     clock = 0;
   const run = {
     headSha: overrides.commit ?? tested,
@@ -71,7 +72,11 @@ const fixture = (overrides = {}) => {
         { databaseId: 123, headSha: overrides.commit ?? tested, url: run.url },
       ]);
     if (args.includes('--log')) return 'Assert dashboard visible ... COMPLETED';
-    if (args[1] === 'view') return JSON.stringify(run);
+    if (args[1] === 'view') {
+      if (runViews++ < (overrides.transientRunViews ?? 0))
+        throw new Error('TLS handshake timeout');
+      return JSON.stringify(run);
+    }
     if (args[1] === 'download' && overrides.artifactFailure)
       throw new Error('artifact missing');
     return '';
@@ -210,6 +215,36 @@ test('remote polling is bounded and a timed-out remote run is never treated as p
   await assert.rejects(f.start(), /Timed out waiting/);
   assert.equal(f.result().status, 'failed');
   assert.equal(f.result().runId, 123);
+});
+
+test('read-only GitHub queries retry transient transport failures without repeating mutations', async () => {
+  const delays = [];
+  let attempts = 0;
+  assert.equal(
+    await retryGitHubRead(
+      async () => {
+        if (attempts++ < 2) throw new Error('TLS handshake timeout');
+        return 'recovered';
+      },
+      { sleep: async (milliseconds) => delays.push(milliseconds) },
+    ),
+    'recovered',
+  );
+  assert.deepEqual(delays, [1_000, 2_000]);
+  await assert.rejects(
+    retryGitHubRead(async () => {
+      throw new Error('permission denied');
+    }),
+    /permission denied/,
+  );
+
+  const f = fixture({ transientRunViews: 1 });
+  assert.equal((await f.start()).status, 'passed');
+  assert.equal(
+    f.calls.filter(({ args }) => args[0] === 'workflow').length,
+    1,
+    'a read retry must never dispatch twice',
+  );
 });
 
 test('repository URL parsing accepts GitHub HTTPS and SSH without accepting other hosts or options', () => {

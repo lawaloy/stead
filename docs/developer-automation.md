@@ -150,8 +150,9 @@ cold-start journey once; repetition is not additional functional coverage.
 committed public-repository checkout, uploads that exact commit to an owned
 temporary branch, dispatches the iOS-only workflow, downloads evidence, and
 deletes the branch after a verified pass. A failed run retains its branch and
-evidence for investigation. Windows/WSL still cannot execute the simulator
-locally.
+evidence for investigation. Read-only GitHub polling uses bounded exponential
+backoff for transient transport failures; pushes and workflow dispatches are
+never retried automatically. Windows/WSL still cannot execute the simulator locally.
 
 GitHub permissions, events, caches, artifacts, PR automation, dependency review
 and branch protection require GitHub execution. Portable workflow/setup tests
