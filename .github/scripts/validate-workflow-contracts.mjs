@@ -265,6 +265,18 @@ for (const job of ['build-ios', 'native-ios']) {
     `The iOS enable switch must gate ${job}.`,
   );
 }
+const iosAppCacheKey =
+  nativeWorkflow.match(/key: ios-simulator-app-[^\n]+/)?.[0] ?? '';
+for (const path of [
+  'mobile/package.json',
+  'mobile/babel.config.js',
+  'mobile/metro.config.js',
+  'mobile/tsconfig.json',
+])
+  assert.ok(
+    iosAppCacheKey.includes(`'${path}'`),
+    `The embedded iOS app cache must include ${path}.`,
+  );
 const readiness = nativeWorkflow.split('  native-readiness:\n')[1];
 assert.match(
   readiness ?? '',
