@@ -561,6 +561,7 @@ test('iOS cannot report successful preflight on Windows or Linux', async () => {
 
 test('testing a built iOS artifact does not require Ruby, Bundler, CocoaPods, or mobile dependencies', async () => {
   const commands = [];
+  const dependencyChecks = [];
   const metadata = await checkNativeToolchain('ios', {
     host: 'darwin',
     requireBuild: false,
@@ -570,6 +571,10 @@ test('testing a built iOS artifact does not require Ruby, Bundler, CocoaPods, or
       STEAD_JAVA_BIN: 'java',
       STEAD_MAESTRO_BIN: 'maestro',
       DEVELOPER_DIR: '/Applications/Xcode.app/Contents/Developer',
+    },
+    exists: (path) => {
+      dependencyChecks.push(path);
+      return path === join(ROOT, 'api', 'node_modules');
     },
     execute: async (command, args) => {
       commands.push([command, ...args]);
@@ -600,4 +605,5 @@ test('testing a built iOS artifact does not require Ruby, Bundler, CocoaPods, or
     commands.some(([command]) => ['ruby', 'bundle'].includes(command)),
     false,
   );
+  assert.deepEqual(dependencyChecks, [join(ROOT, 'api', 'node_modules')]);
 });

@@ -163,6 +163,7 @@ export const checkNativeToolchain = async (
     execute = runCommand,
     env = process.env,
     host = process.platform,
+    exists = existsSync,
   } = {},
 ) => {
   if (!['android', 'ios'].includes(platform))
@@ -356,7 +357,7 @@ export const checkNativeToolchain = async (
   if (requireBuild || platform === 'android')
     dependencyDirectories.add('mobile');
   for (const directory of dependencyDirectories) {
-    if (!existsSync(join(ROOT, directory, 'node_modules')))
+    if (!exists(join(ROOT, directory, 'node_modules')))
       throw new Error(
         `Install ${directory} dependencies with npm run setup first.`,
       );
