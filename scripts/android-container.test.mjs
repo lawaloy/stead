@@ -9,6 +9,8 @@ import {
 } from './android-container-entry.mjs';
 import {
   containerRunArguments,
+  containerBuildArguments,
+  resolveContainerBuildCache,
   runContainerAttempts,
   checkContainerEngine,
 } from './android-container.mjs';
@@ -279,4 +281,42 @@ test('the container limits access to KVM and keeps the same Node patch as the ho
       /--privileged|docker\.sock|--publish|--mount|--volume/.test(arg),
     ),
   );
+});
+
+test('container builds use an explicit repository cache only when CI provides one', () => {
+  assert.equal(resolveContainerBuildCache(), null);
+  const cache = join(ROOT, '.tmp', 'android-buildkit-cache');
+  assert.equal(resolveContainerBuildCache(cache), cache);
+  for (const outside of [ROOT, join(ROOT, '.tmp'), join(ROOT, '..', 'cache')])
+    assert.throws(
+      () => resolveContainerBuildCache(outside),
+      /dedicated directory inside the repository \.tmp directory/,
+    );
+
+  const plain = containerBuildArguments({
+    context: '/source',
+    image: 'stead:test',
+  });
+  assert.deepEqual(plain.slice(0, 3), [
+    'build',
+    '--progress=plain',
+    '--platform=linux/amd64',
+  ]);
+  assert.equal(plain.includes('--cache-from'), false);
+  assert.equal(plain.includes('--cache-to'), false);
+
+  const cached = containerBuildArguments({
+    context: '/source',
+    image: 'stead:test',
+    cacheFrom: '/cache/current',
+    cacheTo: '/cache/next',
+  });
+  assert.deepEqual(cached.slice(0, 4), [
+    'buildx',
+    'build',
+    '--load',
+    '--progress=plain',
+  ]);
+  assert.ok(cached.includes('type=local,src=/cache/current'));
+  assert.ok(cached.includes('type=local,dest=/cache/next,mode=max'));
 });

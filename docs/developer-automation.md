@@ -80,10 +80,14 @@ Windows Node and SDK tools together.
 The controlled runner needs an x86_64 Linux Docker engine exposing usable
 `/dev/kvm`, including on supported WSL2 installations, and at least 10 GiB of
 engine memory (9 GiB runner plus 1 GiB reserve). Its first build downloads the
-pinned tools; later builds reuse Docker layers. Host-managed Android needs at
-least 5 GiB of available RAM before emulator allocation. Builds finish before
-booting fresh emulators; readiness checks reject blocking system dialogs.
-Host CPU/RAM, KVM, kernel and Docker health remain external requirements.
+pinned tools; later local builds reuse Docker layers. CI restores dependency
+layers from a repository-scoped BuildKit cache keyed by the immutable
+toolchain, Docker recipe, and package inputs, while rebuilding the exact source
+and transferred-APK layers. The cache is an acceleration only and cannot
+replace source or artifact identity checks. Host-managed Android needs at least
+5 GiB of available RAM before emulator allocation. Builds finish before booting
+fresh emulators; readiness checks reject blocking system dialogs. Host CPU/RAM,
+KVM, kernel and Docker health remain external requirements.
 
 **iOS:** macOS is required for Xcode and simulator execution; Windows, WSL and
 Docker cannot run this gate. Install the pinned Xcode/runtime, Ruby and Bundler,
@@ -115,6 +119,10 @@ Evidence stays in ignored directories:
 - `.tmp/native-container/`: source/image identity, per-attempt logs, results and
   `memory.json` with peak usage and OOM counters.
 - `.tmp/codeql-validation/`: source snapshot, database, SARIF and finding count.
+
+Native CI retains the Android and iOS journey evidence artifacts for seven days
+on successful and failed runs. Build caches are not evidence and are not
+included in those artifacts.
 
 ## Local Validation
 
