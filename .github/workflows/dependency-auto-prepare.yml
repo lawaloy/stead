@@ -1,4 +1,4 @@
-name: Dependency Maintenance Auto Prepare
+name: Dependency Auto Prepare
 
 on:
   pull_request_target:
@@ -13,6 +13,6 @@ jobs:
   prepare:
     uses: ./.github/workflows/pr-auto-prepare-reusable.yml
     with:
-      lane: maintenance
+      lane: auto
       pull_number: ${{ github.event.pull_request.number }}
     secrets: inherit

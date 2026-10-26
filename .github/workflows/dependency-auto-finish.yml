@@ -2,14 +2,9 @@ name: Dependency Auto Finish
 
 on:
   workflow_run:
-    workflows:
-      [
-        'ci',
-        'native-ci',
-        'CodeQL Advanced',
-        'Dependency review',
-        'Dependency Audit',
-      ]
+    # native-ci is the stable aggregate and the longest dependency-PR gate.
+    # The reusable finisher waits for every other required workflow.
+    workflows: ['native-ci']
     types: [completed]
 
 permissions:
@@ -24,6 +19,7 @@ concurrency:
 
 jobs:
   finish:
+    name: Dependency PR Readiness
     if: |
       github.event.workflow_run.event == 'pull_request' &&
       github.event.workflow_run.conclusion == 'success'

@@ -17,6 +17,7 @@ permissions:
 
 jobs:
   prepare:
+    name: Dependency PR Preparation
     runs-on: ubuntu-24.04
     steps:
       - name: Generate GitHub App token
@@ -35,7 +36,7 @@ jobs:
         with:
           github-token: ${{ steps.app-token.outputs.token }}
           script: |
-            const lane = process.env.LANE;
+            const requestedLane = process.env.LANE;
             const pull_number = Number(process.env.PULL_NUMBER);
             const { owner, repo } = context.repo;
             const pr = (
@@ -67,7 +68,22 @@ jobs:
               );
             };
 
-            const trusted = lane === 'dependabot' ? isTrustedDependabot() : isTrustedMaintenance();
+            const trustedDependabot = isTrustedDependabot();
+            const trustedMaintenance = isTrustedMaintenance();
+            const lane =
+              requestedLane === 'auto'
+                ? trustedDependabot
+                  ? 'dependabot'
+                  : trustedMaintenance
+                    ? 'maintenance'
+                    : undefined
+                : requestedLane;
+            const trusted =
+              lane === 'dependabot'
+                ? trustedDependabot
+                : lane === 'maintenance'
+                  ? trustedMaintenance
+                  : false;
             const files = trusted
               ? await github.paginate(github.rest.pulls.listFiles, {
                   owner,
@@ -85,6 +101,7 @@ jobs:
             );
 
             core.setOutput('trusted', trusted ? 'true' : 'false');
+            core.setOutput('lane', lane || 'untrusted');
             core.setOutput('blocked', labels.includes('automerge-blocked') ? 'true' : 'false');
             core.setOutput('head-ref', pr.head.ref);
             core.setOutput('head-repo', pr.head.repo?.full_name || `${owner}/${repo}`);
@@ -123,7 +140,7 @@ jobs:
         if: steps.pr.outputs.trusted == 'true' && steps.pr.outputs.changed-workspaces != '[]'
         env:
           CHANGED_WORKSPACES: ${{ steps.pr.outputs.changed-workspaces }}
-          LANE: ${{ inputs.lane }}
+          LANE: ${{ steps.pr.outputs.lane }}
         run: |
           node -e "const workspaces = JSON.parse(process.env.CHANGED_WORKSPACES); if (!Array.isArray(workspaces) || workspaces.length === 0) process.exit(0);"
           for workspace in $(node -pe "JSON.parse(process.env.CHANGED_WORKSPACES).join(' ')"); do

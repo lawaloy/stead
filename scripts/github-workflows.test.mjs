@@ -32,6 +32,7 @@ const script = (file, step) => {
   );
 };
 const context = { repo: { owner: 'owner', repo: 'stead' }, payload: {} };
+const prepare = script('pr-auto-prepare-reusable.yml', 'Inspect PR metadata');
 const finish = script('pr-auto-finish-reusable.yml', 'Merge PR when ready');
 const required = [
   'ci',
@@ -56,9 +57,70 @@ const runs = () =>
     status: 'completed',
     conclusion: 'success',
   }));
+const runPrepare = async (pull, files = []) => {
+  const outputs = {};
+  let fileRequests = 0;
+  const github = {
+    rest: {
+      pulls: {
+        get: async () => ({ data: pull }),
+        listFiles: () => {},
+      },
+    },
+    paginate: async () => {
+      fileRequests += 1;
+      return files;
+    },
+  };
+  await prepare(
+    github,
+    context,
+    { setOutput: (name, value) => (outputs[name] = value) },
+    { env: { LANE: 'auto', PULL_NUMBER: '42' } },
+    () => {
+      throw Error('Unexpected require');
+    },
+    setTimeout,
+  );
+  return { fileRequests, outputs };
+};
+test('one preparation entrypoint resolves both trusted dependency lanes', async () => {
+  const dependabot = await runPrepare(pr(), [
+    { filename: 'mobile/package-lock.json' },
+  ]);
+  assert.equal(dependabot.outputs.trusted, 'true');
+  assert.equal(dependabot.outputs.lane, 'dependabot');
+  assert.equal(dependabot.outputs['changed-workspaces'], '["mobile"]');
+
+  const maintenance = await runPrepare(
+    {
+      ...pr(),
+      user: { login: 'github-actions[bot]' },
+      labels: [{ name: 'dependencies' }],
+      head: {
+        ...pr().head,
+        ref: 'chore/api-deps-maintenance',
+        repo: { full_name: 'owner/stead' },
+      },
+    },
+    [{ filename: 'api/package.json' }],
+  );
+  assert.equal(maintenance.outputs.trusted, 'true');
+  assert.equal(maintenance.outputs.lane, 'maintenance');
+  assert.equal(maintenance.outputs['changed-workspaces'], '["api"]');
+
+  const untrusted = await runPrepare({
+    ...pr(),
+    user: { login: 'human' },
+  });
+  assert.equal(untrusted.outputs.trusted, 'false');
+  assert.equal(untrusted.outputs.lane, 'untrusted');
+  assert.equal(untrusted.fileRequests, 0);
+});
 const runFinish = async (pull = pr(), workflows = runs()) => {
   const writes = [];
   const requests = [];
+  const failures = [];
   const github = {
     rest: {
       pulls: {
@@ -83,14 +145,14 @@ const runFinish = async (pull = pr(), workflows = runs()) => {
   await finish(
     github,
     context,
-    { info: () => {} },
+    { info: () => {}, setFailed: (message) => failures.push(message) },
     { env: { LANE: 'auto', PULL_NUMBER: '42' } },
     () => {
       throw Error('Unexpected require');
     },
     (callback) => queueMicrotask(callback),
   );
-  return { writes, requests };
+  return { failures, writes, requests };
 };
 test('automation never merges human PRs, drafts, closed PRs or blocked bot PRs', async () => {
   for (const override of [
@@ -101,15 +163,31 @@ test('automation never merges human PRs, drafts, closed PRs or blocked bot PRs',
   ])
     assert.deepEqual((await runFinish({ ...pr(), ...override })).writes, []);
 });
-test('automation refuses missing, pending, failed, cancelled and stale-head workflows', async () => {
+test('automation waits boundedly for missing, pending and stale-head workflows', async () => {
   for (const workflows of [
     runs().slice(1),
     runs().map((run) => ({ ...run, status: 'in_progress' })),
-    runs().map((run) => ({ ...run, conclusion: 'failure' })),
-    runs().map((run) => ({ ...run, conclusion: 'cancelled' })),
     runs().map((run) => ({ ...run, head_sha: 'old' })),
-  ])
-    assert.deepEqual((await runFinish(pr(), workflows)).writes, []);
+  ]) {
+    const result = await runFinish(pr(), workflows);
+    assert.deepEqual(result.writes, []);
+    assert.equal(result.failures.length, 1);
+    assert.match(
+      result.failures[0],
+      /Timed out waiting for required workflows/,
+    );
+  }
+});
+test('automation refuses failed and cancelled workflows without waiting', async () => {
+  for (const conclusion of ['failure', 'cancelled']) {
+    const result = await runFinish(
+      pr(),
+      runs().map((run) => ({ ...run, conclusion })),
+    );
+    assert.deepEqual(result.writes, []);
+    assert.deepEqual(result.failures, []);
+    assert.equal(result.requests.length, 1);
+  }
 });
 test('automation requests checks for the current head and binds a merge to that same SHA', async () => {
   const { writes, requests } = await runFinish();
