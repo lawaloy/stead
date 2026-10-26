@@ -191,12 +191,17 @@ assert.match(
 );
 assert.doesNotMatch(
   criticalNativeJourney,
-  /eraseText:\s+100/,
-  'Native journeys must not generate excessive synthetic backspaces on iOS.',
+  /eraseText:\s+\d+/,
+  'Native journeys must use Maestro standard field clearing instead of unexplained character counts.',
+);
+assert.equal(
+  [...criticalNativeJourney.matchAll(/^- eraseText$/gm)].length,
+  4,
+  'Every deterministic native text replacement must use the same standard clear operation.',
 );
 assert.match(
   criticalNativeJourney,
-  /id: transaction-note\n\s+point: '95%,50%'\n\s+retryTapIfNoChange: false[\s\S]*waitForAnimationToEnd\n- eraseText: 32/,
+  /id: transaction-note\n\s+point: '95%,50%'\n\s+retryTapIfNoChange: false[\s\S]*waitForAnimationToEnd\n- eraseText/,
   'The transaction note must settle the iOS text keyboard before clearing its bounded default value.',
 );
 assert.match(
