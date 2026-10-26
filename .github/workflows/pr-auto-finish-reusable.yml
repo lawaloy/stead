@@ -19,7 +19,9 @@ permissions:
 
 jobs:
   finish:
+    name: Merge Ready Dependency PR
     runs-on: ubuntu-24.04
+    timeout-minutes: 15
     steps:
       - name: Generate GitHub App token
         id: app-token
@@ -41,7 +43,7 @@ jobs:
             const inputPullNumber = Number(process.env.PULL_NUMBER || 0);
             const pull_number = eventPullNumber || inputPullNumber;
             const { owner, repo } = context.repo;
-            const maxAttempts = 10;
+            const maxAttempts = 40;
             const delayMs = 15000;
             const requiredWorkflowNames = [
               'ci',
@@ -187,19 +189,32 @@ jobs:
                 },
               );
 
-              if (
-                missingWorkflows.length > 0 ||
-                incompleteWorkflows.length > 0 ||
-                unsuccessfulWorkflows.length > 0
-              ) {
-                core.info(
-                  `Required workflow state for ${pullRequest.head.sha}: ${JSON.stringify({
-                    missing: missingWorkflows,
-                    incomplete: incompleteWorkflows,
-                    unsuccessful: unsuccessfulWorkflows,
-                  })}`,
+              if (unsuccessfulWorkflows.length > 0) {
+                core.setFailed(
+                  `Required workflows failed for ${pullRequest.head.sha}: ${JSON.stringify(
+                    unsuccessfulWorkflows,
+                  )}. Rerun or dispatch Dependency Auto Finish after those checks recover.`,
                 );
                 return;
+              }
+
+              if (missingWorkflows.length > 0 || incompleteWorkflows.length > 0) {
+                const state = JSON.stringify({
+                  missing: missingWorkflows,
+                  incomplete: incompleteWorkflows,
+                  unsuccessful: unsuccessfulWorkflows,
+                });
+                core.info(`Required workflow state for ${pullRequest.head.sha}: ${state}`);
+
+                if (attempt === maxAttempts) {
+                  core.setFailed(
+                    `Timed out waiting for required workflows on ${pullRequest.head.sha}: ${state}`,
+                  );
+                  return;
+                }
+
+                await sleep(delayMs);
+                continue;
               }
 
               core.info(`Mergeable state on attempt ${attempt}: ${pullRequest.mergeable_state}`);
@@ -243,7 +258,7 @@ jobs:
               }
 
               if (attempt === maxAttempts) {
-                core.info('PR is not yet fully ready to merge. A later workflow_run will retry.');
+                core.setFailed('PR did not reach a clean mergeable state before the readiness deadline.');
                 return;
               }
 

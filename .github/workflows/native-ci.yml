@@ -1,4 +1,7 @@
 name: native-ci
+run-name: >-
+  native-ci / ${{ github.event_name == 'workflow_dispatch' && inputs.platform || github.event_name }} /
+  ${{ github.event.pull_request.number && format('PR #{0}', github.event.pull_request.number) || github.ref_name }}
 
 # Every PR and main-branch push produces a stable native-ci readiness signal.
 # The config job skips expensive native jobs when they are irrelevant.
@@ -32,6 +35,7 @@ permissions:
 
 jobs:
   config:
+    name: Native CI Configuration
     runs-on: ubuntu-24.04
     outputs:
       run_native: ${{ steps.decision.outputs.run_native }}

@@ -16,6 +16,7 @@ permissions:
 
 jobs:
   config:
+    name: CI Configuration
     runs-on: ubuntu-24.04
     outputs:
       node_version: ${{ steps.versions.outputs.node_version }}
