@@ -28,6 +28,7 @@ const [
   dependencyAuditWorkflow,
   dependencyMaintenanceWorkflow,
   codeqlWorkflow,
+  criticalNativeJourney,
   androidJourney,
   iosBuild,
   nativeRunner,
@@ -42,6 +43,7 @@ const [
   readFile('.github/workflows/dependency-audit.yml', 'utf8'),
   readFile('.github/workflows/deps-maintenance.yml', 'utf8'),
   readFile('.github/workflows/codeql.yml', 'utf8'),
+  readFile('mobile/.maestro/critical-native-journey.yaml', 'utf8'),
   readFile('.github/scripts/run-android-native-journey.sh', 'utf8'),
   readFile('.github/scripts/build-ios-simulator-app.sh', 'utf8'),
   readFile('scripts/native-workflow.mjs', 'utf8'),
@@ -171,6 +173,16 @@ assert.match(
   androidJourney,
   /native-workflow\.mjs" test --platform android --android-runner container --database-ready/,
   'CI Android journeys must reuse the local runner.',
+);
+assert.doesNotMatch(
+  criticalNativeJourney,
+  /eraseText:\s+100/,
+  'Native journeys must not generate excessive synthetic backspaces on iOS.',
+);
+assert.match(
+  criticalNativeJourney,
+  /id: transaction-note\n\s+point: '95%,50%'\n\s+retryTapIfNoChange: false[\s\S]*waitForAnimationToEnd\n- eraseText: 32/,
+  'The transaction note must settle the iOS text keyboard before clearing its bounded default value.',
 );
 assert.match(
   nativeWorkflow,
