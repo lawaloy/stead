@@ -76,6 +76,10 @@ persistence required by the signed-in cold-start check. Android cold-boots a
 dedicated emulator from the checksum-locked SDK without snapshots; iOS miss
 builds restore source mtimes and use inode-aware DerivedData
 plus Pods caches. Metro transforms and the Maestro CLI are cached per platform.
+Android CI also restores BuildKit dependency layers across hosted runners, but
+always rebuilds the source and transferred-APK layers and verifies their image
+identity. Both platform jobs retain journey evidence for seven days whether the
+journey succeeds or fails.
 The iOS build embeds JavaScript so its journey runner does not install mobile
 dependencies or run Metro alongside PostgreSQL, the API, Maestro, and the
 simulator.

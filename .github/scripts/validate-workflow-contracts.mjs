@@ -219,6 +219,43 @@ assert.match(
   /npm run tools:install:android -- --accept-licenses/,
   'Native CI must provision the immutable Android SDK archive lock.',
 );
+const androidBuild =
+  nativeWorkflow.split('  build-android:\n')[1]?.split(/\n  [a-z][\w-]*:/)[0] ??
+  '';
+assert.ok(androidBuild, 'Native CI must define the Android build job.');
+assert.ok(
+  androidBuild.indexOf('Restore Android simulator app') <
+    androidBuild.indexOf('actions/setup-node@v4'),
+  'Android CI must check for a complete cached APK before provisioning build tools.',
+);
+for (const setup of ['actions/setup-node@v4', 'actions/setup-java@v6']) {
+  const section = androidBuild.slice(androidBuild.indexOf(`- uses: ${setup}`));
+  assert.match(
+    section.split(/\n\s+- (?:uses|name):/)[0],
+    /if: steps\.android-app-cache\.outputs\.cache-hit != 'true'/,
+    `${setup} must be skipped when the Android APK cache is complete.`,
+  );
+}
+assert.match(
+  androidBuild,
+  /name: Cache Gradle dependencies and build outputs\n\s+if: steps\.android-app-cache\.outputs\.cache-hit != 'true'\n\s+uses: gradle\/actions\/setup-gradle@v5/,
+  'Gradle setup must be skipped when the Android APK cache is complete.',
+);
+const nativeAndroidJob =
+  nativeWorkflow
+    .split('  native-android:\n')[1]
+    ?.split(/\n  [a-z][\w-]*:/)[0] ?? '';
+assert.ok(nativeAndroidJob, 'Native CI must define the Android journey job.');
+assert.match(
+  nativeAndroidJob,
+  /uses: actions\/upload-artifact@v4\n\s+if: always\(\)[\s\S]*name: android-native-journey-logs[\s\S]*\.tmp\/native-container\/\*\*\/attempts\.json/,
+  'Android CI must retain journey evidence on successful and failed runs.',
+);
+assert.match(
+  nativeAndroidJob,
+  /uses: docker\/setup-buildx-action@v4[\s\S]*path: \.tmp\/android-buildkit-cache[\s\S]*STEAD_ANDROID_BUILDKIT_CACHE: \$\{\{ github\.workspace \}\}\/\.tmp\/android-buildkit-cache/,
+  'Android CI must restore the repository BuildKit cache before the container journey.',
+);
 assert.doesNotMatch(
   nativeWorkflow,
   /sdkmanager|android-emulator-runner/,

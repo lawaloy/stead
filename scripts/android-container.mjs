@@ -3,9 +3,11 @@ import {
   createWriteStream,
   writeFileSync,
   copyFileSync,
+  existsSync,
 } from 'node:fs';
+import { rename, rm } from 'node:fs/promises';
 import { finished } from 'node:stream/promises';
-import { join, resolve } from 'node:path';
+import { isAbsolute, join, relative, resolve } from 'node:path';
 import { randomBytes } from 'node:crypto';
 import { ROOT, TOOLCHAIN, checkJsToolchain } from './toolchain.mjs';
 import { snapshotSource, scanCodeQL, checkCodeQL } from './codeql-local.mjs';
@@ -62,6 +64,43 @@ export const containerRunArguments = ({ name, image, apiPort, phone }) => [
   String(apiPort),
   '--phone',
   phone,
+];
+
+export const resolveContainerBuildCache = (value, root = ROOT) => {
+  if (!value) return null;
+  const temporaryRoot = resolve(root, '.tmp');
+  const cache = resolve(root, value);
+  const within = relative(temporaryRoot, cache);
+  if (
+    !within ||
+    isAbsolute(within) ||
+    within === '..' ||
+    within.startsWith(`..${process.platform === 'win32' ? '\\' : '/'}`)
+  )
+    throw new Error(
+      'STEAD_ANDROID_BUILDKIT_CACHE must select a dedicated directory inside the repository .tmp directory.',
+    );
+  return cache;
+};
+
+export const containerBuildArguments = ({
+  context,
+  image,
+  cacheFrom,
+  cacheTo,
+}) => [
+  ...(cacheTo ? ['buildx', 'build', '--load'] : ['build']),
+  '--progress=plain',
+  '--platform=linux/amd64',
+  ...(cacheFrom ? ['--cache-from', `type=local,src=${cacheFrom}`] : []),
+  ...(cacheTo ? ['--cache-to', `type=local,dest=${cacheTo},mode=max`] : []),
+  '--build-arg',
+  `BASE_IMAGE=${TOOLCHAIN.ANDROID_CONTAINER_BASE_IMAGE}`,
+  '-f',
+  join(context, '.github/native-container/Dockerfile'),
+  '-t',
+  image,
+  context,
 ];
 
 const loggedDocker = async (args, file, signal) => {
@@ -179,22 +218,37 @@ export const containerAndroidWorkflow = async (options) => {
     if (options.app)
       copyFileSync(resolve(options.app), join(context, '.stead-app.apk'));
     const image = `stead-native-android:${randomBytes(8).toString('hex')}`;
-    await loggedDocker(
-      [
-        'build',
-        '--progress=plain',
-        '--platform=linux/amd64',
-        '--build-arg',
-        `BASE_IMAGE=${TOOLCHAIN.ANDROID_CONTAINER_BASE_IMAGE}`,
-        '-f',
-        join(context, '.github/native-container/Dockerfile'),
-        '-t',
-        image,
-        context,
-      ],
-      join(output, 'build.log'),
-      signal,
+    const buildCache = resolveContainerBuildCache(
+      process.env.STEAD_ANDROID_BUILDKIT_CACHE,
     );
+    const nextBuildCache = buildCache
+      ? `${buildCache}.next-${randomBytes(4).toString('hex')}`
+      : null;
+    if (nextBuildCache)
+      await rm(nextBuildCache, { recursive: true, force: true });
+    try {
+      await loggedDocker(
+        containerBuildArguments({
+          context,
+          image,
+          cacheFrom:
+            buildCache && existsSync(join(buildCache, 'index.json'))
+              ? buildCache
+              : null,
+          cacheTo: nextBuildCache,
+        }),
+        join(output, 'build.log'),
+        signal,
+      );
+      if (buildCache) {
+        await rm(buildCache, { recursive: true, force: true });
+        await rename(nextBuildCache, buildCache);
+      }
+    } catch (error) {
+      if (nextBuildCache)
+        await rm(nextBuildCache, { recursive: true, force: true });
+      throw error;
+    }
     const imageId = (
       await runCommand(
         'docker',
