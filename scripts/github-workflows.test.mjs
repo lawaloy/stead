@@ -178,14 +178,18 @@ test('automation waits boundedly for missing, pending and stale-head workflows',
     );
   }
 });
-test('automation refuses failed and cancelled workflows without waiting', async () => {
+test('automation blocks failed and cancelled workflows with a rerunnable readiness failure', async () => {
   for (const conclusion of ['failure', 'cancelled']) {
     const result = await runFinish(
       pr(),
       runs().map((run) => ({ ...run, conclusion })),
     );
     assert.deepEqual(result.writes, []);
-    assert.deepEqual(result.failures, []);
+    assert.equal(result.failures.length, 1);
+    assert.match(
+      result.failures[0],
+      /Rerun or dispatch Dependency Auto Finish/,
+    );
     assert.equal(result.requests.length, 1);
   }
 });

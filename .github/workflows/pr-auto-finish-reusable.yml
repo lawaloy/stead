@@ -190,12 +190,10 @@ jobs:
               );
 
               if (unsuccessfulWorkflows.length > 0) {
-                core.info(
-                  `Required workflow state for ${pullRequest.head.sha}: ${JSON.stringify({
-                    missing: missingWorkflows,
-                    incomplete: incompleteWorkflows,
-                    unsuccessful: unsuccessfulWorkflows,
-                  })}`,
+                core.setFailed(
+                  `Required workflows failed for ${pullRequest.head.sha}: ${JSON.stringify(
+                    unsuccessfulWorkflows,
+                  )}. Rerun or dispatch Dependency Auto Finish after those checks recover.`,
                 );
                 return;
               }

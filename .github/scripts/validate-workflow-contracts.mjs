@@ -66,6 +66,16 @@ assert.deepEqual(
   ['native-ci'],
   'Dependency auto-finish must have one aggregate trigger instead of one run per required workflow.',
 );
+assert.match(
+  finishEntrypoint,
+  /workflow_dispatch:[\s\S]*pull_number:[\s\S]*type: number/,
+  'Dependency auto-finish must expose a lightweight recovery dispatch for a specific PR.',
+);
+assert.match(
+  finishEntrypoint,
+  /pull_number: \$\{\{ inputs\.pull_number \|\| 0 \}\}/,
+  'The recovery dispatch must pass its PR number to the reusable readiness coordinator.',
+);
 assert.deepEqual(
   requiredWorkflows,
   [
@@ -81,6 +91,11 @@ assert.match(
   finishReusable,
   /if \(missingWorkflows\.length > 0 \|\| incompleteWorkflows\.length > 0\)[\s\S]*await sleep\(delayMs\);[\s\S]*continue;/,
   'The single auto-finish trigger must wait for remaining required workflows.',
+);
+assert.match(
+  finishReusable,
+  /core\.setFailed\([\s\S]*Required workflows failed[\s\S]*Rerun or dispatch Dependency Auto Finish/,
+  'Failed required workflows must leave a visible, independently rerunnable readiness check.',
 );
 assert.match(
   finishReusable,
