@@ -19,13 +19,16 @@ const readQuotedItems = (source, startMarker, endMarker) => {
 };
 
 const [
-  entrypoint,
-  reusable,
+  finishEntrypoint,
+  finishReusable,
+  prepareEntrypoint,
+  prepareReusable,
   nativeWorkflow,
   ciWorkflow,
   dependencyAuditWorkflow,
   dependencyMaintenanceWorkflow,
   codeqlWorkflow,
+  criticalNativeJourney,
   androidJourney,
   iosBuild,
   nativeRunner,
@@ -33,28 +36,105 @@ const [
 ] = await Promise.all([
   readFile('.github/workflows/dependency-auto-finish.yml', 'utf8'),
   readFile('.github/workflows/pr-auto-finish-reusable.yml', 'utf8'),
+  readFile('.github/workflows/dependency-auto-prepare.yml', 'utf8'),
+  readFile('.github/workflows/pr-auto-prepare-reusable.yml', 'utf8'),
   readFile('.github/workflows/native-ci.yml', 'utf8'),
   readFile('.github/workflows/ci.yml', 'utf8'),
   readFile('.github/workflows/dependency-audit.yml', 'utf8'),
   readFile('.github/workflows/deps-maintenance.yml', 'utf8'),
   readFile('.github/workflows/codeql.yml', 'utf8'),
+  readFile('mobile/.maestro/critical-native-journey.yaml', 'utf8'),
   readFile('.github/scripts/run-android-native-journey.sh', 'utf8'),
   readFile('.github/scripts/build-ios-simulator-app.sh', 'utf8'),
   readFile('scripts/native-workflow.mjs', 'utf8'),
   readFile('package.json', 'utf8'),
 ]);
 
-const triggerWorkflows = readQuotedItems(entrypoint, 'workflows:', 'types:');
+const triggerWorkflows = readQuotedItems(
+  finishEntrypoint,
+  'workflows:',
+  'types:',
+);
 const requiredWorkflows = readQuotedItems(
-  reusable,
+  finishReusable,
   'const requiredWorkflowNames = [',
   '];',
 );
 
 assert.deepEqual(
-  requiredWorkflows,
   triggerWorkflows,
-  'Dependency auto-finish trigger workflows must exactly match its required workflows.',
+  ['native-ci'],
+  'Dependency auto-finish must have one aggregate trigger instead of one run per required workflow.',
+);
+assert.match(
+  finishEntrypoint,
+  /workflow_dispatch:[\s\S]*pull_number:[\s\S]*type: number/,
+  'Dependency auto-finish must expose a lightweight recovery dispatch for a specific PR.',
+);
+assert.match(
+  finishEntrypoint,
+  /pull_number: \$\{\{ inputs\.pull_number \|\| 0 \}\}/,
+  'The recovery dispatch must pass its PR number to the reusable readiness coordinator.',
+);
+assert.deepEqual(
+  requiredWorkflows,
+  [
+    'ci',
+    'native-ci',
+    'CodeQL Advanced',
+    'Dependency review',
+    'Dependency Audit',
+  ],
+  'Dependency auto-finish must retain every required workflow gate.',
+);
+assert.match(
+  finishReusable,
+  /if \(missingWorkflows\.length > 0 \|\| incompleteWorkflows\.length > 0\)[\s\S]*await sleep\(delayMs\);[\s\S]*continue;/,
+  'The single auto-finish trigger must wait for remaining required workflows.',
+);
+assert.match(
+  finishReusable,
+  /core\.setFailed\([\s\S]*Required workflows failed[\s\S]*Rerun or dispatch Dependency Auto Finish/,
+  'Failed required workflows must leave a visible, independently rerunnable readiness check.',
+);
+assert.match(
+  finishReusable,
+  /core\.setFailed\([\s\S]*Timed out waiting for required workflows/,
+  'Dependency readiness must fail visibly instead of silently timing out.',
+);
+assert.match(
+  prepareEntrypoint,
+  /lane: auto/,
+  'One dependency auto-prepare entrypoint must resolve both trusted lanes.',
+);
+assert.match(
+  prepareReusable,
+  /requestedLane === 'auto'[\s\S]*trustedDependabot[\s\S]*trustedMaintenance/,
+  'Dependency preparation must resolve trusted Dependabot and maintenance provenance.',
+);
+const workflowFilenames = await readdir('.github/workflows');
+for (const removedEntrypoint of [
+  'dependabot-auto-prepare.yml',
+  'deps-maintenance-auto-prepare.yml',
+])
+  assert.ok(
+    !workflowFilenames.includes(removedEntrypoint),
+    `${removedEntrypoint} must remain consolidated into dependency-auto-prepare.yml.`,
+  );
+assert.match(
+  ciWorkflow,
+  /config:\n\s+name: CI Configuration/,
+  'General CI must publish an unambiguous configuration check name.',
+);
+assert.match(
+  nativeWorkflow,
+  /run-name:[\s\S]*workflow_dispatch[\s\S]*inputs\.platform/,
+  'Native runs must identify manual platform selection in the run name.',
+);
+assert.match(
+  nativeWorkflow,
+  /config:\n\s+name: Native CI Configuration/,
+  'Native CI must publish an unambiguous configuration check name.',
 );
 assert.match(
   nativeWorkflow,
@@ -108,6 +188,21 @@ assert.match(
   androidJourney,
   /native-workflow\.mjs" test --platform android --android-runner container --database-ready/,
   'CI Android journeys must reuse the local runner.',
+);
+assert.doesNotMatch(
+  criticalNativeJourney,
+  /eraseText:\s+\d+/,
+  'Native journeys must use Maestro standard field clearing instead of unexplained character counts.',
+);
+assert.equal(
+  [...criticalNativeJourney.matchAll(/^- eraseText$/gm)].length,
+  4,
+  'Every deterministic native text replacement must use the same standard clear operation.',
+);
+assert.match(
+  criticalNativeJourney,
+  /id: transaction-note\n\s+point: '95%,50%'\n\s+retryTapIfNoChange: false[\s\S]*waitForAnimationToEnd\n- eraseText/,
+  'The transaction note must settle the iOS text keyboard before clearing its bounded default value.',
 );
 assert.match(
   nativeWorkflow,
@@ -190,7 +285,7 @@ assert.equal(
   'Mobile dependency maintenance must use the same audit exception policy.',
 );
 
-for (const filename of await readdir('.github/workflows')) {
+for (const filename of workflowFilenames) {
   if (!filename.endsWith('.yml')) continue;
   const workflow = await readFile(`.github/workflows/${filename}`, 'utf8');
   for (const [, version] of workflow.matchAll(/node-version:\s*([^\r\n]+)/g))

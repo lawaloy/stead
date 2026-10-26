@@ -106,7 +106,7 @@ env:
 - assertVisible: Add Transaction
 - tapOn:
     id: transaction-amount
-- eraseText: 100
+- eraseText
 - inputText: '240000'
 - runFlow:
     when:
@@ -115,7 +115,12 @@ env:
       - hideKeyboard
 - tapOn:
     id: transaction-note
-- eraseText: 100
+    point: '95%,50%'
+    retryTapIfNoChange: false
+# Switching from the numeric pad to the text keyboard can leave XCTest
+# dispatching backspaces while iOS is still animating the new keyboard.
+- waitForAnimationToEnd
+- eraseText
 - inputText: Native journey income
 - runFlow:
     when:
@@ -191,7 +196,7 @@ env:
     id: transaction-edit-amount
     point: '95%,50%'
     retryTapIfNoChange: false
-- eraseText: 100
+- eraseText
 - inputText: '360000'
 - runFlow:
     when:
@@ -231,7 +236,7 @@ env:
     id: transaction-edit-note
     point: '95%,50%'
     retryTapIfNoChange: false
-- eraseText: 100
+- eraseText
 - inputText: Native journey corrected income
 - runFlow:
     when:
