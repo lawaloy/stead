@@ -10,10 +10,33 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
 import {
+  assertStructuredRequestLog,
   initializeLocalEnvironment,
   renderApiEnvironment,
   testEnvironment,
 } from './local-workflow.mjs';
+
+test('structured process logs retain correlation without request secrets', () => {
+  const output = `${JSON.stringify({
+    message: 'HTTP request completed',
+    requestId: 'request_1',
+    method: 'GET',
+    path: '/auth/countries',
+    statusCode: 200,
+    durationMs: 4,
+  })}\n`;
+
+  assert.doesNotThrow(() =>
+    assertStructuredRequestLog(output, 'request_1', ['secret']),
+  );
+  assert.throws(
+    () =>
+      assertStructuredRequestLog(`${output}authorization=secret`, 'request_1', [
+        'secret',
+      ]),
+    /forbidden value/u,
+  );
+});
 
 const API_EXAMPLE = `DATABASE_URL="postgresql://localhost/stead"
 JWT_SECRET="__REPLACE_ME__"

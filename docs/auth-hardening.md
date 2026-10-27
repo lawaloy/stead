@@ -118,29 +118,7 @@ is available. Once available:
 - Capture the operator playbook for diagnosing send failures and dead-letter
   jobs.
 
-## Acceptance Criteria
-
-Completed:
-
-- [x] Phone numbers are stored and used in a canonical format.
-- [x] OTP requests enforce a short resend cooldown.
-- [x] OTP request records include client metadata when available.
-- [x] Auth tests cover the critical request and verify paths.
-- [x] OTP jobs survive process restarts and persist retry/dead-letter state.
-- [x] Active SMS provider configuration fails fast when required environment
-      variables are missing.
-- [x] Auth events persist resend and verify outcomes for later inspection.
-- [x] Local/dev SMS mode exercises queue-backed OTP delivery without third-party
-      SMS spend.
-- [x] Notification inspection exposes recent masked jobs, status, provider
-      metadata, and failures.
-- [x] PostgreSQL-backed CI coverage verifies OTP persistence, dev-provider
-      delivery, verification, retries, and dead-lettering.
-- [x] Complete the P0 local mobile auth acceptance pass on Expo web.
-- [x] Add stronger device-aware abuse controls.
-- [x] Expand operator diagnostics for abuse and delivery failures.
-
-Remaining:
+## Remaining Acceptance Criterion
 
 - [ ] Complete a real-provider, real-device OTP pass when sender access is
       available.

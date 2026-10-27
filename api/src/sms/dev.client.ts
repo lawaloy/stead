@@ -10,15 +10,11 @@ export class DevClient {
   private readonly logger = new Logger(DevClient.name);
 
   sendMessage(payload: DevPayload) {
-    this.logger.log(`DEV SMS accepted to=${this.maskPhone(payload.to)}`);
+    void payload;
+    this.logger.log('Development SMS accepted');
     return {
       dev: true,
       accepted: true,
     };
-  }
-
-  private maskPhone(phone: string): string {
-    if (phone.length <= 4) return phone;
-    return `${phone.slice(0, 4)}***${phone.slice(-2)}`;
   }
 }

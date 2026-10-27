@@ -5,6 +5,10 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { queryClient } from '../src/lib/query-client';
 import { AuthProvider, useAuth } from '../src/lib/auth-state';
+import * as Sentry from '@sentry/react-native';
+import { initializeObservability } from '../src/lib/observability';
+
+initializeObservability();
 
 const Gate = () => {
   const { bootstrapping, token } = useAuth();
@@ -36,7 +40,7 @@ const Gate = () => {
   return <Stack screenOptions={{ headerShown: false }} />;
 };
 
-export default function RootLayout() {
+function RootLayout() {
   return (
     <SafeAreaProvider>
       <QueryClientProvider client={queryClient}>
@@ -47,3 +51,5 @@ export default function RootLayout() {
     </SafeAreaProvider>
   );
 }
+
+export default Sentry.wrap(RootLayout);

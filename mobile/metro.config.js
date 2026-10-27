@@ -1,8 +1,8 @@
-const { getDefaultConfig } = require('expo/metro-config');
+const { getSentryExpoConfig } = require('@sentry/react-native/metro');
 const { FileStore } = require('metro-cache');
 const path = require('node:path');
 
-const config = getDefaultConfig(__dirname);
+const config = getSentryExpoConfig(__dirname);
 
 config.cacheStores = [
   new FileStore({ root: path.join(__dirname, '.cache', 'metro') }),

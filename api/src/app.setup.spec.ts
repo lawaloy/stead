@@ -134,6 +134,35 @@ describe('configureApp', () => {
         headers: { 'x-request-id': 'log-trace' },
         method: 'POST',
         originalUrl: '/goals',
+        path: '/goals',
+      } as unknown as Request,
+      res,
+      jest.fn(),
+    );
+
+    res.emit('finish');
+
+    expect(logSpy).toHaveBeenCalledWith('HTTP request completed', {
+      durationMs: expect.any(Number) as unknown,
+      method: 'POST',
+      path: '/goals',
+      requestId: 'log-trace',
+      statusCode: 201,
+    });
+    logSpy.mockRestore();
+  });
+
+  it('removes resource identifiers from the logged request path', () => {
+    const logSpy = jest
+      .spyOn(Logger.prototype, 'log')
+      .mockImplementation(() => undefined);
+    const { res } = createResponse(200);
+
+    middleware(
+      {
+        headers: {},
+        method: 'GET',
+        path: '/goals/123e4567-e89b-42d3-a456-426614174000',
       } as unknown as Request,
       res,
       jest.fn(),
@@ -142,8 +171,32 @@ describe('configureApp', () => {
     res.emit('finish');
 
     expect(logSpy).toHaveBeenCalledWith(
-      expect.stringMatching(/^POST \/goals 201 \d+ms requestId=log-trace$/),
+      'HTTP request completed',
+      expect.objectContaining({ path: '/goals/:id' }),
     );
     logSpy.mockRestore();
+  });
+
+  it('replaces unsafe client request ids', () => {
+    const { res, setHeader } = createResponse(200);
+
+    middleware(
+      {
+        headers: { 'x-request-id': 'unsafe\nheader' },
+        method: 'GET',
+        path: '/',
+      } as unknown as Request,
+      res,
+      jest.fn(),
+    );
+
+    expect(setHeader).not.toHaveBeenCalledWith(
+      'x-request-id',
+      'unsafe\nheader',
+    );
+    expect(setHeader).toHaveBeenCalledWith(
+      'x-request-id',
+      expect.stringMatching(/^[0-9a-f-]{36}$/i),
+    );
   });
 });

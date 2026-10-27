@@ -82,8 +82,8 @@ describe('AlertsScheduler', () => {
     await tick();
 
     expect(alerts.evaluateUser).toHaveBeenCalledTimes(2);
-    expect(errorSpy).toHaveBeenCalledWith(
-      'Readiness alert evaluation failed: dashboard unavailable',
-    );
+    expect(errorSpy).toHaveBeenCalledWith('Readiness alert evaluation failed', {
+      errorName: 'Error',
+    });
   });
 });

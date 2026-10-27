@@ -27,6 +27,7 @@
     "plugins": [
       "expo-router",
       "expo-secure-store",
+      "@sentry/react-native/expo",
       [
         "expo-splash-screen",
         {

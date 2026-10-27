@@ -35,9 +35,9 @@ describe('AlertsScheduler tick preference discovery failure', () => {
     await expect(tick()).resolves.toBeUndefined();
 
     expect(alerts.evaluateUser).not.toHaveBeenCalled();
-    expect(errorSpy).toHaveBeenCalledWith(
-      'Readiness alert evaluation failed: preference discovery unavailable',
-    );
+    expect(errorSpy).toHaveBeenCalledWith('Readiness alert evaluation failed', {
+      errorName: 'Error',
+    });
 
     await tick();
 

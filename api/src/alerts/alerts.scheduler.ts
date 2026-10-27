@@ -47,8 +47,9 @@ export class AlertsScheduler implements OnModuleInit, OnModuleDestroy {
     try {
       await this.run();
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : 'unknown error';
-      this.logger.error(`Readiness alert evaluation failed: ${message}`);
+      this.logger.error('Readiness alert evaluation failed', {
+        errorName: error instanceof Error ? error.name : 'UnknownError',
+      });
     } finally {
       this.running = false;
     }
