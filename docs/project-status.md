@@ -33,6 +33,7 @@ unit coverage is not the same as a full mobile-to-database acceptance test.
 | SMS providers                      | Dev, Twilio, and Termii adapters implemented                                                                                                                                                | OTP UI is provider-agnostic                                                                                                                        | Mocked provider unit tests; dev-provider e2e                                                                                                                                             | Live Twilio or Termii delivery has not been production-validated                                                                                                                          |
 | Weekly readiness and risk alerts   | Opt-in preferences, timezone-aware weekly generation, material risk/recovery detection, cooldown, encrypted queueing, and SMS delivery implemented                                          | Preference and schedule controls implemented                                                                                                       | API rule/service/queue/consumer tests; generated request/response contracts; mobile API-client and screen tests                                                                          | Validate templates and timing with customers; complete live-provider/native-device delivery validation                                                                                    |
 | API/mobile contracts               | OpenAPI generation for mobile-consumed routes implemented                                                                                                                                   | Generated types and Zod response validation used                                                                                                   | CI regeneration/drift check and schema tests                                                                                                                                             | Add every newly consumed route before mobile integration; inspection routes remain intentionally internal                                                                                 |
+| Application observability          | Structured stdout logs, validated levels, sensitive-key redaction, safe request logs, and request-to-notification correlation implemented                                                   | Optional Sentry reporting with request IDs, allowlisted context, and PII scrubbing                                                                 | Logger/mobile unit tests plus a real built-process log contract in the existing live API journey                                                                                         | Complete the prioritized [production observability gaps](observability.md#remaining-production-gaps)                                                                                      |
 | User profile and account lifecycle | Profile, append-only optional consent history, sanitized JSON export, and transactional deletion implemented                                                                                | Account/privacy screen with profile, consent, export/share, configured support, and guarded permanent deletion                                     | API unit and PostgreSQL e2e; generated contracts; mobile API-client and screen journeys                                                                                                  | Configure and staff production support; validate native share/email behavior and enforce backup expiry                                                                                    |
 | Automatic financial data           | Canonical CSV preview and idempotent confirmed import implemented                                                                                                                           | Native/web file picker, row review/selection, optional active-goal linking, and result feedback                                                    | Parser/DTO/service/controller tests; PostgreSQL ownership and deduplication e2e; generated contracts; mobile file, API-client, and screen-journey tests                                  | Validate the format with customers; add adapters for agreed Nigerian bank exports; decide separately whether direct bank connectivity justifies its consent and reconciliation complexity |
 | Multiple simultaneous goals        | Intentionally unsupported; only one active goal is allowed                                                                                                                                  | Not supported                                                                                                                                      | Unit tests plus a schema/migration invariant test                                                                                                                                        | Revisit the product rule before implementing multi-goal planning                                                                                                                          |
@@ -126,18 +127,14 @@ Priority labels apply within a track. A release-blocking engineering item may
 need to happen before a product milestone ships, but that does not turn it into
 the product milestone.
 
-### Product milestones
+### Active product milestone
 
-| Order       | Milestone                          | Customer outcome                                                                                                                                        | Status                           | Remaining scope                                                                                                                                                                                                                                                                                                            |
-| ----------- | ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Completed   | Transaction history and management | Customers can review and filter activity, see the visible net, correct transaction details or goal links, and delete mistakes                           | Implemented in mobile            | Automated transaction-screen journeys now cover validation, warm-session cached/offline behavior, retry, and accessibility semantics; durable cold-start offline support and native assistive-technology validation remain separate decisions/checks                                                                       |
-| Completed   | Goal lifecycle and history         | Customers can correct an active goal, intentionally complete, cancel, or replace it, and understand prior goal state without losing linked transactions | Implemented in API and mobile    | Lifecycle state, authenticated history/end contracts, migration backfill, mobile workflows, and automated API/PostgreSQL/mobile/native-simulator coverage are complete; physical-device accessibility remains a release check                                                                                              |
-| Completed   | Weekly readiness and risk alerts   | Customers receive timely progress and risk updates instead of needing to open the dashboard                                                             | Implemented in API and mobile    | SMS-only opt-in preferences, local weekly scheduling, material deterioration/recovery rules, cooldown/deduplication, templates, and automated API/mobile coverage are complete; live-provider/physical-device validation remains release work                                                                              |
-| Completed   | Account and data self-service      | Customers can manage profile/consent, export data, contact configured support, and delete their account                                                 | Implemented in API and mobile    | Profile and optional-consent controls, versioned sanitized JSON export, configured email support, guarded deletion, session cleanup, policy documentation, and automated API/PostgreSQL/mobile coverage are complete; production support and backup expiry remain operational checks                                       |
-| In progress | Automatic financial-data ingestion | Customers can reduce manual entry through an agreed bank, import, or other ingestion source                                                             | Canonical CSV import implemented | Preview, correction feedback, selection, optional goal linking, confirmation, and retry-safe deduplication are implemented across API/mobile/PostgreSQL. Validate the template with customers, add adapters for agreed bank exports, and decide whether direct connectivity warrants its consent and reconciliation scope. |
+| Priority | Milestone                          | Customer outcome                                                                            | Current state                    | Next scope                                                                                                                                                        |
+| -------- | ---------------------------------- | ------------------------------------------------------------------------------------------- | -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Current  | Automatic financial-data ingestion | Customers can reduce manual entry through an agreed bank, import, or other ingestion source | Canonical CSV import implemented | Validate the template with customers, add adapters for agreed bank exports, and decide whether direct connectivity warrants its consent and reconciliation scope. |
 
-The active product milestone is therefore **Automatic financial-data
-ingestion**. Its first bounded slice is the canonical CSV import documented in
+The active product milestone is **Automatic financial-data ingestion**. Its
+first bounded slice is the canonical CSV import documented in
 [Transaction File Import](transaction-file-import.md). Next, validate that
 format with customers and select the first Nigerian bank-export adapter. Direct
 bank connectivity remains a separate decision because its consent,
@@ -147,23 +144,6 @@ before the score or alerts are treated as financial guidance.
 
 ### Enabling and release work
 
-#### Completed safeguards
-
-- PostgreSQL-backed finance e2e coverage for goal rules, transaction CRUD and
-  ownership, and populated dashboard recalculation.
-- Safe-integer-aware naira-to-kobo conversion and stable date-only transaction
-  handling in the mobile transaction workflow.
-- Session-scoped finance query caches that are cleared across login changes.
-- Transaction-screen journeys covering create/filter/edit/delete, validation,
-  warm-session cached activity and retry during refresh failure, disconnected
-  writes, and accessibility semantics.
-- Goal lifecycle coverage across unit, contract, screen, and PostgreSQL e2e
-  boundaries, including replacement history and preservation of transaction
-  links to ended goals.
-- Auth/dashboard screen coverage and a live mobile API-client journey against
-  PostgreSQL, including goal setup, transaction management, dashboard refresh,
-  bearer restore, and unauthenticated access after local logout.
-
 #### Before a production pilot
 
 1. Validate OTP delivery and verification with the chosen live SMS provider on
@@ -172,12 +152,12 @@ before the score or alerts are treated as financial guidance.
    goal, transaction, dashboard, session-restore, and logout journey, including
    TalkBack and VoiceOver.
 3. Validate session expiry/revocation behavior on physical devices and keep the
-   rotation/revocation incident response runbooks current. Family max age,
-   device-bound refresh, concurrent-family caps, customer sign-out across
-   devices, silent refresh, and clear expiry feedback are implemented.
-4. Establish deployment, monitoring, alerting, and backup/restore; configure
-   production support and enforce the documented privacy, deletion, and 30-day
-   backup-expiry procedures.
+   rotation/revocation incident response runbooks current.
+4. Complete the canonical
+   [production observability gaps](observability.md#remaining-production-gaps).
+   Establish deployment and backup/restore; configure production support and
+   enforce the documented privacy, deletion, and 30-day backup-expiry
+   procedures.
 5. Extend screen-level offline, retry, validation, and accessibility
    verification beyond transactions and goals to the other critical mobile flows, then
    run native TalkBack and VoiceOver acceptance checks.
@@ -185,10 +165,9 @@ before the score or alerts are treated as financial guidance.
 ### Later platform expansion
 
 - Bank-specific export adapters and a separate direct-connectivity decision
-  after customer validation of the implemented canonical CSV import.
+  after customer validation of the canonical CSV import.
 - Multiple concurrent obligations and richer planning scenarios.
-- Internal support tooling; customer profile, preferences, consent, export,
-  and configured support access are already implemented.
+- Internal support tooling.
 - Marketing website, web product, internal admin tools, and the service
   extractions described in the [Architecture Roadmap](architecture-roadmap.md).
 

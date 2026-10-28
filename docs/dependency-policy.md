@@ -24,16 +24,22 @@ As of October 10, 2026, Expo 57's build toolchain has two temporary exceptions:
 | [GHSA-vfj7-8cjw-p6xm](https://github.com/advisories/GHSA-vfj7-8cjw-p6xm) | `braces` 3.0.3     | Used through Metro to match repository/build paths. Stead does not pass customer input to Metro or ship Metro in the native application bundle.                                                            | November 6, 2026; remove immediately when a patched `braces` release is available through Expo/Metro.   |
 | [GHSA-86w9-cpqp-85rv](https://github.com/advisories/GHSA-86w9-cpqp-85rv) | `node-forge` 1.4.0 | Used by Expo CLI's code-signing tooling during development/builds. Stead does not use it for API authentication or runtime signature verification, and it is not shipped in the native application bundle. | November 6, 2026; remove immediately when the upstream node-forge fix is released and consumed by Expo. |
 
-The 19 mobile entries reported by npm are propagation through Expo, Metro, and
-React Native from these two source advisories; the count reflects dependency
-paths rather than independent defects. GitHub currently lists no patched
-release for either source advisory.
+The mobile entries reported by npm are propagation through Expo, Metro, React
+Native, and packages that peer on Expo from these source advisories; the count
+reflects dependency paths rather than independent defects. GitHub currently
+lists no patched release for either source advisory.
 Do not run `npm audit fix --force`: its suggested Expo 44 / React Native 0.72
 downgrades are incompatible with the supported Expo 57 stack and do not
 constitute a safe remediation.
 
-The API's Multer override is pinned to 2.4.0, the first release patched for
-[GHSA-3pph-fpjx-jg34](https://github.com/advisories/GHSA-3pph-fpjx-jg34).
+The API's Multer override is pinned to 2.5.0, which includes the fixes for
+[GHSA-3pph-fpjx-jg34](https://github.com/advisories/GHSA-3pph-fpjx-jg34) and
+[GHSA-q7qp-rjg7-q26m](https://github.com/advisories/GHSA-q7qp-rjg7-q26m).
+
+Mobile pins Expo CLI's compatible Zod alternative to 4.6.7, the first release
+patched for
+[GHSA-mrhx-c7xc-m3w5](https://github.com/advisories/GHSA-mrhx-c7xc-m3w5).
+Expo CLI accepts Zod 4, but npm otherwise selected the vulnerable Zod 3 branch.
 
 Mobile overrides `js-yaml` to 4.3.2 for `@istanbuljs/load-nyc-config` only (test
 tooling via `babel-plugin-istanbul`). Its `js-yaml` 3 range pulled in `argparse` 1 and

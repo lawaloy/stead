@@ -44,6 +44,8 @@ export const testEnvironment = (
       'stead-local-test-device-identifier-key-1234567890',
     SMS_PROVIDER: 'dev',
     DEV_EXPOSE_OTP: 'true',
+    LOG_FORMAT: 'json',
+    LOG_LEVEL: 'info',
     AUTH_INSPECTION_OPERATOR_USER_IDS: '',
   };
   delete environment.E2E_DATABASE_URL;
@@ -275,6 +277,67 @@ const waitForApi = async (child, output) => {
   );
 };
 
+export const assertStructuredRequestLog = (
+  output,
+  requestId,
+  forbiddenValues = [],
+) => {
+  const records = output
+    .split(/\r?\n/u)
+    .filter(Boolean)
+    .flatMap((line) => {
+      try {
+        return [JSON.parse(line)];
+      } catch {
+        return [];
+      }
+    });
+  const requestLog = records.find(
+    (record) =>
+      record.message === 'HTTP request completed' &&
+      record.requestId === requestId,
+  );
+  if (!requestLog) {
+    throw new Error(`No structured request log found for ${requestId}.`);
+  }
+  if (
+    requestLog.path !== '/auth/countries' ||
+    requestLog.method !== 'GET' ||
+    requestLog.statusCode !== 200 ||
+    typeof requestLog.durationMs !== 'number'
+  ) {
+    throw new Error('The structured request log is missing required fields.');
+  }
+  for (const value of forbiddenValues) {
+    if (output.includes(value)) {
+      throw new Error('A forbidden value was written to process logs.');
+    }
+  }
+};
+
+const verifyStructuredProcessLogging = async (output) => {
+  const requestId = 'journey-log-contract';
+  const querySecret = 'never-log-query-value';
+  const authorizationSecret = 'never-log-authorization-value';
+  const response = await fetch(
+    `${JOURNEY_API_URL}/auth/countries?probe=${querySecret}`,
+    {
+      headers: {
+        authorization: `Bearer ${authorizationSecret}`,
+        'x-request-id': requestId,
+      },
+    },
+  );
+  if (!response.ok) {
+    throw new Error('The structured logging probe request failed.');
+  }
+  await delay(50);
+  assertStructuredRequestLog(output(), requestId, [
+    querySecret,
+    authorizationSecret,
+  ]);
+};
+
 const stopChild = async (child) => {
   if (child.exitCode !== null) return;
   child.kill();
@@ -318,6 +381,7 @@ const runJourney = async ({ databaseReady = false } = {}) => {
 
   try {
     await waitForApi(api, () => logs);
+    await verifyStructuredProcessLogging(() => logs);
     await run('npm', ['run', 'test:live-api'], {
       cwd: MOBILE_DIR,
       env: { ...env, STEAD_TEST_API_URL: JOURNEY_API_URL },

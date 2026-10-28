@@ -1,7 +1,7 @@
 import { Logger } from '@nestjs/common';
 import { DevClient } from './dev.client';
 
-describe('DevClient phone masking edges', () => {
+describe('DevClient sensitive-data logging', () => {
   let client: DevClient;
 
   beforeEach(() => {
@@ -13,8 +13,8 @@ describe('DevClient phone masking edges', () => {
     jest.restoreAllMocks();
   });
 
-  it.each(['', '1', '12', '123', '1234'])(
-    'leaves short destination %p unmasked in the acceptance log',
+  it.each(['', '1', '12', '123', '1234', '12345'])(
+    'does not log destination %p or the message body',
     (phone) => {
       const logSpy = jest.spyOn(Logger.prototype, 'log');
 
@@ -23,19 +23,10 @@ describe('DevClient phone masking edges', () => {
         body: 'Your Stead OTP is 123456. It expires in 10 minutes.',
       });
 
-      expect(logSpy).toHaveBeenCalledWith(`DEV SMS accepted to=${phone}`);
-      expect(logSpy.mock.calls.flat().join(' ')).not.toContain('123456');
+      expect(logSpy).toHaveBeenCalledWith('Development SMS accepted');
+      const output = logSpy.mock.calls.flat().join(' ');
+      expect(output).not.toContain(phone || 'Your Stead OTP');
+      expect(output).not.toContain('123456');
     },
   );
-
-  it('masks destinations longer than four characters', () => {
-    const logSpy = jest.spyOn(Logger.prototype, 'log');
-
-    client.sendMessage({
-      to: '12345',
-      body: 'Your Stead OTP is 123456. It expires in 10 minutes.',
-    });
-
-    expect(logSpy).toHaveBeenCalledWith('DEV SMS accepted to=1234***45');
-  });
 });

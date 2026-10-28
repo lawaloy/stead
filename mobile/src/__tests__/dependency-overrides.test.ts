@@ -127,6 +127,27 @@ describe('dependency overrides', () => {
       ),
     ).toEqual([]);
   });
+
+  it('keeps Expo CLI on the patched Zod release', () => {
+    const packageJson = readJson('package.json');
+    const packageLock = readJson<PackageLock>('package-lock.json');
+    const expoCliPath = 'node_modules/@expo/cli';
+
+    expect(packageJson).toMatchObject({
+      overrides: {
+        zod: '$zod',
+      },
+    });
+    const resolvedZodPath = lockfileDependencyCandidates(
+      expoCliPath,
+      'zod',
+    ).find((candidate) => packageLock.packages[candidate]);
+    expect(resolvedZodPath).toBeDefined();
+    expect(packageLock.packages[resolvedZodPath as string]).toMatchObject({
+      version: '4.6.7',
+    });
+  });
+
   it('keeps every package dependency resolvable in the lockfile', () => {
     const packageLock = readJson<PackageLock>('package-lock.json');
 

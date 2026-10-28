@@ -30,7 +30,7 @@ maintaining multiple copies.
   currently prioritized, or still blocking a pilot.
 - [Architecture Roadmap](architecture-roadmap.md): desired architecture,
   extraction stages, technical exit criteria, and open architecture decisions.
-  Product priority and completed-feature inventories belong in Project Status.
+  Current capability evidence and product priority belong in Project Status.
 
 ### Feature behavior and policy
 
@@ -53,6 +53,8 @@ maintaining multiple copies.
   overrides, temporary exceptions, expiry, and removal conditions.
 - [Branch Protection Checklist](branch-protection-checklist.md): observed
   repository rules, required checks, and governance follow-up.
+- [Observability and Sensitive-Data Logging](observability.md): structured API
+  logs, correlation, mobile error reporting, redaction, and production setup.
 
 Repository-specific agent behavior belongs in [`AGENTS.md`](../AGENTS.md).
 Issue and pull-request templates under `.github/` are input forms, not reference

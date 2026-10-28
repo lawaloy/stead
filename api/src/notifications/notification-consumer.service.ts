@@ -7,6 +7,7 @@ import {
 import { SmsService } from '../sms/sms.service';
 import { NotificationQueueService } from './notification-queue.service';
 import { NotificationJob } from './notification.types';
+import { runWithCorrelationId } from '../observability/request-context';
 
 @Injectable()
 export class NotificationConsumerService
@@ -42,33 +43,45 @@ export class NotificationConsumerService
     try {
       const job = await this.queue.claimReadyJob();
       if (!job) return;
-      if (!(await this.queue.canDeliver(job))) {
-        this.logger.log(
-          `Notification job cancelled during account deletion id=${job.id}`,
-        );
-        return;
-      }
-
-      try {
-        const result = await this.processJob(job);
-        await this.queue.markSucceeded(job, result);
-        this.logger.log(
-          `Notification job sent id=${job.id} type=${job.type} provider=${result.provider ?? 'unknown'} phone=${this.maskPhone(job.payload.phone)}`,
-        );
-      } catch (error: unknown) {
-        await this.queue.markFailed(job, error);
-        this.logger.warn(
-          `Notification job failed id=${job.id} type=${job.type} attempts=${job.attempts + 1} phone=${this.maskPhone(job.payload.phone)}`,
-        );
-      }
+      await runWithCorrelationId(job.correlationId, () =>
+        this.processClaimedJob(job),
+      );
     } catch (error: unknown) {
-      const message =
-        error instanceof Error
-          ? error.message
-          : 'unknown notification poll error';
-      this.logger.error(`Notification poll failed: ${message}`);
+      this.logger.error('Notification poll failed', {
+        errorName: error instanceof Error ? error.name : 'UnknownError',
+      });
     } finally {
       this.isProcessing = false;
+    }
+  }
+
+  private async processClaimedJob(job: NotificationJob) {
+    if (!(await this.queue.canDeliver(job))) {
+      this.logger.log('Notification job cancelled during account deletion', {
+        jobId: job.id,
+        type: job.type,
+      });
+      return;
+    }
+
+    try {
+      const result = await this.processJob(job);
+      await this.queue.markSucceeded(job, result);
+      this.logger.log('Notification job sent', {
+        jobId: job.id,
+        type: job.type,
+        provider: result.provider ?? 'unknown',
+        attempt: job.attempts + 1,
+      });
+    } catch (error: unknown) {
+      await this.queue.markFailed(job, error);
+      this.logger.warn('Notification job failed', {
+        jobId: job.id,
+        type: job.type,
+        attempt: job.attempts + 1,
+        terminal: job.attempts + 1 >= job.maxAttempts,
+        errorName: error instanceof Error ? error.name : 'UnknownError',
+      });
     }
   }
 
@@ -113,10 +126,5 @@ export class NotificationConsumerService
     if (typeof body.sid === 'string') return body.sid;
     if (typeof body.message_id === 'string') return body.message_id;
     return null;
-  }
-
-  private maskPhone(phone: string): string {
-    if (phone.length <= 4) return phone;
-    return `${phone.slice(0, 4)}***${phone.slice(-2)}`;
   }
 }

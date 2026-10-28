@@ -30,6 +30,7 @@ describe('NotificationConsumerService', () => {
     lastError: null,
     provider: null,
     providerMessageId: null,
+    correlationId: 'request_1',
     createdAt: new Date('2026-03-29T12:00:00Z'),
     updatedAt: new Date('2026-03-29T12:00:00Z'),
   };
@@ -239,7 +240,7 @@ describe('NotificationConsumerService', () => {
     },
   );
 
-  it('logs short phones unmasked and longer phones masked on success and failure', async () => {
+  it('never includes phone numbers or OTPs in delivery logs', async () => {
     const logSpy = jest.spyOn(Logger.prototype, 'log');
     const warnSpy = jest.spyOn(Logger.prototype, 'warn');
 
@@ -255,10 +256,12 @@ describe('NotificationConsumerService', () => {
 
     await tick();
 
-    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('phone=1234'));
-    expect(logSpy).not.toHaveBeenCalledWith(
-      expect.stringContaining('phone=1234***'),
-    );
+    expect(logSpy).toHaveBeenCalledWith('Notification job sent', {
+      attempt: 1,
+      jobId: 'job_1',
+      provider: 'dev',
+      type: 'otp.requested',
+    });
 
     queue.claimReadyJob.mockResolvedValue({
       ...job,
@@ -268,9 +271,13 @@ describe('NotificationConsumerService', () => {
 
     await tick();
 
-    expect(warnSpy).toHaveBeenCalledWith(
-      expect.stringContaining('phone=+234***78'),
-    );
+    const logged = [...logSpy.mock.calls, ...warnSpy.mock.calls]
+      .flat()
+      .map(String)
+      .join(' ');
+    expect(logged).not.toContain('1234');
+    expect(logged).not.toContain('+2348012345678');
+    expect(logged).not.toContain('123456');
   });
 
   it('does not start a second claim while the first claim is still awaiting', async () => {
@@ -372,9 +379,9 @@ describe('NotificationConsumerService', () => {
     expect(sms.sendOtp).not.toHaveBeenCalled();
     expect(queue.markSucceeded).not.toHaveBeenCalled();
     expect(queue.markFailed).not.toHaveBeenCalled();
-    expect(errorSpy).toHaveBeenCalledWith(
-      'Notification poll failed: db unavailable',
-    );
+    expect(errorSpy).toHaveBeenCalledWith('Notification poll failed', {
+      errorName: 'Error',
+    });
   });
 
   it('logs a fallback message when the poll fails with a non-Error rejection', async () => {
@@ -385,9 +392,9 @@ describe('NotificationConsumerService', () => {
     expect(sms.sendOtp).not.toHaveBeenCalled();
     expect(queue.markSucceeded).not.toHaveBeenCalled();
     expect(queue.markFailed).not.toHaveBeenCalled();
-    expect(errorSpy).toHaveBeenCalledWith(
-      'Notification poll failed: unknown notification poll error',
-    );
+    expect(errorSpy).toHaveBeenCalledWith('Notification poll failed', {
+      errorName: 'UnknownError',
+    });
   });
 
   it('resets the in-flight flag after a claim failure so the next poll can run', async () => {
@@ -410,9 +417,9 @@ describe('NotificationConsumerService', () => {
     await expect(tick()).resolves.toBeUndefined();
 
     expect(queue.markFailed).toHaveBeenCalledWith(job, providerError);
-    expect(errorSpy).toHaveBeenCalledWith(
-      'Notification poll failed: db write failed',
-    );
+    expect(errorSpy).toHaveBeenCalledWith('Notification poll failed', {
+      errorName: 'Error',
+    });
 
     await tick();
 

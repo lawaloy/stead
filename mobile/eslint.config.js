@@ -35,4 +35,9 @@ module.exports = defineConfig([
       'src/contracts/generated/**',
     ],
   },
+  {
+    rules: {
+      'no-console': 'error',
+    },
+  },
 ]);

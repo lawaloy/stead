@@ -41,6 +41,7 @@ import type {
   PreviewTransactionImportRequest,
 } from '../contracts/generated/types.gen';
 import type { AuthSessionTokens } from './token-store';
+import { reportError } from './observability';
 
 export { ApiError } from './api-error';
 
@@ -172,15 +173,62 @@ apiClient.interceptors.request.use(async (config) => {
   if (!config.headers) config.headers = new AxiosHeaders();
   if (token) config.headers.Authorization = `Bearer ${token}`;
   config.headers['X-Stead-Device-Id'] = installationId;
+  if (!config.headers.has('X-Request-ID')) {
+    config.headers.set('X-Request-ID', Crypto.randomUUID());
+  }
   return config;
 });
+
+const requestIdFrom = (
+  config?: InternalAxiosRequestConfig,
+  responseHeaders?: unknown,
+) => {
+  if (responseHeaders && typeof responseHeaders === 'object') {
+    const headers = responseHeaders as Record<string, unknown> & {
+      get?: (name: string) => unknown;
+    };
+    const responseId = headers.get?.('x-request-id') ?? headers['x-request-id'];
+    if (typeof responseId === 'string') return responseId;
+  }
+  const requestId = config?.headers?.get?.('X-Request-ID');
+  return typeof requestId === 'string' ? requestId : undefined;
+};
+
+const safeRoute = (config?: InternalAxiosRequestConfig) => {
+  const path = (config?.url ?? 'unknown').split('?')[0];
+  return path.replace(
+    /\b[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\b/gi,
+    ':id',
+  );
+};
+
+const reportApiError = (
+  error: unknown,
+  config?: InternalAxiosRequestConfig,
+  statusCode?: number,
+  responseHeaders?: unknown,
+) => {
+  if (statusCode !== undefined && statusCode < 500) return;
+  reportError(error, {
+    area: 'api',
+    operation: (config?.method ?? 'unknown').toUpperCase(),
+    requestId: requestIdFrom(config, responseHeaders),
+    route: safeRoute(config),
+    statusCode,
+  });
+};
 
 apiClient.interceptors.response.use(
   (response) => response,
   async (error: unknown) => {
     if (!isAxiosError(error)) {
-      if (error instanceof ApiError) throw error;
-      throw new ApiError({ message: 'Unexpected network error' });
+      if (error instanceof ApiError) {
+        reportApiError(error, undefined, error.status);
+        throw error;
+      }
+      const apiError = new ApiError({ message: 'Unexpected network error' });
+      reportApiError(apiError);
+      throw apiError;
     }
 
     const status = error.response?.status;
@@ -221,7 +269,10 @@ apiClient.interceptors.response.use(
       message = softenUnauthorizedMessage(message);
     }
 
-    throw new ApiError({ message, status, details });
+    const requestId = requestIdFrom(original, error.response?.headers);
+    const apiError = new ApiError({ message, status, details, requestId });
+    reportApiError(apiError, original, status, error.response?.headers);
+    throw apiError;
   },
 );
 

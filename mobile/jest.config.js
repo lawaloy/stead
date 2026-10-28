@@ -10,6 +10,8 @@ module.exports = {
     '^react-native$': '<rootDir>/src/__tests__/react-native-mock.ts',
     '^expo-crypto$': '<rootDir>/src/__tests__/expo-crypto-mock.ts',
     '^expo-secure-store$': '<rootDir>/src/__tests__/expo-secure-store-mock.ts',
+    '^@sentry/react-native$':
+      '<rootDir>/src/__tests__/sentry-react-native-mock.ts',
   },
   clearMocks: true,
 };

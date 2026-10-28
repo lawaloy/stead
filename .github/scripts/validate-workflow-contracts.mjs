@@ -170,6 +170,11 @@ assert.match(
   'The iOS simulator artifact must embed JavaScript so its journey does not require Metro.',
 );
 assert.match(
+  iosBuild,
+  /SENTRY_DISABLE_AUTO_UPLOAD="\$\{SENTRY_DISABLE_AUTO_UPLOAD:-true\}"/,
+  'Simulator builds must not require production Sentry upload credentials.',
+);
+assert.match(
   nativeRunner,
   /IOS_SIMULATOR_PREPARATION_TIMEOUT_MS/,
   'The iOS simulator preparation deadline must come from shared CI configuration.',
@@ -424,6 +429,21 @@ assert.match(
   nativeWorkflow,
   /working-directory: mobile\n/,
   'iOS bundler must use the committed mobile Gemfile.',
+);
+assert.match(
+  nativeWorkflow,
+  /key: react-native-ios-\$\{\{ runner\.os \}\}-\$\{\{ runner\.arch \}\}-v1-\$\{\{ steps\.react-native\.outputs\.version \}\}/,
+  'iOS CI must cache React Native prebuilt binaries independently of the Pods lockfile.',
+);
+assert.match(
+  nativeWorkflow,
+  /build-ios-simulator-app\.sh --prepare-only[\s\S]*Save React Native iOS binaries[\s\S]*IOS_PODS_PREPARED: true/,
+  'iOS CI must save native dependency downloads before starting the Xcode build.',
+);
+assert.match(
+  iosBuild,
+  /ENTERPRISE_REPOSITORY="\$\{ENTERPRISE_REPOSITORY:-\$REACT_NATIVE_MAVEN_REPOSITORY\}"/,
+  'iOS dependency preparation must use the shared React Native Maven repository.',
 );
 assert.match(
   nativeWorkflow,

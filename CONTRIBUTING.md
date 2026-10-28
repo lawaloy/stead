@@ -92,6 +92,9 @@ priorities belong in [Project Status](docs/project-status.md).
 - Keep `AUTH_INSPECTION_OPERATOR_USER_IDS` empty unless specific authenticated
   users require operator access.
 - Set `EXPO_PUBLIC_SUPPORT_EMAIL` to a monitored address for release builds.
+- Follow the redaction, correlation, and release configuration rules in
+  [Observability and Sensitive-Data Logging](docs/observability.md); never put
+  Sentry auth tokens in `EXPO_PUBLIC_` variables.
 - Add every required environment variable to the matching `.env.example`.
 - Never run e2e tests against the development `public` schema. Use the root
   database-backed commands, which enforce dedicated schemas.
