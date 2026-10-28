@@ -11,6 +11,11 @@ test -d "$MOBILE/ios"
 cd "$MOBILE/ios"
 export BUNDLE_GEMFILE="$MOBILE/Gemfile"
 export BUNDLE_FROZEN=true
+# Simulator artifacts are validation builds, not deployable releases. Sentry's
+# Expo plugin still adds upload phases to Release builds, so keep those phases
+# from requiring production organization credentials in local and PR CI runs.
+# A caller performing an intentional upload can explicitly set this to false.
+export SENTRY_DISABLE_AUTO_UPLOAD="${SENTRY_DISABLE_AUTO_UPLOAD:-true}"
 bundle exec pod install
 
 mkdir -p "$DERIVED"

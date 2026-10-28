@@ -170,6 +170,11 @@ assert.match(
   'The iOS simulator artifact must embed JavaScript so its journey does not require Metro.',
 );
 assert.match(
+  iosBuild,
+  /SENTRY_DISABLE_AUTO_UPLOAD="\$\{SENTRY_DISABLE_AUTO_UPLOAD:-true\}"/,
+  'Simulator builds must not require production Sentry upload credentials.',
+);
+assert.match(
   nativeRunner,
   /IOS_SIMULATOR_PREPARATION_TIMEOUT_MS/,
   'The iOS simulator preparation deadline must come from shared CI configuration.',
