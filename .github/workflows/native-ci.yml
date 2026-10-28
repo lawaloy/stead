@@ -251,7 +251,7 @@ jobs:
             ios-pods-${{ needs.config.outputs.ios_runner }}-
       - name: Prepare iOS dependencies
         if: steps.ios-app-cache.outputs.cache-hit != 'true'
-        run: .github/scripts/build-ios-simulator-app.sh --prepare-only
+        run: bash .github/scripts/build-ios-simulator-app.sh --prepare-only
       - name: Save React Native iOS binaries
         if: steps.ios-app-cache.outputs.cache-hit != 'true' && steps.react-native-cache.outputs.cache-hit != 'true'
         uses: actions/cache/save@v4
