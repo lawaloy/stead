@@ -225,6 +225,19 @@ jobs:
         if: steps.ios-app-cache.outputs.cache-hit != 'true'
         working-directory: mobile
         run: CI=1 EXPO_NO_DOTENV=1 npx expo prebuild --platform ios --no-install
+      - name: Resolve React Native version
+        if: steps.ios-app-cache.outputs.cache-hit != 'true'
+        id: react-native
+        run: |
+          version="$(node -p 'require("./mobile/package-lock.json").packages["node_modules/react-native"].version')"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+      - name: Restore React Native iOS binaries
+        if: steps.ios-app-cache.outputs.cache-hit != 'true'
+        id: react-native-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: ~/Library/Caches/ReactNative
+          key: react-native-ios-${{ runner.os }}-${{ runner.arch }}-v1-${{ steps.react-native.outputs.version }}
       - name: Cache CocoaPods
         if: steps.ios-app-cache.outputs.cache-hit != 'true'
         id: pods-cache
@@ -236,6 +249,15 @@ jobs:
           key: ios-pods-${{ needs.config.outputs.ios_runner }}-${{ hashFiles('mobile/ios/Podfile.lock', 'mobile/package-lock.json', 'mobile/Gemfile.lock') }}
           restore-keys: |
             ios-pods-${{ needs.config.outputs.ios_runner }}-
+      - name: Prepare iOS dependencies
+        if: steps.ios-app-cache.outputs.cache-hit != 'true'
+        run: .github/scripts/build-ios-simulator-app.sh --prepare-only
+      - name: Save React Native iOS binaries
+        if: steps.ios-app-cache.outputs.cache-hit != 'true' && steps.react-native-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ~/Library/Caches/ReactNative
+          key: ${{ steps.react-native-cache.outputs.cache-primary-key }}
       - name: Set DerivedData path
         if: steps.ios-app-cache.outputs.cache-hit != 'true'
         id: derived
@@ -253,6 +275,7 @@ jobs:
         if: steps.ios-app-cache.outputs.cache-hit != 'true'
         env:
           DERIVED_DATA_PATH: ${{ steps.derived.outputs.path }}
+          IOS_PODS_PREPARED: true
         run: npm run native -- build --platform ios --project-ready
       - name: Save iOS simulator app
         if: steps.ios-app-cache.outputs.cache-hit != 'true'
