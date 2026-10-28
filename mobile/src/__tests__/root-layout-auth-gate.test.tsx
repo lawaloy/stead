@@ -1,7 +1,10 @@
 import React from 'react';
 import { render } from '@testing-library/react-native';
+import * as Sentry from '@sentry/react-native';
 import RootLayout from '../../app/_layout';
 import { useAuth } from '../lib/auth-state';
+
+const sentryWrapCallsAtImport = jest.mocked(Sentry.wrap).mock.calls.length;
 
 const replace = jest.fn();
 let segments: string[] = ['(app)', 'dashboard'];
@@ -37,6 +40,13 @@ jest.mock('../lib/auth-state', () => ({
     children as React.ReactElement,
   useAuth: jest.fn(),
 }));
+jest.mock('../lib/env', () => ({
+  env: {
+    EXPO_PUBLIC_SENTRY_DSN: undefined,
+    EXPO_PUBLIC_APP_ENV: 'test',
+    EXPO_PUBLIC_SENTRY_TRACES_SAMPLE_RATE: 0,
+  },
+}));
 
 const mockAuth = jest.mocked(useAuth);
 
@@ -48,6 +58,10 @@ describe('root layout auth gate', () => {
       bootstrapping: false,
       token: null,
     } as never);
+  });
+
+  it('does not wrap the app with an uninitialized Sentry client', () => {
+    expect(sentryWrapCallsAtImport).toBe(0);
   });
 
   it('shows a spinner and does not redirect while the session is restoring', async () => {

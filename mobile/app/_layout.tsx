@@ -8,7 +8,7 @@ import { AuthProvider, useAuth } from '../src/lib/auth-state';
 import * as Sentry from '@sentry/react-native';
 import { initializeObservability } from '../src/lib/observability';
 
-initializeObservability();
+const observabilityEnabled = initializeObservability();
 
 const Gate = () => {
   const { bootstrapping, token } = useAuth();
@@ -52,4 +52,4 @@ function RootLayout() {
   );
 }
 
-export default Sentry.wrap(RootLayout);
+export default observabilityEnabled ? Sentry.wrap(RootLayout) : RootLayout;
