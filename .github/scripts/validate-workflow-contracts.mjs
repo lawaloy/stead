@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFile, readdir } from 'node:fs/promises';
 import { TOOLCHAIN } from '../../scripts/toolchain.mjs';
 
-const readQuotedItems = (source, startMarker, endMarker) => {
+const readBlock = (source, startMarker, endMarker) => {
   const start = source.indexOf(startMarker);
   assert.notEqual(
     start,
@@ -13,10 +13,13 @@ const readQuotedItems = (source, startMarker, endMarker) => {
   const end = source.indexOf(endMarker, start);
   assert.notEqual(end, -1, `Missing workflow contract marker: ${endMarker}`);
 
-  return [...source.slice(start, end).matchAll(/'([^']+)'/g)].map(
+  return source.slice(start, end);
+};
+
+const readQuotedItems = (source, startMarker, endMarker) =>
+  [...readBlock(source, startMarker, endMarker).matchAll(/'([^']+)'/g)].map(
     ([, value]) => value,
   );
-};
 
 const [
   finishEntrypoint,
@@ -55,10 +58,25 @@ const triggerWorkflows = readQuotedItems(
   'workflows:',
   'types:',
 );
-const requiredWorkflows = readQuotedItems(
+const requiredWorkflowContractBlock = readBlock(
   finishReusable,
-  'const requiredWorkflowNames = [',
+  'const requiredWorkflowContracts = [',
   '];',
+);
+const requiredWorkflows = [
+  ...requiredWorkflowContractBlock.matchAll(
+    /name: '([^']+)',\s+path: '([^']+)'/g,
+  ),
+].map(([, name, path]) => ({ name, path }));
+const dependencyAuditPaths = readQuotedItems(
+  finishReusable,
+  'const dependencyAuditPaths = [',
+  '];',
+);
+const dependencyAuditTriggerPaths = readQuotedItems(
+  dependencyAuditWorkflow,
+  'pull_request:',
+  'push:',
 );
 
 assert.deepEqual(
@@ -79,13 +97,34 @@ assert.match(
 assert.deepEqual(
   requiredWorkflows,
   [
-    'ci',
-    'native-ci',
-    'CodeQL Advanced',
-    'Dependency review',
-    'Dependency Audit',
+    { name: 'ci', path: '.github/workflows/ci.yml' },
+    { name: 'native-ci', path: '.github/workflows/native-ci.yml' },
+    { name: 'CodeQL Advanced', path: '.github/workflows/codeql.yml' },
+    {
+      name: 'Dependency review',
+      path: '.github/workflows/dependency-review.yml',
+    },
+    {
+      name: 'Dependency Audit',
+      path: '.github/workflows/dependency-audit.yml',
+    },
   ],
   'Dependency auto-finish must retain every required workflow gate.',
+);
+assert.deepEqual(
+  dependencyAuditPaths,
+  dependencyAuditTriggerPaths,
+  'Dependency auto-finish must expect the audit exactly when its pull-request path filter runs.',
+);
+assert.match(
+  finishReusable,
+  /normalizeWorkflowPath\(run\.path\)/,
+  'Dependency readiness must identify workflows by stable workflow paths rather than dynamic run names.',
+);
+assert.match(
+  finishReusable,
+  /github\.rest\.pulls\.listFiles[\s\S]*contract\.expected\(changedFiles\)/,
+  'Path-filtered workflows must be required from the current PR file set.',
 );
 assert.match(
   finishReusable,

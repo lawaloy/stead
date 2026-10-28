@@ -20,7 +20,10 @@ import {
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { runMaestroCommand } from './native-attempts.mjs';
+import {
+  runMaestroCommand,
+  runMaestroWithBootstrapRecovery,
+} from './native-attempts.mjs';
 
 test('a hung Maestro process is stopped and reported as a failed attempt', async () => {
   const attempts = await repeatJourneys(2, async (attempt) => {
@@ -62,6 +65,110 @@ test('the Maestro deadline preserves caller cancellation and validates its budge
       runMaestroCommand('unused', [], {}, { timeoutMs }),
       /positive integer/,
     );
+});
+
+test('Android Maestro bootstrap retries only a new deviceInfo transport death with backoff', async () => {
+  const output = mkdtempSync(join(tmpdir(), 'stead maestro bootstrap '));
+  const sleeps = [];
+  let calls = 0;
+  let recoveries = 0;
+  try {
+    const result = await runMaestroWithBootstrapRecovery(
+      async () => {
+        calls += 1;
+        if (calls === 1) {
+          const logs = join(output, 'first');
+          mkdirSync(logs, { recursive: true });
+          writeFileSync(
+            join(logs, 'maestro.log'),
+            "DeviceServerDiedException: Device server died during 'deviceInfo' on emulator-5554: StatusRuntimeException: UNAVAILABLE",
+          );
+          throw new Error('maestro failed (exit 1).');
+        }
+        return 'passed';
+      },
+      {
+        platform: 'android',
+        debugOutput: output,
+        recover: async () => {
+          recoveries += 1;
+        },
+        sleep: async (milliseconds) => sleeps.push(milliseconds),
+      },
+    );
+    assert.deepEqual(result, { result: 'passed', recoveries: 1 });
+    assert.equal(calls, 2);
+    assert.equal(recoveries, 1);
+    assert.deepEqual(sleeps, [1000]);
+  } finally {
+    rmSync(output, { recursive: true, force: true });
+  }
+});
+
+test('Maestro bootstrap recovery never retries an app failure or reuses an older transient log', async () => {
+  const output = mkdtempSync(join(tmpdir(), 'stead maestro assertion '));
+  let calls = 0;
+  try {
+    await assert.rejects(
+      runMaestroWithBootstrapRecovery(
+        async () => {
+          calls += 1;
+          const logs = join(output, String(calls));
+          mkdirSync(logs, { recursive: true });
+          writeFileSync(
+            join(logs, 'maestro.log'),
+            calls === 1
+              ? "DeviceServerDiedException: Device server died during 'deviceInfo': StatusRuntimeException: UNAVAILABLE"
+              : 'Assertion is false: Goal created',
+          );
+          throw new Error(`failure ${calls}`);
+        },
+        {
+          platform: 'android',
+          debugOutput: output,
+          recover: async () => {},
+          sleep: async () => {},
+        },
+      ),
+      /failure 2/,
+    );
+    assert.equal(calls, 2);
+  } finally {
+    rmSync(output, { recursive: true, force: true });
+  }
+});
+
+test('Android Maestro bootstrap recovery is bounded and uses exponential backoff', async () => {
+  const output = mkdtempSync(join(tmpdir(), 'stead maestro bounded '));
+  const sleeps = [];
+  let calls = 0;
+  try {
+    await assert.rejects(
+      runMaestroWithBootstrapRecovery(
+        async () => {
+          calls += 1;
+          const logs = join(output, String(calls));
+          mkdirSync(logs, { recursive: true });
+          writeFileSync(
+            join(logs, 'maestro.log'),
+            "DeviceServerDiedException: Device server died during 'deviceInfo': StatusRuntimeException: UNAVAILABLE",
+          );
+          throw new Error(`bootstrap failure ${calls}`);
+        },
+        {
+          platform: 'android',
+          debugOutput: output,
+          recover: async () => {},
+          sleep: async (milliseconds) => sleeps.push(milliseconds),
+        },
+      ),
+      /bootstrap failure 3/,
+    );
+    assert.equal(calls, 3);
+    assert.deepEqual(sleeps, [1000, 2000]);
+  } finally {
+    rmSync(output, { recursive: true, force: true });
+  }
 });
 
 test('Android build preflight rejects missing packages and different SDK revisions', () => {

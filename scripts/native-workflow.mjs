@@ -28,7 +28,11 @@ import {
 } from './android-emulator.mjs';
 import { iosEnvironment } from './ios-setup.mjs';
 import { buildAndroidGradle } from './native-gradle.mjs';
-import { repeatJourneys, runMaestroCommand } from './native-attempts.mjs';
+import {
+  repeatJourneys,
+  runMaestroCommand,
+  runMaestroWithBootstrapRecovery,
+} from './native-attempts.mjs';
 export { repeatJourneys } from './native-attempts.mjs';
 import {
   TOOLCHAIN,
@@ -433,28 +437,60 @@ const runAttempt = async (platform, options, tools, app, pool, directory) => {
       }
       const device =
         platform === 'android' ? tools.device : tools.simulator.udid;
-      await runMaestroCommand(
-        tools.maestro,
-        [
-          'test',
-          '--device',
-          device,
-          '--platform',
+      const maestroDebugOutput = join(directory, 'maestro');
+      const maestro = await runMaestroWithBootstrapRecovery(
+        () =>
+          runMaestroCommand(
+            tools.maestro,
+            [
+              'test',
+              '--device',
+              device,
+              '--platform',
+              platform,
+              // Requesting a report switches Maestro to its suite runner,
+              // which hides live command progress for this single flow.
+              '--no-ansi',
+              '--debug-output',
+              maestroDebugOutput,
+              '-e',
+              `TEST_PHONE_DISPLAY=${phoneDisplay(options.phone)}`,
+              join(MOBILE, '.maestro', 'critical-native-journey.yaml'),
+            ],
+            { cwd: MOBILE, env, signal: options.signal },
+          ),
+        {
           platform,
-          // Requesting a report switches Maestro to its suite runner, which
-          // hides live command progress even for this single-flow journey.
-          '--no-ansi',
-          '--debug-output',
-          join(directory, 'maestro'),
-          '-e',
-          `TEST_PHONE_DISPLAY=${phoneDisplay(options.phone)}`,
-          join(MOBILE, '.maestro', 'critical-native-journey.yaml'),
-        ],
-        { cwd: MOBILE, env, signal: options.signal },
+          debugOutput: maestroDebugOutput,
+          signal: options.signal,
+          recover: async () => {
+            await adb(['wait-for-device'], { signal: options.signal });
+            const booted = (
+              await adb(['shell', 'getprop', 'sys.boot_completed'], {
+                quiet: true,
+                signal: options.signal,
+              })
+            ).trim();
+            const focused = assertAndroidUiHealthy(
+              await adb(['shell', 'dumpsys', 'window'], {
+                quiet: true,
+                stdoutOnly: true,
+                signal: options.signal,
+              }),
+            );
+            if (booted !== '1' || !focused)
+              throw new Error(
+                'Android emulator health did not recover after Maestro device-server bootstrap failure.',
+              );
+          },
+        },
       );
       return {
         schema,
         directory,
+        ...(maestro.recoveries
+          ? { androidMaestroBootstrapRecoveries: maestro.recoveries }
+          : {}),
         ...(iosPreparation?.recovered
           ? { iosSimulatorRecovery: 'erase-and-reboot-before-maestro' }
           : {}),
