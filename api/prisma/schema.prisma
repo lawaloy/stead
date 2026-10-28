@@ -213,6 +213,7 @@ model NotificationJob {
   lastError         String?
   provider          String?
   providerMessageId String?
+  correlationId     String                @default(uuid())
   userId            String?
   user              User?                 @relation(fields: [userId], references: [id], onDelete: Cascade)
   otpCodeId         String?               @unique
@@ -230,6 +231,7 @@ model NotificationJob {
   @@index([failedAt])
   @@index([userId, createdAt])
   @@index([goalId, createdAt])
+  @@index([correlationId])
 }
 
 model AlertPreference {

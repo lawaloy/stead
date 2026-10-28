@@ -18,6 +18,7 @@ describe('NotificationConsumerService persist-after-send failure', () => {
 
   const job: NotificationJob = {
     id: 'job_1',
+    correlationId: 'request_1',
     type: 'otp.requested',
     payload: { phone: '+2348012345678', otp: '123456' },
     status: 'processing',

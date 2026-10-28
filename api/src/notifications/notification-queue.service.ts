@@ -5,8 +5,10 @@ import {
   createDecipheriv,
   createHash,
   randomBytes,
+  randomUUID,
 } from 'node:crypto';
 import { PrismaService } from '../prisma/prisma.service';
+import { getCorrelationId } from '../observability/request-context';
 import {
   NotificationJob,
   OtpRequestedPayload,
@@ -45,6 +47,7 @@ type StoredNotificationJob = {
   lastError: string | null;
   provider: string | null;
   providerMessageId: string | null;
+  correlationId: string;
   userId?: string | null;
   goalId?: string | null;
   dedupeKey?: string | null;
@@ -82,6 +85,7 @@ export class NotificationQueueService {
           userId,
           otpCodeId,
           dedupeKey,
+          correlationId: this.correlationId(),
           status: 'pending',
           attempts: 0,
           maxAttempts: 3,
@@ -154,6 +158,7 @@ export class NotificationQueueService {
         data: {
           otpCodeId: input.otpCodeId,
           dedupeKey: input.dedupeKey,
+          correlationId: this.correlationId(),
         },
       });
       if (adopted.count === 1) return true;
@@ -304,9 +309,9 @@ export class NotificationQueueService {
     try {
       return this.mapJob(locked);
     } catch (error: unknown) {
-      this.logger.warn(
-        `Notification job payload unreadable id=${locked.id}; marking failed`,
-      );
+      this.logger.warn('Notification job payload unreadable; marking failed', {
+        jobId: locked.id,
+      });
       await this.markFailed(this.mapUndecryptableJob(locked), error);
       return null;
     }
@@ -494,6 +499,7 @@ export class NotificationQueueService {
       lastError: job.lastError,
       provider: job.provider,
       providerMessageId: job.providerMessageId,
+      correlationId: job.correlationId,
       userId: job.userId ?? null,
       goalId: job.goalId ?? null,
       dedupeKey: job.dedupeKey ?? null,
@@ -518,6 +524,10 @@ export class NotificationQueueService {
 
   private backoffMs(attempt: number): number {
     return Math.min(30_000, 1_000 * 2 ** attempt);
+  }
+
+  private correlationId(): string {
+    return getCorrelationId() ?? randomUUID();
   }
 
   private isMissingRecord(error: unknown): boolean {

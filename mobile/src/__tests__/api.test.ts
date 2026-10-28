@@ -49,6 +49,9 @@ describe('api client', () => {
       expect(config.headers?.['X-Stead-Device-Id']).toBe(
         '0f81c2a7-1e6d-4f05-9a1c-03de8a5f6b77',
       );
+      expect(config.headers?.['X-Request-ID']).toMatch(
+        /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
+      );
       return [200, { ok: true, otp: '123456' }];
     });
 
@@ -326,6 +329,21 @@ describe('api client', () => {
       name: 'ApiError',
       status: 502,
       message: 'upstream unavailable',
+    });
+  });
+
+  it('preserves the server request id on API failures', async () => {
+    mock
+      .onGet('/goals/active')
+      .reply(
+        503,
+        { message: 'temporarily unavailable' },
+        { 'x-request-id': 'server-request-1' },
+      );
+
+    await expect(getActiveGoal()).rejects.toMatchObject({
+      status: 503,
+      requestId: 'server-request-1',
     });
   });
 

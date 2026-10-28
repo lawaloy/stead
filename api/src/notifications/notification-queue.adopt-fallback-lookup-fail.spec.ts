@@ -53,6 +53,7 @@ describe('NotificationQueueService OTP adoption fallback lookup failure', () => 
       data: {
         otpCodeId: input.otpCodeId,
         dedupeKey: input.dedupeKey,
+        correlationId: expect.any(String) as unknown,
       },
     });
     expect(prisma.notificationJob.findUnique).toHaveBeenCalledWith({

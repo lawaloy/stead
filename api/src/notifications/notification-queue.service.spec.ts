@@ -1,4 +1,5 @@
 import { PrismaService } from '../prisma/prisma.service';
+import { runWithCorrelationId } from '../observability/request-context';
 import { NotificationQueueService } from './notification-queue.service';
 
 describe('NotificationQueueService', () => {
@@ -113,6 +114,25 @@ describe('NotificationQueueService', () => {
     });
   });
 
+  it('persists the request correlation id on newly queued work', async () => {
+    prisma.notificationJob.create.mockResolvedValue({ id: 'job_1' });
+
+    await runWithCorrelationId('request_123', () =>
+      queue.enqueueOtpRequested(
+        { phone: '+2348000000000', otp: '123456' },
+        'user_1',
+        'otp_1',
+        'otp.requested:request_123',
+      ),
+    );
+
+    expect(prisma.notificationJob.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        correlationId: 'request_123',
+      }) as unknown,
+    });
+  });
+
   it('reuses the existing OTP job when the dedupe key collides', async () => {
     prisma.notificationJob.create.mockRejectedValue({ code: 'P2002' });
     prisma.notificationJob.findUnique.mockResolvedValue({
@@ -200,6 +220,7 @@ describe('NotificationQueueService', () => {
       data: {
         otpCodeId: 'otp_1',
         dedupeKey: 'otp.requested:key-hash',
+        correlationId: expect.any(String) as unknown,
       },
     });
   });

@@ -25,9 +25,10 @@ export class SmsService implements OnModuleInit {
     const exposeOtp = this.config.get<string>('DEV_EXPOSE_OTP') === 'true';
 
     this.assertProviderConfiguration();
-    this.logger.log(
-      `SMS provider ready provider=${this.getProviderName()} exposeOtp=${String(exposeOtp)}`,
-    );
+    this.logger.log('SMS provider ready', {
+      provider: this.getProviderName(),
+      exposeOtp,
+    });
   }
 
   async sendOtp(phone: string, otp: string) {

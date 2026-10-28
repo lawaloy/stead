@@ -7,11 +7,35 @@ MOBILE="$ROOT/mobile"
 DERIVED="${DERIVED_DATA_PATH:-${RUNNER_TEMP:-/tmp}/DerivedData}"
 OUT_APP="${OUT_APP:-$MOBILE/.ci/ios/mobile.app}"
 
+source "$ROOT/.github/ci.env"
+# Simulator artifacts are validation builds, not deployable releases.
+# Sentry's Expo plugin still adds upload phases to Release builds, so keep
+# those phases from requiring production organization credentials here.
+export SENTRY_DISABLE_AUTO_UPLOAD="${SENTRY_DISABLE_AUTO_UPLOAD:-true}"
+
+prepare_dependencies() {
+  test -d "$MOBILE/ios"
+  cd "$MOBILE/ios"
+  export BUNDLE_GEMFILE="$MOBILE/Gemfile"
+  export BUNDLE_FROZEN=true
+  # React Native uses ENTERPRISE_REPOSITORY as its supported Maven mirror
+  # override for the prebuilt RN Core, dependencies, and Hermes archives.
+  export ENTERPRISE_REPOSITORY="${ENTERPRISE_REPOSITORY:-$REACT_NATIVE_MAVEN_REPOSITORY}"
+  bundle exec pod install
+}
+
+if [[ "${1:-}" == "--prepare-only" ]]; then
+  prepare_dependencies
+  exit 0
+fi
+
 test -d "$MOBILE/ios"
 cd "$MOBILE/ios"
 export BUNDLE_GEMFILE="$MOBILE/Gemfile"
 export BUNDLE_FROZEN=true
-bundle exec pod install
+if [[ "${IOS_PODS_PREPARED:-false}" != "true" ]]; then
+  prepare_dependencies
+fi
 
 mkdir -p "$DERIVED"
 defaults write com.apple.dt.XCBuild IgnoreFileSystemDeviceInodeChanges -bool YES

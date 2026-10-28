@@ -33,6 +33,7 @@ export interface NotificationJobBase<TType, TPayload> {
   lastError?: string | null;
   provider?: string | null;
   providerMessageId?: string | null;
+  correlationId: string;
   userId?: string | null;
   goalId?: string | null;
   dedupeKey?: string | null;

@@ -25,7 +25,7 @@ describe('DevClient', () => {
     });
   });
 
-  it('logs only the masked destination without the OTP body', () => {
+  it('logs neither the destination nor the OTP body', () => {
     const logSpy = jest.spyOn(Logger.prototype, 'log');
 
     client.sendMessage({
@@ -33,7 +33,9 @@ describe('DevClient', () => {
       body: 'Your Stead OTP is 654321. It expires in 10 minutes.',
     });
 
-    expect(logSpy).toHaveBeenCalledWith('DEV SMS accepted to=+141***71');
-    expect(logSpy.mock.calls.flat().join(' ')).not.toContain('654321');
+    expect(logSpy).toHaveBeenCalledWith('Development SMS accepted');
+    const output = logSpy.mock.calls.flat().join(' ');
+    expect(output).not.toContain('+14155552671');
+    expect(output).not.toContain('654321');
   });
 });
