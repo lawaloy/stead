@@ -85,7 +85,16 @@ describe('AuthService verify OTP selection query', () => {
             countRecentEvents: jest.fn().mockResolvedValue(0),
           },
         },
-        { provide: ConfigService, useValue: { get: jest.fn() } },
+        {
+          provide: ConfigService,
+          useValue: {
+            get: jest.fn((key: string) =>
+              key === 'AUTH_OTP_VERIFICATION_ENCRYPTION_KEY'
+                ? VERIFICATION_SECRET
+                : undefined,
+            ),
+          },
+        },
         {
           provide: CountriesService,
           useValue: {
