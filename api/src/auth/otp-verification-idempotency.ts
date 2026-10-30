@@ -47,6 +47,9 @@ export const hashOtpVerificationRequest = (
         input.deviceHash ?? null,
       ]),
     )
+    // This keyed digest is an idempotency fingerprint, not a password or OTP
+    // credential verifier; a slow password hash would add cost without value.
+    // lgtm[js/insufficient-password-hash]
     .digest('hex');
 
 export const otpVerificationRequestMatches = (

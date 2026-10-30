@@ -574,7 +574,18 @@ export class AuthService {
       },
       orderBy: { createdAt: 'desc' },
     });
-    if (!record) throw new BadRequestException('OTP expired or not found');
+    if (!record) {
+      // The winning verification can commit after our initial replay lookup
+      // but before this live-code query. Recheck the key before reporting an
+      // expired OTP so a concurrent retry still receives the stored result.
+      const concurrentReplay = await this.replayOtpVerification(
+        verificationSecret,
+        verificationKeyHash,
+        verificationRequestHash,
+      );
+      if (concurrentReplay) return concurrentReplay;
+      throw new BadRequestException('OTP expired or not found');
+    }
 
     if (record.verifyAttempts >= this.otpMaxVerifyAttempts) {
       await this.telemetry.recordEvent({

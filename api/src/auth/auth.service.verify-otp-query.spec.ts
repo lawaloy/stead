@@ -8,6 +8,13 @@ import { AuthTelemetryService } from './auth-telemetry.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { NOTIFICATION_PUBLISHER } from '../notifications/notification-publisher';
 import { CountriesService } from '../countries/countries.service';
+import {
+  encryptOtpVerificationResponse,
+  hashOtpVerificationKey,
+  hashOtpVerificationRequest,
+} from './otp-verification-idempotency';
+
+const VERIFICATION_SECRET = 'stead-unit-test-otp-verification-key-1234567890';
 
 describe('AuthService verify OTP selection query', () => {
   let service: AuthService;
@@ -159,6 +166,51 @@ describe('AuthService verify OTP selection query', () => {
       orderBy: { createdAt: 'desc' },
     });
     expect(prisma.otpCode.updateMany).not.toHaveBeenCalled();
+    expect(jwt.signAsync).not.toHaveBeenCalled();
+  });
+
+  it('rechecks replay after a concurrent winner consumes the live OTP', async () => {
+    const idempotencyKey = '00000000-0000-4000-8000-000000000001';
+    const verificationKeyHash = hashOtpVerificationKey(idempotencyKey);
+    const verificationRequestHash = hashOtpVerificationRequest(
+      VERIFICATION_SECRET,
+      {
+        phone: '+2348012345678',
+        countryIso: 'NG',
+        otp: '123456',
+        deviceHash: null,
+      },
+    );
+    const original = {
+      token: 'winner-access-token',
+      refreshToken: 'winner-refresh-token',
+      expiresIn: 900,
+    };
+    prisma.user.findUnique.mockResolvedValue({
+      id: 'user_1',
+      phone: '+2348012345678',
+    });
+    prisma.otpCode.findFirst.mockResolvedValue(null);
+    prisma.otpCode.findUnique
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({
+        verificationRequestHash,
+        verificationResponseJson: encryptOtpVerificationResponse(
+          VERIFICATION_SECRET,
+          verificationKeyHash,
+          verificationRequestHash,
+          original,
+        ),
+        verifiedAt: new Date(),
+      });
+
+    await expect(
+      service.verifyOtp('08012345678', 'NG', '123456', { idempotencyKey }),
+    ).resolves.toEqual(original);
+
+    expect(prisma.otpCode.findUnique).toHaveBeenCalledTimes(2);
+    expect(prisma.otpCode.updateMany).not.toHaveBeenCalled();
+    expect(prisma.refreshToken.create).not.toHaveBeenCalled();
     expect(jwt.signAsync).not.toHaveBeenCalled();
   });
 });
