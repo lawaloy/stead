@@ -38,6 +38,9 @@ export const hashOtpVerificationRequest = (
     deviceHash?: string | null;
   },
 ) =>
+  // This keyed digest is an idempotency fingerprint, not a password or OTP
+  // credential verifier; a slow password hash would add cost without value.
+  // codeql[js/insufficient-password-hash]
   createHmac('sha256', deriveKey(secret, 'request-fingerprint'))
     .update(
       JSON.stringify([
@@ -47,9 +50,6 @@ export const hashOtpVerificationRequest = (
         input.deviceHash ?? null,
       ]),
     )
-    // This keyed digest is an idempotency fingerprint, not a password or OTP
-    // credential verifier; a slow password hash would add cost without value.
-    // lgtm[js/insufficient-password-hash]
     .digest('hex');
 
 export const otpVerificationRequestMatches = (
