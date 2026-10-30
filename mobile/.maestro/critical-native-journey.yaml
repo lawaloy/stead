@@ -61,12 +61,21 @@ env:
 - assertVisible: Create a goal
 - tapOn:
     id: goal-name
-- inputText: Native journey goal
 - runFlow:
     when:
       platform: Android
     commands:
+      - inputText: Native journey goal
       - hideKeyboard
+- runFlow:
+    file: input-text-character-by-character.yaml
+    when:
+      platform: iOS
+    env:
+      TEXT: Native journey goal
+- assertVisible:
+    id: goal-name
+    text: Native journey goal
 - scrollUntilVisible:
     element:
       id: goal-target

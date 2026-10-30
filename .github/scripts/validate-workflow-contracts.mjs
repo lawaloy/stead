@@ -32,6 +32,7 @@ const [
   dependencyMaintenanceWorkflow,
   codeqlWorkflow,
   criticalNativeJourney,
+  iosCharacterInput,
   androidJourney,
   iosBuild,
   nativeRunner,
@@ -47,6 +48,7 @@ const [
   readFile('.github/workflows/deps-maintenance.yml', 'utf8'),
   readFile('.github/workflows/codeql.yml', 'utf8'),
   readFile('mobile/.maestro/critical-native-journey.yaml', 'utf8'),
+  readFile('mobile/.maestro/input-text-character-by-character.yaml', 'utf8'),
   readFile('.github/scripts/run-android-native-journey.sh', 'utf8'),
   readFile('.github/scripts/build-ios-simulator-app.sh', 'utf8'),
   readFile('scripts/native-workflow.mjs', 'utf8'),
@@ -242,6 +244,16 @@ assert.equal(
   [...criticalNativeJourney.matchAll(/^- eraseText$/gm)].length,
   4,
   'Every deterministic native text replacement must use the same standard clear operation.',
+);
+assert.match(
+  criticalNativeJourney,
+  /file: input-text-character-by-character\.yaml[\s\S]*platform: iOS[\s\S]*TEXT: Native journey goal[\s\S]*id: goal-name\n\s+text: Native journey goal/,
+  'The iOS goal-name journey must use paced input and verify the field before saving.',
+);
+assert.match(
+  iosCharacterInput,
+  /times: 100[\s\S]*inputText: \$\{output\.characterInput\.text\.charAt\(output\.characterInput\.index\)\}[\s\S]*characterInput\.index = output\.characterInput\.index \+ 1/,
+  'Paced iOS input must send one character per bounded driver request.',
 );
 assert.match(
   criticalNativeJourney,
