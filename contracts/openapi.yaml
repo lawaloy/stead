@@ -48,6 +48,7 @@ paths:
       operationId: verifyOtp
       parameters:
         - $ref: '#/components/parameters/SteadDeviceId'
+        - $ref: '#/components/parameters/IdempotencyKey'
       requestBody:
         required: true
         content:
@@ -63,6 +64,8 @@ paths:
                 $ref: '#/components/schemas/VerifyOtpResponse'
         '400':
           $ref: '#/components/responses/BadRequest'
+        '409':
+          $ref: '#/components/responses/Conflict'
         '429':
           $ref: '#/components/responses/TooManyRequests'
   /auth/refresh:
@@ -519,7 +522,7 @@ components:
       name: Idempotency-Key
       in: header
       required: true
-      description: Stable UUIDv4 reused for every retry of one logical OTP request.
+      description: Stable UUIDv4 reused for every retry of one logical OTP request or verification.
       schema:
         type: string
         format: uuid

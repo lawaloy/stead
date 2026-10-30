@@ -22,8 +22,11 @@ describe('AuthService same-device revoke then refresh create failure', () => {
   let prisma: {
     $transaction: jest.Mock;
     $executeRaw: jest.Mock;
+    authEvent: { create: jest.Mock };
     otpCode: {
+      findUnique: jest.Mock;
       findFirst: jest.Mock;
+      update: jest.Mock;
       updateMany: jest.Mock;
     };
     user: {
@@ -43,8 +46,11 @@ describe('AuthService same-device revoke then refresh create failure', () => {
     prisma = {
       $transaction: jest.fn(),
       $executeRaw: jest.fn().mockResolvedValue(1),
+      authEvent: { create: jest.fn() },
       otpCode: {
+        findUnique: jest.fn().mockResolvedValue(null),
         findFirst: jest.fn(),
+        update: jest.fn(),
         updateMany: jest.fn(),
       },
       user: {
@@ -162,6 +168,7 @@ describe('AuthService same-device revoke then refresh create failure', () => {
     });
     expect(telemetry.recordEvent).toHaveBeenCalledWith(
       expect.objectContaining({ type: 'otp_verify_succeeded' }),
+      expect.anything(),
     );
     expect(prisma.refreshToken.findMany).toHaveBeenCalledWith({
       where: {
@@ -174,7 +181,7 @@ describe('AuthService same-device revoke then refresh create failure', () => {
     });
     expect(prisma.refreshToken.updateMany).toHaveBeenCalledTimes(1);
     expect(prisma.refreshToken.updateMany).toHaveBeenCalledWith({
-      where: { familyId: 'fam-on-device-a', revokedAt: null },
+      where: { familyId: 'fam-on-device-a', userId: 'user_1', revokedAt: null },
       data: { revokedAt: expect.any(Date) as Date },
     });
     expect(prisma.refreshToken.groupBy).toHaveBeenCalledWith({

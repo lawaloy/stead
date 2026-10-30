@@ -168,7 +168,12 @@ export const readIosArtifactConfig = (app, read = readFileSync) => {
       { cause: error },
     );
   }
-  if (typeof config.apiUrl !== 'string' || typeof config.phone !== 'string')
+  if (
+    typeof config.apiUrl !== 'string' ||
+    !Number.isSafeInteger(config.apiTimeoutMs) ||
+    config.apiTimeoutMs <= 0 ||
+    typeof config.phone !== 'string'
+  )
     throw new Error(
       `The iOS simulator app has invalid ${IOS_NATIVE_CONFIG} build metadata.`,
     );
@@ -179,11 +184,16 @@ export const assertIosArtifactConfig = (app, options) => {
   const actual = readIosArtifactConfig(app);
   const expected = {
     apiUrl: `http://127.0.0.1:${options.apiPort}`,
+    apiTimeoutMs: Number(TOOLCHAIN.NATIVE_API_TIMEOUT_MS),
     phone: options.phone,
   };
-  if (actual.apiUrl !== expected.apiUrl || actual.phone !== expected.phone)
+  if (
+    actual.apiUrl !== expected.apiUrl ||
+    actual.apiTimeoutMs !== expected.apiTimeoutMs ||
+    actual.phone !== expected.phone
+  )
     throw new Error(
-      `The iOS simulator app was built for ${actual.apiUrl} and test phone ${actual.phone}, but this run requires ${expected.apiUrl} and ${expected.phone}. Rebuild the app with matching native options.`,
+      `The iOS simulator app was built for ${actual.apiUrl}, ${actual.apiTimeoutMs} ms API timeout, and test phone ${actual.phone}, but this run requires ${expected.apiUrl}, ${expected.apiTimeoutMs} ms, and ${expected.phone}. Rebuild the app with matching native options.`,
     );
   return actual;
 };
@@ -201,6 +211,7 @@ const buildApp = async (platform, options, projectReady = false) => {
     env = iosEnvironment({
       ...env,
       EXPO_PUBLIC_API_URL: `http://127.0.0.1:${options.apiPort}`,
+      EXPO_PUBLIC_API_TIMEOUT_MS: TOOLCHAIN.NATIVE_API_TIMEOUT_MS,
       EXPO_PUBLIC_E2E_PHONE: options.phone,
     });
   if (!projectReady)
@@ -254,6 +265,7 @@ const buildApp = async (platform, options, projectReady = false) => {
     `${JSON.stringify(
       {
         apiUrl: `http://127.0.0.1:${options.apiPort}`,
+        apiTimeoutMs: Number(TOOLCHAIN.NATIVE_API_TIMEOUT_MS),
         phone: options.phone,
       },
       null,

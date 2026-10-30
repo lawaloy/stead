@@ -11,6 +11,9 @@ process.env.NOTIFICATION_PAYLOAD_ENCRYPTION_KEY =
 process.env.AUTH_DEVICE_IDENTIFIER_SECRET =
   process.env.AUTH_DEVICE_IDENTIFIER_SECRET ||
   'stead-test-device-identifier-key-1234567890';
+process.env.AUTH_OTP_VERIFICATION_ENCRYPTION_KEY =
+  process.env.AUTH_OTP_VERIFICATION_ENCRYPTION_KEY ||
+  'stead-test-otp-verification-key-1234567890';
 
 describe('AppController (e2e)', () => {
   let app: INestApplication<App>;

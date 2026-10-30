@@ -42,10 +42,16 @@ const API_EXAMPLE = `DATABASE_URL="postgresql://localhost/stead"
 JWT_SECRET="__REPLACE_ME__"
 NOTIFICATION_PAYLOAD_ENCRYPTION_KEY="__REPLACE_ME__"
 AUTH_DEVICE_IDENTIFIER_SECRET="__REPLACE_ME__"
+AUTH_OTP_VERIFICATION_ENCRYPTION_KEY="__REPLACE_ME__"
 `;
 
 test('renderApiEnvironment replaces all placeholders with distinct secrets', () => {
-  const secrets = ['jwt-secret', 'notification-secret', 'device-secret'];
+  const secrets = [
+    'jwt-secret',
+    'notification-secret',
+    'device-secret',
+    'verification-secret',
+  ];
   const rendered = renderApiEnvironment(API_EXAMPLE, () => secrets.shift());
 
   assert.doesNotMatch(rendered, /__REPLACE_ME__/);
@@ -55,6 +61,10 @@ test('renderApiEnvironment replaces all placeholders with distinct secrets', () 
     /NOTIFICATION_PAYLOAD_ENCRYPTION_KEY="notification-secret"/,
   );
   assert.match(rendered, /AUTH_DEVICE_IDENTIFIER_SECRET="device-secret"/);
+  assert.match(
+    rendered,
+    /AUTH_OTP_VERIFICATION_ENCRYPTION_KEY="verification-secret"/,
+  );
 });
 
 test('the repository API example stays compatible with secure generation', () => {
@@ -67,6 +77,7 @@ test('the repository API example stays compatible with secure generation', () =>
     'JWT_SECRET',
     'NOTIFICATION_PAYLOAD_ENCRYPTION_KEY',
     'AUTH_DEVICE_IDENTIFIER_SECRET',
+    'AUTH_OTP_VERIFICATION_ENCRYPTION_KEY',
   ].map((name) => {
     const value = rendered.match(new RegExp(`^${name}="([^"]+)"$`, 'm'))?.[1];
     assert.ok(value, `${name} must be present`);

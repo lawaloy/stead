@@ -32,7 +32,14 @@ import {
   parseDurationToMs,
   parseDurationToSeconds,
 } from './refresh-token.util';
-import { createHash, randomInt } from 'node:crypto';
+import { createHash, randomInt, randomUUID } from 'node:crypto';
+import {
+  decryptOtpVerificationResponse,
+  encryptOtpVerificationResponse,
+  hashOtpVerificationKey,
+  hashOtpVerificationRequest,
+  otpVerificationRequestMatches,
+} from './otp-verification-idempotency';
 
 const DEFAULT_OTP_REQUEST_LIMIT_PER_HOUR = 5;
 const DEFAULT_OTP_RESEND_COOLDOWN_MS = 60_000;
@@ -43,6 +50,7 @@ const DEFAULT_OTP_VERIFY_FAILURE_LIMIT_PER_IP_WINDOW = 10;
 const DEFAULT_OTP_VERIFY_FAILURE_LIMIT_PER_DEVICE_WINDOW = 8;
 const DEFAULT_OTP_VERIFY_FAILURE_WINDOW_MS = 15 * 60 * 1000;
 const OTP_REQUEST_PROCESSING_TIMEOUT_MS = 30_000;
+const OTP_VERIFICATION_REPLAY_WINDOW_MS = 10 * 60 * 1000;
 const DEFAULT_JWT_EXPIRES_IN = '15m';
 const DEFAULT_REFRESH_TOKEN_EXPIRES_IN = '30d';
 const DEFAULT_REFRESH_FAMILY_MAX_AGE = '90d';
@@ -60,6 +68,10 @@ type AuthRequestContext = {
 
 type OtpRequestContext = AuthRequestContext & {
   idempotencyKey: string;
+};
+
+type OtpVerificationContext = AuthRequestContext & {
+  idempotencyKey?: string;
 };
 
 type SessionUser = {
@@ -452,7 +464,7 @@ export class AuthService {
     phone: string,
     countryIso: string,
     otp: string,
-    context: AuthRequestContext = {},
+    context: OtpVerificationContext = {},
   ): Promise<VerifyOtpResponse> {
     const country = await this.countries.requireAuthCountry(countryIso);
     const normalizedPhone = normalizePhoneNumber(
@@ -463,6 +475,29 @@ export class AuthService {
       context.deviceId,
       this.config.get<string>('AUTH_DEVICE_IDENTIFIER_SECRET'),
     );
+    const idempotencyKey = (context.idempotencyKey ?? randomUUID())
+      .trim()
+      .toLowerCase();
+    if (!IDEMPOTENCY_KEY_PATTERN.test(idempotencyKey)) {
+      throw new BadRequestException('Idempotency-Key must be a UUIDv4 value.');
+    }
+    const verificationSecret = this.otpVerificationEncryptionKey;
+    const verificationKeyHash = hashOtpVerificationKey(idempotencyKey);
+    const verificationRequestHash = hashOtpVerificationRequest(
+      verificationSecret,
+      {
+        phone: normalizedPhone,
+        countryIso: country.iso,
+        otp,
+        deviceHash,
+      },
+    );
+    const replay = await this.replayOtpVerification(
+      verificationSecret,
+      verificationKeyHash,
+      verificationRequestHash,
+    );
+    if (replay) return replay;
     const eventContext = {
       ip: context.ip,
       userAgent: context.userAgent,
@@ -603,35 +638,17 @@ export class AuthService {
       throw new BadRequestException('Invalid phone or code');
     }
 
-    const consumedAt = new Date();
-    const consumed = await this.prisma.otpCode.updateMany({
-      where: {
-        id: record.id,
-        consumedAt: null,
-        expiresAt: { gt: consumedAt },
-      },
-      data: { consumedAt },
-    });
-    if (consumed.count === 0) {
-      throw new BadRequestException('OTP expired or not found');
-    }
-
-    // A newer successful verify must retire every other live code for this
-    // user. Otherwise the previous SMS still matches findFirst after this
-    // row is consumed and issues a second session.
-    await this.retireLiveOtpsForUser(user.id, consumedAt);
-
-    await this.telemetry.recordEvent({
-      type: 'otp_verify_succeeded',
-      phone: normalizedPhone,
+    return this.issueVerifiedSession({
+      user,
+      record,
+      normalizedPhone,
       countryIso: country.iso,
-      ...eventContext,
-      userId: user.id,
-      otpCodeId: record.id,
-      attemptNumber: record.verifyAttempts,
+      eventContext,
+      deviceHash,
+      verificationSecret,
+      verificationKeyHash,
+      verificationRequestHash,
     });
-
-    return this.issueSession(user, deviceHash);
   }
 
   async refreshSession(
@@ -829,21 +846,183 @@ export class AuthService {
       : DEFAULT_REFRESH_MAX_FAMILIES_PER_USER;
   }
 
+  private get otpVerificationEncryptionKey() {
+    const secret =
+      this.config.get<string>('AUTH_OTP_VERIFICATION_ENCRYPTION_KEY') ??
+      process.env.AUTH_OTP_VERIFICATION_ENCRYPTION_KEY;
+    if (!secret) {
+      throw new Error('OTP verification encryption key is not configured');
+    }
+    return secret;
+  }
+
+  private async replayOtpVerification(
+    secret: string,
+    verificationKeyHash: string,
+    verificationRequestHash: string,
+  ): Promise<VerifyOtpResponse | null> {
+    const existing = await this.prisma.otpCode.findUnique({
+      where: { verificationKeyHash },
+      select: {
+        verificationRequestHash: true,
+        verificationResponseJson: true,
+        verifiedAt: true,
+      },
+    });
+    if (!existing) return null;
+    if (
+      !existing.verificationRequestHash ||
+      !otpVerificationRequestMatches(
+        existing.verificationRequestHash,
+        verificationRequestHash,
+      )
+    ) {
+      throw new ConflictException(
+        'Idempotency-Key was already used for another OTP verification.',
+      );
+    }
+    if (
+      !existing.verifiedAt ||
+      !existing.verificationResponseJson ||
+      Date.now() - existing.verifiedAt.getTime() >
+        OTP_VERIFICATION_REPLAY_WINDOW_MS
+    ) {
+      throw new ConflictException(
+        'The OTP verification replay window has expired.',
+      );
+    }
+    return decryptOtpVerificationResponse(
+      secret,
+      verificationKeyHash,
+      verificationRequestHash,
+      existing.verificationResponseJson,
+    );
+  }
+
+  private async issueVerifiedSession(input: {
+    user: SessionUser;
+    record: { id: string; verifyAttempts: number };
+    normalizedPhone: string;
+    countryIso: string;
+    eventContext: {
+      ip?: string;
+      userAgent?: string;
+      deviceHash?: string | null;
+    };
+    deviceHash?: string | null;
+    verificationSecret: string;
+    verificationKeyHash: string;
+    verificationRequestHash: string;
+  }): Promise<VerifyOtpResponse> {
+    const familyId = generateRefreshFamilyId();
+    const familyCreatedAt = new Date();
+    const rawRefreshToken = generateRefreshToken();
+    const consumedAt = new Date();
+    let response: VerifyOtpResponse | undefined;
+
+    try {
+      await this.prisma.$transaction(async (transaction) => {
+        const consumed = await transaction.otpCode.updateMany({
+          where: {
+            id: input.record.id,
+            consumedAt: null,
+            expiresAt: { gt: consumedAt },
+          },
+          data: { consumedAt },
+        });
+        if (consumed.count === 0) {
+          throw new BadRequestException('OTP expired or not found');
+        }
+
+        await transaction.otpCode.updateMany({
+          where: { userId: input.user.id, consumedAt: null },
+          data: { consumedAt },
+        });
+        await this.telemetry.recordEvent(
+          {
+            type: 'otp_verify_succeeded',
+            phone: input.normalizedPhone,
+            countryIso: input.countryIso,
+            ip: input.eventContext.ip,
+            deviceHash: input.eventContext.deviceHash ?? undefined,
+            userAgent: input.eventContext.userAgent,
+            userId: input.user.id,
+            otpCodeId: input.record.id,
+            attemptNumber: input.record.verifyAttempts,
+          },
+          transaction,
+        );
+
+        await this.lockRefreshUser(transaction, input.user.id);
+        await this.prepareRefreshFamilySlot(
+          transaction,
+          input.user.id,
+          input.deviceHash,
+        );
+        await this.createRefreshTokenRow(
+          input.user.id,
+          familyId,
+          input.deviceHash,
+          familyCreatedAt,
+          transaction,
+          rawRefreshToken,
+        );
+        response = {
+          token: await this.signAccessToken(input.user),
+          refreshToken: rawRefreshToken,
+          expiresIn: parseDurationToSeconds(this.accessTokenExpiresIn),
+        };
+        await transaction.otpCode.update({
+          where: { id: input.record.id },
+          data: {
+            verificationKeyHash: input.verificationKeyHash,
+            verificationRequestHash: input.verificationRequestHash,
+            verificationResponseJson: encryptOtpVerificationResponse(
+              input.verificationSecret,
+              input.verificationKeyHash,
+              input.verificationRequestHash,
+              response,
+            ),
+            verifiedAt: consumedAt,
+          },
+        });
+      });
+      if (!response) {
+        throw new Error('OTP verification transaction returned no response');
+      }
+      return response;
+    } catch (error: unknown) {
+      const replay = await this.replayOtpVerification(
+        input.verificationSecret,
+        input.verificationKeyHash,
+        input.verificationRequestHash,
+      );
+      if (replay) return replay;
+      throw error;
+    }
+  }
+
   private async issueSession(
     user: SessionUser,
     deviceHash?: string | null,
     familyId = generateRefreshFamilyId(),
   ): Promise<VerifyOtpResponse> {
-    await this.prepareRefreshFamilySlot(user.id, deviceHash);
-    const created = await this.createRefreshTokenRow(
-      user.id,
-      familyId,
-      deviceHash,
-    );
-    const token = await this.signAccessToken(user);
+    const rawRefreshToken = generateRefreshToken();
+    await this.prisma.$transaction(async (transaction) => {
+      await this.lockRefreshUser(transaction, user.id);
+      await this.prepareRefreshFamilySlot(transaction, user.id, deviceHash);
+      await this.createRefreshTokenRow(
+        user.id,
+        familyId,
+        deviceHash,
+        new Date(),
+        transaction,
+        rawRefreshToken,
+      );
+    });
     return {
-      token,
-      refreshToken: created.rawToken,
+      token: await this.signAccessToken(user),
+      refreshToken: rawRefreshToken,
       expiresIn: parseDurationToSeconds(this.accessTokenExpiresIn),
     };
   }
@@ -854,21 +1033,25 @@ export class AuthService {
    * cap evicts the oldest family so sign-in still succeeds.
    */
   private async prepareRefreshFamilySlot(
+    transaction: Prisma.TransactionClient,
     userId: string,
     deviceHash?: string | null,
   ) {
     if (deviceHash) {
-      const sameDeviceFamilies = await this.prisma.refreshToken.findMany({
+      const sameDeviceFamilies = await transaction.refreshToken.findMany({
         where: { userId, deviceHash, revokedAt: null },
         distinct: ['familyId'],
         select: { familyId: true },
       });
       for (const row of sameDeviceFamilies) {
-        await this.revokeRefreshFamily(row.familyId, userId);
+        await transaction.refreshToken.updateMany({
+          where: { familyId: row.familyId, userId, revokedAt: null },
+          data: { revokedAt: new Date() },
+        });
       }
     }
 
-    const liveFamilies = await this.prisma.refreshToken.groupBy({
+    const liveFamilies = await transaction.refreshToken.groupBy({
       by: ['familyId'],
       where: { userId, revokedAt: null },
       _min: { familyCreatedAt: true },
@@ -886,7 +1069,14 @@ export class AuthService {
         (b._min.familyCreatedAt?.getTime() ?? 0),
     );
     for (let i = 0; i < overflow; i++) {
-      await this.revokeRefreshFamily(oldestFirst[i].familyId, userId);
+      await transaction.refreshToken.updateMany({
+        where: {
+          familyId: oldestFirst[i].familyId,
+          userId,
+          revokedAt: null,
+        },
+        data: { revokedAt: new Date() },
+      });
     }
   }
 
@@ -896,8 +1086,8 @@ export class AuthService {
     deviceHash?: string | null,
     familyCreatedAt: Date = new Date(),
     client: Pick<Prisma.TransactionClient, 'refreshToken'> = this.prisma,
+    rawToken = generateRefreshToken(),
   ) {
-    const rawToken = generateRefreshToken();
     const row = await client.refreshToken.create({
       data: {
         userId,

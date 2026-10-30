@@ -97,7 +97,12 @@ describe('verify OTP busy guard', () => {
     });
 
     await waitFor(() =>
-      expect(mockVerify).toHaveBeenCalledWith('+2348012345678', 'NG', '123456'),
+      expect(mockVerify).toHaveBeenCalledWith(
+        '+2348012345678',
+        'NG',
+        '123456',
+        '00000000-0000-4000-8000-000000000001',
+      ),
     );
     expect(await screen.findByText('Verifying...')).toBeOnTheScreen();
     expect(screen.getByRole('button', { name: 'Verifying...' })).toBeDisabled();

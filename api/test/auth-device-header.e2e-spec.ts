@@ -67,6 +67,7 @@ describe('Auth device header (e2e)', () => {
 
     await request(app.getHttpServer())
       .post('/auth/verify-otp')
+      .set('Idempotency-Key', randomUUID())
       .set('X-Stead-Device-Id', '0f81c2a7-1e6d-3f05-9a1c-03de8a5f6b77')
       .send({ phone: '08091234567', countryIso: 'NG', otp: '123456' })
       .expect(400)
@@ -103,6 +104,7 @@ describe('Auth device header (e2e)', () => {
 
     await request(app.getHttpServer())
       .post('/auth/verify-otp')
+      .set('Idempotency-Key', randomUUID())
       .send({
         phone: OMITTED_HEADER_PHONE,
         countryIso: 'NG',

@@ -96,7 +96,10 @@
       "**/*.(t|j)s"
     ],
     "coverageDirectory": "../coverage/api",
-    "testEnvironment": "node"
+    "testEnvironment": "node",
+    "setupFiles": [
+      "<rootDir>/../test/jest-unit.setup.ts"
+    ]
   },
   "overrides": {
     "js-yaml": "4.3.2",

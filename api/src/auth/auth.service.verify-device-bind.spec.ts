@@ -22,8 +22,11 @@ describe('AuthService verify OTP device binding', () => {
   let prisma: {
     $transaction: jest.Mock;
     $executeRaw: jest.Mock;
+    authEvent: { create: jest.Mock };
     otpCode: {
+      findUnique: jest.Mock;
       findFirst: jest.Mock;
+      update: jest.Mock;
       updateMany: jest.Mock;
     };
     user: {
@@ -42,8 +45,11 @@ describe('AuthService verify OTP device binding', () => {
     prisma = {
       $transaction: jest.fn(),
       $executeRaw: jest.fn().mockResolvedValue(1),
+      authEvent: { create: jest.fn() },
       otpCode: {
+        findUnique: jest.fn().mockResolvedValue(null),
         findFirst: jest.fn(),
+        update: jest.fn(),
         updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
       user: {
@@ -183,6 +189,7 @@ describe('AuthService verify OTP device binding', () => {
       .calls as unknown as [[{ where: { familyId: string; revokedAt: null } }]];
     expect(revokeArg.where).toEqual({
       familyId: 'fam-on-device-a',
+      userId: 'user_1',
       revokedAt: null,
     });
     expect(prisma.refreshToken.updateMany).toHaveBeenCalledTimes(1);

@@ -13,8 +13,11 @@ describe('AuthService family-cap second eviction revoke failure', () => {
   let prisma: {
     $transaction: jest.Mock;
     $executeRaw: jest.Mock;
+    authEvent: { create: jest.Mock };
     otpCode: {
+      findUnique: jest.Mock;
       findFirst: jest.Mock;
+      update: jest.Mock;
       updateMany: jest.Mock;
     };
     user: {
@@ -34,8 +37,11 @@ describe('AuthService family-cap second eviction revoke failure', () => {
     prisma = {
       $transaction: jest.fn(),
       $executeRaw: jest.fn().mockResolvedValue(1),
+      authEvent: { create: jest.fn() },
       otpCode: {
+        findUnique: jest.fn().mockResolvedValue(null),
         findFirst: jest.fn(),
+        update: jest.fn(),
         updateMany: jest.fn(),
       },
       user: {
@@ -177,6 +183,7 @@ describe('AuthService family-cap second eviction revoke failure', () => {
     });
     expect(telemetry.recordEvent).toHaveBeenCalledWith(
       expect.objectContaining({ type: 'otp_verify_succeeded' }),
+      expect.anything(),
     );
     expect(prisma.refreshToken.findMany).not.toHaveBeenCalled();
     expect(prisma.refreshToken.groupBy).toHaveBeenCalledWith({
@@ -186,11 +193,11 @@ describe('AuthService family-cap second eviction revoke failure', () => {
     });
     expect(prisma.refreshToken.updateMany).toHaveBeenCalledTimes(2);
     expect(prisma.refreshToken.updateMany).toHaveBeenNthCalledWith(1, {
-      where: { familyId: 'fam-oldest', revokedAt: null },
+      where: { familyId: 'fam-oldest', userId: 'user_1', revokedAt: null },
       data: { revokedAt: expect.any(Date) as Date },
     });
     expect(prisma.refreshToken.updateMany).toHaveBeenNthCalledWith(2, {
-      where: { familyId: 'fam-2', revokedAt: null },
+      where: { familyId: 'fam-2', userId: 'user_1', revokedAt: null },
       data: { revokedAt: expect.any(Date) as Date },
     });
     expect(prisma.refreshToken.create).not.toHaveBeenCalled();

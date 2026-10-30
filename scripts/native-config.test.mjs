@@ -402,11 +402,13 @@ test('iOS journey artifacts must match their embedded API and fixture configurat
       join(directory, 'stead-native-config.json'),
       JSON.stringify({
         apiUrl: 'http://127.0.0.1:3000',
+        apiTimeoutMs: Number(TOOLCHAIN.NATIVE_API_TIMEOUT_MS),
         phone: '08030000001',
       }),
     );
     assert.deepEqual(assertIosArtifactConfig(app, options), {
       apiUrl: 'http://127.0.0.1:3000',
+      apiTimeoutMs: Number(TOOLCHAIN.NATIVE_API_TIMEOUT_MS),
       phone: '08030000001',
     });
     assert.throws(
@@ -472,14 +474,16 @@ test('native environment replaces production selectors and disables operator acc
   assert.equal(env.SMS_PROVIDER, 'dev');
   assert.equal(env.EXPO_NO_DOTENV, '1');
   assert.equal(env.EXPO_PUBLIC_API_URL, 'http://127.0.0.1:3001');
+  assert.equal(env.EXPO_PUBLIC_API_TIMEOUT_MS, TOOLCHAIN.NATIVE_API_TIMEOUT_MS);
   assert.equal(inherited.DATABASE_URL, 'production');
   assert.equal(
     new Set([
       env.JWT_SECRET,
       env.NOTIFICATION_PAYLOAD_ENCRYPTION_KEY,
       env.AUTH_DEVICE_IDENTIFIER_SECRET,
+      env.AUTH_OTP_VERIFICATION_ENCRYPTION_KEY,
     ]).size,
-    3,
+    4,
   );
 });
 

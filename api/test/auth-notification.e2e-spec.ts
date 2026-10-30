@@ -155,6 +155,7 @@ describe('Auth notification pipeline (e2e)', () => {
 
     const verifyResponse = await request(app.getHttpServer())
       .post('/auth/verify-otp')
+      .set('Idempotency-Key', randomUUID())
       .set('User-Agent', OTP_REQUEST_USER_AGENT)
       .set('X-Stead-Device-Id', DEVICE_ID)
       .send({
@@ -338,6 +339,7 @@ describe('Auth notification pipeline (e2e)', () => {
     for (let attempt = 0; attempt < 2; attempt += 1) {
       await request(app.getHttpServer())
         .post('/auth/verify-otp')
+        .set('Idempotency-Key', randomUUID())
         .set('X-Stead-Device-Id', SECOND_DEVICE_ID)
         .send({ phone: '08071234567', countryIso: 'NG', otp: wrongOtp })
         .expect(400);
@@ -345,6 +347,7 @@ describe('Auth notification pipeline (e2e)', () => {
 
     await request(app.getHttpServer())
       .post('/auth/verify-otp')
+      .set('Idempotency-Key', randomUUID())
       .set('X-Stead-Device-Id', SECOND_DEVICE_ID)
       .send({ phone: '08071234567', countryIso: 'NG', otp })
       .expect(429)

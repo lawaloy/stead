@@ -342,7 +342,7 @@ export type ErrorResponse = {
 };
 
 /**
- * Stable UUIDv4 reused for every retry of one logical OTP request.
+ * Stable UUIDv4 reused for every retry of one logical OTP request or verification.
  */
 export type IdempotencyKey = string;
 
@@ -378,7 +378,7 @@ export type RequestOtpData = {
      */
     'X-Stead-Device-Id'?: string;
     /**
-     * Stable UUIDv4 reused for every retry of one logical OTP request.
+     * Stable UUIDv4 reused for every retry of one logical OTP request or verification.
      */
     'Idempotency-Key': string;
   };
@@ -420,11 +420,15 @@ export type RequestOtpResponse2 =
 
 export type VerifyOtpData = {
   body: VerifyOtpRequest;
-  headers?: {
+  headers: {
     /**
      * Optional mobile installation UUID used as an additive abuse-control signal. The API persists only a keyed hash.
      */
     'X-Stead-Device-Id'?: string;
+    /**
+     * Stable UUIDv4 reused for every retry of one logical OTP request or verification.
+     */
+    'Idempotency-Key': string;
   };
   path?: never;
   query?: never;
@@ -436,6 +440,10 @@ export type VerifyOtpErrors = {
    * Request validation or domain validation failed.
    */
   400: ErrorResponse;
+  /**
+   * The idempotency key was already used for a different request.
+   */
+  409: ErrorResponse;
   /**
    * OTP abuse-control limit reached.
    */

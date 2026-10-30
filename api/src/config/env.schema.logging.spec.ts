@@ -7,6 +7,8 @@ const baseEnvironment = {
   AUTH_DEVICE_IDENTIFIER_SECRET: 'device-secret-value-at-least-32-characters',
   NOTIFICATION_PAYLOAD_ENCRYPTION_KEY:
     'notification-secret-value-at-least-32-characters',
+  AUTH_OTP_VERIFICATION_ENCRYPTION_KEY:
+    'otp-verification-secret-value-at-least-32-characters',
   SMS_PROVIDER: 'dev',
 };
 

@@ -8,6 +8,7 @@ type EnvInput = {
   AUTH_INSPECTION_OPERATOR_USER_IDS?: string;
   AUTH_DEVICE_IDENTIFIER_SECRET?: string;
   NOTIFICATION_PAYLOAD_ENCRYPTION_KEY?: string;
+  AUTH_OTP_VERIFICATION_ENCRYPTION_KEY?: string;
   LOG_FORMAT?: string;
   LOG_LEVEL?: string;
   AUTH_OTP_REQUEST_LIMIT_PER_HOUR?: number;
@@ -40,6 +41,7 @@ export const envSchema = Joi.object({
   AUTH_INSPECTION_OPERATOR_USER_IDS: Joi.string().allow('').default(''),
   AUTH_DEVICE_IDENTIFIER_SECRET: Joi.string().min(32).required(),
   NOTIFICATION_PAYLOAD_ENCRYPTION_KEY: Joi.string().min(32).required(),
+  AUTH_OTP_VERIFICATION_ENCRYPTION_KEY: Joi.string().min(32).required(),
   LOG_FORMAT: Joi.string().valid('json', 'text').default('json'),
   LOG_LEVEL: Joi.string()
     .valid('debug', 'info', 'warn', 'error')
@@ -85,15 +87,16 @@ export const envSchema = Joi.object({
     const provider = (value.SMS_PROVIDER || 'twilio').toLowerCase();
     const exposeOtp = value.DEV_EXPOSE_OTP === 'true';
 
-    if (
-      value.AUTH_DEVICE_IDENTIFIER_SECRET &&
-      (value.AUTH_DEVICE_IDENTIFIER_SECRET === value.JWT_SECRET ||
-        value.AUTH_DEVICE_IDENTIFIER_SECRET ===
-          value.NOTIFICATION_PAYLOAD_ENCRYPTION_KEY)
-    ) {
+    const secrets = [
+      value.JWT_SECRET,
+      value.AUTH_DEVICE_IDENTIFIER_SECRET,
+      value.NOTIFICATION_PAYLOAD_ENCRYPTION_KEY,
+      value.AUTH_OTP_VERIFICATION_ENCRYPTION_KEY,
+    ].filter((secret): secret is string => Boolean(secret));
+    if (new Set(secrets).size !== secrets.length) {
       return helpers.message({
         custom:
-          'AUTH_DEVICE_IDENTIFIER_SECRET must not reuse JWT_SECRET or NOTIFICATION_PAYLOAD_ENCRYPTION_KEY',
+          'JWT_SECRET, AUTH_DEVICE_IDENTIFIER_SECRET, NOTIFICATION_PAYLOAD_ENCRYPTION_KEY, and AUTH_OTP_VERIFICATION_ENCRYPTION_KEY must be distinct',
       });
     }
 

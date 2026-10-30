@@ -75,6 +75,7 @@ describe('Auth device-bound refresh (e2e)', () => {
 
     const verified = await request(app.getHttpServer())
       .post('/auth/verify-otp')
+      .set('Idempotency-Key', randomUUID())
       .set('X-Stead-Device-Id', DEVICE_A)
       .send({ phone: PHONE, countryIso: 'NG', otp })
       .expect(201);

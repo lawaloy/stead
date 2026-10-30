@@ -102,6 +102,7 @@ describe('AuthController', () => {
         ip: '127.0.0.1',
         userAgent: 'jest-agent',
         deviceId: '0f81c2a7-1e6d-4f05-9a1c-03de8a5f6b77',
+        idempotencyKey: '0f81c2a7-1e6d-4f05-9a1c-03de8a5f6b77',
       },
     );
   });
@@ -139,6 +140,7 @@ describe('AuthController', () => {
         ip: undefined,
         userAgent: undefined,
         deviceId: undefined,
+        idempotencyKey: '00000000-0000-4000-8000-000000000001',
       },
     );
     expect(req.get).toHaveBeenCalledWith('user-agent');
@@ -158,6 +160,21 @@ describe('AuthController', () => {
       ),
     ).toThrow(BadRequestException);
     expect(authService.requestOtp).not.toHaveBeenCalled();
+  });
+
+  it('rejects OTP verification without an Idempotency-Key header', () => {
+    const req = {
+      ip: '127.0.0.1',
+      get: jest.fn().mockReturnValue(undefined),
+    };
+
+    expect(() =>
+      controller.verifyOtp(
+        { phone: '08012345678', countryIso: 'NG', otp: '123456' },
+        req as never,
+      ),
+    ).toThrow(BadRequestException);
+    expect(authService.verifyOtp).not.toHaveBeenCalled();
   });
 
   it('passes refresh and logout credentials to the auth service', () => {

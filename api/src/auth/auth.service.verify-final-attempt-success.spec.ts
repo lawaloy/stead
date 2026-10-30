@@ -11,7 +11,11 @@ import { CountriesService } from '../countries/countries.service';
 describe('AuthService verify OTP success on the last allowed attempt', () => {
   let service: AuthService;
   let prisma: {
+    $transaction: jest.Mock;
+    $executeRaw: jest.Mock;
+    authEvent: { create: jest.Mock };
     otpCode: {
+      findUnique: jest.Mock;
       findFirst: jest.Mock;
       update: jest.Mock;
       updateMany: jest.Mock;
@@ -33,7 +37,13 @@ describe('AuthService verify OTP success on the last allowed attempt', () => {
 
   beforeEach(async () => {
     prisma = {
+      $transaction: jest.fn(
+        (callback: (transaction: typeof prisma) => unknown) => callback(prisma),
+      ),
+      $executeRaw: jest.fn().mockResolvedValue(1),
+      authEvent: { create: jest.fn() },
       otpCode: {
+        findUnique: jest.fn().mockResolvedValue(null),
         findFirst: jest.fn(),
         update: jest.fn(),
         updateMany: jest.fn(),
@@ -116,7 +126,15 @@ describe('AuthService verify OTP success on the last allowed attempt', () => {
     expect(typeof session.refreshToken).toBe('string');
     expect(session.refreshToken.length).toBeGreaterThan(0);
 
-    expect(prisma.otpCode.update).not.toHaveBeenCalled();
+    expect(prisma.otpCode.update).toHaveBeenCalledWith({
+      where: { id: 'otp_1' },
+      data: {
+        verificationKeyHash: expect.any(String) as unknown,
+        verificationRequestHash: expect.any(String) as unknown,
+        verificationResponseJson: expect.any(String) as unknown,
+        verifiedAt: expect.any(Date) as unknown,
+      },
+    });
     expect(prisma.otpCode.updateMany).toHaveBeenNthCalledWith(1, {
       where: {
         id: 'otp_1',
@@ -134,6 +152,7 @@ describe('AuthService verify OTP success on the last allowed attempt', () => {
         otpCodeId: 'otp_1',
         attemptNumber: 4,
       }),
+      expect.anything(),
     );
     expect(telemetry.recordEvent).not.toHaveBeenCalledWith(
       expect.objectContaining({ type: 'otp_verify_locked' }),

@@ -22,8 +22,11 @@ describe('AuthService same-device multi-family revoke', () => {
   let prisma: {
     $transaction: jest.Mock;
     $executeRaw: jest.Mock;
+    authEvent: { create: jest.Mock };
     otpCode: {
+      findUnique: jest.Mock;
       findFirst: jest.Mock;
+      update: jest.Mock;
       updateMany: jest.Mock;
     };
     user: {
@@ -42,8 +45,11 @@ describe('AuthService same-device multi-family revoke', () => {
     prisma = {
       $transaction: jest.fn(),
       $executeRaw: jest.fn().mockResolvedValue(1),
+      authEvent: { create: jest.fn() },
       otpCode: {
+        findUnique: jest.fn().mockResolvedValue(null),
         findFirst: jest.fn(),
+        update: jest.fn(),
         updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
       user: {
@@ -156,8 +162,12 @@ describe('AuthService same-device multi-family revoke', () => {
       [{ where: { familyId: string; revokedAt: null } }],
     ];
     expect(revokes.map(([arg]) => arg.where)).toEqual([
-      { familyId: 'fam-on-device-a', revokedAt: null },
-      { familyId: 'fam-on-device-a-stale', revokedAt: null },
+      { familyId: 'fam-on-device-a', userId: 'user_1', revokedAt: null },
+      {
+        familyId: 'fam-on-device-a-stale',
+        userId: 'user_1',
+        revokedAt: null,
+      },
     ]);
     expect(prisma.refreshToken.updateMany).toHaveBeenCalledTimes(2);
 
