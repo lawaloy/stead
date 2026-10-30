@@ -32,15 +32,11 @@ export const hashOtpVerificationKey = (idempotencyKey: string) =>
 export const hashOtpVerificationRequest = (
   secret: string,
   input: {
-    phone: string;
-    countryIso: string;
     deviceHash?: string | null;
   },
 ) =>
   createHmac('sha256', deriveKey(secret, 'request-fingerprint'))
-    .update(
-      JSON.stringify([input.phone, input.countryIso, input.deviceHash ?? null]),
-    )
+    .update(JSON.stringify([input.deviceHash ?? null]))
     .digest('hex');
 
 export const otpVerificationRequestMatches = (

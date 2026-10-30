@@ -12,8 +12,6 @@ describe('OTP verification idempotency crypto', () => {
     '0f81c2a7-1e6d-4f05-9a1c-03de8a5f6b77',
   );
   const requestHash = hashOtpVerificationRequest(secret, {
-    phone: '+2348012345678',
-    countryIso: 'NG',
     deviceHash: 'device_hash',
   });
   const response = {
@@ -64,7 +62,7 @@ describe('OTP verification idempotency crypto', () => {
   });
 
   it('uses a keyed context fingerprint and constant-time comparison', () => {
-    expect(requestHash).not.toContain('+2348012345678');
+    expect(requestHash).not.toContain('device_hash');
     expect(otpVerificationRequestMatches(requestHash, requestHash)).toBe(true);
     expect(otpVerificationRequestMatches(requestHash, '0'.repeat(64))).toBe(
       false,

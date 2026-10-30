@@ -184,8 +184,6 @@ describe('AuthService verify OTP selection query', () => {
     const verificationRequestHash = hashOtpVerificationRequest(
       VERIFICATION_SECRET,
       {
-        phone: '+2348012345678',
-        countryIso: 'NG',
         deviceHash: null,
       },
     );
@@ -212,6 +210,7 @@ describe('AuthService verify OTP selection query', () => {
           original,
         ),
         verifiedAt: new Date(),
+        user: { phone: '+2348012345678' },
       });
 
     await expect(
@@ -229,8 +228,6 @@ describe('AuthService verify OTP selection query', () => {
     const verificationRequestHash = hashOtpVerificationRequest(
       VERIFICATION_SECRET,
       {
-        phone: '+2348012345678',
-        countryIso: 'NG',
         deviceHash: null,
       },
     );
@@ -239,10 +236,32 @@ describe('AuthService verify OTP selection query', () => {
       verificationRequestHash,
       verificationResponseJson: 'unused-for-conflicting-input',
       verifiedAt: new Date(),
+      user: { phone: '+2348012345678' },
     });
 
     await expect(
       service.verifyOtp('08012345678', 'NG', '654321', { idempotencyKey }),
+    ).rejects.toBeInstanceOf(ConflictException);
+
+    expect(prisma.user.findUnique).not.toHaveBeenCalled();
+    expect(prisma.otpCode.findFirst).not.toHaveBeenCalled();
+    expect(jwt.signAsync).not.toHaveBeenCalled();
+  });
+
+  it('rejects replay when the phone differs from the original verification', async () => {
+    const idempotencyKey = '00000000-0000-4000-8000-000000000003';
+    prisma.otpCode.findUnique.mockResolvedValue({
+      codeHash: await bcrypt.hash('123456', 1),
+      verificationRequestHash: hashOtpVerificationRequest(VERIFICATION_SECRET, {
+        deviceHash: null,
+      }),
+      verificationResponseJson: 'unused-for-conflicting-input',
+      verifiedAt: new Date(),
+      user: { phone: '+2348099999999' },
+    });
+
+    await expect(
+      service.verifyOtp('08012345678', 'NG', '123456', { idempotencyKey }),
     ).rejects.toBeInstanceOf(ConflictException);
 
     expect(prisma.user.findUnique).not.toHaveBeenCalled();

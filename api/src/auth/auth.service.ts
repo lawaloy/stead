@@ -486,8 +486,6 @@ export class AuthService {
     const verificationRequestHash = hashOtpVerificationRequest(
       verificationSecret,
       {
-        phone: normalizedPhone,
-        countryIso: country.iso,
         deviceHash,
       },
     );
@@ -495,6 +493,7 @@ export class AuthService {
       verificationSecret,
       verificationKeyHash,
       verificationRequestHash,
+      normalizedPhone,
       otp,
     );
     if (replay) return replay;
@@ -582,6 +581,7 @@ export class AuthService {
         verificationSecret,
         verificationKeyHash,
         verificationRequestHash,
+        normalizedPhone,
         otp,
       );
       if (concurrentReplay) return concurrentReplay;
@@ -873,6 +873,7 @@ export class AuthService {
     secret: string,
     verificationKeyHash: string,
     verificationRequestHash: string,
+    normalizedPhone: string,
     otp: string,
   ): Promise<VerifyOtpResponse | null> {
     const existing = await this.prisma.otpCode.findUnique({
@@ -882,9 +883,15 @@ export class AuthService {
         verificationRequestHash: true,
         verificationResponseJson: true,
         verifiedAt: true,
+        user: { select: { phone: true } },
       },
     });
     if (!existing) return null;
+    if (existing.user.phone !== normalizedPhone) {
+      throw new ConflictException(
+        'Idempotency-Key was already used for another OTP verification.',
+      );
+    }
     if (
       !existing.verificationRequestHash ||
       !otpVerificationRequestMatches(
@@ -1017,6 +1024,7 @@ export class AuthService {
         input.verificationSecret,
         input.verificationKeyHash,
         input.verificationRequestHash,
+        input.normalizedPhone,
         input.otp,
       );
       if (replay) return replay;

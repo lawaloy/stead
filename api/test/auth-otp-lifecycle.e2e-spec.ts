@@ -202,6 +202,25 @@ describe('Auth OTP lifecycle edges (e2e)', () => {
     await expect(prisma.refreshToken.count()).resolves.toBe(1);
   });
 
+  it('rejects reuse of a verification key for another phone', async () => {
+    const phone = '08076554433';
+    const { otp } = await requestOtp(phone);
+    const idempotencyKey = randomUUID();
+
+    await request(app.getHttpServer())
+      .post('/auth/verify-otp')
+      .set('Idempotency-Key', idempotencyKey)
+      .send({ phone, countryIso: 'NG', otp })
+      .expect(201);
+    await request(app.getHttpServer())
+      .post('/auth/verify-otp')
+      .set('Idempotency-Key', idempotencyKey)
+      .send({ phone: '08070001111', countryIso: 'NG', otp })
+      .expect(409);
+
+    await expect(prisma.refreshToken.count()).resolves.toBe(1);
+  });
+
   it('rejects replay after the verification window expires', async () => {
     const phone = '08066554433';
     const { otp } = await requestOtp(phone);
