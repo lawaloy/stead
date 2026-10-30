@@ -73,7 +73,7 @@ describe('dependency overrides', () => {
     }>('package.json');
     const packageLock = readJson<PackageLock>('package-lock.json');
     const pins = {
-      'decode-uri-component': '0.5.0',
+      'decode-uri-component': '0.5.1',
       'shell-quote': '1.12.0',
       'source-map-js': '1.2.2',
       uuid: '14.0.1',
