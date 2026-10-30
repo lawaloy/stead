@@ -14,7 +14,6 @@ describe('OTP verification idempotency crypto', () => {
   const requestHash = hashOtpVerificationRequest(secret, {
     phone: '+2348012345678',
     countryIso: 'NG',
-    otp: '123456',
     deviceHash: 'device_hash',
   });
   const response = {
@@ -64,8 +63,8 @@ describe('OTP verification idempotency crypto', () => {
     ).toThrow('Unable to decrypt OTP verification response');
   });
 
-  it('uses a keyed request fingerprint and constant-time comparison', () => {
-    expect(requestHash).not.toContain('123456');
+  it('uses a keyed context fingerprint and constant-time comparison', () => {
+    expect(requestHash).not.toContain('+2348012345678');
     expect(otpVerificationRequestMatches(requestHash, requestHash)).toBe(true);
     expect(otpVerificationRequestMatches(requestHash, '0'.repeat(64))).toBe(
       false,

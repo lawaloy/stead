@@ -34,21 +34,12 @@ export const hashOtpVerificationRequest = (
   input: {
     phone: string;
     countryIso: string;
-    otp: string;
     deviceHash?: string | null;
   },
 ) =>
-  // This keyed digest is an idempotency fingerprint, not a password or OTP
-  // credential verifier; a slow password hash would add cost without value.
-  // codeql[js/insufficient-password-hash]
   createHmac('sha256', deriveKey(secret, 'request-fingerprint'))
     .update(
-      JSON.stringify([
-        input.phone,
-        input.countryIso,
-        input.otp,
-        input.deviceHash ?? null,
-      ]),
+      JSON.stringify([input.phone, input.countryIso, input.deviceHash ?? null]),
     )
     .digest('hex');
 

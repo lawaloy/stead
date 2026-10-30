@@ -2,7 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, ConflictException } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { AuthTelemetryService } from './auth-telemetry.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -186,10 +186,10 @@ describe('AuthService verify OTP selection query', () => {
       {
         phone: '+2348012345678',
         countryIso: 'NG',
-        otp: '123456',
         deviceHash: null,
       },
     );
+    const codeHash = await bcrypt.hash('123456', 1);
     const original = {
       token: 'winner-access-token',
       refreshToken: 'winner-refresh-token',
@@ -203,6 +203,7 @@ describe('AuthService verify OTP selection query', () => {
     prisma.otpCode.findUnique
       .mockResolvedValueOnce(null)
       .mockResolvedValueOnce({
+        codeHash,
         verificationRequestHash,
         verificationResponseJson: encryptOtpVerificationResponse(
           VERIFICATION_SECRET,
@@ -220,6 +221,32 @@ describe('AuthService verify OTP selection query', () => {
     expect(prisma.otpCode.findUnique).toHaveBeenCalledTimes(2);
     expect(prisma.otpCode.updateMany).not.toHaveBeenCalled();
     expect(prisma.refreshToken.create).not.toHaveBeenCalled();
+    expect(jwt.signAsync).not.toHaveBeenCalled();
+  });
+
+  it('rejects replay when the OTP differs from the original verification', async () => {
+    const idempotencyKey = '00000000-0000-4000-8000-000000000002';
+    const verificationRequestHash = hashOtpVerificationRequest(
+      VERIFICATION_SECRET,
+      {
+        phone: '+2348012345678',
+        countryIso: 'NG',
+        deviceHash: null,
+      },
+    );
+    prisma.otpCode.findUnique.mockResolvedValue({
+      codeHash: await bcrypt.hash('123456', 1),
+      verificationRequestHash,
+      verificationResponseJson: 'unused-for-conflicting-input',
+      verifiedAt: new Date(),
+    });
+
+    await expect(
+      service.verifyOtp('08012345678', 'NG', '654321', { idempotencyKey }),
+    ).rejects.toBeInstanceOf(ConflictException);
+
+    expect(prisma.user.findUnique).not.toHaveBeenCalled();
+    expect(prisma.otpCode.findFirst).not.toHaveBeenCalled();
     expect(jwt.signAsync).not.toHaveBeenCalled();
   });
 });

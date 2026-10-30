@@ -488,7 +488,6 @@ export class AuthService {
       {
         phone: normalizedPhone,
         countryIso: country.iso,
-        otp,
         deviceHash,
       },
     );
@@ -496,6 +495,7 @@ export class AuthService {
       verificationSecret,
       verificationKeyHash,
       verificationRequestHash,
+      otp,
     );
     if (replay) return replay;
     const eventContext = {
@@ -582,6 +582,7 @@ export class AuthService {
         verificationSecret,
         verificationKeyHash,
         verificationRequestHash,
+        otp,
       );
       if (concurrentReplay) return concurrentReplay;
       throw new BadRequestException('OTP expired or not found');
@@ -659,6 +660,7 @@ export class AuthService {
       verificationSecret,
       verificationKeyHash,
       verificationRequestHash,
+      otp,
     });
   }
 
@@ -871,10 +873,12 @@ export class AuthService {
     secret: string,
     verificationKeyHash: string,
     verificationRequestHash: string,
+    otp: string,
   ): Promise<VerifyOtpResponse | null> {
     const existing = await this.prisma.otpCode.findUnique({
       where: { verificationKeyHash },
       select: {
+        codeHash: true,
         verificationRequestHash: true,
         verificationResponseJson: true,
         verifiedAt: true,
@@ -888,6 +892,11 @@ export class AuthService {
         verificationRequestHash,
       )
     ) {
+      throw new ConflictException(
+        'Idempotency-Key was already used for another OTP verification.',
+      );
+    }
+    if (!(await bcrypt.compare(otp, existing.codeHash))) {
       throw new ConflictException(
         'Idempotency-Key was already used for another OTP verification.',
       );
@@ -924,6 +933,7 @@ export class AuthService {
     verificationSecret: string;
     verificationKeyHash: string;
     verificationRequestHash: string;
+    otp: string;
   }): Promise<VerifyOtpResponse> {
     const familyId = generateRefreshFamilyId();
     const familyCreatedAt = new Date();
@@ -1007,6 +1017,7 @@ export class AuthService {
         input.verificationSecret,
         input.verificationKeyHash,
         input.verificationRequestHash,
+        input.otp,
       );
       if (replay) return replay;
       throw error;
