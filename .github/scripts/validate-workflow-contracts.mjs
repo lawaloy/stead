@@ -337,13 +337,28 @@ assert.match(
 const auditWrapperInvocation = /node \.\.\/\.github\/scripts\/audit-npm\.mjs/g;
 assert.equal(
   [...dependencyAuditWorkflow.matchAll(auditWrapperInvocation)].length,
-  2,
-  'Scheduled mobile audits must use the expiring advisory-exception wrapper.',
+  4,
+  'Dependency audits must use one parser for blocking gates and report-only findings.',
 );
 assert.equal(
   [...dependencyMaintenanceWorkflow.matchAll(auditWrapperInvocation)].length,
-  2,
-  'Mobile dependency maintenance must use the same audit exception policy.',
+  4,
+  'Dependency maintenance must use one parser for blocking gates and report-only findings.',
+);
+assert.match(
+  dependencyAuditWorkflow,
+  /name: Report moderate-or-higher full-tree vulnerabilities\n\s+if: always\(\)\n\s+run: node \.\.\/\.github\/scripts\/audit-npm\.mjs --audit-level=moderate --report-only/,
+  'Full-tree audits must report findings without hiding audit execution failures.',
+);
+assert.match(
+  dependencyMaintenanceWorkflow,
+  /name: Mobile full-tree audit report\n\s+if: always\(\)\n\s+working-directory: mobile\n\s+run: node \.\.\/\.github\/scripts\/audit-npm\.mjs --audit-level=moderate --report-only/,
+  'Maintenance full-tree audits must report findings without hiding audit execution failures.',
+);
+assert.doesNotMatch(
+  `${dependencyAuditWorkflow}\n${dependencyMaintenanceWorkflow}`,
+  /continue-on-error/,
+  'Audit workflows must express expected findings in the command contract, not suppress step failures.',
 );
 
 for (const filename of workflowFilenames) {
