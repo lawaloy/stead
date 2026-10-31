@@ -255,6 +255,33 @@ assert.match(
   /^appId: com\.lawaloy\.stead\r?\n---\r?\n/m,
   'Reusable Maestro flows must contain a config section before their commands.',
 );
+const maestroFlowFilenames = (await readdir('mobile/.maestro')).filter(
+  (filename) => /\.ya?ml$/.test(filename),
+);
+const maestroFlows = new Map(
+  await Promise.all(
+    maestroFlowFilenames.map(async (filename) => [
+      filename,
+      await readFile(`mobile/.maestro/${filename}`, 'utf8'),
+    ]),
+  ),
+);
+for (const [owner, flow] of maestroFlows) {
+  for (const [, referenced] of flow.matchAll(
+    /^\s*file:\s*([^\s#]+\.ya?ml)\s*$/gm,
+  )) {
+    const reusable = maestroFlows.get(referenced);
+    assert.ok(
+      reusable,
+      `${owner} references missing Maestro flow ${referenced}.`,
+    );
+    const separator = reusable.indexOf('\n---');
+    assert.ok(
+      separator > 0 && /^appId:\s*\S+/m.test(reusable.slice(0, separator)),
+      `${referenced} must define its own Maestro config section.`,
+    );
+  }
+}
 assert.match(
   iosCharacterInput,
   /times: 100[\s\S]*inputText: \$\{output\.characterInput\.text\.charAt\(output\.characterInput\.index\)\}[\s\S]*characterInput\.index = output\.characterInput\.index \+ 1/,
@@ -355,15 +382,14 @@ assert.match(
   /name: Mobile full-tree audit report\n\s+if: always\(\)\n\s+working-directory: mobile\n\s+run: node \.\.\/\.github\/scripts\/audit-npm\.mjs --audit-level=moderate --report-only/,
   'Maintenance full-tree audits must report findings without hiding audit execution failures.',
 );
-assert.doesNotMatch(
-  `${dependencyAuditWorkflow}\n${dependencyMaintenanceWorkflow}`,
-  /continue-on-error/,
-  'Audit workflows must express expected findings in the command contract, not suppress step failures.',
-);
-
 for (const filename of workflowFilenames) {
   if (!filename.endsWith('.yml')) continue;
   const workflow = await readFile(`.github/workflows/${filename}`, 'utf8');
+  assert.doesNotMatch(
+    workflow,
+    /^\s*continue-on-error\s*:/m,
+    `${filename} must express expected outcomes in the command contract, not suppress step failures.`,
+  );
   for (const [, version] of workflow.matchAll(/node-version:\s*([^\r\n]+)/g))
     assert.ok(
       version.includes('outputs.node_version'),

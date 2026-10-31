@@ -97,4 +97,23 @@ evidence for their available platforms. Developers without a Mac can run
 `npm run native -- remote-ios` from a clean committed checkout to validate the
 exact commit on GitHub-hosted macOS and download its evidence.
 
+## Journey authoring rules
+
+- Treat Android and iOS as separate evidence boundaries. A shared flow should
+  express the same customer outcome, while a platform-specific interaction is
+  acceptable when the native drivers behave differently.
+- Assert the exact UI value or completed state before advancing. A successful
+  driver command does not prove that a controlled React Native input or render
+  committed the intended result.
+- Wait for observable completion after a write; do not repeat taps,
+  submissions, or other business actions to hide timing problems. A retry is
+  safe only when the operation is idempotent or the failure proves the action
+  never began.
+- Restrict automatic recovery to a specifically classified infrastructure
+  failure, bound its attempts and backoff, and preserve the original evidence.
+  Product assertions and unclassified failures fail immediately.
+- Give every reusable Maestro flow its own valid config section, and extend the
+  workflow contract checks whenever a native workaround becomes required
+  behavior.
+
 </details>
