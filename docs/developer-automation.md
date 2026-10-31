@@ -35,30 +35,6 @@ workflow, see [Contributing](../CONTRIBUTING.md).
 Package-level scripts remain available for focused iteration. Use the root
 gates before pushing; they enforce ordering and test database isolation.
 
-## Safety Properties
-
-- Environment initialization never overwrites existing `.env` files or prints
-  generated secrets. Restart API or Expo processes after environment changes.
-- Database-backed tests use dedicated schemas, never development `public`.
-  Native attempts accept only a local database and drop only their own
-  `e2e_native_<random>` schema. Local `.env` files do not select the native backend.
-- Journeys reject occupied ports without stopping their owners. Use
-  `STEAD_TEST_API_PORT=3001` for the API-client journey or `--api-port 3001`
-  for native commands. Android debug apps require Metro port 8081; iOS journey
-  builds carry their JavaScript bundle and do not start Metro.
-- Managed runs remove only their owned emulator data and services. Native
-  Android validation rejects physical devices; iOS setup clears the dedicated
-  simulator's keychain and refuses personal simulators. The signed-in restart
-  step preserves credentials and verifies session restoration.
-- Repeats use fresh fixtures and retain every result. Any failed attempt or
-  container OOM kill fails the command, even if later attempts pass.
-- Workflow steps fail closed. Expected non-blocking outcomes must be modeled by
-  the command's exit contract; workflows must not hide failures with
-  `continue-on-error`.
-- Each Maestro process has the shared 12-minute deadline in `.github/ci.env`.
-  A driver/JVM hang fails the attempt and stops its process tree so cleanup and
-  evidence collection can finish. App assertion timeouts remain independent.
-
 ## Native and Security Setup
 
 Install dependencies and keep Docker running. Exact local/CI versions live in
