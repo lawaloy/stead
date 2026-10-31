@@ -252,6 +252,11 @@ assert.match(
 );
 assert.match(
   iosCharacterInput,
+  /^appId: com\.lawaloy\.stead\r?\n---\r?\n/m,
+  'Reusable Maestro flows must contain a config section before their commands.',
+);
+assert.match(
+  iosCharacterInput,
   /times: 100[\s\S]*inputText: \$\{output\.characterInput\.text\.charAt\(output\.characterInput\.index\)\}[\s\S]*characterInput\.index = output\.characterInput\.index \+ 1/,
   'Paced iOS input must send one character per bounded driver request.',
 );

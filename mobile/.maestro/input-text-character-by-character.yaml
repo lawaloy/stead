@@ -3,6 +3,8 @@
 # first controlled TextInput update after that batch and discard the remaining
 # characters. Send one character per completed driver request so the journey
 # exercises human-rate input instead of XCTest's unsupported burst rate.
+appId: com.lawaloy.stead
+---
 - evalScript: '${output.characterInput = { index: 0, text: TEXT }}'
 - repeat:
     times: 100
