@@ -26,19 +26,6 @@
         "react-native-reanimated",
         "react-native-worklets"
       ]
-    },
-    {
-      "advisoryId": 1240912,
-      "ghsa": "GHSA-86w9-cpqp-85rv",
-      "package": "node-forge",
-      "workspace": "mobile",
-      "expiresOn": "2026-11-06",
-      "allowedVulnerabilities": [
-        "@expo/cli",
-        "@expo/code-signing-certificates",
-        "expo",
-        "node-forge"
-      ]
     }
   ]
 }

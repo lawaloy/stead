@@ -11,7 +11,11 @@ import { CountriesService } from '../countries/countries.service';
 describe('AuthService verify OTP lock-path update failure', () => {
   let service: AuthService;
   let prisma: {
+    $transaction: jest.Mock;
+    $executeRaw: jest.Mock;
+    authEvent: { create: jest.Mock };
     otpCode: {
+      findUnique: jest.Mock;
       findFirst: jest.Mock;
       update: jest.Mock;
       updateMany: jest.Mock;
@@ -25,7 +29,13 @@ describe('AuthService verify OTP lock-path update failure', () => {
 
   beforeEach(async () => {
     prisma = {
+      $transaction: jest.fn(
+        (callback: (transaction: typeof prisma) => unknown) => callback(prisma),
+      ),
+      $executeRaw: jest.fn().mockResolvedValue(1),
+      authEvent: { create: jest.fn() },
       otpCode: {
+        findUnique: jest.fn().mockResolvedValue(null),
         findFirst: jest.fn(),
         update: jest.fn(),
         updateMany: jest.fn(),

@@ -42,6 +42,8 @@ export const testEnvironment = (
       'stead-local-test-notification-key-1234567890',
     AUTH_DEVICE_IDENTIFIER_SECRET:
       'stead-local-test-device-identifier-key-1234567890',
+    AUTH_OTP_VERIFICATION_ENCRYPTION_KEY:
+      'stead-local-test-otp-verification-key-1234567890',
     SMS_PROVIDER: 'dev',
     DEV_EXPOSE_OTP: 'true',
     LOG_FORMAT: 'json',
@@ -122,7 +124,7 @@ const run = (
 const makeSecret = () => randomBytes(32).toString('base64url');
 
 export const renderApiEnvironment = (example, secretFactory = makeSecret) => {
-  const secrets = Array.from({ length: 3 }, () => secretFactory());
+  const secrets = Array.from({ length: 4 }, () => secretFactory());
   if (new Set(secrets).size !== secrets.length) {
     throw new Error('Generated local secrets must be distinct.');
   }

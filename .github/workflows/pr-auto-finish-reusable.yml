@@ -45,13 +45,30 @@ jobs:
             const { owner, repo } = context.repo;
             const maxAttempts = 40;
             const delayMs = 15000;
-            const requiredWorkflowNames = [
-              'ci',
-              'native-ci',
-              'CodeQL Advanced',
-              'Dependency review',
-              'Dependency Audit',
+            const dependencyAuditPaths = [
+              'api/package.json',
+              'api/package-lock.json',
+              'mobile/package.json',
+              'mobile/package-lock.json',
+              '.github/dependency-audit-exceptions.json',
+              '.github/scripts/audit-npm.mjs',
             ];
+            const requiredWorkflowContracts = [
+              { name: 'ci', path: '.github/workflows/ci.yml' },
+              { name: 'native-ci', path: '.github/workflows/native-ci.yml' },
+              { name: 'CodeQL Advanced', path: '.github/workflows/codeql.yml' },
+              { name: 'Dependency review', path: '.github/workflows/dependency-review.yml' },
+              {
+                name: 'Dependency Audit',
+                path: '.github/workflows/dependency-audit.yml',
+                expected: (files) => files.some((file) => dependencyAuditPaths.includes(file.filename)),
+              },
+            ];
+            const normalizeWorkflowPath = (path = '') => {
+              const withoutRef = path.split('@')[0];
+              const workflowRoot = withoutRef.indexOf('.github/workflows/');
+              return workflowRoot === -1 ? withoutRef : withoutRef.slice(workflowRoot);
+            };
             const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
             if (!pull_number) {
@@ -155,6 +172,22 @@ jobs:
                 return;
               }
 
+              const changedFiles = await github.paginate(
+                github.rest.pulls.listFiles,
+                {
+                  owner,
+                  repo,
+                  pull_number,
+                  per_page: 100,
+                },
+              );
+              const expectedWorkflowContracts = requiredWorkflowContracts.filter(
+                (contract) => !contract.expected || contract.expected(changedFiles),
+              );
+              const workflowByPath = new Map(
+                expectedWorkflowContracts.map((contract) => [contract.path, contract]),
+              );
+
               const workflowRuns = await github.paginate(
                 github.rest.actions.listWorkflowRunsForRepo,
                 {
@@ -168,26 +201,27 @@ jobs:
               const latestRunsByName = new Map();
 
               for (const run of workflowRuns) {
-                if (
-                  requiredWorkflowNames.includes(run.name) &&
-                  !latestRunsByName.has(run.name)
-                ) {
-                  latestRunsByName.set(run.name, run);
+                const contract = workflowByPath.get(normalizeWorkflowPath(run.path));
+                if (contract && !latestRunsByName.has(contract.name)) {
+                  latestRunsByName.set(contract.name, run);
                 }
               }
 
-              const missingWorkflows = requiredWorkflowNames.filter(
-                (name) => !latestRunsByName.has(name),
-              );
-              const incompleteWorkflows = requiredWorkflowNames.filter(
-                (name) => latestRunsByName.get(name)?.status !== 'completed',
-              );
-              const unsuccessfulWorkflows = requiredWorkflowNames.filter(
-                (name) => {
-                  const run = latestRunsByName.get(name);
+              const missingWorkflows = expectedWorkflowContracts
+                .filter((contract) => !latestRunsByName.has(contract.name))
+                .map((contract) => contract.name);
+              const incompleteWorkflows = expectedWorkflowContracts
+                .filter((contract) => {
+                  const run = latestRunsByName.get(contract.name);
+                  return run && run.status !== 'completed';
+                })
+                .map((contract) => contract.name);
+              const unsuccessfulWorkflows = expectedWorkflowContracts
+                .filter((contract) => {
+                  const run = latestRunsByName.get(contract.name);
                   return run?.status === 'completed' && run.conclusion !== 'success';
-                },
-              );
+                })
+                .map((contract) => contract.name);
 
               if (unsuccessfulWorkflows.length > 0) {
                 core.setFailed(

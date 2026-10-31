@@ -329,6 +329,7 @@ jobs:
       JWT_SECRET: stead-native-ci-jwt-secret
       NOTIFICATION_PAYLOAD_ENCRYPTION_KEY: stead-native-ci-notification-key-1234567890
       AUTH_DEVICE_IDENTIFIER_SECRET: stead-native-ci-device-key-1234567890
+      AUTH_OTP_VERIFICATION_ENCRYPTION_KEY: stead-native-ci-otp-verification-key-1234567890
       SMS_PROVIDER: dev
       DEV_EXPOSE_OTP: 'true'
       EXPO_PUBLIC_API_URL: http://127.0.0.1:3000
@@ -384,6 +385,7 @@ jobs:
       JWT_SECRET: stead-native-ci-jwt-secret
       NOTIFICATION_PAYLOAD_ENCRYPTION_KEY: stead-native-ci-notification-key-1234567890
       AUTH_DEVICE_IDENTIFIER_SECRET: stead-native-ci-device-key-1234567890
+      AUTH_OTP_VERIFICATION_ENCRYPTION_KEY: stead-native-ci-otp-verification-key-1234567890
       SMS_PROVIDER: dev
       DEV_EXPOSE_OTP: 'true'
       EXPO_PUBLIC_API_URL: http://127.0.0.1:3000

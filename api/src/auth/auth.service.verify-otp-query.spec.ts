@@ -2,17 +2,28 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, ConflictException } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { AuthTelemetryService } from './auth-telemetry.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { NOTIFICATION_PUBLISHER } from '../notifications/notification-publisher';
 import { CountriesService } from '../countries/countries.service';
+import {
+  encryptOtpVerificationResponse,
+  hashOtpVerificationKey,
+  hashOtpVerificationRequest,
+} from './otp-verification-idempotency';
+
+const VERIFICATION_SECRET = 'stead-unit-test-otp-verification-key-1234567890';
 
 describe('AuthService verify OTP selection query', () => {
   let service: AuthService;
   let prisma: {
+    $transaction: jest.Mock;
+    $executeRaw: jest.Mock;
+    authEvent: { create: jest.Mock };
     otpCode: {
+      findUnique: jest.Mock;
       findFirst: jest.Mock;
       update: jest.Mock;
       updateMany: jest.Mock;
@@ -33,7 +44,13 @@ describe('AuthService verify OTP selection query', () => {
 
   beforeEach(async () => {
     prisma = {
+      $transaction: jest.fn(
+        (callback: (transaction: typeof prisma) => unknown) => callback(prisma),
+      ),
+      $executeRaw: jest.fn().mockResolvedValue(1),
+      authEvent: { create: jest.fn() },
       otpCode: {
+        findUnique: jest.fn().mockResolvedValue(null),
         findFirst: jest.fn(),
         update: jest.fn(),
         updateMany: jest.fn(),
@@ -68,7 +85,16 @@ describe('AuthService verify OTP selection query', () => {
             countRecentEvents: jest.fn().mockResolvedValue(0),
           },
         },
-        { provide: ConfigService, useValue: { get: jest.fn() } },
+        {
+          provide: ConfigService,
+          useValue: {
+            get: jest.fn((key: string) =>
+              key === 'AUTH_OTP_VERIFICATION_ENCRYPTION_KEY'
+                ? VERIFICATION_SECRET
+                : undefined,
+            ),
+          },
+        },
         {
           provide: CountriesService,
           useValue: {
@@ -149,6 +175,97 @@ describe('AuthService verify OTP selection query', () => {
       orderBy: { createdAt: 'desc' },
     });
     expect(prisma.otpCode.updateMany).not.toHaveBeenCalled();
+    expect(jwt.signAsync).not.toHaveBeenCalled();
+  });
+
+  it('rechecks replay after a concurrent winner consumes the live OTP', async () => {
+    const idempotencyKey = '00000000-0000-4000-8000-000000000001';
+    const verificationKeyHash = hashOtpVerificationKey(idempotencyKey);
+    const verificationRequestHash = hashOtpVerificationRequest(
+      VERIFICATION_SECRET,
+      {
+        deviceHash: null,
+      },
+    );
+    const codeHash = await bcrypt.hash('123456', 1);
+    const original = {
+      token: 'winner-access-token',
+      refreshToken: 'winner-refresh-token',
+      expiresIn: 900,
+    };
+    prisma.user.findUnique.mockResolvedValue({
+      id: 'user_1',
+      phone: '+2348012345678',
+    });
+    prisma.otpCode.findFirst.mockResolvedValue(null);
+    prisma.otpCode.findUnique
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({
+        codeHash,
+        verificationRequestHash,
+        verificationResponseJson: encryptOtpVerificationResponse(
+          VERIFICATION_SECRET,
+          verificationKeyHash,
+          verificationRequestHash,
+          original,
+        ),
+        verifiedAt: new Date(),
+        user: { phone: '+2348012345678' },
+      });
+
+    await expect(
+      service.verifyOtp('08012345678', 'NG', '123456', { idempotencyKey }),
+    ).resolves.toEqual(original);
+
+    expect(prisma.otpCode.findUnique).toHaveBeenCalledTimes(2);
+    expect(prisma.otpCode.updateMany).not.toHaveBeenCalled();
+    expect(prisma.refreshToken.create).not.toHaveBeenCalled();
+    expect(jwt.signAsync).not.toHaveBeenCalled();
+  });
+
+  it('rejects replay when the OTP differs from the original verification', async () => {
+    const idempotencyKey = '00000000-0000-4000-8000-000000000002';
+    const verificationRequestHash = hashOtpVerificationRequest(
+      VERIFICATION_SECRET,
+      {
+        deviceHash: null,
+      },
+    );
+    prisma.otpCode.findUnique.mockResolvedValue({
+      codeHash: await bcrypt.hash('123456', 1),
+      verificationRequestHash,
+      verificationResponseJson: 'unused-for-conflicting-input',
+      verifiedAt: new Date(),
+      user: { phone: '+2348012345678' },
+    });
+
+    await expect(
+      service.verifyOtp('08012345678', 'NG', '654321', { idempotencyKey }),
+    ).rejects.toBeInstanceOf(ConflictException);
+
+    expect(prisma.user.findUnique).not.toHaveBeenCalled();
+    expect(prisma.otpCode.findFirst).not.toHaveBeenCalled();
+    expect(jwt.signAsync).not.toHaveBeenCalled();
+  });
+
+  it('rejects replay when the phone differs from the original verification', async () => {
+    const idempotencyKey = '00000000-0000-4000-8000-000000000003';
+    prisma.otpCode.findUnique.mockResolvedValue({
+      codeHash: await bcrypt.hash('123456', 1),
+      verificationRequestHash: hashOtpVerificationRequest(VERIFICATION_SECRET, {
+        deviceHash: null,
+      }),
+      verificationResponseJson: 'unused-for-conflicting-input',
+      verifiedAt: new Date(),
+      user: { phone: '+2348099999999' },
+    });
+
+    await expect(
+      service.verifyOtp('08012345678', 'NG', '123456', { idempotencyKey }),
+    ).rejects.toBeInstanceOf(ConflictException);
+
+    expect(prisma.user.findUnique).not.toHaveBeenCalled();
+    expect(prisma.otpCode.findFirst).not.toHaveBeenCalled();
     expect(jwt.signAsync).not.toHaveBeenCalled();
   });
 });

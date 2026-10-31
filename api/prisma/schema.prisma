@@ -104,14 +104,18 @@ model OtpCode {
   userId String
   user   User   @relation(fields: [userId], references: [id])
 
-  codeHash           String
-  requestKeyHash     String    @unique
-  requestCompletedAt DateTime?
-  developmentOtp     String?
-  verifyAttempts     Int       @default(0)
-  expiresAt          DateTime
-  consumedAt         DateTime?
-  createdAt          DateTime  @default(now())
+  codeHash                 String
+  requestKeyHash           String    @unique
+  requestCompletedAt       DateTime?
+  developmentOtp           String?
+  verificationKeyHash      String?   @unique
+  verificationRequestHash  String?
+  verificationResponseJson String?
+  verifiedAt               DateTime?
+  verifyAttempts           Int       @default(0)
+  expiresAt                DateTime
+  consumedAt               DateTime?
+  createdAt                DateTime  @default(now())
 
   ip        String?
   userAgent String?

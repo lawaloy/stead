@@ -11,6 +11,9 @@ import { CountriesService } from '../countries/countries.service';
 describe('AuthService device header edges', () => {
   let service: AuthService;
   let prisma: {
+    $transaction: jest.Mock;
+    $executeRaw: jest.Mock;
+    authEvent: { create: jest.Mock };
     otpCode: {
       count: jest.Mock;
       create: jest.Mock;
@@ -28,6 +31,11 @@ describe('AuthService device header edges', () => {
 
   beforeEach(async () => {
     prisma = {
+      $transaction: jest.fn(
+        (callback: (transaction: typeof prisma) => unknown) => callback(prisma),
+      ),
+      $executeRaw: jest.fn().mockResolvedValue(1),
+      authEvent: { create: jest.fn() },
       otpCode: {
         count: jest.fn(),
         create: jest.fn(),

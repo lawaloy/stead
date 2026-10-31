@@ -10,11 +10,15 @@ import { CountriesService } from '../countries/countries.service';
 describe('AuthService missing device identifier secret', () => {
   let service: AuthService;
   let prisma: {
+    $transaction: jest.Mock;
+    $executeRaw: jest.Mock;
+    authEvent: { create: jest.Mock };
     otpCode: {
       count: jest.Mock;
       create: jest.Mock;
       findUnique: jest.Mock;
       findFirst: jest.Mock;
+      update: jest.Mock;
     };
     user: {
       upsert: jest.Mock;
@@ -28,11 +32,17 @@ describe('AuthService missing device identifier secret', () => {
 
   beforeEach(async () => {
     prisma = {
+      $transaction: jest.fn(
+        (callback: (transaction: typeof prisma) => unknown) => callback(prisma),
+      ),
+      $executeRaw: jest.fn().mockResolvedValue(1),
+      authEvent: { create: jest.fn() },
       otpCode: {
         count: jest.fn(),
         create: jest.fn(),
         findUnique: jest.fn().mockResolvedValue(null),
         findFirst: jest.fn(),
+        update: jest.fn(),
       },
       user: {
         upsert: jest.fn(),

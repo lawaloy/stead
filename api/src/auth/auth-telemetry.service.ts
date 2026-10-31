@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { getDeviceReference } from './device-identity.util';
+import type { Prisma } from '@prisma/client';
 
 export type AuthTelemetryEventType =
   | 'otp_requested'
@@ -46,8 +47,11 @@ const ONE_DAY_MS = 24 * ONE_HOUR_MS;
 export class AuthTelemetryService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async recordEvent(input: RecordAuthEventInput): Promise<void> {
-    await this.prisma.authEvent.create({
+  async recordEvent(
+    input: RecordAuthEventInput,
+    client: Pick<Prisma.TransactionClient, 'authEvent'> = this.prisma,
+  ): Promise<void> {
+    await client.authEvent.create({
       data: {
         type: input.type,
         phone: input.phone,

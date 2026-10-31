@@ -121,6 +121,128 @@ describe('Auth OTP lifecycle edges (e2e)', () => {
     ).resolves.toBe(1);
   });
 
+  it('requires an idempotency key for every OTP verification', async () => {
+    await request(app.getHttpServer())
+      .post('/auth/verify-otp')
+      .send({ phone: '08012345678', countryIso: 'NG', otp: '123456' })
+      .expect(400)
+      .expect((response) => {
+        expect(response.body).toMatchObject({
+          message: 'Idempotency-Key header is required.',
+        });
+      });
+  });
+
+  it('replays the exact successful OTP verification without issuing another session', async () => {
+    const phone = '08099887766';
+    const { otp } = await requestOtp(phone);
+    const idempotencyKey = randomUUID();
+
+    const first = await request(app.getHttpServer())
+      .post('/auth/verify-otp')
+      .set('Idempotency-Key', idempotencyKey)
+      .send({ phone, countryIso: 'NG', otp })
+      .expect(201);
+    const replay = await request(app.getHttpServer())
+      .post('/auth/verify-otp')
+      .set('Idempotency-Key', idempotencyKey)
+      .send({ phone, countryIso: 'NG', otp })
+      .expect(201);
+
+    expect(replay.body).toEqual(first.body);
+    await expect(prisma.refreshToken.count()).resolves.toBe(1);
+    await expect(
+      prisma.authEvent.count({ where: { type: 'otp_verify_succeeded' } }),
+    ).resolves.toBe(1);
+    const stored = await prisma.otpCode.findFirstOrThrow();
+    const firstBody = first.body as { refreshToken: string };
+    expect(stored.verificationResponseJson).not.toContain(
+      firstBody.refreshToken,
+    );
+  });
+
+  it('returns one session to concurrent retries using the same verification key', async () => {
+    const phone = '08088776655';
+    const { otp } = await requestOtp(phone);
+    const idempotencyKey = randomUUID();
+    const verify = () =>
+      request(app.getHttpServer())
+        .post('/auth/verify-otp')
+        .set('Idempotency-Key', idempotencyKey)
+        .send({ phone, countryIso: 'NG', otp });
+
+    const [first, second] = await Promise.all([verify(), verify()]);
+
+    expect(first.status).toBe(201);
+    expect(second.status).toBe(201);
+    expect(second.body).toEqual(first.body);
+    await expect(prisma.refreshToken.count()).resolves.toBe(1);
+  });
+
+  it('rejects reuse of a verification key with different input', async () => {
+    const phone = '08077665544';
+    const { otp } = await requestOtp(phone);
+    const idempotencyKey = randomUUID();
+
+    await request(app.getHttpServer())
+      .post('/auth/verify-otp')
+      .set('Idempotency-Key', idempotencyKey)
+      .send({ phone, countryIso: 'NG', otp })
+      .expect(201);
+    await request(app.getHttpServer())
+      .post('/auth/verify-otp')
+      .set('Idempotency-Key', idempotencyKey)
+      .send({
+        phone,
+        countryIso: 'NG',
+        otp: otp === '000000' ? '111111' : '000000',
+      })
+      .expect(409);
+
+    await expect(prisma.refreshToken.count()).resolves.toBe(1);
+  });
+
+  it('rejects reuse of a verification key for another phone', async () => {
+    const phone = '08076554433';
+    const { otp } = await requestOtp(phone);
+    const idempotencyKey = randomUUID();
+
+    await request(app.getHttpServer())
+      .post('/auth/verify-otp')
+      .set('Idempotency-Key', idempotencyKey)
+      .send({ phone, countryIso: 'NG', otp })
+      .expect(201);
+    await request(app.getHttpServer())
+      .post('/auth/verify-otp')
+      .set('Idempotency-Key', idempotencyKey)
+      .send({ phone: '08070001111', countryIso: 'NG', otp })
+      .expect(409);
+
+    await expect(prisma.refreshToken.count()).resolves.toBe(1);
+  });
+
+  it('rejects replay after the verification window expires', async () => {
+    const phone = '08066554433';
+    const { otp } = await requestOtp(phone);
+    const idempotencyKey = randomUUID();
+
+    await request(app.getHttpServer())
+      .post('/auth/verify-otp')
+      .set('Idempotency-Key', idempotencyKey)
+      .send({ phone, countryIso: 'NG', otp })
+      .expect(201);
+    await prisma.otpCode.updateMany({
+      data: { verifiedAt: new Date(Date.now() - 11 * 60 * 1000) },
+    });
+
+    await request(app.getHttpServer())
+      .post('/auth/verify-otp')
+      .set('Idempotency-Key', idempotencyKey)
+      .send({ phone, countryIso: 'NG', otp })
+      .expect(409);
+    await expect(prisma.refreshToken.count()).resolves.toBe(1);
+  });
+
   it('rejects OTP requests when the phone does not match the selected country', async () => {
     await request(app.getHttpServer())
       .post('/auth/request-otp')
@@ -157,6 +279,7 @@ describe('Auth OTP lifecycle edges (e2e)', () => {
   it('rejects verification for an unknown phone without creating a user', async () => {
     await request(app.getHttpServer())
       .post('/auth/verify-otp')
+      .set('Idempotency-Key', randomUUID())
       .send({ phone: '08099887766', countryIso: 'NG', otp: '123456' })
       .expect(400)
       .expect((response) => {
@@ -181,6 +304,7 @@ describe('Auth OTP lifecycle edges (e2e)', () => {
 
     await request(app.getHttpServer())
       .post('/auth/verify-otp')
+      .set('Idempotency-Key', randomUUID())
       .send({ phone: '08055667788', countryIso: 'NG', otp })
       .expect(400)
       .expect((response) => {
@@ -204,6 +328,7 @@ describe('Auth OTP lifecycle edges (e2e)', () => {
 
     await request(app.getHttpServer())
       .post('/auth/verify-otp')
+      .set('Idempotency-Key', randomUUID())
       .send({ phone: '08066778899', countryIso: 'NG', otp: wrongOtp })
       .expect(429)
       .expect((response) => {
@@ -232,6 +357,7 @@ describe('Auth OTP lifecycle edges (e2e)', () => {
 
     await request(app.getHttpServer())
       .post('/auth/verify-otp')
+      .set('Idempotency-Key', randomUUID())
       .send({ phone: '08077889900', countryIso: 'NG', otp })
       .expect(429)
       .expect((response) => {
@@ -300,9 +426,11 @@ describe('Auth OTP lifecycle edges (e2e)', () => {
     const [first, second] = await Promise.all([
       request(app.getHttpServer())
         .post('/auth/verify-otp')
+        .set('Idempotency-Key', randomUUID())
         .send({ phone, countryIso: 'NG', otp }),
       request(app.getHttpServer())
         .post('/auth/verify-otp')
+        .set('Idempotency-Key', randomUUID())
         .send({ phone, countryIso: 'NG', otp }),
     ]);
 
@@ -331,12 +459,14 @@ describe('Auth OTP lifecycle edges (e2e)', () => {
 
     const first = await request(app.getHttpServer())
       .post('/auth/verify-otp')
+      .set('Idempotency-Key', randomUUID())
       .send({ phone, countryIso: 'NG', otp })
       .expect(201);
     expect((first.body as { token: string }).token).toEqual(expect.any(String));
 
     await request(app.getHttpServer())
       .post('/auth/verify-otp')
+      .set('Idempotency-Key', randomUUID())
       .send({ phone, countryIso: 'NG', otp })
       .expect(400)
       .expect((response) => {
@@ -375,6 +505,7 @@ describe('Auth OTP lifecycle edges (e2e)', () => {
 
     await request(app.getHttpServer())
       .post('/auth/verify-otp')
+      .set('Idempotency-Key', randomUUID())
       .send({ phone, countryIso: 'NG', otp: first.otp })
       .expect(400)
       .expect((response) => {
@@ -398,6 +529,7 @@ describe('Auth OTP lifecycle edges (e2e)', () => {
 
     const latest = await request(app.getHttpServer())
       .post('/auth/verify-otp')
+      .set('Idempotency-Key', randomUUID())
       .send({ phone, countryIso: 'NG', otp: latestOtp })
       .expect(201);
     expect((latest.body as { token: string }).token).toEqual(
@@ -437,6 +569,7 @@ describe('Auth OTP lifecycle edges (e2e)', () => {
 
     const latest = await request(app.getHttpServer())
       .post('/auth/verify-otp')
+      .set('Idempotency-Key', randomUUID())
       .send({ phone, countryIso: 'NG', otp: latestOtp })
       .expect(201);
     expect((latest.body as { token: string }).token).toEqual(
@@ -445,6 +578,7 @@ describe('Auth OTP lifecycle edges (e2e)', () => {
 
     await request(app.getHttpServer())
       .post('/auth/verify-otp')
+      .set('Idempotency-Key', randomUUID())
       .send({ phone, countryIso: 'NG', otp: first.otp })
       .expect(400)
       .expect((response) => {
@@ -501,6 +635,7 @@ describe('Auth OTP lifecycle edges (e2e)', () => {
 
     await request(app.getHttpServer())
       .post('/auth/verify-otp')
+      .set('Idempotency-Key', randomUUID())
       .send({ phone, countryIso: 'NG', otp: wrongOtp })
       .expect(429)
       .expect((response) => {
@@ -511,6 +646,7 @@ describe('Auth OTP lifecycle edges (e2e)', () => {
 
     await request(app.getHttpServer())
       .post('/auth/verify-otp')
+      .set('Idempotency-Key', randomUUID())
       .send({ phone, countryIso: 'NG', otp: first.otp })
       .expect(400)
       .expect((response) => {
@@ -556,6 +692,7 @@ describe('Auth OTP lifecycle edges (e2e)', () => {
 
     await request(app.getHttpServer())
       .post('/auth/verify-otp')
+      .set('Idempotency-Key', randomUUID())
       .send({ phone: phoneA, countryIso: 'NG', otp: latestA })
       .expect(201);
 
@@ -574,6 +711,7 @@ describe('Auth OTP lifecycle edges (e2e)', () => {
 
     const bobVerify = await request(app.getHttpServer())
       .post('/auth/verify-otp')
+      .set('Idempotency-Key', randomUUID())
       .send({ phone: phoneB, countryIso: 'NG', otp: other.otp })
       .expect(201);
     expect((bobVerify.body as { token: string }).token).toEqual(
@@ -595,6 +733,7 @@ describe('Auth OTP lifecycle edges (e2e)', () => {
 
     await request(app.getHttpServer())
       .post('/auth/verify-otp')
+      .set('Idempotency-Key', randomUUID())
       .send({ phone, countryIso: 'NG', otp })
       .expect(201);
 
@@ -625,6 +764,7 @@ describe('Auth OTP lifecycle edges (e2e)', () => {
 
     await request(app.getHttpServer())
       .post('/auth/verify-otp')
+      .set('Idempotency-Key', randomUUID())
       .send({ phone, countryIso: 'NG', otp: wrongOtp })
       .expect(400)
       .expect((response) => {
@@ -639,6 +779,7 @@ describe('Auth OTP lifecycle edges (e2e)', () => {
 
     const second = await request(app.getHttpServer())
       .post('/auth/verify-otp')
+      .set('Idempotency-Key', randomUUID())
       .send({ phone, countryIso: 'NG', otp })
       .expect(201);
     expect((second.body as { token: string }).token).toEqual(
@@ -657,6 +798,7 @@ describe('Auth OTP lifecycle edges (e2e)', () => {
     const { otp } = await requestOtp(phone);
     const verified = await request(app.getHttpServer())
       .post('/auth/verify-otp')
+      .set('Idempotency-Key', randomUUID())
       .send({ phone, countryIso: 'NG', otp })
       .expect(201);
 

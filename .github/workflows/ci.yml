@@ -144,6 +144,7 @@ jobs:
       JWT_SECRET: stead-ci-jwt-secret
       NOTIFICATION_PAYLOAD_ENCRYPTION_KEY: stead-ci-notification-key-1234567890
       AUTH_DEVICE_IDENTIFIER_SECRET: stead-ci-device-identifier-key-1234567890
+      AUTH_OTP_VERIFICATION_ENCRYPTION_KEY: stead-ci-otp-verification-key-1234567890
       SMS_PROVIDER: dev
       DEV_EXPOSE_OTP: 'true'
     steps:
@@ -200,6 +201,7 @@ jobs:
       JWT_SECRET: stead-ci-jwt-secret
       NOTIFICATION_PAYLOAD_ENCRYPTION_KEY: stead-ci-notification-key-1234567890
       AUTH_DEVICE_IDENTIFIER_SECRET: stead-ci-device-identifier-key-1234567890
+      AUTH_OTP_VERIFICATION_ENCRYPTION_KEY: stead-ci-otp-verification-key-1234567890
       SMS_PROVIDER: dev
       DEV_EXPOSE_OTP: 'true'
       STEAD_TEST_API_URL: http://127.0.0.1:3000

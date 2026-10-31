@@ -35,11 +35,17 @@ const context = { repo: { owner: 'owner', repo: 'stead' }, payload: {} };
 const prepare = script('pr-auto-prepare-reusable.yml', 'Inspect PR metadata');
 const finish = script('pr-auto-finish-reusable.yml', 'Merge PR when ready');
 const required = [
-  'ci',
-  'native-ci',
-  'CodeQL Advanced',
-  'Dependency review',
-  'Dependency Audit',
+  { name: 'ci', path: '.github/workflows/ci.yml' },
+  { name: 'native-ci', path: '.github/workflows/native-ci.yml' },
+  { name: 'CodeQL Advanced', path: '.github/workflows/codeql.yml' },
+  {
+    name: 'Dependency review',
+    path: '.github/workflows/dependency-review.yml',
+  },
+  {
+    name: 'Dependency Audit',
+    path: '.github/workflows/dependency-audit.yml',
+  },
 ];
 const pr = () => ({
   state: 'open',
@@ -51,8 +57,9 @@ const pr = () => ({
   mergeable_state: 'clean',
 });
 const runs = () =>
-  required.map((name) => ({
+  required.map(({ name, path }) => ({
     name,
+    path,
     head_sha: 'current',
     status: 'completed',
     conclusion: 'success',
@@ -117,7 +124,11 @@ test('one preparation entrypoint resolves both trusted dependency lanes', async 
   assert.equal(untrusted.outputs.lane, 'untrusted');
   assert.equal(untrusted.fileRequests, 0);
 });
-const runFinish = async (pull = pr(), workflows = runs()) => {
+const runFinish = async (
+  pull = pr(),
+  workflows = runs(),
+  files = [{ filename: 'mobile/package-lock.json' }],
+) => {
   const writes = [];
   const requests = [];
   const failures = [];
@@ -125,6 +136,7 @@ const runFinish = async (pull = pr(), workflows = runs()) => {
     rest: {
       pulls: {
         get: async () => ({ data: pull }),
+        listFiles: () => {},
         merge: async (args) => writes.push(['merge', args]),
         updateBranch: async (args) => writes.push(['update', args]),
       },
@@ -136,6 +148,7 @@ const runFinish = async (pull = pr(), workflows = runs()) => {
       },
     },
     paginate: async (endpoint, args) => {
+      if (endpoint === github.rest.pulls.listFiles) return files;
       requests.push(args);
       return endpoint === github.rest.actions.listWorkflowRunsForRepo
         ? workflows.filter((run) => run.head_sha === args.head_sha)
@@ -198,6 +211,31 @@ test('automation requests checks for the current head and binds a merge to that 
   assert.equal(writes.length, 1);
   assert.equal(writes[0][1].sha, 'current');
   assert.equal(requests[0].head_sha, 'current');
+});
+test('automation matches dynamic run names by workflow path and respects audit path filters', async () => {
+  const dynamicNames = runs().map((run) =>
+    run.path === '.github/workflows/native-ci.yml'
+      ? { ...run, name: 'native-ci / pull_request / PR #42' }
+      : run,
+  );
+  assert.equal((await runFinish(pr(), dynamicNames)).writes.length, 1);
+
+  const withoutAudit = runs().filter(
+    (run) => run.path !== '.github/workflows/dependency-audit.yml',
+  );
+  assert.equal(
+    (await runFinish(pr(), withoutAudit, [{ filename: 'README.md' }])).writes
+      .length,
+    1,
+  );
+  assert.match(
+    (
+      await runFinish(pr(), withoutAudit, [
+        { filename: 'mobile/package-lock.json' },
+      ])
+    ).failures[0],
+    /Timed out waiting for required workflows/,
+  );
 });
 test('behind Dependabot branches wait without merging or updating the branch', async () => {
   assert.deepEqual(

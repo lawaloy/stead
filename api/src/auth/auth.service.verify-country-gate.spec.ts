@@ -12,6 +12,9 @@ describe('AuthService verify OTP country gate', () => {
   let service: AuthService;
   let countries: { requireAuthCountry: jest.Mock };
   let prisma: {
+    $transaction: jest.Mock;
+    $executeRaw: jest.Mock;
+    authEvent: { create: jest.Mock };
     otpCode: { findFirst: jest.Mock };
     user: { findUnique: jest.Mock };
     refreshToken: { create: jest.Mock };
@@ -21,6 +24,11 @@ describe('AuthService verify OTP country gate', () => {
 
   beforeEach(async () => {
     prisma = {
+      $transaction: jest.fn(
+        (callback: (transaction: typeof prisma) => unknown) => callback(prisma),
+      ),
+      $executeRaw: jest.fn().mockResolvedValue(1),
+      authEvent: { create: jest.fn() },
       otpCode: { findFirst: jest.fn() },
       user: { findUnique: jest.fn() },
       refreshToken: { create: jest.fn() },

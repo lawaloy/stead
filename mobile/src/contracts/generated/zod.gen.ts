@@ -324,7 +324,7 @@ export const zErrorResponse = z.object({
 });
 
 /**
- * Stable UUIDv4 reused for every retry of one logical OTP request.
+ * Stable UUIDv4 reused for every retry of one logical OTP request or verification.
  */
 export const zIdempotencyKey = z
   .uuid()
@@ -378,6 +378,11 @@ export const zVerifyOtpHeaders = z.object({
       /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$/,
     )
     .optional(),
+  'Idempotency-Key': z
+    .uuid()
+    .regex(
+      /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$/,
+    ),
 });
 
 /**

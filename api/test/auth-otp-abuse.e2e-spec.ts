@@ -131,12 +131,14 @@ describe('Auth OTP IP abuse and resend cooldown (e2e)', () => {
     for (let attempt = 0; attempt < IP_VERIFY_LIMIT; attempt += 1) {
       await request(app.getHttpServer())
         .post('/auth/verify-otp')
+        .set('Idempotency-Key', randomUUID())
         .send({ phone: '08003123456', countryIso: 'NG', otp: wrongOtp })
         .expect(400);
     }
 
     await request(app.getHttpServer())
       .post('/auth/verify-otp')
+      .set('Idempotency-Key', randomUUID())
       .send({ phone: '08003123456', countryIso: 'NG', otp })
       .expect(429)
       .expect((response) => {

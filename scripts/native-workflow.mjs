@@ -28,7 +28,11 @@ import {
 } from './android-emulator.mjs';
 import { iosEnvironment } from './ios-setup.mjs';
 import { buildAndroidGradle } from './native-gradle.mjs';
-import { repeatJourneys, runMaestroCommand } from './native-attempts.mjs';
+import {
+  repeatJourneys,
+  runMaestroCommand,
+  runMaestroWithBootstrapRecovery,
+} from './native-attempts.mjs';
 export { repeatJourneys } from './native-attempts.mjs';
 import {
   TOOLCHAIN,
@@ -164,7 +168,12 @@ export const readIosArtifactConfig = (app, read = readFileSync) => {
       { cause: error },
     );
   }
-  if (typeof config.apiUrl !== 'string' || typeof config.phone !== 'string')
+  if (
+    typeof config.apiUrl !== 'string' ||
+    !Number.isSafeInteger(config.apiTimeoutMs) ||
+    config.apiTimeoutMs <= 0 ||
+    typeof config.phone !== 'string'
+  )
     throw new Error(
       `The iOS simulator app has invalid ${IOS_NATIVE_CONFIG} build metadata.`,
     );
@@ -175,11 +184,16 @@ export const assertIosArtifactConfig = (app, options) => {
   const actual = readIosArtifactConfig(app);
   const expected = {
     apiUrl: `http://127.0.0.1:${options.apiPort}`,
+    apiTimeoutMs: Number(TOOLCHAIN.NATIVE_API_TIMEOUT_MS),
     phone: options.phone,
   };
-  if (actual.apiUrl !== expected.apiUrl || actual.phone !== expected.phone)
+  if (
+    actual.apiUrl !== expected.apiUrl ||
+    actual.apiTimeoutMs !== expected.apiTimeoutMs ||
+    actual.phone !== expected.phone
+  )
     throw new Error(
-      `The iOS simulator app was built for ${actual.apiUrl} and test phone ${actual.phone}, but this run requires ${expected.apiUrl} and ${expected.phone}. Rebuild the app with matching native options.`,
+      `The iOS simulator app was built for ${actual.apiUrl}, ${actual.apiTimeoutMs} ms API timeout, and test phone ${actual.phone}, but this run requires ${expected.apiUrl}, ${expected.apiTimeoutMs} ms, and ${expected.phone}. Rebuild the app with matching native options.`,
     );
   return actual;
 };
@@ -197,6 +211,7 @@ const buildApp = async (platform, options, projectReady = false) => {
     env = iosEnvironment({
       ...env,
       EXPO_PUBLIC_API_URL: `http://127.0.0.1:${options.apiPort}`,
+      EXPO_PUBLIC_API_TIMEOUT_MS: TOOLCHAIN.NATIVE_API_TIMEOUT_MS,
       EXPO_PUBLIC_E2E_PHONE: options.phone,
     });
   if (!projectReady)
@@ -250,6 +265,7 @@ const buildApp = async (platform, options, projectReady = false) => {
     `${JSON.stringify(
       {
         apiUrl: `http://127.0.0.1:${options.apiPort}`,
+        apiTimeoutMs: Number(TOOLCHAIN.NATIVE_API_TIMEOUT_MS),
         phone: options.phone,
       },
       null,
@@ -433,28 +449,60 @@ const runAttempt = async (platform, options, tools, app, pool, directory) => {
       }
       const device =
         platform === 'android' ? tools.device : tools.simulator.udid;
-      await runMaestroCommand(
-        tools.maestro,
-        [
-          'test',
-          '--device',
-          device,
-          '--platform',
+      const maestroDebugOutput = join(directory, 'maestro');
+      const maestro = await runMaestroWithBootstrapRecovery(
+        () =>
+          runMaestroCommand(
+            tools.maestro,
+            [
+              'test',
+              '--device',
+              device,
+              '--platform',
+              platform,
+              // Requesting a report switches Maestro to its suite runner,
+              // which hides live command progress for this single flow.
+              '--no-ansi',
+              '--debug-output',
+              maestroDebugOutput,
+              '-e',
+              `TEST_PHONE_DISPLAY=${phoneDisplay(options.phone)}`,
+              join(MOBILE, '.maestro', 'critical-native-journey.yaml'),
+            ],
+            { cwd: MOBILE, env, signal: options.signal },
+          ),
+        {
           platform,
-          // Requesting a report switches Maestro to its suite runner, which
-          // hides live command progress even for this single-flow journey.
-          '--no-ansi',
-          '--debug-output',
-          join(directory, 'maestro'),
-          '-e',
-          `TEST_PHONE_DISPLAY=${phoneDisplay(options.phone)}`,
-          join(MOBILE, '.maestro', 'critical-native-journey.yaml'),
-        ],
-        { cwd: MOBILE, env, signal: options.signal },
+          debugOutput: maestroDebugOutput,
+          signal: options.signal,
+          recover: async () => {
+            await adb(['wait-for-device'], { signal: options.signal });
+            const booted = (
+              await adb(['shell', 'getprop', 'sys.boot_completed'], {
+                quiet: true,
+                signal: options.signal,
+              })
+            ).trim();
+            const focused = assertAndroidUiHealthy(
+              await adb(['shell', 'dumpsys', 'window'], {
+                quiet: true,
+                stdoutOnly: true,
+                signal: options.signal,
+              }),
+            );
+            if (booted !== '1' || !focused)
+              throw new Error(
+                'Android emulator health did not recover after Maestro device-server bootstrap failure.',
+              );
+          },
+        },
       );
       return {
         schema,
         directory,
+        ...(maestro.recoveries
+          ? { androidMaestroBootstrapRecoveries: maestro.recoveries }
+          : {}),
         ...(iosPreparation?.recovered
           ? { iosSimulatorRecovery: 'erase-and-reboot-before-maestro' }
           : {}),
