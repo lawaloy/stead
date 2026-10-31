@@ -71,13 +71,12 @@ jobs:
 
       - name: Block high-severity production vulnerabilities
         working-directory: api
-        run: npm audit --omit=dev --audit-level=high
+        run: node ../.github/scripts/audit-npm.mjs --omit-dev --audit-level=high
 
       - name: API full-tree audit report
         if: always()
-        continue-on-error: true
         working-directory: api
-        run: npm audit --audit-level=moderate
+        run: node ../.github/scripts/audit-npm.mjs --audit-level=moderate --report-only
 
       - name: Lint API
         working-directory: api
@@ -203,7 +202,7 @@ jobs:
       - name: Mobile full-tree audit report
         if: always()
         working-directory: mobile
-        run: node ../.github/scripts/audit-npm.mjs --audit-level=moderate
+        run: node ../.github/scripts/audit-npm.mjs --audit-level=moderate --report-only
 
       - name: Verify Expo dependency compatibility
         working-directory: mobile

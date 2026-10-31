@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFile, readdir } from 'node:fs/promises';
 import { TOOLCHAIN } from '../../scripts/toolchain.mjs';
 
-const readQuotedItems = (source, startMarker, endMarker) => {
+const readBlock = (source, startMarker, endMarker) => {
   const start = source.indexOf(startMarker);
   assert.notEqual(
     start,
@@ -13,10 +13,13 @@ const readQuotedItems = (source, startMarker, endMarker) => {
   const end = source.indexOf(endMarker, start);
   assert.notEqual(end, -1, `Missing workflow contract marker: ${endMarker}`);
 
-  return [...source.slice(start, end).matchAll(/'([^']+)'/g)].map(
+  return source.slice(start, end);
+};
+
+const readQuotedItems = (source, startMarker, endMarker) =>
+  [...readBlock(source, startMarker, endMarker).matchAll(/'([^']+)'/g)].map(
     ([, value]) => value,
   );
-};
 
 const [
   finishEntrypoint,
@@ -29,6 +32,7 @@ const [
   dependencyMaintenanceWorkflow,
   codeqlWorkflow,
   criticalNativeJourney,
+  iosCharacterInput,
   androidJourney,
   iosBuild,
   nativeRunner,
@@ -44,6 +48,7 @@ const [
   readFile('.github/workflows/deps-maintenance.yml', 'utf8'),
   readFile('.github/workflows/codeql.yml', 'utf8'),
   readFile('mobile/.maestro/critical-native-journey.yaml', 'utf8'),
+  readFile('mobile/.maestro/input-text-character-by-character.yaml', 'utf8'),
   readFile('.github/scripts/run-android-native-journey.sh', 'utf8'),
   readFile('.github/scripts/build-ios-simulator-app.sh', 'utf8'),
   readFile('scripts/native-workflow.mjs', 'utf8'),
@@ -55,10 +60,25 @@ const triggerWorkflows = readQuotedItems(
   'workflows:',
   'types:',
 );
-const requiredWorkflows = readQuotedItems(
+const requiredWorkflowContractBlock = readBlock(
   finishReusable,
-  'const requiredWorkflowNames = [',
+  'const requiredWorkflowContracts = [',
   '];',
+);
+const requiredWorkflows = [
+  ...requiredWorkflowContractBlock.matchAll(
+    /name: '([^']+)',\s+path: '([^']+)'/g,
+  ),
+].map(([, name, path]) => ({ name, path }));
+const dependencyAuditPaths = readQuotedItems(
+  finishReusable,
+  'const dependencyAuditPaths = [',
+  '];',
+);
+const dependencyAuditTriggerPaths = readQuotedItems(
+  dependencyAuditWorkflow,
+  'pull_request:',
+  'push:',
 );
 
 assert.deepEqual(
@@ -79,13 +99,34 @@ assert.match(
 assert.deepEqual(
   requiredWorkflows,
   [
-    'ci',
-    'native-ci',
-    'CodeQL Advanced',
-    'Dependency review',
-    'Dependency Audit',
+    { name: 'ci', path: '.github/workflows/ci.yml' },
+    { name: 'native-ci', path: '.github/workflows/native-ci.yml' },
+    { name: 'CodeQL Advanced', path: '.github/workflows/codeql.yml' },
+    {
+      name: 'Dependency review',
+      path: '.github/workflows/dependency-review.yml',
+    },
+    {
+      name: 'Dependency Audit',
+      path: '.github/workflows/dependency-audit.yml',
+    },
   ],
   'Dependency auto-finish must retain every required workflow gate.',
+);
+assert.deepEqual(
+  dependencyAuditPaths,
+  dependencyAuditTriggerPaths,
+  'Dependency auto-finish must expect the audit exactly when its pull-request path filter runs.',
+);
+assert.match(
+  finishReusable,
+  /normalizeWorkflowPath\(run\.path\)/,
+  'Dependency readiness must identify workflows by stable workflow paths rather than dynamic run names.',
+);
+assert.match(
+  finishReusable,
+  /github\.rest\.pulls\.listFiles[\s\S]*contract\.expected\(changedFiles\)/,
+  'Path-filtered workflows must be required from the current PR file set.',
 );
 assert.match(
   finishReusable,
@@ -206,6 +247,21 @@ assert.equal(
 );
 assert.match(
   criticalNativeJourney,
+  /file: input-text-character-by-character\.yaml[\s\S]*platform: iOS[\s\S]*TEXT: Native journey goal[\s\S]*id: goal-name\n\s+text: Native journey goal/,
+  'The iOS goal-name journey must use paced input and verify the field before saving.',
+);
+assert.match(
+  iosCharacterInput,
+  /^appId: com\.lawaloy\.stead\r?\n---\r?\n/m,
+  'Reusable Maestro flows must contain a config section before their commands.',
+);
+assert.match(
+  iosCharacterInput,
+  /times: 100[\s\S]*inputText: \$\{output\.characterInput\.text\.charAt\(output\.characterInput\.index\)\}[\s\S]*characterInput\.index = output\.characterInput\.index \+ 1/,
+  'Paced iOS input must send one character per bounded driver request.',
+);
+assert.match(
+  criticalNativeJourney,
   /id: transaction-note\n\s+point: '95%,50%'\n\s+retryTapIfNoChange: false[\s\S]*waitForAnimationToEnd\n- eraseText/,
   'The transaction note must settle the iOS text keyboard before clearing its bounded default value.',
 );
@@ -281,13 +337,28 @@ assert.match(
 const auditWrapperInvocation = /node \.\.\/\.github\/scripts\/audit-npm\.mjs/g;
 assert.equal(
   [...dependencyAuditWorkflow.matchAll(auditWrapperInvocation)].length,
-  2,
-  'Scheduled mobile audits must use the expiring advisory-exception wrapper.',
+  4,
+  'Dependency audits must use one parser for blocking gates and report-only findings.',
 );
 assert.equal(
   [...dependencyMaintenanceWorkflow.matchAll(auditWrapperInvocation)].length,
-  2,
-  'Mobile dependency maintenance must use the same audit exception policy.',
+  4,
+  'Dependency maintenance must use one parser for blocking gates and report-only findings.',
+);
+assert.match(
+  dependencyAuditWorkflow,
+  /name: Report moderate-or-higher full-tree vulnerabilities\n\s+if: always\(\)\n\s+run: node \.\.\/\.github\/scripts\/audit-npm\.mjs --audit-level=moderate --report-only/,
+  'Full-tree audits must report findings without hiding audit execution failures.',
+);
+assert.match(
+  dependencyMaintenanceWorkflow,
+  /name: Mobile full-tree audit report\n\s+if: always\(\)\n\s+working-directory: mobile\n\s+run: node \.\.\/\.github\/scripts\/audit-npm\.mjs --audit-level=moderate --report-only/,
+  'Maintenance full-tree audits must report findings without hiding audit execution failures.',
+);
+assert.doesNotMatch(
+  `${dependencyAuditWorkflow}\n${dependencyMaintenanceWorkflow}`,
+  /continue-on-error/,
+  'Audit workflows must express expected findings in the command contract, not suppress step failures.',
 );
 
 for (const filename of workflowFilenames) {

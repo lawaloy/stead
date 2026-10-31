@@ -11,8 +11,8 @@ for early environments.
 ## Current Validation Status
 
 The API path is automated: PostgreSQL-backed e2e tests cover OTP persistence,
-idempotent request recovery, dev-provider delivery, verification, retry, and
-dead-letter behavior. Mobile schemas, rotating session storage, and expiry
+idempotent request and verification recovery, dev-provider delivery, retry,
+and dead-letter behavior. Mobile schemas, rotating session storage, and expiry
 feedback have unit coverage. The integrated Expo web path has passed against a
 running local API, and native-impacting pull requests run the OTP-to-logout
 journey on Android and iOS simulators. Live-provider delivery and
@@ -124,6 +124,16 @@ is available. Once available:
       available.
 
 ## Session tokens and rotation
+
+`POST /auth/verify-otp` requires a UUIDv4 `Idempotency-Key`. Mobile keeps one
+key for a logical verification and uses it for bounded retries of network,
+timeout, and server failures. The API consumes the OTP, records success,
+creates the refresh session, and stores the encrypted response in one database
+transaction. A retry with the same key and request receives the exact original
+token response without creating a second session. Reusing a key with different
+input, or after the ten-minute replay window, returns 409. The response is
+encrypted at rest with `AUTH_OTP_VERIFICATION_ENCRYPTION_KEY`; this key must be
+at least 32 characters and distinct from every other application secret.
 
 Access JWTs are short-lived (default `JWT_EXPIRES_IN=15m`). Successful OTP
 verify and `POST /auth/refresh` also return an opaque `refreshToken` (default

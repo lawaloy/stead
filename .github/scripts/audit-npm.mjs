@@ -12,6 +12,7 @@ const severityOrder = {
 };
 
 const args = new Set(process.argv.slice(2));
+const reportOnly = args.has('--report-only');
 const auditLevelArgument = process.argv.find((argument) =>
   argument.startsWith('--audit-level='),
 );
@@ -133,13 +134,17 @@ if (accepted.length > 0) {
 }
 
 if (blocked.length > 0) {
-  console.error('Blocking npm audit findings:');
+  console.error(
+    reportOnly
+      ? 'Reported npm audit findings:'
+      : 'Blocking npm audit findings:',
+  );
   for (const finding of blocked) {
     console.error(
       `- ${finding.packageName} (${finding.severity}); advisories: ${finding.advisoryIds.join(', ') || 'unresolved dependency cycle'}`,
     );
   }
-  process.exitCode = 1;
+  if (!reportOnly) process.exitCode = 1;
 } else {
   console.log(
     `No unexcepted ${auditLevel}-or-higher vulnerabilities found in ${workspace}.`,

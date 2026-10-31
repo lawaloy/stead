@@ -7,6 +7,8 @@ describe('envSchema', () => {
     AUTH_DEVICE_IDENTIFIER_SECRET: 'a-device-identifier-secret-with-32-chars',
     NOTIFICATION_PAYLOAD_ENCRYPTION_KEY:
       'a-notification-encryption-key-with-32-chars',
+    AUTH_OTP_VERIFICATION_ENCRYPTION_KEY:
+      'an-otp-verification-key-with-32-chars',
   };
 
   it('allows the dev SMS provider without external SMS credentials', () => {
@@ -165,8 +167,27 @@ describe('envSchema', () => {
 
     expect(missing.error?.message).toContain('AUTH_DEVICE_IDENTIFIER_SECRET');
     expect(reused.error?.message).toContain(
-      'AUTH_DEVICE_IDENTIFIER_SECRET must not reuse',
+      'JWT_SECRET, AUTH_DEVICE_IDENTIFIER_SECRET, NOTIFICATION_PAYLOAD_ENCRYPTION_KEY, and AUTH_OTP_VERIFICATION_ENCRYPTION_KEY must be distinct',
     );
+  });
+
+  it('requires a separate 32-character OTP verification encryption key', () => {
+    const missing = envSchema.validate({
+      ...requiredEnv,
+      AUTH_OTP_VERIFICATION_ENCRYPTION_KEY: undefined,
+      SMS_PROVIDER: 'dev',
+    });
+    const reused = envSchema.validate({
+      ...requiredEnv,
+      AUTH_OTP_VERIFICATION_ENCRYPTION_KEY:
+        requiredEnv.NOTIFICATION_PAYLOAD_ENCRYPTION_KEY,
+      SMS_PROVIDER: 'dev',
+    });
+
+    expect(missing.error?.message).toContain(
+      'AUTH_OTP_VERIFICATION_ENCRYPTION_KEY',
+    );
+    expect(reused.error?.message).toContain('must be distinct');
   });
 
   it('rejects otp abuse-control env values below their minimums', () => {

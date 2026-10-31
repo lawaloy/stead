@@ -16,9 +16,12 @@ describe('AuthService refresh rotation token lifetime', () => {
   let service: AuthService;
   let prisma: {
     $executeRaw: jest.Mock;
+    authEvent: { create: jest.Mock };
     $transaction: jest.Mock;
     otpCode: {
+      findUnique: jest.Mock;
       findFirst: jest.Mock;
+      update: jest.Mock;
       updateMany: jest.Mock;
     };
     user: {
@@ -40,9 +43,12 @@ describe('AuthService refresh rotation token lifetime', () => {
 
     prisma = {
       $executeRaw: jest.fn().mockResolvedValue(1),
+      authEvent: { create: jest.fn() },
       $transaction: jest.fn(),
       otpCode: {
+        findUnique: jest.fn().mockResolvedValue(null),
         findFirst: jest.fn(),
+        update: jest.fn(),
         updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
       user: {

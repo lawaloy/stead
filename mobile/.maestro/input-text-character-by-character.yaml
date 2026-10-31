@@ -1,0 +1,15 @@
+# Maestro's iOS driver sends the first character separately, then injects the
+# rest as one rapid batch. Under simulator load, React Native can commit the
+# first controlled TextInput update after that batch and discard the remaining
+# characters. Send one character per completed driver request so the journey
+# exercises human-rate input instead of XCTest's unsupported burst rate.
+appId: com.lawaloy.stead
+---
+- evalScript: '${output.characterInput = { index: 0, text: TEXT }}'
+- repeat:
+    times: 100
+    while:
+      true: ${output.characterInput.index < output.characterInput.text.length}
+    commands:
+      - inputText: ${output.characterInput.text.charAt(output.characterInput.index)}
+      - evalScript: ${output.characterInput.index = output.characterInput.index + 1}

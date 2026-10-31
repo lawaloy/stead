@@ -1,5 +1,64 @@
 import { runCommand } from './process-utils.mjs';
 import { TOOLCHAIN } from './toolchain.mjs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { setTimeout as delay } from 'node:timers/promises';
+
+const TRANSIENT_ANDROID_MAESTRO_BOOTSTRAP =
+  /DeviceServerDiedException: Device server died during 'deviceInfo'[\s\S]*StatusRuntimeException: UNAVAILABLE/;
+
+const maestroLogPaths = (directory) => {
+  if (!existsSync(directory)) return [];
+  const paths = [];
+  for (const entry of readdirSync(directory, { withFileTypes: true })) {
+    const path = join(directory, entry.name);
+    if (entry.isDirectory()) paths.push(...maestroLogPaths(path));
+    else if (entry.name === 'maestro.log') paths.push(path);
+  }
+  return paths;
+};
+
+export const runMaestroWithBootstrapRecovery = async (
+  operation,
+  {
+    platform,
+    debugOutput,
+    recover,
+    signal,
+    maxAttempts = 3,
+    sleep = (milliseconds, waitSignal) =>
+      delay(milliseconds, undefined, { signal: waitSignal }),
+  },
+) => {
+  if (!Number.isSafeInteger(maxAttempts) || maxAttempts < 1)
+    throw new Error('Maestro bootstrap attempts must be a positive integer.');
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    signal?.throwIfAborted();
+    const previousLogs = new Set(maestroLogPaths(debugOutput));
+    try {
+      return { result: await operation(attempt), recoveries: attempt - 1 };
+    } catch (error) {
+      signal?.throwIfAborted();
+      const newLogs = maestroLogPaths(debugOutput).filter(
+        (path) => !previousLogs.has(path),
+      );
+      const transientBootstrapFailure =
+        platform === 'android' &&
+        newLogs.some((path) =>
+          TRANSIENT_ANDROID_MAESTRO_BOOTSTRAP.test(readFileSync(path, 'utf8')),
+        );
+      if (!transientBootstrapFailure || attempt === maxAttempts) throw error;
+
+      const backoffMs = 2 ** (attempt - 1) * 1_000;
+      console.warn(
+        `Maestro's Android device server died before the journey began. Retrying bootstrap after ${backoffMs} ms (${attempt}/${maxAttempts}).`,
+      );
+      await sleep(backoffMs, signal);
+      await recover({ attempt, error });
+    }
+  }
+};
 
 // A failed XCTest request can leave Maestro's JVM alive after its main thread
 // throws. Bound the owned process so cleanup and evidence collection can finish.

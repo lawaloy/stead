@@ -25,6 +25,8 @@ describe('AuthService', () => {
     consumedAt?: Date | null;
   };
   let prisma: {
+    $executeRaw: jest.Mock;
+    $transaction: jest.Mock;
     otpCode: {
       count: jest.Mock;
       create: jest.Mock;
@@ -45,6 +47,7 @@ describe('AuthService', () => {
       update: jest.Mock;
       updateMany: jest.Mock;
     };
+    authEvent: { create: jest.Mock };
   };
   let notificationPublisher: { publishOtpRequested: jest.Mock };
   let jwt: { signAsync: jest.Mock };
@@ -54,6 +57,8 @@ describe('AuthService', () => {
 
   beforeEach(async () => {
     prisma = {
+      $executeRaw: jest.fn(),
+      $transaction: jest.fn(),
       otpCode: {
         count: jest.fn(),
         create: jest.fn(),
@@ -74,7 +79,11 @@ describe('AuthService', () => {
         update: jest.fn(),
         updateMany: jest.fn(),
       },
+      authEvent: { create: jest.fn() },
     };
+    prisma.$transaction.mockImplementation(
+      (callback: (transaction: typeof prisma) => unknown) => callback(prisma),
+    );
     notificationPublisher = {
       publishOtpRequested: jest.fn(),
     };
@@ -595,7 +604,9 @@ describe('AuthService', () => {
         consumedAt: null,
         expiresAt: { gt: expect.any(Date) as unknown },
       },
-      data: { consumedAt: expect.any(Date) as unknown },
+      data: {
+        consumedAt: expect.any(Date) as unknown,
+      },
     });
     expect(prisma.otpCode.updateMany).toHaveBeenNthCalledWith(2, {
       where: {
@@ -612,6 +623,7 @@ describe('AuthService', () => {
         ip: '127.0.0.1',
         userAgent: 'jest-agent',
       }),
+      prisma,
     );
     expect(jwt.signAsync).toHaveBeenCalledWith(
       {
@@ -711,6 +723,7 @@ describe('AuthService', () => {
     expect(jwt.signAsync).not.toHaveBeenCalled();
     expect(telemetry.recordEvent).not.toHaveBeenCalledWith(
       expect.objectContaining({ type: 'otp_verify_succeeded' }),
+      expect.anything(),
     );
   });
 

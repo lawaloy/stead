@@ -100,7 +100,12 @@ describe('OTP screen journeys', () => {
     await fireEvent.press(screen.getByRole('button', { name: 'Verify OTP' }));
 
     await waitFor(() =>
-      expect(mockVerify).toHaveBeenCalledWith('+2348012345678', 'NG', '123456'),
+      expect(mockVerify).toHaveBeenCalledWith(
+        '+2348012345678',
+        'NG',
+        '123456',
+        '00000000-0000-4000-8000-000000000001',
+      ),
     );
     await waitFor(() =>
       expect(auth.completeAuth).toHaveBeenCalledWith({

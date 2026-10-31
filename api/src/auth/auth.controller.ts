@@ -52,10 +52,16 @@ export class AuthController {
 
   @Post('verify-otp')
   verifyOtp(@Body() dto: VerifyOtpDto, @Req() req: Request) {
+    const idempotencyKey = req.get('idempotency-key');
+    if (!idempotencyKey) {
+      throw new BadRequestException('Idempotency-Key header is required.');
+    }
+
     return this.auth.verifyOtp(dto.phone, dto.countryIso, dto.otp, {
       ip: req.ip,
       userAgent: req.get('user-agent'),
       deviceId: req.get('x-stead-device-id'),
+      idempotencyKey,
     });
   }
 

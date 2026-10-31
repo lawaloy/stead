@@ -1,6 +1,7 @@
 import { randomBytes } from 'node:crypto';
 import { testEnvironment } from './local-workflow.mjs';
-export { ROOT, TOOLCHAIN } from './toolchain.mjs';
+import { ROOT, TOOLCHAIN } from './toolchain.mjs';
+export { ROOT, TOOLCHAIN };
 
 export const parsePort = (value) => {
   if (
@@ -47,6 +48,7 @@ export const nativeEnvironment = (
   AUTH_INSPECTION_OPERATOR_USER_IDS: '',
   EXPO_NO_DOTENV: '1',
   EXPO_PUBLIC_API_URL: `http://127.0.0.1:${apiPort}`,
+  EXPO_PUBLIC_API_TIMEOUT_MS: TOOLCHAIN.NATIVE_API_TIMEOUT_MS,
   EXPO_PUBLIC_E2E_PHONE: phone,
   CI: '1',
   METRO_PORT: String(metroPort),

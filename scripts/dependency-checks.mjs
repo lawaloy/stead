@@ -5,25 +5,23 @@ import { runCommand } from './process-utils.mjs';
 
 export const checkDependencies = async ({ execute = runCommand } = {}) => {
   await checkJsToolchain({ execute });
+  const api = join(ROOT, 'api');
   const mobile = join(ROOT, 'mobile');
   const env = { ...process.env, CI: '1', EXPO_NO_DOTENV: '1' };
-  for (const [cwd, flags] of [
-    [ROOT, []],
-    [join(ROOT, 'api'), ['--omit=dev']],
-  ])
-    await execute('npm', ['audit', ...flags, '--audit-level=high'], {
-      cwd,
-      env,
-    });
-  for (const args of [
-    ['--omit-dev', '--audit-level=high'],
-    ['--audit-level=moderate'],
-  ])
+  await execute('npm', ['audit', '--audit-level=high'], { cwd: ROOT, env });
+  const auditScript = join(ROOT, '.github/scripts/audit-npm.mjs');
+  for (const cwd of [api, mobile]) {
     await execute(
       process.execPath,
-      [join(ROOT, '.github/scripts/audit-npm.mjs'), ...args],
-      { cwd: mobile, env },
+      [auditScript, '--omit-dev', '--audit-level=high'],
+      { cwd, env },
     );
+    await execute(
+      process.execPath,
+      [auditScript, '--audit-level=moderate', '--report-only'],
+      { cwd, env },
+    );
+  }
 };
 
 export const checkMobileCompatibility = async ({

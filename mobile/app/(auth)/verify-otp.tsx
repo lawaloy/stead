@@ -1,4 +1,5 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import * as Crypto from 'expo-crypto';
 import { useRouter } from 'expo-router';
 import { useMutation } from '@tanstack/react-query';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
@@ -28,6 +29,10 @@ export default function VerifyOtpScreen() {
     setDevOtpHint,
   } = useAuth();
   const country = getAuthCountry(pendingCountryIso);
+  const verificationAttempt = useRef<{
+    identity: string;
+    idempotencyKey: string;
+  } | null>(null);
 
   const otpToSubmit = useMemo(
     () => resolveOtpToSubmit(otp, devOtpHint),
@@ -55,8 +60,21 @@ export default function VerifyOtpScreen() {
   const canResend = resendCooldownMs === 0;
 
   const mutation = useMutation({
-    mutationFn: async () =>
-      verifyOtp(pendingPhone, pendingCountryIso, otpToSubmit),
+    mutationFn: async () => {
+      const identity = `${pendingCountryIso}:${pendingPhone}:${otpToSubmit}`;
+      if (verificationAttempt.current?.identity !== identity) {
+        verificationAttempt.current = {
+          identity,
+          idempotencyKey: Crypto.randomUUID(),
+        };
+      }
+      return verifyOtp(
+        pendingPhone,
+        pendingCountryIso,
+        otpToSubmit,
+        verificationAttempt.current.idempotencyKey,
+      );
+    },
     retry: false,
     onSuccess: async (data) => {
       await completeAuth({
@@ -72,6 +90,7 @@ export default function VerifyOtpScreen() {
     mutationFn: async () => requestOtp(pendingPhone, pendingCountryIso),
     retry: false,
     onSuccess: (data) => {
+      verificationAttempt.current = null;
       setPendingOtpRequestedAt(Date.now());
       setDevOtpHint(data.otp || '');
     },

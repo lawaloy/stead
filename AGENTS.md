@@ -67,9 +67,10 @@ actionable feedback is unresolved.
 ## Safety-Critical Local Rules
 
 - Preserve existing `.env` files. `npm run env:init` creates only missing files.
-- Keep `JWT_SECRET`, `NOTIFICATION_PAYLOAD_ENCRYPTION_KEY`, and
-  `AUTH_DEVICE_IDENTIFIER_SECRET` distinct; the latter two require at least 32
-  characters and the JWT secret requires at least 16.
+- Keep `JWT_SECRET`, `NOTIFICATION_PAYLOAD_ENCRYPTION_KEY`,
+  `AUTH_DEVICE_IDENTIFIER_SECRET`, and
+  `AUTH_OTP_VERIFICATION_ENCRYPTION_KEY` distinct; the latter three require at
+  least 32 characters and the JWT secret requires at least 16.
 - Keep `AUTH_INSPECTION_OPERATOR_USER_IDS` empty unless authenticated operator
   access is intentionally configured.
 - `SMS_PROVIDER=dev` and `DEV_EXPOSE_OTP=true` are local/test settings and are
