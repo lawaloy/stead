@@ -18,6 +18,10 @@ describe('NotificationConsumerService startup redaction failure', () => {
     const service = new NotificationConsumerService(
       queue as never,
       sms as never,
+      {
+        recordNotificationPoll: jest.fn(),
+        recordNotificationJob: jest.fn(),
+      } as never,
     );
     const setIntervalSpy = jest
       .spyOn(global, 'setInterval')

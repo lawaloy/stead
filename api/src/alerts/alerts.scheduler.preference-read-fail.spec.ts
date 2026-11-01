@@ -13,6 +13,7 @@ describe('AlertsScheduler preference discovery failure', () => {
     scheduler = new AlertsScheduler(
       prisma as unknown as PrismaService,
       alerts as unknown as AlertsService,
+      { recordSchedulerRun: jest.fn() } as never,
     );
   });
 

@@ -15,6 +15,10 @@ describe('NotificationConsumerService', () => {
     sendOtp: jest.Mock;
     sendMessage: jest.Mock;
   };
+  let metrics: {
+    recordNotificationPoll: jest.Mock;
+    recordNotificationJob: jest.Mock;
+  };
 
   const job: NotificationJob = {
     id: 'job_1',
@@ -57,7 +61,15 @@ describe('NotificationConsumerService', () => {
       sendOtp: jest.fn(),
       sendMessage: jest.fn(),
     };
-    service = new NotificationConsumerService(queue as never, sms as never);
+    metrics = {
+      recordNotificationPoll: jest.fn(),
+      recordNotificationJob: jest.fn(),
+    };
+    service = new NotificationConsumerService(
+      queue as never,
+      sms as never,
+      metrics as never,
+    );
   });
 
   afterEach(() => {
@@ -80,6 +92,16 @@ describe('NotificationConsumerService', () => {
       providerMessageId: 'SM123',
     });
     expect(queue.markFailed).not.toHaveBeenCalled();
+    expect(metrics.recordNotificationJob).toHaveBeenCalledWith({
+      durationMs: expect.any(Number) as unknown,
+      outcome: 'sent',
+      provider: 'twilio',
+      type: 'otp.requested',
+    });
+    expect(metrics.recordNotificationPoll).toHaveBeenCalledWith({
+      durationMs: expect.any(Number) as unknown,
+      outcome: 'processed',
+    });
   });
 
   it('does not deliver a claimed job once account deletion starts', async () => {
@@ -91,6 +113,12 @@ describe('NotificationConsumerService', () => {
     expect(sms.sendOtp).not.toHaveBeenCalled();
     expect(queue.markSucceeded).not.toHaveBeenCalled();
     expect(queue.markFailed).not.toHaveBeenCalled();
+    expect(metrics.recordNotificationJob).toHaveBeenCalledWith({
+      durationMs: expect.any(Number) as unknown,
+      outcome: 'cancelled',
+      provider: 'none',
+      type: 'otp.requested',
+    });
   });
 
   it('delivers readiness jobs through the generic SMS path', async () => {
@@ -156,6 +184,12 @@ describe('NotificationConsumerService', () => {
 
     expect(queue.markSucceeded).not.toHaveBeenCalled();
     expect(queue.markFailed).toHaveBeenCalledWith(job, error);
+    expect(metrics.recordNotificationJob).toHaveBeenCalledWith({
+      durationMs: expect.any(Number) as unknown,
+      outcome: 'retry',
+      provider: 'none',
+      type: 'otp.requested',
+    });
   });
 
   it('skips work when no ready job is claimed', async () => {
@@ -166,6 +200,10 @@ describe('NotificationConsumerService', () => {
     expect(sms.sendOtp).not.toHaveBeenCalled();
     expect(queue.markSucceeded).not.toHaveBeenCalled();
     expect(queue.markFailed).not.toHaveBeenCalled();
+    expect(metrics.recordNotificationPoll).toHaveBeenCalledWith({
+      durationMs: expect.any(Number) as unknown,
+      outcome: 'empty',
+    });
   });
 
   it('marks unsupported job types as failed', async () => {
@@ -291,6 +329,10 @@ describe('NotificationConsumerService', () => {
     await tick();
 
     expect(queue.claimReadyJob).toHaveBeenCalledTimes(1);
+    expect(metrics.recordNotificationPoll).toHaveBeenCalledWith({
+      outcome: 'skipped',
+      durationMs: 0,
+    });
 
     resolveClaim!(null);
     await firstTick;

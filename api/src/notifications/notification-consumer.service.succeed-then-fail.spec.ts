@@ -53,7 +53,14 @@ describe('NotificationConsumerService persist-after-send failure', () => {
       sendOtp: jest.fn(),
       sendMessage: jest.fn(),
     };
-    service = new NotificationConsumerService(queue as never, sms as never);
+    service = new NotificationConsumerService(
+      queue as never,
+      sms as never,
+      {
+        recordNotificationPoll: jest.fn(),
+        recordNotificationJob: jest.fn(),
+      } as never,
+    );
   });
 
   afterEach(() => {

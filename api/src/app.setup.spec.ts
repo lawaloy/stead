@@ -8,6 +8,7 @@ describe('configureApp', () => {
   let useGlobalPipes: jest.Mock;
   let use: jest.Mock;
   let useBodyParser: jest.Mock;
+  let metrics: { recordHttpRequest: jest.Mock };
   let middleware: (req: Request, res: Response, next: NextFunction) => void;
   let app: INestApplication;
 
@@ -27,8 +28,10 @@ describe('configureApp', () => {
       middleware = handler;
     });
     useBodyParser = jest.fn();
+    metrics = { recordHttpRequest: jest.fn() };
     app = {
       enableCors,
+      get: jest.fn().mockReturnValue(metrics),
       useGlobalPipes,
       use,
       useBodyParser,
@@ -147,6 +150,12 @@ describe('configureApp', () => {
       method: 'POST',
       path: '/goals',
       requestId: 'log-trace',
+      statusCode: 201,
+    });
+    expect(metrics.recordHttpRequest).toHaveBeenCalledWith({
+      durationMs: expect.any(Number) as unknown,
+      method: 'POST',
+      route: '/goals',
       statusCode: 201,
     });
     logSpy.mockRestore();

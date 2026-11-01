@@ -5,6 +5,7 @@ import { SmsService } from './sms.service';
 import { TwilioClient } from './twilio.client';
 import { TermiiClient } from './termii.client';
 import { DevClient } from './dev.client';
+import { OBSERVABILITY_METRICS } from '../observability/metrics';
 
 describe('SmsService', () => {
   let service: SmsService;
@@ -12,6 +13,7 @@ describe('SmsService', () => {
   let twilio: { sendMessage: jest.Mock };
   let termii: { sendMessage: jest.Mock };
   let dev: { sendMessage: jest.Mock };
+  let metrics: { recordProviderRequest: jest.Mock };
   const processEnvKeys = [
     'TWILIO_FROM',
     'TWILIO_MESSAGING_SERVICE_SID',
@@ -55,6 +57,7 @@ describe('SmsService', () => {
     dev = {
       sendMessage: jest.fn(),
     };
+    metrics = { recordProviderRequest: jest.fn() };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -74,6 +77,10 @@ describe('SmsService', () => {
         {
           provide: DevClient,
           useValue: dev,
+        },
+        {
+          provide: OBSERVABILITY_METRICS,
+          useValue: metrics,
         },
       ],
     }).compile();
@@ -228,6 +235,12 @@ describe('SmsService', () => {
     });
     expect(twilio.sendMessage).not.toHaveBeenCalled();
     expect(termii.sendMessage).not.toHaveBeenCalled();
+    expect(metrics.recordProviderRequest).toHaveBeenCalledWith({
+      provider: 'dev',
+      kind: 'otp',
+      outcome: 'success',
+      durationMs: expect.any(Number) as unknown,
+    });
   });
 
   it('reports dev provider inspection with OTP exposure status', () => {
@@ -271,6 +284,12 @@ describe('SmsService', () => {
     });
     expect(termii.sendMessage).not.toHaveBeenCalled();
     expect(dev.sendMessage).not.toHaveBeenCalled();
+    expect(metrics.recordProviderRequest).toHaveBeenCalledWith({
+      provider: 'twilio',
+      kind: 'otp',
+      outcome: 'success',
+      durationMs: expect.any(Number) as unknown,
+    });
   });
 
   it('sends OTP via Twilio using From when MessagingServiceSid is unset', async () => {
@@ -317,6 +336,12 @@ describe('SmsService', () => {
       status: HttpStatus.BAD_REQUEST,
     });
     expect(twilio.sendMessage).not.toHaveBeenCalled();
+    expect(metrics.recordProviderRequest).toHaveBeenCalledWith({
+      provider: 'twilio',
+      kind: 'otp',
+      outcome: 'error',
+      durationMs: expect.any(Number) as unknown,
+    });
   });
 
   it('wraps Twilio provider failures as BAD_GATEWAY with details', async () => {
@@ -369,6 +394,12 @@ describe('SmsService', () => {
       channel: 'generic',
     });
     expect(twilio.sendMessage).not.toHaveBeenCalled();
+    expect(metrics.recordProviderRequest).toHaveBeenCalledWith({
+      provider: 'termii',
+      kind: 'otp',
+      outcome: 'success',
+      durationMs: expect.any(Number) as unknown,
+    });
   });
 
   it('rejects Termii OTP sends when TERMII_SENDER_ID is missing at send time', async () => {
@@ -445,6 +476,12 @@ describe('SmsService', () => {
       from: 'STEAD',
       sms: 'Review your savings pace.',
       channel: 'dnd',
+    });
+    expect(metrics.recordProviderRequest).toHaveBeenCalledWith({
+      provider: 'termii',
+      kind: 'notification',
+      outcome: 'error',
+      durationMs: expect.any(Number) as unknown,
     });
   });
 

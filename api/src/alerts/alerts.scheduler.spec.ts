@@ -8,6 +8,7 @@ describe('AlertsScheduler', () => {
   let prisma: { alertPreference: { findMany: jest.Mock } };
   let alerts: { evaluateUser: jest.Mock };
   let scheduler: AlertsScheduler;
+  let metrics: { recordSchedulerRun: jest.Mock };
   let errorSpy: jest.SpyInstance;
 
   const tick = () =>
@@ -20,9 +21,11 @@ describe('AlertsScheduler', () => {
       .mockImplementation(() => undefined);
     prisma = { alertPreference: { findMany: jest.fn() } };
     alerts = { evaluateUser: jest.fn().mockResolvedValue(undefined) };
+    metrics = { recordSchedulerRun: jest.fn() };
     scheduler = new AlertsScheduler(
       prisma as unknown as PrismaService,
       alerts as unknown as AlertsService,
+      metrics as never,
     );
   });
 
@@ -70,6 +73,10 @@ describe('AlertsScheduler', () => {
       'user_1',
       expect.any(Date),
     );
+    expect(metrics.recordSchedulerRun).toHaveBeenCalledWith({
+      outcome: 'skipped',
+      durationMs: 0,
+    });
   });
 
   it('allows a later tick after an evaluation failure', async () => {
@@ -84,6 +91,10 @@ describe('AlertsScheduler', () => {
     expect(alerts.evaluateUser).toHaveBeenCalledTimes(2);
     expect(errorSpy).toHaveBeenCalledWith('Readiness alert evaluation failed', {
       errorName: 'Error',
+    });
+    expect(metrics.recordSchedulerRun).toHaveBeenCalledWith({
+      outcome: 'error',
+      durationMs: expect.any(Number) as unknown,
     });
   });
 });

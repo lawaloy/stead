@@ -1,13 +1,23 @@
 import {
+  Inject,
   Injectable,
   Logger,
   OnModuleDestroy,
   OnModuleInit,
 } from '@nestjs/common';
+import { randomUUID } from 'node:crypto';
+import { performance } from 'node:perf_hooks';
 import { SmsService } from '../sms/sms.service';
 import { NotificationQueueService } from './notification-queue.service';
 import { NotificationJob } from './notification.types';
-import { runWithCorrelationId } from '../observability/request-context';
+import {
+  OBSERVABILITY_METRICS,
+  type ObservabilityMetrics,
+} from '../observability/metrics';
+import {
+  runWithCorrelationId,
+  runWithOperationId,
+} from '../observability/request-context';
 
 @Injectable()
 export class NotificationConsumerService
@@ -20,6 +30,8 @@ export class NotificationConsumerService
   constructor(
     private readonly queue: NotificationQueueService,
     private readonly sms: SmsService,
+    @Inject(OBSERVABILITY_METRICS)
+    private readonly metrics: ObservabilityMetrics,
   ) {}
 
   async onModuleInit() {
@@ -37,36 +49,62 @@ export class NotificationConsumerService
   }
 
   private async tick() {
-    if (this.isProcessing) return;
+    const operationId = randomUUID();
+    return runWithOperationId(operationId, async () => {
+      if (this.isProcessing) {
+        this.metrics.recordNotificationPoll({
+          outcome: 'skipped',
+          durationMs: 0,
+        });
+        return;
+      }
 
-    this.isProcessing = true;
-    try {
-      const job = await this.queue.claimReadyJob();
-      if (!job) return;
-      await runWithCorrelationId(job.correlationId, () =>
-        this.processClaimedJob(job),
-      );
-    } catch (error: unknown) {
-      this.logger.error('Notification poll failed', {
-        errorName: error instanceof Error ? error.name : 'UnknownError',
-      });
-    } finally {
-      this.isProcessing = false;
-    }
+      const started = performance.now();
+      let outcome: 'empty' | 'processed' | 'error' = 'error';
+      this.isProcessing = true;
+      try {
+        const job = await this.queue.claimReadyJob();
+        if (!job) {
+          outcome = 'empty';
+          return;
+        }
+        await runWithCorrelationId(job.correlationId, () =>
+          this.processClaimedJob(job),
+        );
+        outcome = 'processed';
+      } catch (error: unknown) {
+        this.logger.error('Notification poll failed', {
+          errorName: error instanceof Error ? error.name : 'UnknownError',
+        });
+      } finally {
+        this.metrics.recordNotificationPoll({
+          outcome,
+          durationMs: performance.now() - started,
+        });
+        this.isProcessing = false;
+      }
+    });
   }
 
   private async processClaimedJob(job: NotificationJob) {
-    if (!(await this.queue.canDeliver(job))) {
-      this.logger.log('Notification job cancelled during account deletion', {
-        jobId: job.id,
-        type: job.type,
-      });
-      return;
-    }
-
+    const started = performance.now();
+    let provider = 'none';
+    let outcome: 'sent' | 'cancelled' | 'retry' | 'dead_letter' | 'error' =
+      'error';
     try {
+      if (!(await this.queue.canDeliver(job))) {
+        outcome = 'cancelled';
+        this.logger.log('Notification job cancelled during account deletion', {
+          jobId: job.id,
+          type: job.type,
+        });
+        return;
+      }
+
       const result = await this.processJob(job);
+      provider = result.provider ?? 'unknown';
       await this.queue.markSucceeded(job, result);
+      outcome = 'sent';
       this.logger.log('Notification job sent', {
         jobId: job.id,
         type: job.type,
@@ -75,12 +113,20 @@ export class NotificationConsumerService
       });
     } catch (error: unknown) {
       await this.queue.markFailed(job, error);
+      outcome = job.attempts + 1 >= job.maxAttempts ? 'dead_letter' : 'retry';
       this.logger.warn('Notification job failed', {
         jobId: job.id,
         type: job.type,
         attempt: job.attempts + 1,
         terminal: job.attempts + 1 >= job.maxAttempts,
         errorName: error instanceof Error ? error.name : 'UnknownError',
+      });
+    } finally {
+      this.metrics.recordNotificationJob({
+        type: job.type,
+        provider,
+        outcome,
+        durationMs: performance.now() - started,
       });
     }
   }
