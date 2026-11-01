@@ -170,47 +170,55 @@ function getPackageMetadata(packageName) {
   };
 }
 
-function createProbeEnvironment(
-  targetTypeScript,
-  toolPackages,
-  runtimeCandidates,
-) {
-  const packageByName = new Map(
-    toolPackages.map((toolPackage) => [toolPackage.packageName, toolPackage]),
+function buildProbePackageSpecs(targetTypeScript, runtimeCandidates) {
+  const directlyInstalledPackages = new Set(
+    runtimeCandidates.map(({ packageName }) => packageName),
   );
-  const packageSpecs = [
+  const peerRanges = new Map();
+
+  for (const candidate of runtimeCandidates) {
+    for (const [peerPackage, range] of Object.entries(
+      candidate.peerDependencies,
+    )) {
+      if (
+        peerPackage === 'typescript' ||
+        directlyInstalledPackages.has(peerPackage)
+      ) {
+        continue;
+      }
+
+      const ranges = peerRanges.get(peerPackage) ?? new Set();
+      ranges.add(range);
+      peerRanges.set(peerPackage, ranges);
+    }
+  }
+
+  const peerSpecs = [...peerRanges.entries()].map(([peerPackage, ranges]) => {
+    if (ranges.size !== 1) {
+      throw new Error(
+        `Readiness probe consumers declare incompatible ${peerPackage} peer ranges: ${[
+          ...ranges,
+        ].join(', ')}`,
+      );
+    }
+
+    return `${peerPackage}@${[...ranges][0]}`;
+  });
+
+  return [
     `typescript@${targetTypeScript}`,
     ...runtimeCandidates.map(
       ({ packageName, version }) => `${packageName}@${version}`,
     ),
+    ...peerSpecs,
   ];
+}
 
-  if (runtimeCandidates.some(({ packageName }) => packageName === 'ts-jest')) {
-    const jestRange = packageByName.get('ts-jest').peerDependencies.jest;
-
-    if (!jestRange) {
-      throw new Error(
-        'The ts-jest readiness probe could not resolve its Jest peer dependency range.',
-      );
-    }
-
-    packageSpecs.push(`jest@${jestRange}`);
-  }
-
-  if (
-    runtimeCandidates.some(({ packageName }) => packageName === 'ts-loader')
-  ) {
-    const webpackRange =
-      packageByName.get('ts-loader').peerDependencies.webpack;
-
-    if (!webpackRange) {
-      throw new Error(
-        'The ts-loader readiness probe could not resolve its webpack peer dependency range.',
-      );
-    }
-
-    packageSpecs.push(`webpack@${webpackRange}`);
-  }
+function createProbeEnvironment(targetTypeScript, runtimeCandidates) {
+  const packageSpecs = buildProbePackageSpecs(
+    targetTypeScript,
+    runtimeCandidates,
+  );
 
   const probeRoot = fs.mkdtempSync(
     path.join(os.tmpdir(), 'stead-typescript-readiness-'),
@@ -369,11 +377,7 @@ function main() {
   const runtimeCandidates = packagesWithMetadata.filter(
     ({ metadataReady }) => metadataReady,
   );
-  const probeRoot = createProbeEnvironment(
-    targetTypeScript,
-    toolPackages,
-    runtimeCandidates,
-  );
+  const probeRoot = createProbeEnvironment(targetTypeScript, runtimeCandidates);
   let toolResults;
 
   try {
@@ -442,6 +446,7 @@ function main() {
 }
 
 module.exports = {
+  buildProbePackageSpecs,
   combineSupportSignals,
   executeRuntimeProbe,
   runtimeProbeDefinitions,

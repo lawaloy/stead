@@ -7,11 +7,32 @@ import test from 'node:test';
 
 const require = createRequire(import.meta.url);
 const {
+  buildProbePackageSpecs,
   combineSupportSignals,
   executeRuntimeProbe,
   runtimeProbeDefinitions,
   summarizeProbeFailure,
 } = require('../.github/scripts/check-typescript-6-removal-readiness.cjs');
+
+test('runtime candidates install every non-TypeScript peer explicitly', () => {
+  const plugin = {
+    packageName: '@typescript-eslint/eslint-plugin',
+    peerDependencies: {
+      '@typescript-eslint/parser': '^8.72.1',
+      eslint: '^8.57.0 || ^9.0.0 || ^10.0.0',
+      typescript: '>=7.1.0',
+    },
+    version: '8.72.1',
+  };
+  const specs = buildProbePackageSpecs('7.1.0', [plugin]);
+
+  assert.deepEqual(specs, [
+    'typescript@7.1.0',
+    '@typescript-eslint/eslint-plugin@8.72.1',
+    '@typescript-eslint/parser@^8.72.1',
+    'eslint@^8.57.0 || ^9.0.0 || ^10.0.0',
+  ]);
+});
 
 test('runtime incompatibility blocks removal despite a permissive peer range', () => {
   const result = combineSupportSignals({
