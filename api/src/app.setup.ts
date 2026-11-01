@@ -15,6 +15,12 @@ const UUID_PATH_SEGMENT =
 const safeRequestPath = (path: string) =>
   path.replace(UUID_PATH_SEGMENT, ':id');
 
+const metricRoute = (req: Request) => {
+  const routePath = (req.route as { path?: unknown } | undefined)?.path;
+  if (typeof routePath !== 'string') return 'unmatched';
+  return routePath || '/';
+};
+
 export function configureApp(app: INestApplication) {
   const expressApp = app as INestApplication & {
     useBodyParser: (type: 'json', options: { limit: string }) => void;
@@ -43,6 +49,7 @@ export function configureApp(app: INestApplication) {
     const started = performance.now();
     res.on('finish', () => {
       const path = safeRequestPath(req.path);
+      const route = metricRoute(req);
       const durationMs = performance.now() - started;
       logger.log('HTTP request completed', {
         requestId,
@@ -53,7 +60,7 @@ export function configureApp(app: INestApplication) {
       });
       metrics.recordHttpRequest({
         method: req.method,
-        route: path,
+        route,
         statusCode: res.statusCode,
         durationMs,
       });

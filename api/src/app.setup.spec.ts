@@ -135,9 +135,11 @@ describe('configureApp', () => {
     middleware(
       {
         headers: { 'x-request-id': 'log-trace' },
+        baseUrl: '',
         method: 'POST',
         originalUrl: '/goals',
         path: '/goals',
+        route: { path: '/goals' },
       } as unknown as Request,
       res,
       jest.fn(),
@@ -184,6 +186,44 @@ describe('configureApp', () => {
       expect.objectContaining({ path: '/goals/:id' }),
     );
     logSpy.mockRestore();
+  });
+
+  it('uses matched route templates and a fixed unmatched metric fallback', () => {
+    const first = createResponse(200);
+    middleware(
+      {
+        baseUrl: '',
+        headers: {},
+        method: 'GET',
+        path: '/goals/customer-controlled-id',
+        route: { path: '/goals/:id' },
+      } as unknown as Request,
+      first.res,
+      jest.fn(),
+    );
+    first.res.emit('finish');
+
+    const second = createResponse(404);
+    middleware(
+      {
+        baseUrl: '',
+        headers: {},
+        method: 'GET',
+        path: '/missing/customer-controlled-id',
+      } as unknown as Request,
+      second.res,
+      jest.fn(),
+    );
+    second.res.emit('finish');
+
+    expect(metrics.recordHttpRequest).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({ route: '/goals/:id' }),
+    );
+    expect(metrics.recordHttpRequest).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ route: 'unmatched' }),
+    );
   });
 
   it('replaces unsafe client request ids', () => {
