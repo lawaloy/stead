@@ -68,6 +68,18 @@ const runtimeProbeDefinitions = {
   'ts-loader': {
     description: 'compile TypeScript through ts-loader and webpack',
     files: {
+      'tsconfig.json': `${JSON.stringify(
+        {
+          compilerOptions: {
+            module: 'commonjs',
+            strict: true,
+            target: 'es2022',
+          },
+          files: ['ts-loader-entry.ts'],
+        },
+        null,
+        2,
+      )}\n`,
       'ts-loader-entry.ts': 'export const value: number = 1;\n',
       'ts-loader-probe.cjs': `const path = require('node:path');
 const webpack = require('webpack');

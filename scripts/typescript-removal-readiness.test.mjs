@@ -92,6 +92,14 @@ test('every tracked compiler API consumer has an executable probe', () => {
   ]);
 });
 
+test('the ts-loader probe compiles an explicitly configured source file', () => {
+  const tsconfig = JSON.parse(
+    runtimeProbeDefinitions['ts-loader'].files['tsconfig.json'],
+  );
+
+  assert.deepEqual(tsconfig.files, ['ts-loader-entry.ts']);
+});
+
 test('runtime probes execute commands and preserve incompatibility details', () => {
   const probeRoot = fs.mkdtempSync(
     path.join(os.tmpdir(), 'stead-readiness-test-'),
