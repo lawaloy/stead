@@ -6,7 +6,7 @@ import {
   OBSERVABILITY_METRICS,
   type ObservabilityMetrics,
 } from './observability/metrics';
-import { runWithCorrelationId } from './observability/request-context';
+import { runWithRequestId } from './observability/request-context';
 
 const SAFE_REQUEST_ID = /^[A-Za-z0-9._:-]{1,128}$/;
 const UUID_PATH_SEGMENT =
@@ -48,23 +48,25 @@ export function configureApp(app: INestApplication) {
     res.setHeader('x-request-id', requestId);
     const started = performance.now();
     res.on('finish', () => {
-      const path = safeRequestPath(req.path);
-      const route = metricRoute(req);
-      const durationMs = performance.now() - started;
-      logger.log('HTTP request completed', {
-        requestId,
-        method: req.method,
-        path,
-        statusCode: res.statusCode,
-        durationMs,
-      });
-      metrics.recordHttpRequest({
-        method: req.method,
-        route,
-        statusCode: res.statusCode,
-        durationMs,
+      runWithRequestId(requestId, () => {
+        const path = safeRequestPath(req.path);
+        const route = metricRoute(req);
+        const durationMs = performance.now() - started;
+        logger.log('HTTP request completed', {
+          requestId,
+          method: req.method,
+          path,
+          statusCode: res.statusCode,
+          durationMs,
+        });
+        metrics.recordHttpRequest({
+          method: req.method,
+          route,
+          statusCode: res.statusCode,
+          durationMs,
+        });
       });
     });
-    runWithCorrelationId(requestId, next);
+    runWithRequestId(requestId, next);
   });
 }

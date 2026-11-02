@@ -5,13 +5,15 @@ import {
   OnModuleDestroy,
   OnModuleInit,
 } from '@nestjs/common';
-import { randomUUID } from 'node:crypto';
 import { performance } from 'node:perf_hooks';
 import {
   OBSERVABILITY_METRICS,
   type ObservabilityMetrics,
 } from '../observability/metrics';
-import { runWithOperationId } from '../observability/request-context';
+import {
+  createOperationId,
+  runWithOperation,
+} from '../observability/request-context';
 import { PrismaService } from '../prisma/prisma.service';
 import { AlertsService } from './alerts.service';
 
@@ -53,8 +55,9 @@ export class AlertsScheduler implements OnModuleInit, OnModuleDestroy {
   }
 
   private async tick() {
-    const operationId = randomUUID();
-    return runWithOperationId(operationId, async () => {
+    const operationName = 'alerts.scheduler.evaluate';
+    const operationId = createOperationId(operationName);
+    return runWithOperation(operationId, operationName, async () => {
       if (this.running) {
         this.metrics.recordSchedulerRun({
           outcome: 'skipped',
