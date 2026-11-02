@@ -2,7 +2,10 @@ openapi: 3.0.3
 info:
   title: Stead API
   version: 1.0.0
-  description: Authoritative contract for the API surface consumed by Stead mobile.
+  description: >-
+    Authoritative contract for the API surface consumed by Stead mobile. Every
+    request may provide X-Request-ID; the API returns the validated value, or a
+    generated replacement, in the response header.
 servers:
   - url: http://localhost:3000
 paths:
@@ -518,6 +521,16 @@ components:
       scheme: bearer
       bearerFormat: JWT
   parameters:
+    RequestId:
+      name: X-Request-ID
+      in: header
+      required: false
+      description: Optional caller-provided request identifier. The API returns the validated value, or a generated replacement, in the response header.
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 128
+        pattern: '^[A-Za-z0-9._:-]+$'
     IdempotencyKey:
       name: Idempotency-Key
       in: header

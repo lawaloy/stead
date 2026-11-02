@@ -12,7 +12,7 @@
     "postinstall": "prisma generate",
     "build": "node ./node_modules/@typescript/native/bin/tsc -p tsconfig.build.json",
     "contracts:generate": "node scripts/generate-contracts.mjs",
-    "contracts:check": "npm run contracts:generate && git diff --exit-code -- src/contracts/generated ../mobile/src/contracts/generated",
+    "contracts:check": "npm run contracts:generate && git diff --exit-code -- src/contracts/generated ../mobile/src/contracts/generated ../contracts/generated",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "start": "nest start",
     "start:dev": "nest start --watch",
@@ -80,7 +80,8 @@
     "ts-node": "^10.9.2",
     "tsconfig-paths": "^4.2.0",
     "typescript": "npm:@typescript/typescript6@^6.0.2",
-    "typescript-eslint": "^8.72.1"
+    "typescript-eslint": "^8.72.1",
+    "yaml": "^2.9.1"
   },
   "jest": {
     "moduleFileExtensions": [

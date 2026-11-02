@@ -81,7 +81,7 @@ describe('configureApp', () => {
       next,
     );
 
-    expect(setHeader).toHaveBeenCalledWith('x-request-id', 'client-trace-1');
+    expect(setHeader).toHaveBeenCalledWith('X-Request-ID', 'client-trace-1');
     expect(next).toHaveBeenCalledTimes(1);
   });
 
@@ -127,7 +127,7 @@ describe('configureApp', () => {
     );
 
     expect(setHeader).toHaveBeenCalledWith(
-      'x-request-id',
+      'X-Request-ID',
       expect.stringMatching(
         /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
       ),
@@ -148,10 +148,10 @@ describe('configureApp', () => {
       jest.fn(),
     );
 
-    expect(setHeader).not.toHaveBeenCalledWith('x-request-id', 'a');
-    expect(setHeader).not.toHaveBeenCalledWith('x-request-id', 'b');
+    expect(setHeader).not.toHaveBeenCalledWith('X-Request-ID', 'a');
+    expect(setHeader).not.toHaveBeenCalledWith('X-Request-ID', 'b');
     expect(setHeader).toHaveBeenCalledWith(
-      'x-request-id',
+      'X-Request-ID',
       expect.stringMatching(
         /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
       ),
@@ -272,11 +272,11 @@ describe('configureApp', () => {
     );
 
     expect(setHeader).not.toHaveBeenCalledWith(
-      'x-request-id',
+      'X-Request-ID',
       'unsafe\nheader',
     );
     expect(setHeader).toHaveBeenCalledWith(
-      'x-request-id',
+      'X-Request-ID',
       expect.stringMatching(/^[0-9a-f-]{36}$/i),
     );
   });

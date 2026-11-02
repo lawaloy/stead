@@ -10,6 +10,7 @@ import {
 import { createHash, randomBytes } from 'node:crypto';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { API_ROUTES } from '../contracts/generated/runtime.gen.mjs';
 import {
   ROOT,
   newSchema,
@@ -343,7 +344,7 @@ const runAttempt = async (platform, options, tools, app, pool, directory) => {
         join(directory, 'api.log'),
         { cwd: API, env, signal: options.signal },
       );
-      await waitForEndpoint(`${apiUrl}/auth/countries`, api, {
+      await waitForEndpoint(`${apiUrl}${API_ROUTES.getAuthCountries}`, api, {
         signal: options.signal,
       });
       const appId = JSON.parse(readFileSync(join(MOBILE, 'app.json'), 'utf8'))

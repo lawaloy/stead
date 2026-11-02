@@ -4,6 +4,10 @@ import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawn } from 'node:child_process';
 import { setTimeout as delay } from 'node:timers/promises';
+import {
+  API_ROUTES,
+  HTTP_HEADERS,
+} from '../contracts/generated/runtime.gen.mjs';
 import { TOOLCHAIN } from './toolchain.mjs';
 
 const SCRIPT_PATH = fileURLToPath(import.meta.url);
@@ -259,7 +263,7 @@ const endpointResponds = async (url) => {
 };
 
 const waitForApi = async (child, output) => {
-  const endpoint = `${JOURNEY_API_URL}/auth/countries`;
+  const endpoint = `${JOURNEY_API_URL}${API_ROUTES.getAuthCountries}`;
   for (let attempt = 1; attempt <= 30; attempt += 1) {
     if (child.exitCode !== null) {
       throw new Error(`The API exited before it became ready.\n${output()}`);
@@ -303,7 +307,7 @@ export const assertStructuredRequestLog = (
     throw new Error(`No structured request log found for ${requestId}.`);
   }
   if (
-    requestLog.path !== '/auth/countries' ||
+    requestLog.path !== API_ROUTES.getAuthCountries ||
     requestLog.method !== 'GET' ||
     requestLog.statusCode !== 200 ||
     typeof requestLog.durationMs !== 'number'
@@ -322,11 +326,11 @@ const verifyStructuredProcessLogging = async (output) => {
   const querySecret = 'never-log-query-value';
   const authorizationSecret = 'never-log-authorization-value';
   const response = await fetch(
-    `${JOURNEY_API_URL}/auth/countries?probe=${querySecret}`,
+    `${JOURNEY_API_URL}${API_ROUTES.getAuthCountries}?probe=${querySecret}`,
     {
       headers: {
         authorization: `Bearer ${authorizationSecret}`,
-        'x-request-id': requestId,
+        [HTTP_HEADERS.requestId]: requestId,
       },
     },
   );
@@ -351,7 +355,7 @@ const stopChild = async (child) => {
 };
 
 const runJourney = async ({ databaseReady = false } = {}) => {
-  const endpoint = `${JOURNEY_API_URL}/auth/countries`;
+  const endpoint = `${JOURNEY_API_URL}${API_ROUTES.getAuthCountries}`;
   if (await endpointResponds(endpoint)) {
     throw new Error(
       `Port ${JOURNEY_PORT} is already serving an application. Stop it or select another STEAD_TEST_API_PORT before running the isolated journey.`,

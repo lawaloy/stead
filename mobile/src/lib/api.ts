@@ -40,6 +40,7 @@ import type {
   ConfirmTransactionImportRequest,
   PreviewTransactionImportRequest,
 } from '../contracts/generated/types.gen';
+import { API_ROUTES, HTTP_HEADERS } from '../contracts/generated/runtime.gen';
 import type { AuthSessionTokens } from './token-store';
 import { reportError } from './observability';
 
@@ -81,11 +82,11 @@ const otpRetryDelayMs = (failedAttempt: number) => {
 };
 
 const PUBLIC_AUTH_PATHS = [
-  appConfig.api.routes.auth.countries,
-  appConfig.api.routes.auth.requestOtp,
-  appConfig.api.routes.auth.verifyOtp,
-  appConfig.api.routes.auth.refresh,
-  appConfig.api.routes.auth.logout,
+  API_ROUTES.getAuthCountries,
+  API_ROUTES.requestOtp,
+  API_ROUTES.verifyOtp,
+  API_ROUTES.refreshSession,
+  API_ROUTES.logoutSession,
 ] as const;
 
 let getTokenFn: AuthConfig['getToken'] = async () => null;
@@ -128,10 +129,7 @@ const rotateAccessToken = async (): Promise<string | null> => {
     if (!refreshAllowed || epoch !== refreshEpoch) return null;
 
     const payload: RefreshSessionRequest = { refreshToken };
-    const response = await apiClient.post(
-      appConfig.api.routes.auth.refresh,
-      payload,
-    );
+    const response = await apiClient.post(API_ROUTES.refreshSession, payload);
     if (!refreshAllowed || epoch !== refreshEpoch) return null;
     const session = AuthVerifyOtpResponseSchema.parse(response.data);
     if (!refreshAllowed || epoch !== refreshEpoch) return null;
@@ -173,9 +171,9 @@ apiClient.interceptors.request.use(async (config) => {
   ]);
   if (!config.headers) config.headers = new AxiosHeaders();
   if (token) config.headers.Authorization = `Bearer ${token}`;
-  config.headers['X-Stead-Device-Id'] = installationId;
-  if (!config.headers.has('X-Request-ID')) {
-    config.headers.set('X-Request-ID', Crypto.randomUUID());
+  config.headers[HTTP_HEADERS.steadDeviceId] = installationId;
+  if (!config.headers.has(HTTP_HEADERS.requestId)) {
+    config.headers.set(HTTP_HEADERS.requestId, Crypto.randomUUID());
   }
   return config;
 });
@@ -188,10 +186,12 @@ const requestIdFrom = (
     const headers = responseHeaders as Record<string, unknown> & {
       get?: (name: string) => unknown;
     };
-    const responseId = headers.get?.('x-request-id') ?? headers['x-request-id'];
+    const responseId =
+      headers.get?.(HTTP_HEADERS.requestId) ??
+      headers[HTTP_HEADERS.requestId.toLowerCase()];
     if (typeof responseId === 'string') return responseId;
   }
-  const requestId = config?.headers?.get?.('X-Request-ID');
+  const requestId = config?.headers?.get?.(HTTP_HEADERS.requestId);
   return typeof requestId === 'string' ? requestId : undefined;
 };
 
@@ -286,7 +286,7 @@ export const configureApiAuth = (config: AuthConfig) => {
 };
 
 export const fetchAuthCountries = async () => {
-  const response = await apiClient.get(appConfig.api.routes.auth.countries);
+  const response = await apiClient.get(API_ROUTES.getAuthCountries);
   return AuthCountriesResponseSchema.parse(response.data);
 };
 
@@ -296,11 +296,9 @@ export const requestOtp = async (phone: string, countryIso: string) => {
 
   for (let attempt = 1; attempt <= OTP_REQUEST_MAX_ATTEMPTS; attempt += 1) {
     try {
-      const response = await apiClient.post(
-        appConfig.api.routes.auth.requestOtp,
-        payload,
-        { headers: { 'Idempotency-Key': idempotencyKey } },
-      );
+      const response = await apiClient.post(API_ROUTES.requestOtp, payload, {
+        headers: { [HTTP_HEADERS.idempotencyKey]: idempotencyKey },
+      });
       return AuthRequestOtpResponseSchema.parse(response.data);
     } catch (error: unknown) {
       const canRetry =
@@ -324,11 +322,9 @@ export const verifyOtp = async (
   const payload: VerifyOtpRequest = { phone, countryIso, otp };
   for (let attempt = 1; attempt <= OTP_VERIFY_MAX_ATTEMPTS; attempt += 1) {
     try {
-      const response = await apiClient.post(
-        appConfig.api.routes.auth.verifyOtp,
-        payload,
-        { headers: { 'Idempotency-Key': idempotencyKey } },
-      );
+      const response = await apiClient.post(API_ROUTES.verifyOtp, payload, {
+        headers: { [HTTP_HEADERS.idempotencyKey]: idempotencyKey },
+      });
       return AuthVerifyOtpResponseSchema.parse(response.data);
     } catch (error: unknown) {
       const canRetry =
@@ -343,10 +339,7 @@ export const verifyOtp = async (
 
 export const refreshSession = async (refreshToken: string) => {
   const payload: RefreshSessionRequest = { refreshToken };
-  const response = await apiClient.post(
-    appConfig.api.routes.auth.refresh,
-    payload,
-  );
+  const response = await apiClient.post(API_ROUTES.refreshSession, payload);
   return AuthVerifyOtpResponseSchema.parse(response.data);
 };
 
@@ -357,16 +350,13 @@ export const logoutSession = async (options?: {
   const payload: LogoutSessionRequest = {};
   if (options?.refreshToken) payload.refreshToken = options.refreshToken;
   if (options?.allDevices) payload.allDevices = true;
-  const response = await apiClient.post(
-    appConfig.api.routes.auth.logout,
-    payload,
-  );
+  const response = await apiClient.post(API_ROUTES.logoutSession, payload);
   return OkResponseSchema.parse(response.data);
 };
 
 export const getActiveGoal = async () => {
   try {
-    const response = await apiClient.get(appConfig.api.routes.goals.active);
+    const response = await apiClient.get(API_ROUTES.getActiveGoal);
     return GoalSchema.parse(response.data);
   } catch (error) {
     if (error instanceof ApiError && error.status === 404) return null;
@@ -375,39 +365,27 @@ export const getActiveGoal = async () => {
 };
 
 export const createGoal = async (payload: CreateGoalRequest) => {
-  const response = await apiClient.post(
-    appConfig.api.routes.goals.create,
-    payload,
-  );
+  const response = await apiClient.post(API_ROUTES.createGoal, payload);
   return GoalSchema.parse(response.data);
 };
 
 export const listGoals = async () => {
-  const response = await apiClient.get(appConfig.api.routes.goals.list);
+  const response = await apiClient.get(API_ROUTES.listGoals);
   return z.array(GoalSchema).parse(response.data);
 };
 
 export const updateGoal = async (id: string, payload: UpdateGoalRequest) => {
-  const response = await apiClient.patch(
-    appConfig.api.routes.goals.detail(id),
-    payload,
-  );
+  const response = await apiClient.patch(API_ROUTES.updateGoal(id), payload);
   return GoalSchema.parse(response.data);
 };
 
 export const endGoal = async (id: string, payload: EndGoalRequest) => {
-  const response = await apiClient.post(
-    appConfig.api.routes.goals.end(id),
-    payload,
-  );
+  const response = await apiClient.post(API_ROUTES.endGoal(id), payload);
   return GoalSchema.parse(response.data);
 };
 
 export const createTransaction = async (payload: CreateTransactionRequest) => {
-  const response = await apiClient.post(
-    appConfig.api.routes.transactions.create,
-    payload,
-  );
+  const response = await apiClient.post(API_ROUTES.createTransaction, payload);
   return TransactionSchema.parse(response.data);
 };
 
@@ -415,7 +393,7 @@ export const listTransactions = async (query?: {
   from?: string;
   to?: string;
 }) => {
-  const response = await apiClient.get(appConfig.api.routes.transactions.list, {
+  const response = await apiClient.get(API_ROUTES.listTransactions, {
     params: query,
   });
   return z.array(TransactionSchema).parse(response.data);
@@ -426,16 +404,14 @@ export const updateTransaction = async (
   payload: UpdateTransactionRequest,
 ) => {
   const response = await apiClient.patch(
-    appConfig.api.routes.transactions.detail(id),
+    API_ROUTES.updateTransaction(id),
     payload,
   );
   return TransactionSchema.parse(response.data);
 };
 
 export const deleteTransaction = async (id: string) => {
-  const response = await apiClient.delete(
-    appConfig.api.routes.transactions.detail(id),
-  );
+  const response = await apiClient.delete(API_ROUTES.deleteTransaction(id));
   return OkResponseSchema.parse(response.data);
 };
 
@@ -443,7 +419,7 @@ export const previewTransactionImport = async (
   payload: PreviewTransactionImportRequest,
 ) => {
   const response = await apiClient.post(
-    appConfig.api.routes.transactions.importPreview,
+    API_ROUTES.previewTransactionImport,
     payload,
   );
   return TransactionImportPreviewSchema.parse(response.data);
@@ -453,21 +429,19 @@ export const confirmTransactionImport = async (
   payload: ConfirmTransactionImportRequest,
 ) => {
   const response = await apiClient.post(
-    appConfig.api.routes.transactions.importConfirm,
+    API_ROUTES.confirmTransactionImport,
     payload,
   );
   return TransactionImportResultSchema.parse(response.data);
 };
 
 export const getDashboardStability = async () => {
-  const response = await apiClient.get(
-    appConfig.api.routes.dashboard.stability,
-  );
+  const response = await apiClient.get(API_ROUTES.getDashboardStability);
   return DashboardStabilityResponseSchema.parse(response.data);
 };
 
 export const getAlertPreferences = async () => {
-  const response = await apiClient.get(appConfig.api.routes.alerts.preferences);
+  const response = await apiClient.get(API_ROUTES.getAlertPreferences);
   return AlertPreferencesSchema.parse(response.data);
 };
 
@@ -475,14 +449,14 @@ export const updateAlertPreferences = async (
   payload: UpdateAlertPreferencesRequest,
 ) => {
   const response = await apiClient.patch(
-    appConfig.api.routes.alerts.preferences,
+    API_ROUTES.updateAlertPreferences,
     payload,
   );
   return AlertPreferencesSchema.parse(response.data);
 };
 
 export const getAccount = async () => {
-  const response = await apiClient.get(appConfig.api.routes.account.root);
+  const response = await apiClient.get(API_ROUTES.getAccount);
   return AccountResponseSchema.parse(response.data);
 };
 
@@ -490,7 +464,7 @@ export const updateAccountProfile = async (
   payload: UpdateAccountProfileRequest,
 ) => {
   const response = await apiClient.patch(
-    appConfig.api.routes.account.profile,
+    API_ROUTES.updateAccountProfile,
     payload,
   );
   return AccountResponseSchema.parse(response.data);
@@ -500,19 +474,19 @@ export const updateAccountConsents = async (
   payload: UpdateAccountConsentsRequest,
 ) => {
   const response = await apiClient.put(
-    appConfig.api.routes.account.consents,
+    API_ROUTES.updateAccountConsents,
     payload,
   );
   return AccountResponseSchema.parse(response.data);
 };
 
 export const exportAccountData = async () => {
-  const response = await apiClient.get(appConfig.api.routes.account.export);
+  const response = await apiClient.get(API_ROUTES.exportAccountData);
   return AccountDataExportSchema.parse(response.data);
 };
 
 export const deleteAccount = async () => {
-  const response = await apiClient.delete(appConfig.api.routes.account.root, {
+  const response = await apiClient.delete(API_ROUTES.deleteAccount, {
     data: { confirmation: 'DELETE' },
   });
   return DeleteAccountResponseSchema.parse(response.data);

@@ -118,6 +118,7 @@ export type {
   RefreshSessionRequest,
   RefreshSessionResponse,
   RefreshSessionResponses,
+  RequestId,
   RequestOtpData,
   RequestOtpError,
   RequestOtpErrors,

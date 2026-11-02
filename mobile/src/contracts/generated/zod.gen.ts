@@ -324,6 +324,15 @@ export const zErrorResponse = z.object({
 });
 
 /**
+ * Optional caller-provided request identifier. The API returns the validated value, or a generated replacement, in the response header.
+ */
+export const zRequestId = z
+  .string()
+  .min(1)
+  .max(128)
+  .regex(/^[A-Za-z0-9._:-]+$/);
+
+/**
  * Stable UUIDv4 reused for every retry of one logical OTP request or verification.
  */
 export const zIdempotencyKey = z
