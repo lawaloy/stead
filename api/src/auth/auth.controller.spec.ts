@@ -58,8 +58,9 @@ describe('AuthController', () => {
     const req = {
       ip: '127.0.0.1',
       get: jest.fn((header: string) => {
-        if (header === 'user-agent') return 'jest-agent';
-        if (header === 'x-stead-device-id') {
+        const normalizedHeader = header.toLowerCase();
+        if (normalizedHeader === 'user-agent') return 'jest-agent';
+        if (normalizedHeader === 'x-stead-device-id') {
           return '0f81c2a7-1e6d-4f05-9a1c-03de8a5f6b77';
         }
         return '00000000-0000-4000-8000-000000000001';
@@ -111,7 +112,7 @@ describe('AuthController', () => {
     const req = {
       ip: undefined,
       get: jest.fn((header: string) =>
-        header === 'idempotency-key'
+        header.toLowerCase() === 'idempotency-key'
           ? '00000000-0000-4000-8000-000000000001'
           : undefined,
       ),
@@ -144,7 +145,7 @@ describe('AuthController', () => {
       },
     );
     expect(req.get).toHaveBeenCalledWith('user-agent');
-    expect(req.get).toHaveBeenCalledWith('x-stead-device-id');
+    expect(req.get).toHaveBeenCalledWith('X-Stead-Device-Id');
   });
 
   it('rejects an OTP request without an Idempotency-Key header', () => {

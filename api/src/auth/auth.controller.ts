@@ -21,6 +21,7 @@ import { VerifyOtpDto } from './dto/verify-otp.dto';
 import { RefreshSessionDto } from './dto/refresh-session.dto';
 import { LogoutSessionDto } from './dto/logout-session.dto';
 import { CountriesService } from '../countries/countries.service';
+import { HTTP_HEADERS } from '../contracts/generated/runtime.gen';
 
 @Controller('auth')
 export class AuthController {
@@ -37,30 +38,34 @@ export class AuthController {
 
   @Post('request-otp')
   requestOtp(@Body() dto: RequestOtpDto, @Req() req: Request) {
-    const idempotencyKey = req.get('idempotency-key');
+    const idempotencyKey = req.get(HTTP_HEADERS.idempotencyKey);
     if (!idempotencyKey) {
-      throw new BadRequestException('Idempotency-Key header is required.');
+      throw new BadRequestException(
+        `${HTTP_HEADERS.idempotencyKey} header is required.`,
+      );
     }
 
     return this.auth.requestOtp(dto.phone, dto.countryIso, {
       ip: req.ip,
       userAgent: req.get('user-agent'),
-      deviceId: req.get('x-stead-device-id'),
+      deviceId: req.get(HTTP_HEADERS.steadDeviceId),
       idempotencyKey,
     });
   }
 
   @Post('verify-otp')
   verifyOtp(@Body() dto: VerifyOtpDto, @Req() req: Request) {
-    const idempotencyKey = req.get('idempotency-key');
+    const idempotencyKey = req.get(HTTP_HEADERS.idempotencyKey);
     if (!idempotencyKey) {
-      throw new BadRequestException('Idempotency-Key header is required.');
+      throw new BadRequestException(
+        `${HTTP_HEADERS.idempotencyKey} header is required.`,
+      );
     }
 
     return this.auth.verifyOtp(dto.phone, dto.countryIso, dto.otp, {
       ip: req.ip,
       userAgent: req.get('user-agent'),
-      deviceId: req.get('x-stead-device-id'),
+      deviceId: req.get(HTTP_HEADERS.steadDeviceId),
       idempotencyKey,
     });
   }
@@ -70,7 +75,7 @@ export class AuthController {
     return this.auth.refreshSession(dto.refreshToken, {
       ip: req.ip,
       userAgent: req.get('user-agent'),
-      deviceId: req.get('x-stead-device-id'),
+      deviceId: req.get(HTTP_HEADERS.steadDeviceId),
     });
   }
 

@@ -18,44 +18,6 @@ export const appConfig = {
     androidEmulatorHost: '10.0.2.2',
     localhost: 'localhost',
     timeoutMs: resolveApiTimeoutMs(),
-    routes: {
-      auth: {
-        countries: '/auth/countries',
-        requestOtp: '/auth/request-otp',
-        verifyOtp: '/auth/verify-otp',
-        refresh: '/auth/refresh',
-        logout: '/auth/logout',
-      },
-      goals: {
-        active: '/goals/active',
-        create: '/goals',
-        list: '/goals',
-        detail: (id: string) => `/goals/${id}`,
-        end: (id: string) => `/goals/${id}/end`,
-      },
-      transactions: {
-        create: '/transactions',
-        list: '/transactions',
-        importPreview: '/transactions/import/preview',
-        importConfirm: '/transactions/import',
-        detail: (id: string) => `/transactions/${id}`,
-      },
-      dashboard: {
-        stability: '/dashboard/stability',
-      },
-      notifications: {
-        inspection: '/notifications/inspection',
-      },
-      alerts: {
-        preferences: '/alerts/preferences',
-      },
-      account: {
-        root: '/account',
-        profile: '/account/profile',
-        consents: '/account/consents',
-        export: '/account/export',
-      },
-    },
   },
   support: {
     email: process.env.EXPO_PUBLIC_SUPPORT_EMAIL?.trim() || null,

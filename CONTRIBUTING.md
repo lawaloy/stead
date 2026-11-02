@@ -98,9 +98,12 @@ priorities belong in [Project Status](docs/project-status.md).
 - Add every required environment variable to the matching `.env.example`.
 - Never run e2e tests against the development `public` schema. Use the root
   database-backed commands, which enforce dedicated schemas.
-- Update `contracts/openapi.yaml` before changing a mobile-consumed API request
-  or response. Run `npm --prefix api run contracts:generate`, commit the
-  generated API/mobile files, and never edit generated files by hand.
+- Update `contracts/openapi.yaml` before changing a mobile-consumed API request,
+  response, shared HTTP header, or route. Run
+  `npm --prefix api run contracts:generate`, commit the generated API, mobile,
+  and automation files, and never edit generated files by hand. Runtime code
+  must consume generated `HTTP_HEADERS` and `API_ROUTES` values instead of
+  repeating wire-contract literals.
 
 ## Validation Strategy
 

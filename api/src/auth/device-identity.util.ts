@@ -1,5 +1,6 @@
 import { BadRequestException } from '@nestjs/common';
 import { createHmac } from 'node:crypto';
+import { HTTP_HEADERS } from '../contracts/generated/runtime.gen';
 
 const DEVICE_ID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -12,7 +13,7 @@ export function hashDeviceIdentifier(
 
   if (!DEVICE_ID_PATTERN.test(deviceId)) {
     throw new BadRequestException(
-      'X-Stead-Device-Id must be a valid UUIDv4 identifier',
+      `${HTTP_HEADERS.steadDeviceId} must be a valid UUIDv4 identifier`,
     );
   }
 

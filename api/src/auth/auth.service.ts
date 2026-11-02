@@ -24,6 +24,7 @@ import type {
   RequestOtpResponse,
   VerifyOtpResponse,
 } from '../contracts/generated/types.gen';
+import { HTTP_HEADERS } from '../contracts/generated/runtime.gen';
 import { hashDeviceIdentifier } from './device-identity.util';
 import {
   generateRefreshFamilyId,
@@ -145,7 +146,7 @@ export class AuthService {
 
     if (existing.user.phone !== normalizedPhone) {
       throw new ConflictException(
-        'Idempotency-Key was already used for another OTP request.',
+        `${HTTP_HEADERS.idempotencyKey} was already used for another OTP request.`,
       );
     }
 
@@ -262,7 +263,9 @@ export class AuthService {
     );
     const idempotencyKey = context.idempotencyKey.trim().toLowerCase();
     if (!IDEMPOTENCY_KEY_PATTERN.test(idempotencyKey)) {
-      throw new BadRequestException('Idempotency-Key must be a UUIDv4 value.');
+      throw new BadRequestException(
+        `${HTTP_HEADERS.idempotencyKey} must be a UUIDv4 value.`,
+      );
     }
     const requestKeyHash = createHash('sha256')
       .update(idempotencyKey)
@@ -479,7 +482,9 @@ export class AuthService {
       .trim()
       .toLowerCase();
     if (!IDEMPOTENCY_KEY_PATTERN.test(idempotencyKey)) {
-      throw new BadRequestException('Idempotency-Key must be a UUIDv4 value.');
+      throw new BadRequestException(
+        `${HTTP_HEADERS.idempotencyKey} must be a UUIDv4 value.`,
+      );
     }
     const verificationSecret = this.otpVerificationEncryptionKey;
     const verificationKeyHash = hashOtpVerificationKey(idempotencyKey);
@@ -889,7 +894,7 @@ export class AuthService {
     if (!existing) return null;
     if (existing.user.phone !== normalizedPhone) {
       throw new ConflictException(
-        'Idempotency-Key was already used for another OTP verification.',
+        `${HTTP_HEADERS.idempotencyKey} was already used for another OTP verification.`,
       );
     }
     if (
@@ -900,12 +905,12 @@ export class AuthService {
       )
     ) {
       throw new ConflictException(
-        'Idempotency-Key was already used for another OTP verification.',
+        `${HTTP_HEADERS.idempotencyKey} was already used for another OTP verification.`,
       );
     }
     if (!(await bcrypt.compare(otp, existing.codeHash))) {
       throw new ConflictException(
-        'Idempotency-Key was already used for another OTP verification.',
+        `${HTTP_HEADERS.idempotencyKey} was already used for another OTP verification.`,
       );
     }
     if (

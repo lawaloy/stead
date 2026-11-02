@@ -342,6 +342,11 @@ export type ErrorResponse = {
 };
 
 /**
+ * Optional caller-provided request identifier. The API returns the validated value, or a generated replacement, in the response header.
+ */
+export type RequestId = string;
+
+/**
  * Stable UUIDv4 reused for every retry of one logical OTP request or verification.
  */
 export type IdempotencyKey = string;

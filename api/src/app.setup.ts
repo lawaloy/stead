@@ -7,6 +7,7 @@ import {
   type ObservabilityMetrics,
 } from './observability/metrics';
 import { runWithRequestId } from './observability/request-context';
+import { HTTP_HEADERS } from './contracts/generated/runtime.gen';
 
 const SAFE_REQUEST_ID = /^[A-Za-z0-9._:-]{1,128}$/;
 const UUID_PATH_SEGMENT =
@@ -40,12 +41,12 @@ export function configureApp(app: INestApplication) {
     }),
   );
   app.use((req: Request, res: Response, next: NextFunction) => {
-    const rawRequestId = req.headers['x-request-id'];
+    const rawRequestId = req.headers[HTTP_HEADERS.requestId.toLowerCase()];
     const requestId =
       typeof rawRequestId === 'string' && SAFE_REQUEST_ID.test(rawRequestId)
         ? rawRequestId
         : randomUUID();
-    res.setHeader('x-request-id', requestId);
+    res.setHeader(HTTP_HEADERS.requestId, requestId);
     const started = performance.now();
     res.on('finish', () => {
       runWithRequestId(requestId, () => {
