@@ -15,16 +15,34 @@ available for local readability. `LOG_LEVEL` accepts `debug`, `info`, `warn`,
 or `error` and defaults to `info`.
 
 Every HTTP response includes `x-request-id`. A safe client value is preserved;
-otherwise the API generates one. Request logs contain the method, sanitized
-route path, status, duration, and request ID, but never resource UUIDs, the
-query string, or request body.
-The same identifier is available to logs written during request handling.
+otherwise the API generates one. The resolved request ID is used as both the
+request's correlation ID and operation ID, so every request has one searchable
+identifier rather than two unrelated values. Request logs contain the method,
+sanitized route path, status, duration, request ID, and the stable
+`http.request` operation name, but never resource UUIDs, the query string, or
+request body. The same context is available to logs written during request
+handling.
 
 Queued notification jobs persist their originating correlation ID. Work that
 starts outside a request receives a generated ID, and consumer logs restore
 that context while delivering the job. This makes an API action traceable into
 asynchronous SMS delivery without persisting a provider credential or message
 body in logs.
+
+Each readiness-scheduler evaluation and notification queue-poll cycle has a
+generated, operation-name-prefixed ID because background work has no incoming
+request ID. Logs carry both the stable operation name and unique ID. When a job
+is claimed, delivery logs also carry the job's originating correlation ID.
+Operation IDs are log context only and are deliberately excluded from metric
+attributes.
+
+The API records vendor-neutral OpenTelemetry counters and duration histograms
+for HTTP requests, scheduler runs, notification polling and processing, and SMS
+provider outcomes. Attribute values are bounded operational dimensions such as
+route, status, notification type, provider, and outcome; customer, request,
+operation, job, and message identifiers are never metric attributes. Durations
+use seconds. A deployment must register an OpenTelemetry metrics SDK and
+exporter to send these instruments to its selected monitoring destination.
 
 ## Sensitive-Data Boundary
 
@@ -92,10 +110,6 @@ release documents should link here instead of copying it.
 
 ### Follow-up instrumentation
 
-- Give each scheduler evaluation and queue-poll cycle an operation ID so
-  failures that happen before a notification job is claimed remain traceable.
-- Add vendor-neutral counters and latency distributions for HTTP requests,
-  notification processing, scheduler runs, and provider outcomes.
 - Add backend spans or an APM integration when the deployment platform is
   selected; the current request ID is correlation, not distributed tracing.
 - Decide whether handled backend failures need a dedicated error tracker in

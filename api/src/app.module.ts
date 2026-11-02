@@ -13,11 +13,13 @@ import { TransactionsModule } from './transactions/transactions.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { AlertsModule } from './alerts/alerts.module';
 import { AccountModule } from './account/account.module';
+import { ObservabilityModule } from './observability/observability.module';
 
 @Module({
   controllers: [AppController],
   providers: [AppService],
   imports: [
+    ObservabilityModule,
     ConfigModule.forRoot({
       isGlobal: true,
       validationSchema: envSchema,

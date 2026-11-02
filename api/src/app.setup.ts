@@ -1,7 +1,12 @@
 import { INestApplication, Logger, ValidationPipe } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import type { NextFunction, Request, Response } from 'express';
-import { runWithCorrelationId } from './observability/request-context';
+import { performance } from 'node:perf_hooks';
+import {
+  OBSERVABILITY_METRICS,
+  type ObservabilityMetrics,
+} from './observability/metrics';
+import { runWithRequestId } from './observability/request-context';
 
 const SAFE_REQUEST_ID = /^[A-Za-z0-9._:-]{1,128}$/;
 const UUID_PATH_SEGMENT =
@@ -9,6 +14,12 @@ const UUID_PATH_SEGMENT =
 
 const safeRequestPath = (path: string) =>
   path.replace(UUID_PATH_SEGMENT, ':id');
+
+const metricRoute = (req: Request) => {
+  const routePath = (req.route as { path?: unknown } | undefined)?.path;
+  if (typeof routePath !== 'string') return 'unmatched';
+  return routePath || '/';
+};
 
 export function configureApp(app: INestApplication) {
   const expressApp = app as INestApplication & {
@@ -20,6 +31,7 @@ export function configureApp(app: INestApplication) {
   });
 
   const logger = new Logger('HTTP');
+  const metrics = app.get<ObservabilityMetrics>(OBSERVABILITY_METRICS);
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
@@ -34,16 +46,27 @@ export function configureApp(app: INestApplication) {
         ? rawRequestId
         : randomUUID();
     res.setHeader('x-request-id', requestId);
-    const started = Date.now();
+    const started = performance.now();
     res.on('finish', () => {
-      logger.log('HTTP request completed', {
-        requestId,
-        method: req.method,
-        path: safeRequestPath(req.path),
-        statusCode: res.statusCode,
-        durationMs: Date.now() - started,
+      runWithRequestId(requestId, () => {
+        const path = safeRequestPath(req.path);
+        const route = metricRoute(req);
+        const durationMs = performance.now() - started;
+        logger.log('HTTP request completed', {
+          requestId,
+          method: req.method,
+          path,
+          statusCode: res.statusCode,
+          durationMs,
+        });
+        metrics.recordHttpRequest({
+          method: req.method,
+          route,
+          statusCode: res.statusCode,
+          durationMs,
+        });
       });
     });
-    runWithCorrelationId(requestId, next);
+    runWithRequestId(requestId, next);
   });
 }

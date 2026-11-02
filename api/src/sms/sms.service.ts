@@ -1,14 +1,20 @@
 import {
   HttpException,
   HttpStatus,
+  Inject,
   Injectable,
   Logger,
   OnModuleInit,
 } from '@nestjs/common';
+import { performance } from 'node:perf_hooks';
 import { ConfigService } from '@nestjs/config';
 import { TwilioClient } from './twilio.client';
 import { TermiiClient } from './termii.client';
 import { DevClient } from './dev.client';
+import {
+  OBSERVABILITY_METRICS,
+  type ObservabilityMetrics,
+} from '../observability/metrics';
 
 @Injectable()
 export class SmsService implements OnModuleInit {
@@ -19,6 +25,8 @@ export class SmsService implements OnModuleInit {
     private readonly twilio: TwilioClient,
     private readonly termii: TermiiClient,
     private readonly dev: DevClient,
+    @Inject(OBSERVABILITY_METRICS)
+    private readonly metrics: ObservabilityMetrics,
   ) {}
 
   onModuleInit() {
@@ -49,71 +57,88 @@ export class SmsService implements OnModuleInit {
     kind: 'OTP' | 'notification',
   ) {
     const provider = this.getProviderName();
+    const started = performance.now();
+    let outcome: 'success' | 'error' = 'error';
 
-    const to = phone;
+    try {
+      const to = phone;
 
-    if (provider === 'dev') {
-      const response = this.dev.sendMessage({ to, body });
-      return { ok: true, provider: 'dev', response };
+      if (provider === 'dev') {
+        const response = this.dev.sendMessage({ to, body });
+        outcome = 'success';
+        return { ok: true, provider: 'dev', response };
+      }
+
+      if (provider === 'twilio') {
+        const from = process.env.TWILIO_FROM;
+        const messagingServiceSid = process.env.TWILIO_MESSAGING_SERVICE_SID;
+
+        if (!from && !messagingServiceSid) {
+          throw new HttpException(
+            'Set TWILIO_FROM or TWILIO_MESSAGING_SERVICE_SID',
+            HttpStatus.BAD_REQUEST,
+          );
+        }
+
+        try {
+          const response = await this.twilio.sendMessage({
+            to,
+            body,
+            from,
+            messagingServiceSid,
+          });
+          outcome = 'success';
+          return { ok: true, provider: 'twilio', response };
+        } catch (error: unknown) {
+          const details = this.extractErrorDetails(error);
+          throw new HttpException(
+            { message: `Failed to send ${kind} via Twilio`, details },
+            HttpStatus.BAD_GATEWAY,
+          );
+        }
+      }
+
+      if (provider === 'termii') {
+        const senderId = process.env.TERMII_SENDER_ID;
+        const channel = process.env.TERMII_CHANNEL || 'generic';
+
+        if (!senderId) {
+          throw new HttpException(
+            'Set TERMII_SENDER_ID',
+            HttpStatus.BAD_REQUEST,
+          );
+        }
+
+        try {
+          const response = await this.termii.sendMessage({
+            to,
+            from: senderId,
+            sms: body,
+            channel,
+          });
+          outcome = 'success';
+          return { ok: true, provider: 'termii', response };
+        } catch (error: unknown) {
+          const details = this.extractErrorDetails(error);
+          throw new HttpException(
+            { message: `Failed to send ${kind} via Termii`, details },
+            HttpStatus.BAD_GATEWAY,
+          );
+        }
+      }
+
+      throw new HttpException(
+        `Unsupported SMS provider: ${String(provider)}`,
+        HttpStatus.BAD_REQUEST,
+      );
+    } finally {
+      this.metrics.recordProviderRequest({
+        provider,
+        kind: kind === 'OTP' ? 'otp' : 'notification',
+        outcome,
+        durationMs: performance.now() - started,
+      });
     }
-
-    if (provider === 'twilio') {
-      const from = process.env.TWILIO_FROM;
-      const messagingServiceSid = process.env.TWILIO_MESSAGING_SERVICE_SID;
-
-      if (!from && !messagingServiceSid) {
-        throw new HttpException(
-          'Set TWILIO_FROM or TWILIO_MESSAGING_SERVICE_SID',
-          HttpStatus.BAD_REQUEST,
-        );
-      }
-
-      try {
-        const response = await this.twilio.sendMessage({
-          to,
-          body,
-          from,
-          messagingServiceSid,
-        });
-        return { ok: true, provider: 'twilio', response };
-      } catch (error: unknown) {
-        const details = this.extractErrorDetails(error);
-        throw new HttpException(
-          { message: `Failed to send ${kind} via Twilio`, details },
-          HttpStatus.BAD_GATEWAY,
-        );
-      }
-    }
-
-    if (provider === 'termii') {
-      const senderId = process.env.TERMII_SENDER_ID;
-      const channel = process.env.TERMII_CHANNEL || 'generic';
-
-      if (!senderId) {
-        throw new HttpException('Set TERMII_SENDER_ID', HttpStatus.BAD_REQUEST);
-      }
-
-      try {
-        const response = await this.termii.sendMessage({
-          to,
-          from: senderId,
-          sms: body,
-          channel,
-        });
-        return { ok: true, provider: 'termii', response };
-      } catch (error: unknown) {
-        const details = this.extractErrorDetails(error);
-        throw new HttpException(
-          { message: `Failed to send ${kind} via Termii`, details },
-          HttpStatus.BAD_GATEWAY,
-        );
-      }
-    }
-
-    throw new HttpException(
-      `Unsupported SMS provider: ${String(provider)}`,
-      HttpStatus.BAD_REQUEST,
-    );
   }
 
   private extractErrorDetails(error: unknown) {

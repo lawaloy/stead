@@ -14,6 +14,7 @@ describe('AlertsScheduler module lifecycle', () => {
     scheduler = new AlertsScheduler(
       prisma as unknown as PrismaService,
       alerts as unknown as AlertsService,
+      { recordSchedulerRun: jest.fn() } as never,
     );
   });
 
