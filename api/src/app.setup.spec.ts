@@ -8,6 +8,7 @@ describe('configureApp', () => {
   let useGlobalPipes: jest.Mock;
   let use: jest.Mock;
   let useBodyParser: jest.Mock;
+  let metrics: { recordHttpRequest: jest.Mock };
   let middleware: (req: Request, res: Response, next: NextFunction) => void;
   let app: INestApplication;
 
@@ -27,8 +28,10 @@ describe('configureApp', () => {
       middleware = handler;
     });
     useBodyParser = jest.fn();
+    metrics = { recordHttpRequest: jest.fn() };
     app = {
       enableCors,
+      get: jest.fn().mockReturnValue(metrics),
       useGlobalPipes,
       use,
       useBodyParser,
@@ -132,9 +135,11 @@ describe('configureApp', () => {
     middleware(
       {
         headers: { 'x-request-id': 'log-trace' },
+        baseUrl: '',
         method: 'POST',
         originalUrl: '/goals',
         path: '/goals',
+        route: { path: '/goals' },
       } as unknown as Request,
       res,
       jest.fn(),
@@ -147,6 +152,12 @@ describe('configureApp', () => {
       method: 'POST',
       path: '/goals',
       requestId: 'log-trace',
+      statusCode: 201,
+    });
+    expect(metrics.recordHttpRequest).toHaveBeenCalledWith({
+      durationMs: expect.any(Number) as unknown,
+      method: 'POST',
+      route: '/goals',
       statusCode: 201,
     });
     logSpy.mockRestore();
@@ -175,6 +186,44 @@ describe('configureApp', () => {
       expect.objectContaining({ path: '/goals/:id' }),
     );
     logSpy.mockRestore();
+  });
+
+  it('uses matched route templates and a fixed unmatched metric fallback', () => {
+    const first = createResponse(200);
+    middleware(
+      {
+        baseUrl: '',
+        headers: {},
+        method: 'GET',
+        path: '/goals/customer-controlled-id',
+        route: { path: '/goals/:id' },
+      } as unknown as Request,
+      first.res,
+      jest.fn(),
+    );
+    first.res.emit('finish');
+
+    const second = createResponse(404);
+    middleware(
+      {
+        baseUrl: '',
+        headers: {},
+        method: 'GET',
+        path: '/missing/customer-controlled-id',
+      } as unknown as Request,
+      second.res,
+      jest.fn(),
+    );
+    second.res.emit('finish');
+
+    expect(metrics.recordHttpRequest).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({ route: '/goals/:id' }),
+    );
+    expect(metrics.recordHttpRequest).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ route: 'unmatched' }),
+    );
   });
 
   it('replaces unsafe client request ids', () => {

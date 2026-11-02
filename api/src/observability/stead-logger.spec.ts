@@ -1,4 +1,4 @@
-import { runWithCorrelationId } from './request-context';
+import { runWithCorrelationId, runWithOperationId } from './request-context';
 import { SteadLogger } from './stead-logger';
 
 describe('SteadLogger', () => {
@@ -51,5 +51,32 @@ describe('SteadLogger', () => {
 
     expect(write).toHaveBeenCalledTimes(1);
     expect(String(write.mock.calls[0]?.[0])).toContain('emitted');
+  });
+
+  it('keeps operation and correlation identifiers across nested async work', async () => {
+    const write = jest
+      .spyOn(process.stdout, 'write')
+      .mockImplementation(() => true);
+    const logger = new SteadLogger({
+      LOG_FORMAT: 'json',
+      LOG_LEVEL: 'info',
+    });
+
+    await runWithOperationId('poll_123', () =>
+      runWithCorrelationId('request_456', async () => {
+        await Promise.resolve();
+        logger.log('Claimed job');
+      }),
+    );
+
+    const record = JSON.parse(String(write.mock.calls[0]?.[0])) as Record<
+      string,
+      unknown
+    >;
+    expect(record).toMatchObject({
+      message: 'Claimed job',
+      operationId: 'poll_123',
+      correlationId: 'request_456',
+    });
   });
 });

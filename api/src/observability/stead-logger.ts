@@ -1,5 +1,5 @@
 import { ConsoleLogger, type LogLevel } from '@nestjs/common';
-import { getCorrelationId } from './request-context';
+import { getCorrelationId, getOperationId } from './request-context';
 
 const REDACTED_LOG_PATHS = [
   'authorization',
@@ -59,13 +59,19 @@ export class SteadLogger extends ConsoleLogger {
 
   private withCorrelation(optionalParams: unknown[]): unknown[] {
     const correlationId = getCorrelationId();
-    if (!correlationId) return optionalParams;
+    const operationId = getOperationId();
+    if (!correlationId && !operationId) return optionalParams;
+
+    const context = {
+      ...(correlationId ? { correlationId } : {}),
+      ...(operationId ? { operationId } : {}),
+    };
 
     const last = optionalParams.at(-1);
     if (typeof last === 'string') {
-      return [...optionalParams.slice(0, -1), { correlationId }, last];
+      return [...optionalParams.slice(0, -1), context, last];
     }
-    return [...optionalParams, { correlationId }];
+    return [...optionalParams, context];
   }
 }
 

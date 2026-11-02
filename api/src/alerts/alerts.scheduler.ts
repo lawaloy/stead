@@ -1,9 +1,17 @@
 import {
+  Inject,
   Injectable,
   Logger,
   OnModuleDestroy,
   OnModuleInit,
 } from '@nestjs/common';
+import { randomUUID } from 'node:crypto';
+import { performance } from 'node:perf_hooks';
+import {
+  OBSERVABILITY_METRICS,
+  type ObservabilityMetrics,
+} from '../observability/metrics';
+import { runWithOperationId } from '../observability/request-context';
 import { PrismaService } from '../prisma/prisma.service';
 import { AlertsService } from './alerts.service';
 
@@ -16,6 +24,8 @@ export class AlertsScheduler implements OnModuleInit, OnModuleDestroy {
   constructor(
     private readonly prisma: PrismaService,
     private readonly alerts: AlertsService,
+    @Inject(OBSERVABILITY_METRICS)
+    private readonly metrics: ObservabilityMetrics,
   ) {}
 
   onModuleInit() {
@@ -39,19 +49,41 @@ export class AlertsScheduler implements OnModuleInit, OnModuleDestroy {
     for (const preference of preferences) {
       await this.alerts.evaluateUser(preference.userId, now);
     }
+    return preferences.length;
   }
 
   private async tick() {
-    if (this.running) return;
-    this.running = true;
-    try {
-      await this.run();
-    } catch (error: unknown) {
-      this.logger.error('Readiness alert evaluation failed', {
-        errorName: error instanceof Error ? error.name : 'UnknownError',
-      });
-    } finally {
-      this.running = false;
-    }
+    const operationId = randomUUID();
+    return runWithOperationId(operationId, async () => {
+      if (this.running) {
+        this.metrics.recordSchedulerRun({
+          outcome: 'skipped',
+          durationMs: 0,
+        });
+        return;
+      }
+
+      const started = performance.now();
+      let outcome: 'success' | 'error' = 'error';
+      this.running = true;
+      try {
+        const evaluatedUsers = await this.run();
+        outcome = 'success';
+        this.logger.log('Readiness alert evaluation completed', {
+          evaluatedUsers,
+          durationMs: performance.now() - started,
+        });
+      } catch (error: unknown) {
+        this.logger.error('Readiness alert evaluation failed', {
+          errorName: error instanceof Error ? error.name : 'UnknownError',
+        });
+      } finally {
+        this.metrics.recordSchedulerRun({
+          outcome,
+          durationMs: performance.now() - started,
+        });
+        this.running = false;
+      }
+    });
   }
 }
