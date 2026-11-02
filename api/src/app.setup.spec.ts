@@ -2,6 +2,11 @@ import { Logger, ValidationPipe, type INestApplication } from '@nestjs/common';
 import type { NextFunction, Request, Response } from 'express';
 import { EventEmitter } from 'events';
 import { configureApp } from './app.setup';
+import {
+  getCorrelationId,
+  getOperationId,
+  getOperationName,
+} from './observability/request-context';
 
 describe('configureApp', () => {
   let enableCors: jest.Mock;
@@ -78,6 +83,33 @@ describe('configureApp', () => {
 
     expect(setHeader).toHaveBeenCalledWith('x-request-id', 'client-trace-1');
     expect(next).toHaveBeenCalledTimes(1);
+  });
+
+  it('uses the resolved request id as every HTTP request operation id', () => {
+    const { res } = createResponse(200);
+    let observedContext: Record<string, string | undefined> = {};
+
+    middleware(
+      {
+        headers: { 'x-request-id': 'client-trace-1' },
+        method: 'GET',
+        originalUrl: '/health',
+      } as unknown as Request,
+      res,
+      () => {
+        observedContext = {
+          correlationId: getCorrelationId(),
+          operationId: getOperationId(),
+          operationName: getOperationName(),
+        };
+      },
+    );
+
+    expect(observedContext).toEqual({
+      correlationId: 'client-trace-1',
+      operationId: 'client-trace-1',
+      operationName: 'http.request',
+    });
   });
 
   it('generates a request id when the header is missing or empty', () => {

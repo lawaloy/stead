@@ -5,7 +5,6 @@ import {
   OnModuleDestroy,
   OnModuleInit,
 } from '@nestjs/common';
-import { randomUUID } from 'node:crypto';
 import { performance } from 'node:perf_hooks';
 import { SmsService } from '../sms/sms.service';
 import { NotificationQueueService } from './notification-queue.service';
@@ -16,7 +15,8 @@ import {
 } from '../observability/metrics';
 import {
   runWithCorrelationId,
-  runWithOperationId,
+  createOperationId,
+  runWithOperation,
 } from '../observability/request-context';
 
 @Injectable()
@@ -49,8 +49,9 @@ export class NotificationConsumerService
   }
 
   private async tick() {
-    const operationId = randomUUID();
-    return runWithOperationId(operationId, async () => {
+    const operationName = 'notifications.poll';
+    const operationId = createOperationId(operationName);
+    return runWithOperation(operationId, operationName, async () => {
       if (this.isProcessing) {
         this.metrics.recordNotificationPoll({
           outcome: 'skipped',

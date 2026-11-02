@@ -1,4 +1,8 @@
-import { runWithCorrelationId, runWithOperationId } from './request-context';
+import {
+  createOperationId,
+  runWithCorrelationId,
+  runWithOperation,
+} from './request-context';
 import { SteadLogger } from './stead-logger';
 
 describe('SteadLogger', () => {
@@ -62,7 +66,7 @@ describe('SteadLogger', () => {
       LOG_LEVEL: 'info',
     });
 
-    await runWithOperationId('poll_123', () =>
+    await runWithOperation('poll_123', 'notifications.poll', () =>
       runWithCorrelationId('request_456', async () => {
         await Promise.resolve();
         logger.log('Claimed job');
@@ -76,7 +80,18 @@ describe('SteadLogger', () => {
     expect(record).toMatchObject({
       message: 'Claimed job',
       operationId: 'poll_123',
+      operationName: 'notifications.poll',
       correlationId: 'request_456',
     });
+  });
+
+  it('creates recognizable unique identifiers for background operations', () => {
+    const first = createOperationId('alerts.scheduler.evaluate');
+    const second = createOperationId('alerts.scheduler.evaluate');
+
+    expect(first).toMatch(
+      /^alerts\.scheduler\.evaluate:[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
+    );
+    expect(second).not.toBe(first);
   });
 });
