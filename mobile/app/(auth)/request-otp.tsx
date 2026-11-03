@@ -165,9 +165,21 @@ export default function RequestOtpScreen() {
       <Text style={styles.helper}>
         {selectedCountry.label}: local number or full international number
       </Text>
-      {validation ? <Text style={styles.error}>{validation}</Text> : null}
+      {validation ? (
+        <Text
+          accessibilityLiveRegion="assertive"
+          accessibilityRole="alert"
+          style={styles.error}
+        >
+          {validation}
+        </Text>
+      ) : null}
       {mutation.error ? (
-        <Text style={styles.error}>
+        <Text
+          accessibilityLiveRegion="assertive"
+          accessibilityRole="alert"
+          style={styles.error}
+        >
           {getAuthErrorMessage(mutation.error, 'request')}
         </Text>
       ) : null}

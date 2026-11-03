@@ -12,6 +12,10 @@ import { getDashboardStability } from '../../src/lib/api';
 import { useAuth } from '../../src/lib/auth-state';
 import { sessionQueryKeys } from '../../src/lib/session-query-cache';
 import { ScreenShell } from '../../src/components/screen-shell';
+import {
+  LoadingFeedback,
+  RetryFeedback,
+} from '../../src/components/async-feedback';
 
 const koboToNaira = (kobo: number) => `₦${(kobo / 100).toLocaleString()}`;
 
@@ -56,25 +60,18 @@ export default function DashboardScreen() {
   if (query.isLoading) {
     return (
       <ScreenShell title="Stability Dashboard" scroll={false}>
-        <Text>Loading stability metrics...</Text>
+        <LoadingFeedback message="Loading stability metrics..." />
       </ScreenShell>
     );
   }
 
-  if (query.isLoadingError) {
+  if (!query.data) {
     return (
       <ScreenShell title="Stability Dashboard" scroll={false}>
-        <Text style={styles.error}>
-          Failed to load dashboard. Pull to retry.
-        </Text>
-        <ScrollView
-          testID="dashboard-refresh"
-          refreshControl={
-            <RefreshControl
-              refreshing={query.isRefetching}
-              onRefresh={query.refetch}
-            />
-          }
+        <RetryFeedback
+          message="Could not load dashboard. Check your connection and retry."
+          onRetry={query.refetch}
+          retrying={query.isRefetching}
         />
       </ScreenShell>
     );
@@ -83,7 +80,14 @@ export default function DashboardScreen() {
   if (!query.data?.ok) {
     return (
       <ScreenShell title="Stability Dashboard" scroll={false}>
-        <Text>{query.data?.message || 'No active goal found.'}</Text>
+        {query.isRefetchError ? (
+          <RetryFeedback
+            message="Could not refresh dashboard. Showing your last saved status."
+            onRetry={query.refetch}
+            retrying={query.isRefetching}
+          />
+        ) : null}
+        <Text>{query.data.message || 'No active goal found.'}</Text>
       </ScreenShell>
     );
   }
@@ -99,6 +103,13 @@ export default function DashboardScreen() {
           />
         }
       >
+        {query.isRefetchError ? (
+          <RetryFeedback
+            message="Could not refresh dashboard. Showing your last saved metrics."
+            onRetry={query.refetch}
+            retrying={query.isRefetching}
+          />
+        ) : null}
         <View style={styles.card}>
           <Text style={styles.cardTitle}>{query.data.goal.name}</Text>
           <Text>Target: {koboToNaira(query.data.goal.amountTotalKobo)}</Text>
@@ -167,5 +178,4 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
   },
   badgeText: { fontWeight: '800' },
-  error: { color: '#c02020' },
 });

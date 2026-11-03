@@ -1,6 +1,11 @@
 import React from 'react';
 import { QueryClientProvider } from '@tanstack/react-query';
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react-native';
 import AccountScreen from '../../app/(app)/account';
 import {
   deleteAccount,
@@ -10,6 +15,7 @@ import {
   updateAccountProfile,
 } from '../lib/api';
 import { queryClient } from '../lib/query-client';
+import { sessionQueryKeys } from '../lib/session-query-cache';
 
 const replace = jest.fn();
 const logout = jest.fn();
@@ -99,6 +105,39 @@ describe('account screen load failure', () => {
     await fireEvent.press(screen.getByRole('button', { name: 'Retry' }));
 
     expect(await screen.findByLabelText('Display name')).toBeOnTheScreen();
+    expect(screen.getByDisplayValue('Ada')).toBeOnTheScreen();
+  });
+
+  it('keeps cached account data visible when a background refresh fails', async () => {
+    queryClient.setQueryData(
+      sessionQueryKeys.account('session-token'),
+      account,
+      { updatedAt: 0 },
+    );
+    mockGet.mockRejectedValue(new Error('Offline'));
+    await renderScreen();
+
+    expect(await screen.findByDisplayValue('Ada')).toBeOnTheScreen();
+    expect(
+      await screen.findByRole(
+        'alert',
+        {
+          name: 'Could not refresh your account. Showing your last saved information.',
+        },
+        { timeout: 3_000 },
+      ),
+    ).toBeOnTheScreen();
+
+    mockGet.mockResolvedValue(account);
+    await fireEvent.press(screen.getByRole('button', { name: 'Retry' }));
+
+    await waitFor(() =>
+      expect(
+        screen.queryByText(
+          'Could not refresh your account. Showing your last saved information.',
+        ),
+      ).not.toBeOnTheScreen(),
+    );
     expect(screen.getByDisplayValue('Ada')).toBeOnTheScreen();
   });
 });

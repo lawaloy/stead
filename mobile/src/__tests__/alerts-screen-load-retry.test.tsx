@@ -1,9 +1,15 @@
 import React from 'react';
 import { QueryClientProvider } from '@tanstack/react-query';
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react-native';
 import AlertsScreen from '../../app/(app)/alerts';
 import { getAlertPreferences, updateAlertPreferences } from '../lib/api';
 import { queryClient } from '../lib/query-client';
+import { sessionQueryKeys } from '../lib/session-query-cache';
 
 jest.mock('react-native-safe-area-context', () => {
   const ReactModule = jest.requireActual<typeof import('react')>('react');
@@ -63,6 +69,43 @@ describe('alerts screen load failure', () => {
 
     expect(
       await screen.findByRole('switch', { name: 'Weekly summary' }),
+    ).toBeOnTheScreen();
+  });
+
+  it('keeps cached preferences visible when a background refresh fails', async () => {
+    queryClient.setQueryData(
+      sessionQueryKeys.alertPreferences('session-token'),
+      preferences,
+      { updatedAt: 0 },
+    );
+    mockGet.mockRejectedValue(new Error('Offline'));
+    await renderScreen();
+
+    expect(
+      await screen.findByRole('switch', { name: 'Weekly summary' }),
+    ).toBeOnTheScreen();
+    expect(
+      await screen.findByRole(
+        'alert',
+        {
+          name: 'Could not refresh notification preferences. Showing your last saved choices.',
+        },
+        { timeout: 3_000 },
+      ),
+    ).toBeOnTheScreen();
+
+    mockGet.mockResolvedValue(preferences);
+    await fireEvent.press(screen.getByRole('button', { name: 'Retry' }));
+
+    await waitFor(() =>
+      expect(
+        screen.queryByText(
+          'Could not refresh notification preferences. Showing your last saved choices.',
+        ),
+      ).not.toBeOnTheScreen(),
+    );
+    expect(
+      screen.getByRole('switch', { name: 'Weekly summary' }),
     ).toBeOnTheScreen();
   });
 });
