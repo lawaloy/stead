@@ -7,6 +7,10 @@ import { useAuth } from '../../src/lib/auth-state';
 import { queryClient } from '../../src/lib/query-client';
 import { sessionQueryKeys } from '../../src/lib/session-query-cache';
 import type { AlertPreferences } from '../../src/contracts/generated/types.gen';
+import {
+  LoadingFeedback,
+  RetryFeedback,
+} from '../../src/components/async-feedback';
 
 const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
@@ -87,26 +91,32 @@ export default function AlertsScreen() {
   if (query.isLoading) {
     return (
       <ScreenShell title="Notification preferences">
-        <Text>Loading notification preferences...</Text>
+        <LoadingFeedback message="Loading notification preferences..." />
       </ScreenShell>
     );
   }
 
-  if (query.error) {
+  if (!query.data) {
     return (
       <ScreenShell title="Notification preferences">
-        <Text accessibilityRole="alert" style={styles.error}>
-          Could not load notification preferences.
-        </Text>
-        <Pressable accessibilityRole="button" onPress={() => query.refetch()}>
-          <Text style={styles.action}>Retry</Text>
-        </Pressable>
+        <RetryFeedback
+          message="Could not load notification preferences."
+          onRetry={query.refetch}
+          retrying={query.isRefetching}
+        />
       </ScreenShell>
     );
   }
 
   return (
     <ScreenShell title="Notification preferences">
+      {query.isRefetchError ? (
+        <RetryFeedback
+          message="Could not refresh notification preferences. Showing your last saved choices."
+          onRetry={query.refetch}
+          retrying={query.isRefetching}
+        />
+      ) : null}
       <Text style={styles.intro}>
         Choose the SMS updates Stead may send. Both options are off until you
         enable them.
@@ -185,7 +195,11 @@ export default function AlertsScreen() {
           Could not save preferences. Check the time zone and retry.
         </Text>
       ) : null}
-      {saved ? <Text accessibilityRole="alert">{saved}</Text> : null}
+      {saved ? (
+        <Text accessibilityLiveRegion="polite" accessibilityRole="alert">
+          {saved}
+        </Text>
+      ) : null}
       <Pressable
         accessibilityRole="button"
         accessibilityState={{ disabled: !formValid || mutation.isPending }}

@@ -99,7 +99,11 @@ export default function VerifyOtpScreen() {
   if (!pendingPhone) {
     return (
       <ScreenShell title="Verify OTP">
-        <Text style={styles.error}>
+        <Text
+          accessibilityLiveRegion="assertive"
+          accessibilityRole="alert"
+          style={styles.error}
+        >
           No phone found. Start from Request OTP.
         </Text>
         <Pressable
@@ -130,19 +134,41 @@ export default function VerifyOtpScreen() {
         maxLength={6}
         style={styles.input}
       />
-      {validation ? <Text style={styles.error}>{validation}</Text> : null}
+      {validation ? (
+        <Text
+          accessibilityLiveRegion="assertive"
+          accessibilityRole="alert"
+          style={styles.error}
+        >
+          {validation}
+        </Text>
+      ) : null}
       {mutation.error ? (
-        <Text style={styles.error}>
+        <Text
+          accessibilityLiveRegion="assertive"
+          accessibilityRole="alert"
+          style={styles.error}
+        >
           {getAuthErrorMessage(mutation.error, 'verify')}
         </Text>
       ) : null}
       {resendMutation.error ? (
-        <Text style={styles.error}>
+        <Text
+          accessibilityLiveRegion="assertive"
+          accessibilityRole="alert"
+          style={styles.error}
+        >
           {getAuthErrorMessage(resendMutation.error, 'resend')}
         </Text>
       ) : null}
       {resendMutation.isSuccess ? (
-        <Text style={styles.success}>A fresh code is on the way.</Text>
+        <Text
+          accessibilityLiveRegion="polite"
+          accessibilityRole="alert"
+          style={styles.success}
+        >
+          A fresh code is on the way.
+        </Text>
       ) : null}
       <Pressable
         testID="auth-verify-otp"

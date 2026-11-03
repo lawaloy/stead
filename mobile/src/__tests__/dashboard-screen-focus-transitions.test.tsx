@@ -102,9 +102,11 @@ describe('stability dashboard focus transitions', () => {
     mockDashboard.mockRejectedValue(new Error('Offline'));
     await renderScreen();
     expect(
-      await screen.findByText(
-        'Failed to load dashboard. Pull to retry.',
-        {},
+      await screen.findByRole(
+        'alert',
+        {
+          name: 'Could not load dashboard. Check your connection and retry.',
+        },
         { timeout: 3_000 },
       ),
     ).toBeOnTheScreen();
@@ -115,7 +117,9 @@ describe('stability dashboard focus transitions', () => {
     expect(await screen.findByText('Annual rent')).toBeOnTheScreen();
     expect(screen.getByText('17%')).toBeOnTheScreen();
     expect(
-      screen.queryByText('Failed to load dashboard. Pull to retry.'),
+      screen.queryByText(
+        'Could not load dashboard. Check your connection and retry.',
+      ),
     ).not.toBeOnTheScreen();
   });
 

@@ -121,7 +121,9 @@ describe('OTP screen journeys', () => {
     await renderScreen(<VerifyOtpScreen />);
 
     expect(
-      screen.getByText('No phone found. Start from Request OTP.'),
+      screen.getByRole('alert', {
+        name: 'No phone found. Start from Request OTP.',
+      }),
     ).toBeOnTheScreen();
     await fireEvent.press(
       screen.getByRole('button', { name: 'Go to Request OTP' }),

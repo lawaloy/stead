@@ -82,9 +82,9 @@ describe('OTP screen error paths', () => {
     await fireEvent.changeText(screen.getByLabelText('Phone number'), '12');
 
     expect(
-      await screen.findByText(
-        'Enter a valid phone number for the selected country',
-      ),
+      await screen.findByRole('alert', {
+        name: 'Enter a valid phone number for the selected country',
+      }),
     ).toBeOnTheScreen();
     expect(screen.getByRole('button', { name: 'Request OTP' })).toBeDisabled();
     expect(mockRequest).not.toHaveBeenCalled();
@@ -106,9 +106,9 @@ describe('OTP screen error paths', () => {
     await fireEvent.press(screen.getByRole('button', { name: 'Request OTP' }));
 
     expect(
-      await screen.findByText(
-        'Too many code requests came from this network. Try again later.',
-      ),
+      await screen.findByRole('alert', {
+        name: 'Too many code requests came from this network. Try again later.',
+      }),
     ).toBeOnTheScreen();
     expect(push).not.toHaveBeenCalled();
   });
@@ -122,7 +122,9 @@ describe('OTP screen error paths', () => {
 
     await fireEvent.changeText(screen.getByLabelText('One-time code'), '12ab');
 
-    expect(await screen.findByText('OTP must be 6 digits')).toBeOnTheScreen();
+    expect(
+      await screen.findByRole('alert', { name: 'OTP must be 6 digits' }),
+    ).toBeOnTheScreen();
     expect(screen.getByRole('button', { name: 'Verify OTP' })).toBeDisabled();
     expect(mockVerify).not.toHaveBeenCalled();
   });
@@ -144,9 +146,9 @@ describe('OTP screen error paths', () => {
     await fireEvent.press(screen.getByRole('button', { name: 'Verify OTP' }));
 
     expect(
-      await screen.findByText(
-        'That code did not match this phone number. Check it and try again.',
-      ),
+      await screen.findByRole('alert', {
+        name: 'That code did not match this phone number. Check it and try again.',
+      }),
     ).toBeOnTheScreen();
     expect(auth.completeAuth).not.toHaveBeenCalled();
     await waitFor(() => expect(queryClient.isMutating()).toBe(0));

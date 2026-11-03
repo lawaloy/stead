@@ -1,6 +1,12 @@
 import React from 'react';
 import { QueryClientProvider } from '@tanstack/react-query';
-import { act, render, screen, waitFor } from '@testing-library/react-native';
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react-native';
 import DashboardScreen from '../../app/(app)/dashboard';
 import type { DashboardStabilityResponse } from '../contracts/generated/types.gen';
 import { getDashboardStability } from '../lib/api';
@@ -71,7 +77,11 @@ describe('stability dashboard screen', () => {
       }),
     );
     await renderScreen();
-    expect(screen.getByText('Loading stability metrics...')).toBeOnTheScreen();
+    expect(
+      screen.getByRole('progressbar', {
+        name: 'Loading stability metrics...',
+      }),
+    ).toBeOnTheScreen();
 
     await act(async () => release(stability));
     expect(await screen.findByText('Annual rent')).toBeOnTheScreen();
@@ -135,8 +145,14 @@ describe('stability dashboard screen', () => {
     expect(screen.getByText('Annual rent')).toBeOnTheScreen();
     expect(screen.getByText('17%')).toBeOnTheScreen();
     expect(
-      screen.queryByText('Failed to load dashboard. Pull to retry.'),
-    ).not.toBeOnTheScreen();
+      await screen.findByRole(
+        'alert',
+        {
+          name: 'Could not refresh dashboard. Showing your last saved metrics.',
+        },
+        { timeout: 3_000 },
+      ),
+    ).toBeOnTheScreen();
   });
 
   it('shows a missing-goal state instead of fabricated metrics', async () => {
@@ -150,21 +166,21 @@ describe('stability dashboard screen', () => {
     expect(screen.queryByText('Readiness')).not.toBeOnTheScreen();
   });
 
-  it('shows a failed-read state and supports retry by pulling to refresh', async () => {
+  it('shows a failed-read state with an accessible retry action', async () => {
     mockDashboard.mockRejectedValue(new Error('Offline'));
     await renderScreen();
     expect(
-      await screen.findByText(
-        'Failed to load dashboard. Pull to retry.',
-        {},
+      await screen.findByRole(
+        'alert',
+        {
+          name: 'Could not load dashboard. Check your connection and retry.',
+        },
         { timeout: 3_000 },
       ),
     ).toBeOnTheScreen();
 
     mockDashboard.mockResolvedValue(stability);
-    const refresh = screen.getByTestId('dashboard-refresh').props
-      .refreshControl as React.ReactElement<{ onRefresh: () => void }>;
-    await act(async () => refresh.props.onRefresh());
+    await fireEvent.press(screen.getByRole('button', { name: 'Retry' }));
     await waitFor(() =>
       expect(screen.getByText('Annual rent')).toBeOnTheScreen(),
     );

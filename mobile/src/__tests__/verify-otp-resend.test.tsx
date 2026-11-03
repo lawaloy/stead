@@ -109,7 +109,9 @@ describe('verify OTP resend cooldown', () => {
     expect(auth.setPendingOtpRequestedAt).toHaveBeenCalled();
     expect(auth.setDevOtpHint).toHaveBeenCalledWith('654321');
     expect(
-      await screen.findByText('A fresh code is on the way.'),
+      await screen.findByRole('alert', {
+        name: 'A fresh code is on the way.',
+      }),
     ).toBeOnTheScreen();
     expect(mockVerify).not.toHaveBeenCalled();
   });

@@ -23,6 +23,10 @@ import { appConfig } from '../../src/lib/app-config';
 import { useAuth } from '../../src/lib/auth-state';
 import { queryClient } from '../../src/lib/query-client';
 import { sessionQueryKeys } from '../../src/lib/session-query-cache';
+import {
+  LoadingFeedback,
+  RetryFeedback,
+} from '../../src/components/async-feedback';
 
 const Toggle = ({
   label,
@@ -119,19 +123,18 @@ export default function AccountScreen() {
   if (query.isLoading) {
     return (
       <ScreenShell title="Account and privacy">
-        <Text>Loading your account...</Text>
+        <LoadingFeedback message="Loading your account..." />
       </ScreenShell>
     );
   }
-  if (!query.data || query.error) {
+  if (!query.data) {
     return (
       <ScreenShell title="Account and privacy">
-        <Text accessibilityRole="alert" style={styles.error}>
-          Could not load your account.
-        </Text>
-        <Pressable accessibilityRole="button" onPress={() => query.refetch()}>
-          <Text style={styles.action}>Retry</Text>
-        </Pressable>
+        <RetryFeedback
+          message="Could not load your account."
+          onRetry={query.refetch}
+          retrying={query.isRefetching}
+        />
       </ScreenShell>
     );
   }
@@ -183,6 +186,13 @@ export default function AccountScreen() {
 
   return (
     <ScreenShell title="Account and privacy">
+      {query.isRefetchError ? (
+        <RetryFeedback
+          message="Could not refresh your account. Showing your last saved information."
+          onRetry={query.refetch}
+          retrying={query.isRefetching}
+        />
+      ) : null}
       <View style={styles.card}>
         <Text style={styles.label}>Phone number</Text>
         <Text selectable>{account.profile.phone}</Text>
@@ -323,7 +333,11 @@ export default function AccountScreen() {
         </Pressable>
       </View>
 
-      {message ? <Text accessibilityRole="alert">{message}</Text> : null}
+      {message ? (
+        <Text accessibilityLiveRegion="polite" accessibilityRole="alert">
+          {message}
+        </Text>
+      ) : null}
       {profileMutation.error ||
       consentMutation.error ||
       exportMutation.error ||
