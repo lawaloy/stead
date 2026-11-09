@@ -1,7 +1,20 @@
-import { readFileSync } from 'node:fs';
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
+import { createRequire } from 'node:module';
+import { tmpdir } from 'node:os';
 import { join, posix } from 'node:path';
 
 const apiRoot = join(__dirname, '..');
+const requireDependency = createRequire(join(apiRoot, 'package.json'));
+const satisfies = requireDependency('semver/functions/satisfies') as (
+  version: string,
+  range: string,
+) => boolean;
 
 type LockfilePackage = {
   dependencies?: Record<string, string>;
@@ -74,6 +87,60 @@ const lockfileDependencyCandidates = (
 };
 
 describe('dependency lockfile', () => {
+  it('keeps vulnerable glob and minimatch versions out of every nested dependency path', () => {
+    const packageJson = readJson<{ overrides: Record<string, string> }>(
+      'package.json',
+    );
+    const packages = readJson<PackageLock>('package-lock.json').packages;
+    for (const [name, range, patched] of [
+      ['glob', '>=9 <14.0.2', '14.0.4'],
+      ['minimatch', '>=7 <11.0.1', '11.0.5'],
+    ]) {
+      expect(packageJson.overrides[`${name}@${range}`]).toBe(patched);
+      const copies = Object.entries(packages).filter(([path]) =>
+        path.endsWith(`node_modules/${name}`),
+      );
+      expect(copies.length).toBeGreaterThan(0);
+      for (const [path, metadata] of copies) {
+        expect({
+          path,
+          vulnerable: satisfies(metadata.version!, range),
+        }).toEqual({ path, vulnerable: false });
+      }
+    }
+  });
+
+  it('keeps sync and async instrumentation discovery compatible with the patched glob APIs', async () => {
+    const TestExclude = requireDependency('test-exclude') as new (options: {
+      cwd: string;
+      include: string[];
+      exclude: string[];
+      extension: string[];
+    }) => { glob(): Promise<string[]>; globSync(): string[] };
+    const directory = mkdtempSync(join(tmpdir(), 'stead-glob-compatibility-'));
+    try {
+      mkdirSync(join(directory, 'src', 'nested'), { recursive: true });
+      for (const file of ['keep.ts', 'ignore.spec.ts', 'nested/deep.ts']) {
+        writeFileSync(join(directory, 'src', file), 'export {};');
+      }
+      const exclude = new TestExclude({
+        cwd: directory,
+        include: ['src/**/*.ts'],
+        exclude: ['**/*.spec.ts'],
+        extension: ['.ts'],
+      });
+      const expected = ['src/keep.ts', 'src/nested/deep.ts'];
+      expect(exclude.globSync().sort()).toEqual(expected);
+      expect((await exclude.glob()).sort()).toEqual(expected);
+      const legacy = createRequire(
+        join(apiRoot, 'node_modules/@eslint/eslintrc/package.json'),
+      )('minimatch') as (path: string, pattern: string) => boolean;
+      expect(legacy('src/keep.ts', '**/*.ts')).toBe(true);
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
   it('pins audit-remediated packages in package metadata and lockfile', () => {
     const packageJson = readJson<{
       overrides: Record<string, string | Record<string, string>>;

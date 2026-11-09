@@ -1,7 +1,11 @@
 import { readFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { join, posix } from 'node:path';
 
 const mobileRoot = join(__dirname, '..', '..');
+const satisfies = createRequire(join(mobileRoot, 'package.json'))(
+  'semver/functions/satisfies',
+) as (version: string, range: string) => boolean;
 
 type LockfilePackage = {
   dependencies?: Record<string, string>;
@@ -67,6 +71,29 @@ const lockfileDependencyCandidates = (
 };
 
 describe('dependency overrides', () => {
+  it('keeps vulnerable glob and minimatch versions out of every nested dependency path', () => {
+    const packageJson = readJson<{ overrides: Record<string, string> }>(
+      'package.json',
+    );
+    const packages = readJson<PackageLock>('package-lock.json').packages;
+    for (const [name, range, patched] of [
+      ['glob', '>=9 <14.0.2', '14.0.4'],
+      ['minimatch', '>=7 <11.0.1', '11.0.5'],
+    ]) {
+      expect(packageJson.overrides[`${name}@${range}`]).toBe(patched);
+      const copies = Object.entries(packages).filter(([path]) =>
+        path.endsWith(`node_modules/${name}`),
+      );
+      expect(copies.length).toBeGreaterThan(0);
+      for (const [path, metadata] of copies) {
+        expect({
+          path,
+          vulnerable: satisfies(metadata.version!, range),
+        }).toEqual({ path, vulnerable: false });
+      }
+    }
+  });
+
   it('keeps audit overrides on every installed copy after deduplication', () => {
     const packageJson = readJson<{
       overrides: Record<string, string | Record<string, string>>;
