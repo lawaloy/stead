@@ -3,6 +3,7 @@ import { TOOLCHAIN } from './toolchain.mjs';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
+import { findXCTestFailure, xctestLogFiles } from './native-evidence.mjs';
 
 const TRANSIENT_ANDROID_MAESTRO_BOOTSTRAP =
   /DeviceServerDiedException: Device server died during 'deviceInfo'[\s\S]*StatusRuntimeException: UNAVAILABLE/;
@@ -70,6 +71,8 @@ export const runMaestroCommand = async (
     execute = runCommand,
     timeoutMs = Number(TOOLCHAIN.MAESTRO_FLOW_TIMEOUT_MS),
     startupTimeoutMs = 0,
+    xctestOutput,
+    pollIntervalMs = 1_000,
   } = {},
 ) => {
   if (!Number.isSafeInteger(timeoutMs) || timeoutMs <= 0)
@@ -79,15 +82,49 @@ export const runMaestroCommand = async (
   const processTimeoutMs = timeoutMs + startupTimeoutMs;
   if (!Number.isSafeInteger(processTimeoutMs))
     throw new Error('The combined Maestro timeout must be a safe integer.');
+  if (!Number.isSafeInteger(pollIntervalMs) || pollIntervalMs <= 0)
+    throw new Error(
+      'The XCTest log polling interval must be a positive integer.',
+    );
+  const previousLogs = new Set(xctestLogFiles(xctestOutput));
+  const driver = new AbortController();
+  let driverFailure;
+  const checkDriver = () => {
+    if (!xctestOutput || driver.signal.aborted) return;
+    try {
+      driverFailure = findXCTestFailure(xctestOutput, previousLogs);
+    } catch (error) {
+      driverFailure = { kind: 'evidence-monitor-failed', error: error.message };
+    }
+    if (driverFailure) driver.abort();
+  };
+  const monitor = xctestOutput
+    ? setInterval(checkDriver, pollIntervalMs)
+    : undefined;
+  monitor?.unref();
   const deadline = new AbortController();
   const timer = setTimeout(() => deadline.abort(), processTimeoutMs);
   timer.unref();
-  const signal = options.signal
-    ? AbortSignal.any([options.signal, deadline.signal])
-    : deadline.signal;
+  const signal = AbortSignal.any([
+    deadline.signal,
+    driver.signal,
+    ...(options.signal ? [options.signal] : []),
+  ]);
   try {
-    return await execute(command, args, { ...options, signal });
+    const result = await execute(command, args, { ...options, signal });
+    checkDriver();
+    signal.throwIfAborted();
+    return result;
   } catch (error) {
+    checkDriver();
+    if (driverFailure && !options.signal?.aborted) {
+      const failure = new Error(
+        `Maestro stopped because ${driverFailure.kind}. The attempt failed and will not be retried. Evidence: ${driverFailure.log ?? driverFailure.error}`,
+        { cause: error },
+      );
+      failure.nativeFailure = driverFailure;
+      throw failure;
+    }
     if (deadline.signal.aborted && !options.signal?.aborted)
       throw new Error(
         `Maestro exceeded its ${processTimeoutMs} ms process deadline (${timeoutMs} ms journey + ${startupTimeoutMs} ms driver startup). The attempt failed; inspect its driver logs.`,
@@ -96,6 +133,7 @@ export const runMaestroCommand = async (
     throw error;
   } finally {
     clearTimeout(timer);
+    clearInterval(monitor);
   }
 };
 
@@ -103,17 +141,21 @@ export const repeatJourneys = async (count, operation, signal) => {
   const attempts = [];
   for (let index = 0; index < count; index += 1) {
     if (signal?.aborted) break;
+    const started = Date.now();
     try {
       attempts.push({
         attempt: index + 1,
         status: 'passed',
         ...(await operation(index + 1)),
+        durationMs: Date.now() - started,
       });
     } catch (error) {
       attempts.push({
         attempt: index + 1,
         status: 'failed',
         error: error.message,
+        durationMs: Date.now() - started,
+        ...(error.nativeFailure ? { failure: error.nativeFailure } : {}),
       });
     }
   }

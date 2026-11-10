@@ -1,0 +1,8 @@
+# Diagnostic only: exercise the same login, text input and numeric input as
+# the full journey, then stop before any financial write.
+appId: com.lawaloy.stead
+env:
+  TEST_PHONE_DISPLAY: '0803 000 0001'
+---
+- runFlow: sign-in.yaml
+- runFlow: fill-goal.yaml

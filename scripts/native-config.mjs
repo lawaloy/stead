@@ -111,6 +111,7 @@ export const parseNativeArguments = (args) => {
     phone: '08030000001',
     databaseReady: false,
     androidRunner: 'host',
+    scenario: 'journey',
   };
   const names = new Set([
     'platform',
@@ -121,6 +122,7 @@ export const parseNativeArguments = (args) => {
     'device',
     'app',
     'android-runner',
+    'scenario',
   ]);
   while (args.length) {
     const arg = args.shift();
@@ -152,6 +154,15 @@ export const parseNativeArguments = (args) => {
   }
   if (!['android', 'ios', 'all'].includes(options.platform))
     throw new Error('Platform must be android, ios, or all.');
+  if (!['journey', 'sign-in', 'input'].includes(options.scenario))
+    throw new Error('Scenario must be journey, sign-in, or input.');
+  if (
+    options.scenario !== 'journey' &&
+    (command !== 'test' || options.platform !== 'ios')
+  )
+    throw new Error(
+      'Diagnostic scenarios require test --platform ios; verify always runs the full journey.',
+    );
   if (!['host', 'managed', 'container'].includes(options.androidRunner))
     throw new Error('Android runner must be host, managed, or container.');
   if (
