@@ -471,6 +471,12 @@ const runAttempt = async (platform, options, tools, app, pool, directory) => {
               join(MOBILE, '.maestro', 'critical-native-journey.yaml'),
             ],
             { cwd: MOBILE, env, signal: options.signal },
+            {
+              startupTimeoutMs:
+                platform === 'ios'
+                  ? Number(TOOLCHAIN.IOS_DRIVER_STARTUP_TIMEOUT_MS)
+                  : 0,
+            },
           ),
         {
           platform,
