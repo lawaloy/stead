@@ -136,17 +136,37 @@ env:
 # dispatching backspaces while iOS is still animating the new keyboard.
 - waitForAnimationToEnd
 - eraseText
-- inputText: Native journey income
 - runFlow:
     when:
       platform: Android
     commands:
+      - inputText: Native journey income
       - hideKeyboard
+# Use the same paced iOS input as the goal name. A completed bulk input can
+# leave a controlled TextInput with missing characters under simulator load.
+- runFlow:
+    file: input-text-character-by-character.yaml
+    when:
+      platform: iOS
+    env:
+      TEXT: Native journey income
 - runFlow:
     when:
       platform: iOS
     commands:
       - tapOn: Add Transaction
+# Verify the actual note before saving so a driver input failure is reported
+# at the field instead of later as a missing transaction in Activity.
+- scrollUntilVisible:
+    element:
+      id: transaction-note
+    timeout: 40000
+    visibilityPercentage: 100
+    centerElement: true
+- waitForAnimationToEnd
+- assertVisible:
+    id: transaction-note
+    text: Native journey income
 - scrollUntilVisible:
     element:
       id: transaction-create
@@ -254,12 +274,18 @@ env:
     point: '95%,50%'
     retryTapIfNoChange: false
 - eraseText
-- inputText: Native journey corrected income
 - runFlow:
     when:
       platform: Android
     commands:
+      - inputText: Native journey corrected income
       - hideKeyboard
+- runFlow:
+    file: input-text-character-by-character.yaml
+    when:
+      platform: iOS
+    env:
+      TEXT: Native journey corrected income
 - runFlow:
     when:
       platform: iOS

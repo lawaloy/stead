@@ -76,8 +76,10 @@ dedicated simulator. Release-configured simulator builds embed JavaScript, use
 locked CocoaPods, and validate simulator keychain entitlements. The journey
 warms the installed app before Maestro and performs one erase-and-reboot
 recovery only when that infrastructure launch fails.
-`IOS_DRIVER_STARTUP_TIMEOUT_MS` sets the shared driver startup budget; app
-assertions keep their own limits. `IOS_SIMULATOR_PREPARATION_TIMEOUT_MS` bounds
+`IOS_DRIVER_STARTUP_TIMEOUT_MS` sets the shared driver startup budget. The iOS
+process watchdog allows that startup budget plus `MAESTRO_FLOW_TIMEOUT_MS` for
+the journey; app assertions keep their own limits.
+`IOS_SIMULATOR_PREPARATION_TIMEOUT_MS` bounds
 the complete boot/install/warm-up sequence, including its one recovery.
 
 Use `--platform ios` for iOS or `--platform all` where both pinned environments

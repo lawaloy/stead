@@ -20,6 +20,7 @@ import {
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { setTimeout as delay } from 'node:timers/promises';
 import {
   runMaestroCommand,
   runMaestroWithBootstrapRecovery,
@@ -45,6 +46,34 @@ test('a hung Maestro process is stopped and reported as a failed attempt', async
   );
 });
 
+test('Maestro allows driver startup in addition to the journey and still stops a hung process', async () => {
+  await runMaestroCommand(
+    'unused',
+    [],
+    {},
+    {
+      timeoutMs: 20,
+      startupTimeoutMs: 500,
+      execute: async (_command, _args, { signal }) =>
+        delay(50, undefined, { signal }),
+    },
+  );
+  await assert.rejects(
+    runMaestroCommand(
+      'unused',
+      [],
+      {},
+      {
+        timeoutMs: 20,
+        startupTimeoutMs: 30,
+        execute: async (_command, _args, { signal }) =>
+          delay(1000, undefined, { signal }),
+      },
+    ),
+    /50 ms process deadline \(20 ms journey \+ 30 ms driver startup\)/,
+  );
+});
+
 test('the Maestro deadline preserves caller cancellation and validates its budget before spawning', async () => {
   const controller = new AbortController();
   const reason = new Error('User cancelled validation');
@@ -65,6 +94,20 @@ test('the Maestro deadline preserves caller cancellation and validates its budge
       runMaestroCommand('unused', [], {}, { timeoutMs }),
       /positive integer/,
     );
+  for (const startupTimeoutMs of [-1, NaN, 0.5])
+    await assert.rejects(
+      runMaestroCommand('unused', [], {}, { startupTimeoutMs }),
+      /non-negative integer/,
+    );
+  await assert.rejects(
+    runMaestroCommand(
+      'unused',
+      [],
+      {},
+      { timeoutMs: Number.MAX_SAFE_INTEGER, startupTimeoutMs: 1 },
+    ),
+    /combined Maestro timeout/,
+  );
 });
 
 test('Android Maestro bootstrap retries only a new deviceInfo transport death with backoff', async () => {

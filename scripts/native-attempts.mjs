@@ -69,12 +69,18 @@ export const runMaestroCommand = async (
   {
     execute = runCommand,
     timeoutMs = Number(TOOLCHAIN.MAESTRO_FLOW_TIMEOUT_MS),
+    startupTimeoutMs = 0,
   } = {},
 ) => {
   if (!Number.isSafeInteger(timeoutMs) || timeoutMs <= 0)
     throw new Error('Maestro process timeout must be a positive integer.');
+  if (!Number.isSafeInteger(startupTimeoutMs) || startupTimeoutMs < 0)
+    throw new Error('Maestro startup timeout must be a non-negative integer.');
+  const processTimeoutMs = timeoutMs + startupTimeoutMs;
+  if (!Number.isSafeInteger(processTimeoutMs))
+    throw new Error('The combined Maestro timeout must be a safe integer.');
   const deadline = new AbortController();
-  const timer = setTimeout(() => deadline.abort(), timeoutMs);
+  const timer = setTimeout(() => deadline.abort(), processTimeoutMs);
   timer.unref();
   const signal = options.signal
     ? AbortSignal.any([options.signal, deadline.signal])
@@ -84,7 +90,7 @@ export const runMaestroCommand = async (
   } catch (error) {
     if (deadline.signal.aborted && !options.signal?.aborted)
       throw new Error(
-        `Maestro exceeded its ${timeoutMs} ms process deadline. The attempt failed; inspect its driver logs.`,
+        `Maestro exceeded its ${processTimeoutMs} ms process deadline (${timeoutMs} ms journey + ${startupTimeoutMs} ms driver startup). The attempt failed; inspect its driver logs.`,
         { cause: error },
       );
     throw error;
