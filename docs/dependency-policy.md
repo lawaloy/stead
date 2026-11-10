@@ -14,6 +14,24 @@ execution, and malformed-report errors; it only converts successfully parsed
 dependency findings into a successful reporting step. Workflows must not use
 `continue-on-error` for audit commands.
 
+## November 2026 alert remediation
+
+API and mobile override vulnerable `glob` 9–14.0.1 releases to 14.0.4 for
+[GHSA-3g3m-2fjr-6pw4](https://github.com/advisories/GHSA-3g3m-2fjr-6pw4),
+and vulnerable `minimatch` 7–11.0.0 releases to 11.0.5 for
+[GHSA-g3hv-75wg-m249](https://github.com/advisories/GHSA-g3hv-75wg-m249).
+The selectors leave legacy `minimatch` 3 consumers on their compatible API.
+Lockfile guards check every resolved copy, and compatibility checks exercise
+the glob and instrumentation APIs used by the tooling.
+
+Dependabot alerts #140 and #141 reference `deepmerge` advisory
+GHSA-gcqx-w48m-w2h4 / CVE-2026-93753. On November 2, 2026, its assigning
+authority rejected the CVE because it does not describe a security vulnerability;
+see the [official CVE record](https://github.com/CVEProject/cvelistV5/blob/main/cves/2026/93xxx/CVE-2026-93753.json).
+These alerts are classified as inaccurate using that record. GitHub's advisory
+still lists no patched version. This disposition does not introduce a dependency
+downgrade, a replacement package, or an audit exception.
+
 ## Temporary upstream exceptions
 
 An exception is permitted only when no patched release exists, the affected
