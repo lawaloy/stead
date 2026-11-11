@@ -220,6 +220,41 @@ test('Maestro bootstrap recovery never retries an app failure or reuses an older
   }
 });
 
+test('Android Maestro bootstrap recovery stops when emulator health does not recover', async () => {
+  const output = mkdtempSync(join(tmpdir(), 'stead maestro recover fail '));
+  let calls = 0;
+  try {
+    await assert.rejects(
+      runMaestroWithBootstrapRecovery(
+        async () => {
+          calls += 1;
+          const logs = join(output, 'attempt');
+          mkdirSync(logs, { recursive: true });
+          writeFileSync(
+            join(logs, 'maestro.log'),
+            "DeviceServerDiedException: Device server died during 'deviceInfo': StatusRuntimeException: UNAVAILABLE",
+          );
+          throw new Error('bootstrap died');
+        },
+        {
+          platform: 'android',
+          debugOutput: output,
+          recover: async () => {
+            throw new Error(
+              'Android emulator health did not recover after Maestro device-server bootstrap failure.',
+            );
+          },
+          sleep: async () => {},
+        },
+      ),
+      /health did not recover/,
+    );
+    assert.equal(calls, 1);
+  } finally {
+    rmSync(output, { recursive: true, force: true });
+  }
+});
+
 test('Android Maestro bootstrap recovery is bounded and uses exponential backoff', async () => {
   const output = mkdtempSync(join(tmpdir(), 'stead maestro bounded '));
   const sleeps = [];
@@ -549,6 +584,24 @@ test('iOS journey artifacts must match their embedded API and fixture configurat
       () => assertIosArtifactConfig(app, { ...options, apiPort: 3001 }),
       /was built for.*run requires/,
     );
+    writeFileSync(
+      join(directory, 'stead-native-config.json'),
+      JSON.stringify({
+        apiUrl: 3000,
+        apiTimeoutMs: '30000',
+        phone: 808,
+      }),
+    );
+    assert.throws(() => readIosArtifactConfig(app), /invalid.*build metadata/);
+    writeFileSync(
+      join(directory, 'stead-native-config.json'),
+      JSON.stringify({
+        apiUrl: 'http://127.0.0.1:3000',
+        apiTimeoutMs: -1,
+        phone: '08030000001',
+      }),
+    );
+    assert.throws(() => readIosArtifactConfig(app), /invalid.*build metadata/);
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }

@@ -157,6 +157,33 @@ describe('AuthService verify OTP replay device fingerprint', () => {
     expect(jwt.signAsync).not.toHaveBeenCalled();
   });
 
+  it('replays after trimming and lowercasing a padded UUIDv4 verification key', async () => {
+    const otp = '123456';
+    prisma.otpCode.findUnique.mockResolvedValue(
+      await storedWinner(otp, DEVICE_A),
+    );
+
+    await expect(
+      service.verifyOtp('08012345678', 'NG', otp, {
+        idempotencyKey: `  ${IDEMPOTENCY_KEY.toUpperCase()}  `,
+        deviceId: DEVICE_A,
+      }),
+    ).resolves.toEqual(WINNER_SESSION);
+
+    expect(prisma.otpCode.findUnique).toHaveBeenCalledWith({
+      where: { verificationKeyHash: hashOtpVerificationKey(IDEMPOTENCY_KEY) },
+      select: {
+        codeHash: true,
+        verificationRequestHash: true,
+        verificationResponseJson: true,
+        verifiedAt: true,
+        user: { select: { phone: true } },
+      },
+    });
+    expect(prisma.otpCode.findFirst).not.toHaveBeenCalled();
+    expect(jwt.signAsync).not.toHaveBeenCalled();
+  });
+
   it('rejects replay when a different device reuses the idempotency key', async () => {
     const otp = '123456';
     prisma.otpCode.findUnique.mockResolvedValue(

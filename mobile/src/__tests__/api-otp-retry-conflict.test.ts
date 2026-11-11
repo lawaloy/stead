@@ -30,6 +30,7 @@ describe('api client OTP retry on conflict and validation', () => {
   it.each([
     [409, 'Idempotency-Key was already used for another OTP request.'],
     [400, 'phone must match the selected country'],
+    [429, 'Please wait before requesting another OTP.'],
   ])('does not retry HTTP %s OTP failures', async (status, message) => {
     let attempts = 0;
     mock.onPost('/auth/request-otp').reply(() => {

@@ -82,6 +82,16 @@ test('driver failure classification requires a failed HTTP-server test, not a pr
   assert.equal(findXCTestFailure(directory).kind, 'xctest-server-failed');
 });
 
+test('nested Maestro debug paths still classify a current XCTest screenshot failure', (t) => {
+  const directory = fixture(t);
+  const nested = join(directory, 'invocation-2', 'debug-output');
+  mkdirSync(nested, { recursive: true });
+  const log = join(nested, 'xctest_runner_current.log');
+  writeFileSync(log, screenshotFailure);
+  assert.equal(findXCTestFailure(directory).kind, 'xctest-screenshot-timeout');
+  assert.equal(findXCTestFailure(directory).log, log);
+});
+
 test('a testHttpServer failure in the last 64 KB of a large XCTest log is still classified', (t) => {
   const directory = fixture(t);
   const log = join(directory, 'xctest_runner_current.log');
