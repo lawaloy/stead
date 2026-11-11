@@ -1,0 +1,39 @@
+appId: com.lawaloy.stead
+---
+- tapOn:
+    id: nav-goal
+- assertVisible: Create a goal
+- tapOn:
+    id: goal-name
+- runFlow:
+    file: input-text.yaml
+    env:
+      TEXT: Native journey goal
+- assertVisible:
+    id: goal-name
+    text: Native journey goal
+- scrollUntilVisible:
+    element:
+      id: goal-target
+    timeout: 40000
+    visibilityPercentage: 50
+- tapOn:
+    id: goal-target
+- runFlow:
+    file: input-text.yaml
+    env:
+      TEXT: '1200000'
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - tapOn: Create a goal
+- scrollUntilVisible:
+    element:
+      id: goal-target
+    timeout: 40000
+    visibilityPercentage: 100
+    centerElement: true
+- assertVisible:
+    id: goal-target
+    text: '1200000'

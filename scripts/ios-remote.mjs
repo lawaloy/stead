@@ -56,7 +56,7 @@ export const assertIosRun = (run, expected) => {
       `iOS validation did not pass (${run.conclusion || run.status}).`,
     );
   for (const name of [
-    'config',
+    'Native CI Configuration',
     'build-ios',
     'native-ios',
     'Native Readiness',

@@ -5,6 +5,18 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { githubRepository, remoteIos, retryGitHubRead } from './ios-remote.mjs';
 import { runCommand } from './process-utils.mjs';
+import { ROOT } from './toolchain.mjs';
+
+// GitHub exposes the configured display name, not the YAML job ID. Derive
+// this fixture from the workflow so a rename cannot silently break preflight.
+const configurationJob = readFileSync(
+  join(ROOT, '.github/workflows/native-ci.yml'),
+  'utf8',
+).match(/^  config:\r?\n    name: ([^\r\n]+)/m)?.[1];
+assert.ok(
+  configurationJob,
+  'Native CI must declare its configuration check name.',
+);
 
 const feature = 'a'.repeat(40),
   base = 'b'.repeat(40),
@@ -25,7 +37,7 @@ const fixture = (overrides = {}) => {
     conclusion: 'success',
     url: 'https://github.com/owner/repo/actions/runs/123',
     jobs: [
-      'config',
+      configurationJob,
       'build-ios',
       'native-ios',
       'Native Readiness',

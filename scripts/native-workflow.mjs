@@ -34,6 +34,7 @@ import {
   runMaestroCommand,
   runMaestroWithBootstrapRecovery,
 } from './native-attempts.mjs';
+import { summarizeMaestro } from './native-evidence.mjs';
 export { repeatJourneys } from './native-attempts.mjs';
 import {
   TOOLCHAIN,
@@ -452,7 +453,7 @@ const runAttempt = async (platform, options, tools, app, pool, directory) => {
         platform === 'android' ? tools.device : tools.simulator.udid;
       const maestroDebugOutput = join(directory, 'maestro');
       const maestro = await runMaestroWithBootstrapRecovery(
-        () =>
+        (invocation) =>
           runMaestroCommand(
             tools.maestro,
             [
@@ -466,12 +467,23 @@ const runAttempt = async (platform, options, tools, app, pool, directory) => {
               '--no-ansi',
               '--debug-output',
               maestroDebugOutput,
+              '--test-output-dir',
+              join(maestroDebugOutput, `invocation-${invocation}`),
               '-e',
               `TEST_PHONE_DISPLAY=${phoneDisplay(options.phone)}`,
-              join(MOBILE, '.maestro', 'critical-native-journey.yaml'),
+              join(
+                MOBILE,
+                '.maestro',
+                {
+                  journey: 'critical-native-journey.yaml',
+                  'sign-in': 'sign-in.yaml',
+                  input: 'input-probe.yaml',
+                }[options.scenario ?? 'journey'],
+              ),
             ],
             { cwd: MOBILE, env, signal: options.signal },
             {
+              xctestOutput: platform === 'ios' ? maestroDebugOutput : undefined,
               startupTimeoutMs:
                 platform === 'ios'
                   ? Number(TOOLCHAIN.IOS_DRIVER_STARTUP_TIMEOUT_MS)
@@ -656,15 +668,34 @@ export const nativeWorkflow = async (options) => {
         };
         const attempts = await repeatJourneys(
           options.repeat,
-          (attempt) =>
-            runAttempt(
-              platform,
-              options,
-              checked[index].tools,
-              app,
-              pool,
-              join(output, platform, `attempt-${attempt}`),
-            ),
+          async (attempt) => {
+            const directory = join(output, platform, `attempt-${attempt}`);
+            try {
+              return await runAttempt(
+                platform,
+                options,
+                checked[index].tools,
+                app,
+                pool,
+                directory,
+              );
+            } finally {
+              mkdirSync(directory, { recursive: true });
+              try {
+                const summaries = summarizeMaestro(join(directory, 'maestro'));
+                writeFileSync(
+                  join(directory, 'maestro-summary.json'),
+                  JSON.stringify(summaries, null, 2),
+                );
+                for (const summary of summaries)
+                  console.log(`Maestro evidence: ${JSON.stringify(summary)}`);
+              } catch (error) {
+                // A partial commands.json after a killed driver must never
+                // replace the original process failure.
+                console.warn(`Maestro summary unavailable: ${error.message}`);
+              }
+            }
+          },
           options.signal,
         );
         const artifact = platform === 'android' ? app : join(app, 'mobile');
@@ -679,7 +710,22 @@ export const nativeWorkflow = async (options) => {
         mkdirSync(output, { recursive: true });
         writeFileSync(
           join(output, 'results.json'),
-          JSON.stringify({ source, results }, null, 2),
+          JSON.stringify(
+            {
+              source,
+              scenario: options.scenario ?? 'journey',
+              ...(process.env.GITHUB_ACTIONS === 'true'
+                ? {
+                    workflowRun: process.env.GITHUB_RUN_ID,
+                    workflowAttempt: process.env.GITHUB_RUN_ATTEMPT,
+                    hostSample: process.env.STEAD_IOS_HOST_SAMPLE,
+                  }
+                : {}),
+              results,
+            },
+            null,
+            2,
+          ),
         );
       }
     } finally {
@@ -714,6 +760,7 @@ export const runNativeCommand = async (args, handlers = {}) => {
   remote-ios                                  Test on GitHub macOS from any host
 
 Options: --repeat <1-20>, --api-port <port>, --app <artifact>, --device <Android emulator>
+Diagnostic iOS tests: --scenario sign-in|input (never a full-journey pass)
 Run npm run validate -- --platform android|ios|all for the complete local gate.`);
     return;
   }

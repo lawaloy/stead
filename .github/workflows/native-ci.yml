@@ -20,6 +20,16 @@ on:
         type: choice
         options: [all, ios, android]
         default: all
+      scenario:
+        description: Full journey, or an iOS diagnostic probe (no Native Readiness pass)
+        type: choice
+        options: [journey, sign-in, input]
+        default: journey
+      ios_samples:
+        description: Independent fresh macOS hosts (each result is retained)
+        type: choice
+        options: ['1', '3']
+        default: '1'
   pull_request:
     branches: [main]
   push:
@@ -69,7 +79,13 @@ jobs:
         env:
           CHANGED: ${{ steps.changes.outputs.native }}
           EVENT_NAME: ${{ github.event_name }}
+          SCENARIO: ${{ inputs.scenario || 'journey' }}
+          PLATFORM: ${{ inputs.platform || 'all' }}
         run: |
+          if [[ "$SCENARIO" != "journey" && "$PLATFORM" != "ios" ]]; then
+            echo "Diagnostic probes require platform=ios." >&2
+            exit 1
+          fi
           if [[ "$EVENT_NAME" == "pull_request" || "$EVENT_NAME" == "push" ]]; then
             echo "run_native=$CHANGED" >> "$GITHUB_OUTPUT"
           else
@@ -376,9 +392,14 @@ jobs:
           retention-days: 7
 
   native-ios:
+    name: ${{ matrix.sample == 1 && 'native-ios' || format('native-ios-{0}', matrix.sample) }}
     needs: [config, build-ios]
     if: needs.config.outputs.ios_enabled == 'true'
     runs-on: ${{ needs.config.outputs.ios_runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        sample: ${{ fromJSON(inputs.ios_samples == '3' && '[1,2,3]' || '[1]') }}
     timeout-minutes: 45
     env:
       DATABASE_URL: postgresql://stead:stead@127.0.0.1:5432/stead?schema=e2e_native
@@ -390,6 +411,8 @@ jobs:
       DEV_EXPOSE_OTP: 'true'
       EXPO_PUBLIC_API_URL: http://127.0.0.1:3000
       EXPO_PUBLIC_E2E_PHONE: '08030000001'
+      STEAD_IOS_HOST_SAMPLE: ${{ matrix.sample }}
+      STEAD_NATIVE_SCENARIO: ${{ inputs.scenario || 'journey' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -460,11 +483,11 @@ jobs:
       - name: Run iOS native journey
         run: |
           npm run native -- setup --platform ios
-          npm run native -- test --platform ios --database-ready --app mobile/.ci/ios/mobile.app
+          npm run native -- test --platform ios --database-ready --app mobile/.ci/ios/mobile.app --scenario "$STEAD_NATIVE_SCENARIO"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: ios-native-journey-logs
+          name: ${{ matrix.sample == 1 && 'ios-native-journey-logs' || format('ios-native-journey-logs-{0}', matrix.sample) }}
           include-hidden-files: true
           path: |
             .tmp/native-validation
@@ -474,7 +497,9 @@ jobs:
           retention-days: 7
 
   native-readiness:
-    name: Native Readiness
+    # A skipped required check counts as passing in GitHub. Give diagnostic
+    # runs a different check name instead of skipping Native Readiness.
+    name: ${{ inputs.scenario && inputs.scenario != 'journey' && 'iOS Diagnostic Probe' || 'Native Readiness' }}
     if: always()
     needs: [config, build-android, build-ios, native-android, native-ios]
     runs-on: ubuntu-24.04

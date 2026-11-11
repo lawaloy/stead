@@ -93,6 +93,10 @@ embedded in its Release JavaScript bundle.
 
 Native journeys print each Maestro command's status live. The single-flow
 runner uses plain output because Maestro's JUnit mode suppresses step progress.
+Each attempt records its duration and a `maestro-summary.json` containing the
+failed field/command and slowest steps, without copying input or environment
+values. A failed XCTest HTTP server stops the owned Maestro process promptly;
+the attempt remains failed, with the driver log path in `results.json`.
 Evidence stays in ignored directories:
 
 - `.tmp/native-validation/`: service logs, bundle, Maestro command results and
@@ -134,6 +138,17 @@ switch, not a normal optimization. The aggregate `Native Readiness` job fails a
 native-impacting PR when iOS is disabled or either applicable platform does not
 complete. Each PR execution runs the complete financial and signed-in
 cold-start journey once; repetition is not additional functional coverage.
+
+To investigate iOS without the financial journey, use `native test --platform
+ios --scenario sign-in` or `--scenario input` through `npm run native --`.
+The input probe reuses sign-in and goal-field entry, stopping before saving.
+These diagnostic scenarios cannot replace `verify` or publish a Native
+Readiness pass. The `native-ci` manual workflow exposes the same scenario
+selection with `platform=ios`. Its `ios_samples=3` option builds once and runs
+on three independent macOS hosts, with separate artifacts and no fail-fast
+cancellation. Full-journey readiness requires every sample to pass. Unlike
+`--repeat`, these samples do not reuse a host; reruns are not first-attempt
+reliability evidence.
 
 `npm run native -- remote-ios` is the Windows/Linux bridge: it requires a clean
 committed public-repository checkout, uploads that exact commit to an owned

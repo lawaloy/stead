@@ -246,9 +246,9 @@ assert.equal(
   'Every deterministic native text replacement must use the same standard clear operation.',
 );
 assert.match(
-  criticalNativeJourney,
-  /file: input-text-character-by-character\.yaml[\s\S]*platform: iOS[\s\S]*TEXT: Native journey goal[\s\S]*id: goal-name\n\s+text: Native journey goal/,
-  'The iOS goal-name journey must use paced input and verify the field before saving.',
+  await readFile('mobile/.maestro/fill-goal.yaml', 'utf8'),
+  /file: input-text\.yaml[\s\S]*TEXT: Native journey goal[\s\S]*id: goal-name\n\s+text: Native journey goal/,
+  'Goal input must use the shared input flow and verify the field before saving.',
 );
 assert.match(
   iosCharacterInput,
@@ -514,7 +514,7 @@ for (const path of [
 const readiness = nativeWorkflow.split('  native-readiness:\n')[1];
 assert.match(
   readiness ?? '',
-  /name: Native Readiness[\s\S]*if: always\(\)[\s\S]*needs: \[config, build-android, build-ios, native-android, native-ios\]/,
+  /name: .*'iOS Diagnostic Probe' \|\| 'Native Readiness'[\s\S]*if: always\(\)[\s\S]*needs: \[config, build-android, build-ios, native-android, native-ios\]/,
   'Native CI must expose one stable aggregate result across conditional platform jobs.',
 );
 assert.match(

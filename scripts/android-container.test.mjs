@@ -109,8 +109,12 @@ test('container repeats preserve a middle failure, finish later diagnostics and 
       /2: Journey assertion failed/,
     );
     assert.deepEqual(executed, [1, 2, 3]);
+    const attempts = JSON.parse(
+      readFileSync(join(output, 'attempts.json'), 'utf8'),
+    );
+    for (const attempt of attempts) assert.ok(attempt.durationMs >= 0);
     assert.deepEqual(
-      JSON.parse(readFileSync(join(output, 'attempts.json'), 'utf8')),
+      attempts.map(({ durationMs, ...attempt }) => attempt),
       [
         { attempt: 1, status: 'passed' },
         { attempt: 2, status: 'failed', error: 'Journey assertion failed' },
@@ -140,8 +144,12 @@ test('cancelling container repeats records completed work and stops subsequent a
       (error) => error === reason,
     );
     assert.deepEqual(executed, [1]);
+    const attempts = JSON.parse(
+      readFileSync(join(output, 'attempts.json'), 'utf8'),
+    );
+    assert.ok(attempts[0].durationMs >= 0);
     assert.deepEqual(
-      JSON.parse(readFileSync(join(output, 'attempts.json'), 'utf8')),
+      attempts.map(({ durationMs, ...attempt }) => attempt),
       [{ attempt: 1, status: 'passed' }],
     );
   } finally {

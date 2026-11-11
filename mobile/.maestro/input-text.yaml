@@ -1,0 +1,16 @@
+# Keep every journey field on the same platform-specific input path, including
+# numbers. Callers must read back the field before submitting the form.
+appId: com.lawaloy.stead
+---
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - inputText: ${TEXT}
+      - hideKeyboard
+- runFlow:
+    file: input-text-character-by-character.yaml
+    when:
+      platform: iOS
+    env:
+      TEXT: ${TEXT}
