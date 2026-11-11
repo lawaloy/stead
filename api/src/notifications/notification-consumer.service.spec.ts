@@ -413,6 +413,27 @@ describe('NotificationConsumerService', () => {
     );
   });
 
+  it('records a dead_letter job metric when the last delivery attempt fails', async () => {
+    const lastAttempt = { ...job, attempts: 2, maxAttempts: 3 };
+    const error = new Error('provider down');
+    queue.claimReadyJob.mockResolvedValue(lastAttempt);
+    sms.sendOtp.mockRejectedValue(error);
+
+    await tick();
+
+    expect(queue.markFailed).toHaveBeenCalledWith(lastAttempt, error);
+    expect(metrics.recordNotificationJob).toHaveBeenCalledWith({
+      durationMs: expect.any(Number) as unknown,
+      outcome: 'dead_letter',
+      provider: 'none',
+      type: 'otp.requested',
+    });
+    expect(metrics.recordNotificationPoll).toHaveBeenCalledWith({
+      durationMs: expect.any(Number) as unknown,
+      outcome: 'processed',
+    });
+  });
+
   it('swallows claim errors so the poll loop cannot crash the process', async () => {
     queue.claimReadyJob.mockRejectedValue(new Error('db unavailable'));
 
@@ -423,6 +444,10 @@ describe('NotificationConsumerService', () => {
     expect(queue.markFailed).not.toHaveBeenCalled();
     expect(errorSpy).toHaveBeenCalledWith('Notification poll failed', {
       errorName: 'Error',
+    });
+    expect(metrics.recordNotificationPoll).toHaveBeenCalledWith({
+      durationMs: expect.any(Number) as unknown,
+      outcome: 'error',
     });
   });
 

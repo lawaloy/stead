@@ -68,4 +68,23 @@ describe('OTP verification idempotency crypto', () => {
       false,
     );
   });
+
+  it('fails closed when decrypted JSON is not a usable session', () => {
+    for (const invalid of [
+      { token: 'access-token', refreshToken: 'refresh-token', expiresIn: 0 },
+      { token: 'access-token', refreshToken: 'refresh-token', expiresIn: 1.5 },
+      { token: 'access-token', expiresIn: 900 },
+    ]) {
+      const encrypted = encryptOtpVerificationResponse(
+        secret,
+        keyHash,
+        requestHash,
+        invalid as typeof response,
+      );
+
+      expect(() =>
+        decryptOtpVerificationResponse(secret, keyHash, requestHash, encrypted),
+      ).toThrow('Unable to decrypt OTP verification response');
+    }
+  });
 });

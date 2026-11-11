@@ -93,4 +93,90 @@ describe('api client OTP verification retry policy', () => {
     ).rejects.toMatchObject({ status: 400 });
     expect(attempts).toBe(1);
   });
+
+  it('does not retry an idempotency conflict', async () => {
+    let attempts = 0;
+    mock.onPost('/auth/verify-otp').reply(() => {
+      attempts += 1;
+      return [
+        409,
+        {
+          message:
+            'Idempotency-Key was already used for another OTP verification.',
+        },
+      ];
+    });
+
+    await expect(
+      verifyOtp(
+        '08012345678',
+        'NG',
+        '123456',
+        '00000000-0000-4000-8000-000000000042',
+      ),
+    ).rejects.toMatchObject({
+      status: 409,
+      message: 'Idempotency-Key was already used for another OTP verification.',
+    });
+    expect(attempts).toBe(1);
+  });
+
+  it('retries status-less network failures with the caller-supplied idempotency key', async () => {
+    jest.useFakeTimers();
+    jest.spyOn(Math, 'random').mockReturnValue(0.5);
+    let attempts = 0;
+    const idempotencyKey = '00000000-0000-4000-8000-000000000042';
+
+    mock.onPost('/auth/verify-otp').reply((config) => {
+      attempts += 1;
+      if (attempts < 3) {
+        return Promise.reject({
+          isAxiosError: true,
+          message: 'Network Error',
+          config,
+        });
+      }
+      return [
+        201,
+        { token: 'access', refreshToken: 'refresh', expiresIn: 900 },
+      ];
+    });
+
+    const response = verifyOtp('08012345678', 'NG', '123456', idempotencyKey);
+    await jest.runAllTimersAsync();
+
+    await expect(response).resolves.toEqual({
+      token: 'access',
+      refreshToken: 'refresh',
+      expiresIn: 900,
+    });
+    expect(attempts).toBe(3);
+    const idempotencyKeys = mock.history.post.map((config) =>
+      String(config.headers?.['Idempotency-Key']),
+    );
+    expect(idempotencyKeys).toEqual([
+      idempotencyKey,
+      idempotencyKey,
+      idempotencyKey,
+    ]);
+  });
+
+  it('surfaces the last retryable verify failure after three attempts', async () => {
+    jest.useFakeTimers();
+    jest.spyOn(Math, 'random').mockReturnValue(0.5);
+    let attempts = 0;
+    mock.onPost('/auth/verify-otp').reply(() => {
+      attempts += 1;
+      return [503, { message: 'upstream unavailable' }];
+    });
+
+    const response = verifyOtp('08012345678', 'NG', '123456');
+    const expectation = expect(response).rejects.toMatchObject({
+      status: 503,
+      message: 'upstream unavailable',
+    });
+    await jest.runAllTimersAsync();
+    await expectation;
+    expect(attempts).toBe(3);
+  });
 });

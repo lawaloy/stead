@@ -61,6 +61,40 @@ describe('ObservabilityMetrics', () => {
     );
   });
 
+  it('treats client and auth HTTP failures as successful request outcomes', () => {
+    const metrics = new ObservabilityMetrics(meter);
+
+    metrics.recordHttpRequest({
+      method: 'POST',
+      route: '/auth/verify-otp',
+      statusCode: 401,
+      durationMs: 40,
+    });
+    metrics.recordHttpRequest({
+      method: 'POST',
+      route: '/auth/request-otp',
+      statusCode: 429,
+      durationMs: 12,
+    });
+
+    expect(
+      counters.get('stead.http.server.request.count'),
+    ).toHaveBeenCalledWith(1, {
+      'http.request.method': 'POST',
+      'http.route': '/auth/verify-otp',
+      'http.response.status_code': 401,
+      'stead.outcome': 'success',
+    });
+    expect(
+      counters.get('stead.http.server.request.count'),
+    ).toHaveBeenCalledWith(1, {
+      'http.request.method': 'POST',
+      'http.route': '/auth/request-otp',
+      'http.response.status_code': 429,
+      'stead.outcome': 'success',
+    });
+  });
+
   it('never records negative or non-finite durations', () => {
     const metrics = new ObservabilityMetrics(meter);
 

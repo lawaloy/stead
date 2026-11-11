@@ -118,6 +118,16 @@ describe('AuthService OTP idempotency key edges', () => {
     expect(prisma.otpCode.create).not.toHaveBeenCalled();
   });
 
+  it('rejects UUID v1 keys on verify before looking up OTP state', async () => {
+    await expect(
+      service.verifyOtp('08012345678', 'NG', '123456', {
+        idempotencyKey: '550e8400-e29b-11d4-a716-446655440000',
+      }),
+    ).rejects.toThrow('Idempotency-Key must be a UUIDv4 value.');
+    expect(prisma.otpCode.findUnique).not.toHaveBeenCalled();
+    expect(prisma.otpCode.findFirst).not.toHaveBeenCalled();
+  });
+
   it('propagates a create collision when the winning row is still unreadable', async () => {
     const collision = { code: 'P2002' };
     prisma.otpCode.create.mockRejectedValue(collision);

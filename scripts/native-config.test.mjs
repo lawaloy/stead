@@ -423,6 +423,58 @@ test('iOS preparation recovers one failed app launch before handing the simulato
   assert.equal(installs, 2);
 });
 
+test('iOS preparation fails closed when erase-and-reboot recovery still cannot launch', async () => {
+  let state = 'Shutdown',
+    launches = 0,
+    erases = 0,
+    installs = 0;
+  const execute = async (_command, args) => {
+    if (args[1] === 'list')
+      return JSON.stringify({
+        devices: {
+          [TOOLCHAIN.IOS_RUNTIME]: [
+            {
+              name: 'Stead Native iPhone 17',
+              udid: 'test',
+              isAvailable: true,
+              state,
+            },
+          ],
+        },
+      });
+    if (args[1] === 'boot') state = 'Booted';
+    if (args[1] === 'shutdown') state = 'Shutdown';
+    if (args[1] === 'erase') erases++;
+    if (args[1] === 'install') installs++;
+    if (args[1] === 'launch') {
+      launches++;
+      throw new Error(
+        launches === 1
+          ? 'FBS refused the first launch'
+          : 'FBS refused the recovery launch',
+      );
+    }
+    return '';
+  };
+  await assert.rejects(
+    prepareIosSimulator('test', 'mobile.app', execute, 'com.test.app'),
+    (error) => {
+      assert.equal(error.name, 'AggregateError');
+      assert.match(
+        error.message,
+        /including after one erase-and-reboot recovery/,
+      );
+      assert.equal(error.errors.length, 2);
+      assert.match(error.errors[0].message, /first launch/);
+      assert.match(error.errors[1].message, /recovery launch/);
+      return true;
+    },
+  );
+  assert.equal(launches, 2);
+  assert.equal(erases, 1);
+  assert.equal(installs, 2);
+});
+
 test('iOS journey artifacts must carry their JavaScript bundle', () => {
   const app = mkdtempSync(join(tmpdir(), 'stead-ios-app-'));
   try {
