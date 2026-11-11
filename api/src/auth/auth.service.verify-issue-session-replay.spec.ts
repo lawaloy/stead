@@ -196,4 +196,71 @@ describe('AuthService verify OTP issue-session catch replay', () => {
     expect(prisma.refreshToken.create).not.toHaveBeenCalled();
     expect(jwt.signAsync).not.toHaveBeenCalled();
   });
+
+  it('returns the winner session when JWT signing fails after consume and another request stored the response', async () => {
+    const otp = '123456';
+    prisma.user.findUnique.mockResolvedValue({
+      id: 'user_1',
+      phone: '+2348012345678',
+    });
+    prisma.otpCode.findFirst.mockResolvedValue({
+      id: 'otp_latest',
+      codeHash: await bcrypt.hash(otp, 1),
+      verifyAttempts: 0,
+      expiresAt: new Date(Date.now() + 60_000),
+      consumedAt: null,
+    });
+    prisma.otpCode.findUnique
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(await storedWinner(otp));
+    prisma.otpCode.updateMany.mockResolvedValue({ count: 1 });
+    prisma.refreshToken.create.mockResolvedValue({ id: 'rt_1' });
+    jwt.signAsync.mockRejectedValue(new Error('signing failed'));
+
+    await expect(
+      service.verifyOtp('08012345678', 'NG', otp, {
+        idempotencyKey: IDEMPOTENCY_KEY,
+      }),
+    ).resolves.toEqual(WINNER_SESSION);
+
+    expect(jwt.signAsync).toHaveBeenCalledTimes(1);
+    expect(prisma.refreshToken.create).toHaveBeenCalledTimes(1);
+    expect(prisma.otpCode.update).not.toHaveBeenCalled();
+  });
+
+  it('surfaces a catch-path replay conflict instead of the original signing failure', async () => {
+    const otp = '123456';
+    prisma.user.findUnique.mockResolvedValue({
+      id: 'user_1',
+      phone: '+2348012345678',
+    });
+    prisma.otpCode.findFirst.mockResolvedValue({
+      id: 'otp_latest',
+      codeHash: await bcrypt.hash(otp, 1),
+      verifyAttempts: 0,
+      expiresAt: new Date(Date.now() + 60_000),
+      consumedAt: null,
+    });
+    prisma.otpCode.findUnique.mockResolvedValueOnce(null).mockResolvedValueOnce(
+      await storedWinner(otp).then((winner) => ({
+        ...winner,
+        verifiedAt: new Date(Date.now() - 10 * 60 * 1000 - 1),
+      })),
+    );
+    prisma.otpCode.updateMany.mockResolvedValue({ count: 1 });
+    prisma.refreshToken.create.mockResolvedValue({ id: 'rt_1' });
+    jwt.signAsync.mockRejectedValue(new Error('signing failed'));
+
+    await expect(
+      service.verifyOtp('08012345678', 'NG', otp, {
+        idempotencyKey: IDEMPOTENCY_KEY,
+      }),
+    ).rejects.toEqual(
+      expect.objectContaining({
+        message: 'The OTP verification replay window has expired.',
+      }),
+    );
+
+    expect(jwt.signAsync).toHaveBeenCalledTimes(1);
+  });
 });

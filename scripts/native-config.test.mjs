@@ -148,6 +148,45 @@ test('Android Maestro bootstrap retries only a new deviceInfo transport death wi
   }
 });
 
+test('iOS Maestro bootstrap never retries an Android-only deviceInfo transport death', async () => {
+  const output = mkdtempSync(join(tmpdir(), 'stead maestro ios bootstrap '));
+  let calls = 0;
+  let recoveries = 0;
+  try {
+    await assert.rejects(
+      runMaestroWithBootstrapRecovery(
+        async () => {
+          calls += 1;
+          const logs = join(output, 'first');
+          mkdirSync(logs, { recursive: true });
+          writeFileSync(
+            join(logs, 'maestro.log'),
+            "DeviceServerDiedException: Device server died during 'deviceInfo' on emulator-5554: StatusRuntimeException: UNAVAILABLE",
+          );
+          throw new Error('maestro failed (exit 1).');
+        },
+        {
+          platform: 'ios',
+          debugOutput: output,
+          recover: async () => {
+            recoveries += 1;
+          },
+          sleep: async () => {
+            throw new Error(
+              'iOS bootstrap must not sleep for Android transients',
+            );
+          },
+        },
+      ),
+      /maestro failed \(exit 1\)/,
+    );
+    assert.equal(calls, 1);
+    assert.equal(recoveries, 0);
+  } finally {
+    rmSync(output, { recursive: true, force: true });
+  }
+});
+
 test('Maestro bootstrap recovery never retries an app failure or reuses an older transient log', async () => {
   const output = mkdtempSync(join(tmpdir(), 'stead maestro assertion '));
   let calls = 0;

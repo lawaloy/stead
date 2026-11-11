@@ -90,6 +90,29 @@ test('a testHttpServer failure in the last 64 KB of a large XCTest log is still 
   assert.equal(findXCTestFailure(directory).log, log);
 });
 
+test('unreadable XCTest evidence fails closed as evidence-monitor-failed and is not retried', async (t) => {
+  const directory = fixture(t);
+  await assert.rejects(
+    runMaestroCommand(
+      'unused',
+      [],
+      {},
+      {
+        xctestOutput: directory,
+        pollIntervalMs: 5,
+        timeoutMs: 5_000,
+        execute: async () => {
+          rmSync(directory, { recursive: true, force: true });
+          writeFileSync(directory, 'not-a-directory');
+        },
+      },
+    ),
+    (error) =>
+      error.nativeFailure?.kind === 'evidence-monitor-failed' &&
+      /will not be retried/.test(error.message),
+  );
+});
+
 test('a successful Maestro exit is still a failed attempt when the XCTest driver already failed', async (t) => {
   const directory = fixture(t);
   await assert.rejects(

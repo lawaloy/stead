@@ -85,6 +85,43 @@ describe('SteadLogger', () => {
     });
   });
 
+  it('redacts queue and OTP secrets when Nest supplies a trailing context string', () => {
+    const write = jest
+      .spyOn(process.stdout, 'write')
+      .mockImplementation(() => true);
+    const logger = new SteadLogger({
+      LOG_FORMAT: 'json',
+      LOG_LEVEL: 'info',
+    });
+
+    runWithCorrelationId('request_789', () => {
+      logger.log(
+        'Claimed job',
+        {
+          payloadJson: '{"phone":"+2348012345678","otp":"123456"}',
+          codeHash: 'hashed-otp',
+          otp: '123456',
+        },
+        'NotificationConsumerService',
+      );
+    });
+
+    expect(write).toHaveBeenCalledTimes(1);
+    const record = JSON.parse(String(write.mock.calls[0]?.[0])) as Record<
+      string,
+      unknown
+    >;
+    expect(record).toMatchObject({
+      message: 'Claimed job',
+      correlationId: 'request_789',
+      payloadJson: '[REDACTED]',
+      codeHash: '[REDACTED]',
+      otp: '[REDACTED]',
+    });
+    expect(JSON.stringify(record)).not.toContain('+2348012345678');
+    expect(JSON.stringify(record)).not.toContain('123456');
+  });
+
   it('creates recognizable unique identifiers for background operations', () => {
     const first = createOperationId('alerts.scheduler.evaluate');
     const second = createOperationId('alerts.scheduler.evaluate');

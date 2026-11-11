@@ -223,6 +223,42 @@ describe('AuthService verify OTP selection query', () => {
     expect(jwt.signAsync).not.toHaveBeenCalled();
   });
 
+  it('rejects a concurrent recheck as conflict when the winner row is not yet replayable', async () => {
+    const idempotencyKey = '00000000-0000-4000-8000-000000000003';
+    const verificationRequestHash = hashOtpVerificationRequest(
+      VERIFICATION_SECRET,
+      {
+        deviceHash: null,
+      },
+    );
+    prisma.user.findUnique.mockResolvedValue({
+      id: 'user_1',
+      phone: '+2348012345678',
+    });
+    prisma.otpCode.findFirst.mockResolvedValue(null);
+    prisma.otpCode.findUnique
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({
+        codeHash: await bcrypt.hash('123456', 1),
+        verificationRequestHash,
+        verificationResponseJson: null,
+        verifiedAt: new Date(),
+        user: { phone: '+2348012345678' },
+      });
+
+    await expect(
+      service.verifyOtp('08012345678', 'NG', '123456', { idempotencyKey }),
+    ).rejects.toEqual(
+      expect.objectContaining({
+        message: 'The OTP verification replay window has expired.',
+      }),
+    );
+
+    expect(prisma.otpCode.findUnique).toHaveBeenCalledTimes(2);
+    expect(prisma.otpCode.updateMany).not.toHaveBeenCalled();
+    expect(jwt.signAsync).not.toHaveBeenCalled();
+  });
+
   it('rejects replay when the OTP differs from the original verification', async () => {
     const idempotencyKey = '00000000-0000-4000-8000-000000000002';
     const verificationRequestHash = hashOtpVerificationRequest(
