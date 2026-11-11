@@ -82,6 +82,39 @@ test('driver failure classification requires a failed HTTP-server test, not a pr
   assert.equal(findXCTestFailure(directory).kind, 'xctest-server-failed');
 });
 
+test('a testHttpServer failure in the last 64 KB of a large XCTest log is still classified', (t) => {
+  const directory = fixture(t);
+  const log = join(directory, 'xctest_runner_current.log');
+  writeFileSync(log, `${'x'.repeat(70 * 1024)}${screenshotFailure}`);
+  assert.equal(findXCTestFailure(directory).kind, 'xctest-screenshot-timeout');
+  assert.equal(findXCTestFailure(directory).log, log);
+});
+
+test('a successful Maestro exit is still a failed attempt when the XCTest driver already failed', async (t) => {
+  const directory = fixture(t);
+  await assert.rejects(
+    runMaestroCommand(
+      'unused',
+      [],
+      {},
+      {
+        xctestOutput: directory,
+        pollIntervalMs: 5,
+        timeoutMs: 5_000,
+        execute: async () => {
+          writeFileSync(
+            join(directory, 'xctest_runner_new.log'),
+            screenshotFailure,
+          );
+        },
+      },
+    ),
+    (error) =>
+      error.nativeFailure?.kind === 'xctest-screenshot-timeout' &&
+      /will not be retried/.test(error.message),
+  );
+});
+
 test('an assertion failure retains its original error and is never reported as an infrastructure pass', async (t) => {
   const directory = fixture(t);
   const assertion = new Error('Assertion is false: 20% is visible');
