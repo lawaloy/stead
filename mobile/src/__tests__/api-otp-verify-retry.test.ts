@@ -94,6 +94,29 @@ describe('api client OTP verification retry policy', () => {
     expect(attempts).toBe(1);
   });
 
+  it('does not retry HTTP 429 verify failures', async () => {
+    let attempts = 0;
+    mock.onPost('/auth/verify-otp').reply(() => {
+      attempts += 1;
+      return [
+        429,
+        {
+          message:
+            'Too many invalid OTP attempts from this network. Try again later.',
+        },
+      ];
+    });
+
+    await expect(
+      verifyOtp('08012345678', 'NG', '123456'),
+    ).rejects.toMatchObject({
+      status: 429,
+      message:
+        'Too many invalid OTP attempts from this network. Try again later.',
+    });
+    expect(attempts).toBe(1);
+  });
+
   it('does not retry an idempotency conflict', async () => {
     let attempts = 0;
     mock.onPost('/auth/verify-otp').reply(() => {

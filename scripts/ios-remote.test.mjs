@@ -3,7 +3,12 @@ import test from 'node:test';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { githubRepository, remoteIos, retryGitHubRead } from './ios-remote.mjs';
+import {
+  assertIosRun,
+  githubRepository,
+  remoteIos,
+  retryGitHubRead,
+} from './ios-remote.mjs';
 import { runCommand } from './process-utils.mjs';
 import { ROOT } from './toolchain.mjs';
 
@@ -80,9 +85,17 @@ const fixture = (overrides = {}) => {
       return '';
     }
     if (args[1] === 'list')
-      return JSON.stringify([
-        { databaseId: 123, headSha: overrides.commit ?? tested, url: run.url },
-      ]);
+      return JSON.stringify(
+        overrides.missingDispatchedRun
+          ? []
+          : [
+              {
+                databaseId: 123,
+                headSha: overrides.commit ?? tested,
+                url: run.url,
+              },
+            ],
+      );
     if (args.includes('--log')) return 'Assert dashboard visible ... COMPLETED';
     if (args[1] === 'view') {
       if (runViews++ < (overrides.transientRunViews ?? 0))
@@ -227,6 +240,51 @@ test('remote polling is bounded and a timed-out remote run is never treated as p
   await assert.rejects(f.start(), /Timed out waiting/);
   assert.equal(f.result().status, 'failed');
   assert.equal(f.result().runId, 123);
+});
+
+test('iOS-only preflight rejects a matrix run that executed Android jobs', () => {
+  const sha = 'a'.repeat(40);
+  assert.throws(
+    () =>
+      assertIosRun(
+        {
+          headSha: sha,
+          headBranch: branch,
+          event: 'workflow_dispatch',
+          status: 'completed',
+          conclusion: 'success',
+          jobs: [
+            configurationJob,
+            'build-ios',
+            'native-ios',
+            'Native Readiness',
+            'build-android',
+            'native-android',
+          ].map((name) => ({
+            name,
+            status: 'completed',
+            conclusion: 'success',
+          })),
+        },
+        { testedCommit: sha, remoteBranch: branch },
+      ),
+    /Expected build-android to be skipped/,
+  );
+});
+
+test('a dispatched iOS run that never appears for the uploaded SHA is a failed preflight', async () => {
+  const f = fixture({ missingDispatchedRun: true });
+  await assert.rejects(f.start(), /Timed out finding the dispatched workflow/);
+  assert.equal(f.result().status, 'failed');
+  assert.equal(
+    f.calls.filter(({ args }) => args[0] === 'workflow').length,
+    1,
+    'discovery timeout must not dispatch twice',
+  );
+  assert.ok(
+    !f.calls.some(({ args }) => args.includes(`:refs/heads/${branch}`)),
+    'the temporary ref must be retained for investigation',
+  );
 });
 
 test('read-only GitHub queries retry transient transport failures without repeating mutations', async () => {

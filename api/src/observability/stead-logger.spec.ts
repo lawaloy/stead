@@ -85,6 +85,45 @@ describe('SteadLogger', () => {
     });
   });
 
+  it('redacts authorization, cookie, password, token, refresh, and body fields', () => {
+    const write = jest
+      .spyOn(process.stdout, 'write')
+      .mockImplementation(() => true);
+    const logger = new SteadLogger({
+      LOG_FORMAT: 'json',
+      LOG_LEVEL: 'info',
+    });
+
+    logger.log('Inbound request', {
+      authorization: 'Bearer secret-access',
+      cookie: 'session=secret-cookie',
+      password: 'secret-password',
+      token: 'secret-token',
+      refreshToken: 'secret-refresh',
+      body: { otp: '654321', nested: 'still-secret' },
+    });
+
+    expect(write).toHaveBeenCalledTimes(1);
+    const serialized = String(write.mock.calls[0]?.[0]);
+    const record = JSON.parse(serialized) as Record<string, unknown>;
+    expect(record).toMatchObject({
+      message: 'Inbound request',
+      authorization: '[REDACTED]',
+      cookie: '[REDACTED]',
+      password: '[REDACTED]',
+      token: '[REDACTED]',
+      refreshToken: '[REDACTED]',
+      body: '[REDACTED]',
+    });
+    expect(serialized).not.toContain('secret-access');
+    expect(serialized).not.toContain('secret-cookie');
+    expect(serialized).not.toContain('secret-password');
+    expect(serialized).not.toContain('secret-token');
+    expect(serialized).not.toContain('secret-refresh');
+    expect(serialized).not.toContain('654321');
+    expect(serialized).not.toContain('still-secret');
+  });
+
   it('redacts queue and OTP secrets when Nest supplies a trailing context string', () => {
     const write = jest
       .spyOn(process.stdout, 'write')
