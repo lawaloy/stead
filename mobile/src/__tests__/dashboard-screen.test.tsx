@@ -166,6 +166,40 @@ describe('stability dashboard screen', () => {
     expect(screen.queryByText('Readiness')).not.toBeOnTheScreen();
   });
 
+  it('keeps the missing-goal status when a focus refresh fails', async () => {
+    mockDashboard.mockResolvedValue({
+      ok: false,
+      message: 'No active goal found',
+    });
+    await renderScreen();
+    expect(await screen.findByText('No active goal found')).toBeOnTheScreen();
+
+    mockDashboard.mockRejectedValue(new Error('Offline'));
+    await act(async () => {
+      onFocus?.();
+    });
+    await waitFor(() => expect(mockDashboard).toHaveBeenCalledTimes(3), {
+      timeout: 4_000,
+    });
+    await act(async () => {
+      await Promise.allSettled(
+        mockDashboard.mock.results.map((result) => result.value),
+      );
+    });
+
+    expect(screen.getByText('No active goal found')).toBeOnTheScreen();
+    expect(screen.queryByText('Readiness')).not.toBeOnTheScreen();
+    expect(
+      await screen.findByRole(
+        'alert',
+        {
+          name: 'Could not refresh dashboard. Showing your last saved status.',
+        },
+        { timeout: 3_000 },
+      ),
+    ).toBeOnTheScreen();
+  });
+
   it('shows a failed-read state with an accessible retry action', async () => {
     mockDashboard.mockRejectedValue(new Error('Offline'));
     await renderScreen();
