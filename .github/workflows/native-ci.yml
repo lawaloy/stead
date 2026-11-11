@@ -389,7 +389,7 @@ jobs:
             .tmp/native-container/**/attempts.json
             .tmp/native-container/**/build.log
             .tmp/native-container/**/source.json
-          retention-days: 7
+          retention-days: 1
 
   native-ios:
     name: ${{ matrix.sample == 1 && 'native-ios' || format('native-ios-{0}', matrix.sample) }}
@@ -494,7 +494,7 @@ jobs:
             ~/.maestro/tests
             mobile/.expo
             mobile/.ci/ios
-          retention-days: 7
+          retention-days: 1
 
   native-readiness:
     # A skipped required check counts as passing in GitHub. Give diagnostic
