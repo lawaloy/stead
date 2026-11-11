@@ -96,7 +96,10 @@ const fixture = (overrides = {}) => {
               },
             ],
       );
-    if (args.includes('--log')) return 'Assert dashboard visible ... COMPLETED';
+    if (args.includes('--log')) {
+      if (overrides.workflowLogFailure) throw new Error('workflow log missing');
+      return 'Assert dashboard visible ... COMPLETED';
+    }
     if (args[1] === 'view') {
       if (runViews++ < (overrides.transientRunViews ?? 0))
         throw new Error('TLS handshake timeout');
@@ -231,6 +234,32 @@ test('changed source and missing evidence fail and retain the remote ref', async
     assert.equal(f.result().status, 'failed');
     assert.ok(
       !f.calls.some(({ args }) => args.includes(`:refs/heads/${branch}`)),
+    );
+  }
+});
+
+test('a successful iOS run still fails closed when evidence collection fails', async () => {
+  for (const scenario of [
+    {
+      artifactFailure: true,
+      message: /iOS passed, but evidence collection failed: artifact missing/,
+      retainsWorkflowLog: true,
+    },
+    {
+      workflowLogFailure: true,
+      message:
+        /iOS passed, but evidence collection failed: workflow log missing/,
+      retainsWorkflowLog: false,
+    },
+  ]) {
+    const f = fixture(scenario);
+    await assert.rejects(f.start(), scenario.message);
+    assert.equal(f.result().status, 'failed');
+    assert.equal(f.saved.has('workflow.log'), scenario.retainsWorkflowLog);
+    assert.ok(f.result().collectionErrors.length > 0);
+    assert.ok(
+      !f.calls.some(({ args }) => args.includes(`:refs/heads/${branch}`)),
+      'the temporary ref must be retained when evidence is incomplete',
     );
   }
 });

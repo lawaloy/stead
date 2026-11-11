@@ -90,3 +90,29 @@ test('an already-aborted signal schedules no repeated journeys', async () => {
   assert.deepEqual(results, []);
   assert.equal(operations, 0);
 });
+
+test('Android Maestro bootstrap does not retry a deviceInfo death without a new maestro.log', async () => {
+  let operations = 0;
+  let recoveries = 0;
+  await assert.rejects(
+    runMaestroWithBootstrapRecovery(
+      async () => {
+        operations += 1;
+        throw new Error('maestro failed (exit 1).');
+      },
+      {
+        platform: 'android',
+        debugOutput: '/nonexistent-stead-maestro-debug',
+        recover: async () => {
+          recoveries += 1;
+        },
+        sleep: async () => {
+          throw new Error('missing logs must not sleep for retry');
+        },
+      },
+    ),
+    /maestro failed \(exit 1\)/,
+  );
+  assert.equal(operations, 1);
+  assert.equal(recoveries, 0);
+});
