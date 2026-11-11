@@ -105,9 +105,12 @@ Evidence stays in ignored directories:
   `memory.json` with peak usage and OOM counters.
 - `.tmp/codeql-validation/`: source snapshot, database, SARIF and finding count.
 
-Native CI retains the Android and iOS journey evidence artifacts for seven days
-on successful and failed runs. Build caches are not evidence and are not
-included in those artifacts.
+Native CI retains focused Android and iOS journey evidence for three days on
+successful and failed runs. The evidence includes logs, screenshots, videos,
+and JSON failure metadata; it excludes simulator applications, generated
+JavaScript bundles, and build caches. The separately transferred simulator
+applications remain available only long enough for their same-workflow test
+jobs.
 
 ## Local Validation
 

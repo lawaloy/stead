@@ -65,6 +65,7 @@ jobs:
       image_target: ${{ steps.versions.outputs.image_target }}
       android_arch: ${{ steps.versions.outputs.android_arch }}
       android_profile: ${{ steps.versions.outputs.android_profile }}
+      native_evidence_retention_days: ${{ steps.versions.outputs.native_evidence_retention_days }}
     steps:
       - uses: actions/checkout@v4
       - name: Detect native-impacting changes
@@ -112,6 +113,7 @@ jobs:
             echo "image_target=$ANDROID_IMAGE_TARGET"
             echo "android_arch=$ANDROID_ARCH"
             echo "android_profile=$ANDROID_PROFILE"
+            echo "native_evidence_retention_days=$NATIVE_EVIDENCE_RETENTION_DAYS"
           } >> "$GITHUB_OUTPUT"
           if [[ "$IOS_NATIVE_ENABLED" != "true" ]]; then
             echo "Native iOS builds and journeys are disabled by the emergency switch. Native Readiness will reject applicable changes." >> "$GITHUB_STEP_SUMMARY"
@@ -389,7 +391,12 @@ jobs:
             .tmp/native-container/**/attempts.json
             .tmp/native-container/**/build.log
             .tmp/native-container/**/source.json
-          retention-days: 1
+            !.tmp/native-container/**/*.bundle
+            !.tmp/native-container/**/*.apk
+            !.tmp/native-container/**/*.aab
+            !.tmp/native-container/**/*.zip
+          if-no-files-found: error
+          retention-days: ${{ needs.config.outputs.native_evidence_retention_days }}
 
   native-ios:
     name: ${{ matrix.sample == 1 && 'native-ios' || format('native-ios-{0}', matrix.sample) }}
@@ -492,9 +499,10 @@ jobs:
           path: |
             .tmp/native-validation
             ~/.maestro/tests
-            mobile/.expo
-            mobile/.ci/ios
-          retention-days: 1
+            mobile/.expo/**/*.log
+            !.tmp/native-validation/**/*.bundle
+          if-no-files-found: error
+          retention-days: ${{ needs.config.outputs.native_evidence_retention_days }}
 
   native-readiness:
     # A skipped required check counts as passing in GitHub. Give diagnostic
