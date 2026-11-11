@@ -95,6 +95,54 @@ describe('ObservabilityMetrics', () => {
     });
   });
 
+  it('treats validation and forbidden HTTP statuses as success and 500 as error', () => {
+    const metrics = new ObservabilityMetrics(meter);
+
+    metrics.recordHttpRequest({
+      method: 'POST',
+      route: '/goals',
+      statusCode: 400,
+      durationMs: 8,
+    });
+    metrics.recordHttpRequest({
+      method: 'GET',
+      route: '/notifications/inspect',
+      statusCode: 403,
+      durationMs: 5,
+    });
+    metrics.recordHttpRequest({
+      method: 'POST',
+      route: '/auth/verify-otp',
+      statusCode: 500,
+      durationMs: 20,
+    });
+
+    expect(
+      counters.get('stead.http.server.request.count'),
+    ).toHaveBeenCalledWith(1, {
+      'http.request.method': 'POST',
+      'http.route': '/goals',
+      'http.response.status_code': 400,
+      'stead.outcome': 'success',
+    });
+    expect(
+      counters.get('stead.http.server.request.count'),
+    ).toHaveBeenCalledWith(1, {
+      'http.request.method': 'GET',
+      'http.route': '/notifications/inspect',
+      'http.response.status_code': 403,
+      'stead.outcome': 'success',
+    });
+    expect(
+      counters.get('stead.http.server.request.count'),
+    ).toHaveBeenCalledWith(1, {
+      'http.request.method': 'POST',
+      'http.route': '/auth/verify-otp',
+      'http.response.status_code': 500,
+      'stead.outcome': 'error',
+    });
+  });
+
   it('never records negative or non-finite durations', () => {
     const metrics = new ObservabilityMetrics(meter);
 

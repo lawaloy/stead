@@ -112,6 +112,30 @@ describe('NotificationQueueService decrypt fail-closed paths', () => {
     );
   });
 
+  it('rejects a tampered AES-GCM authTag inside an otherwise valid envelope', async () => {
+    const envelope = JSON.parse(
+      encryptWithKey(encryptionKey, {
+        phone: '+2348000000000',
+        otp: '123456',
+      }),
+    ) as { v: number; iv: string; authTag: string; ciphertext: string };
+    const authTag = Buffer.from(envelope.authTag, 'base64');
+    authTag[0] = authTag[0] ^ 0xff;
+    envelope.authTag = authTag.toString('base64');
+
+    await expect(
+      claimWithPayload(JSON.stringify(envelope)),
+    ).resolves.toBeNull();
+    expect(prisma.notificationJob.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'job_1' },
+        data: expect.objectContaining({
+          lastError: 'Unable to decrypt notification payload',
+        }) as unknown,
+      }),
+    );
+  });
+
   it('rejects tampered ciphertext inside an otherwise valid envelope', async () => {
     const envelope = JSON.parse(
       encryptWithKey(encryptionKey, {
