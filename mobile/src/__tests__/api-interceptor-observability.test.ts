@@ -50,6 +50,26 @@ describe('api interceptor error reporting', () => {
     expect(reportErrorMock).not.toHaveBeenCalled();
   });
 
+  it('reports transport failures that have no HTTP status', async () => {
+    mock.onGet('/goals/active').networkError();
+
+    await expect(getActiveGoal()).rejects.toMatchObject({
+      name: 'ApiError',
+    });
+    expect(reportErrorMock).toHaveBeenCalledTimes(1);
+    expect(reportErrorMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: 'ApiError',
+      }),
+      expect.objectContaining({
+        area: 'api',
+        operation: 'GET',
+        route: '/goals/active',
+      }),
+    );
+    expect(reportErrorMock.mock.calls[0]?.[1]?.statusCode).toBeUndefined();
+  });
+
   it('reports server failures with UUID routes redacted', async () => {
     const transactionId = '550e8400-e29b-41d4-a716-446655440000';
     mock.onDelete(`/transactions/${transactionId}`).reply(503, {
