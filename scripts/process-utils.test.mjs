@@ -10,6 +10,7 @@ import {
   spawnOwned,
   stopOwned,
   assertPortAvailable,
+  waitForEndpoint,
   withCleanup,
 } from './process-utils.mjs';
 
@@ -210,3 +211,69 @@ test(
     }
   },
 );
+
+test('waitForEndpoint fails closed when the service exits, times out, or is aborted', async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => {
+    throw new Error('not ready');
+  };
+  try {
+    await assert.rejects(
+      waitForEndpoint(
+        'http://127.0.0.1:9/health',
+        { exitCode: 1, signalCode: null },
+        { timeout: 5_000 },
+      ),
+      /Service exited before http:\/\/127\.0\.0\.1:9\/health became ready/,
+    );
+
+    const aborted = new AbortController();
+    aborted.abort();
+    await assert.rejects(
+      waitForEndpoint('http://127.0.0.1:9/health', null, {
+        signal: aborted.signal,
+      }),
+      (error) => error.name === 'AbortError',
+    );
+
+    await assert.rejects(
+      waitForEndpoint(
+        'http://127.0.0.1:9/health',
+        { exitCode: null, signalCode: null },
+        { timeout: 50 },
+      ),
+      /Timed out waiting for http:\/\/127\.0\.0\.1:9\/health/,
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('waitForEndpoint uses the caller accept predicate before treating Metro as ready', async () => {
+  const originalFetch = globalThis.fetch;
+  let calls = 0;
+  globalThis.fetch = async () => {
+    calls += 1;
+    const body =
+      calls === 1 ? 'packager-status:starting' : 'packager-status:running';
+    return {
+      ok: true,
+      text: async () => body,
+    };
+  };
+  try {
+    await waitForEndpoint(
+      'http://127.0.0.1:9/status',
+      { exitCode: null, signalCode: null },
+      {
+        timeout: 5_000,
+        accept: async (response) =>
+          response.ok &&
+          (await response.text()).includes('packager-status:running'),
+      },
+    );
+    assert.equal(calls, 2);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});

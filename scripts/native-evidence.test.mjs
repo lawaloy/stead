@@ -227,6 +227,14 @@ test('command summaries identify a failed field and slow steps without publishin
   assert.doesNotMatch(JSON.stringify(summary), /sensitive|1200000/);
 });
 
+test('Maestro summaries fail closed on unreadable command evidence', (t) => {
+  const directory = fixture(t);
+  const flow = join(directory, 'flow');
+  mkdirSync(flow);
+  writeFileSync(join(flow, 'commands.json'), '{not-json');
+  assert.throws(() => summarizeMaestro(directory), SyntaxError);
+});
+
 test('diagnostic scenarios cannot substitute for the full verify gate or select arbitrary flows', () => {
   assert.equal(
     parseNativeArguments(['test', '--platform', 'ios', '--scenario', 'input'])

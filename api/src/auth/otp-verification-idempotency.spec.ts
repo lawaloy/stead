@@ -69,6 +69,29 @@ describe('OTP verification idempotency crypto', () => {
     );
   });
 
+  it('fails closed for truncated, empty, or non-hex stored request hashes', () => {
+    expect(otpVerificationRequestMatches('deadbeef', requestHash)).toBe(false);
+    expect(otpVerificationRequestMatches('', requestHash)).toBe(false);
+    expect(otpVerificationRequestMatches('not-hex', requestHash)).toBe(false);
+    expect(
+      otpVerificationRequestMatches(requestHash, requestHash.toUpperCase()),
+    ).toBe(true);
+  });
+
+  it('treats a missing device fingerprint as distinct from a bound device', () => {
+    const unbound = hashOtpVerificationRequest(secret, { deviceHash: null });
+    const bound = hashOtpVerificationRequest(secret, {
+      deviceHash: 'device_hash',
+    });
+    expect(otpVerificationRequestMatches(unbound, bound)).toBe(false);
+    expect(
+      otpVerificationRequestMatches(
+        unbound,
+        hashOtpVerificationRequest(secret, {}),
+      ),
+    ).toBe(true);
+  });
+
   it('fails closed when the encryption secret does not match', () => {
     const encrypted = encryptOtpVerificationResponse(
       secret,
