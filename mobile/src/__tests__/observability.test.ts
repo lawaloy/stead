@@ -71,6 +71,37 @@ describe('mobile observability', () => {
     ).not.toContain('+2348012345678');
   });
 
+  it('does not leak raw non-Error sources or stackless secrets into Sentry', () => {
+    expect(
+      reportError('phone=+2348012345678', {
+        area: 'api',
+        operation: 'POST',
+        route: '/auth/verify-otp',
+      }),
+    ).toBe('event-id');
+
+    const stackless = new Error('otp=123456');
+    stackless.stack = undefined;
+    expect(
+      reportError(stackless, {
+        area: 'app',
+        operation: 'completeAuth',
+      }),
+    ).toBe('event-id');
+
+    const captured = (Sentry.captureException as jest.Mock).mock.calls;
+    expect(captured[0]?.[0]).toMatchObject({
+      name: 'ApiError',
+      message: 'API request failed',
+    });
+    expect(captured[1]?.[0]).toMatchObject({
+      name: 'ApplicationError',
+      message: 'Application error',
+    });
+    expect(JSON.stringify(captured)).not.toContain('+2348012345678');
+    expect(JSON.stringify(captured)).not.toContain('123456');
+  });
+
   it('strips request and breadcrumb payloads before sending', () => {
     initializeObservability();
     const options = (Sentry.init as jest.Mock).mock.calls[0]?.[0] as {

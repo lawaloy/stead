@@ -341,6 +341,36 @@ test('iOS-only preflight rejects a matrix run that executed Android jobs', () =>
   );
 });
 
+test('iOS-only preflight does not trust workflow success when a required job is missing', () => {
+  const sha = 'a'.repeat(40);
+  const jobs = [
+    configurationJob,
+    'build-ios',
+    'native-ios',
+    'build-android',
+    'native-android',
+  ].map((name) => ({
+    name,
+    status: 'completed',
+    conclusion: name.includes('android') ? 'skipped' : 'success',
+  }));
+  assert.throws(
+    () =>
+      assertIosRun(
+        {
+          headSha: sha,
+          headBranch: branch,
+          event: 'workflow_dispatch',
+          status: 'completed',
+          conclusion: 'success',
+          jobs,
+        },
+        { testedCommit: sha, remoteBranch: branch },
+      ),
+    /Required job Native Readiness did not pass/,
+  );
+});
+
 test('iOS-only preflight does not trust workflow success when a required job failed', () => {
   const sha = 'a'.repeat(40);
   const jobs = [
@@ -429,6 +459,17 @@ test('read-only GitHub queries retry transient transport failures without repeat
     }),
     /permission denied/,
   );
+  const exhausted = [];
+  await assert.rejects(
+    retryGitHubRead(
+      async () => {
+        throw new Error('TLS handshake timeout');
+      },
+      { sleep: async (milliseconds) => exhausted.push(milliseconds) },
+    ),
+    /TLS handshake timeout/,
+  );
+  assert.deepEqual(exhausted, [1_000, 2_000, 4_000]);
 
   const f = fixture({ transientRunViews: 1 });
   assert.equal((await f.start()).status, 'passed');
