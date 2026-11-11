@@ -59,7 +59,15 @@ const fixture = (overrides = {}) => {
     calls.push({ command, args, options });
     if (command === 'git') {
       if (overrides.executeGit) return overrides.executeGit(args, options);
-      if (args[0] === 'status') return overrides.dirty ? ' M source.js' : '';
+      if (args[0] === 'status') {
+        if (overrides.untracked) return '?? scripts/new-file.mjs\n';
+        const statusCount = calls.filter(
+          (item) => item.command === 'git' && item.args[0] === 'status',
+        ).length;
+        if (overrides.dirtyAfterSuccess && statusCount > 1)
+          return ' M source.js';
+        return overrides.dirty ? ' M source.js' : '';
+      }
       if (args[0] === 'remote') return 'https://github.com/owner/repo.git';
       if (args[0] === 'rev-parse') {
         if (args[1].endsWith('^{tree}')) return tree;
@@ -197,6 +205,38 @@ test('dirty checkouts and private repositories never upload source', async () =>
       !f.calls.some(({ args }) => ['push', 'workflow'].includes(args[0])),
     );
   }
+});
+
+test('untracked source files never upload a remote iOS checkout', async () => {
+  const f = fixture({ untracked: true });
+  await assert.rejects(f.start(), /untracked source files/);
+  assert.ok(
+    f.calls.some(
+      ({ command, args }) =>
+        command === 'git' &&
+        args[0] === 'status' &&
+        args.includes('--untracked-files=all'),
+    ),
+  );
+  assert.ok(
+    !f.calls.some(({ args }) => ['push', 'workflow'].includes(args[0])),
+  );
+});
+
+test('a checkout that becomes dirty after a green iOS run fails closed and retains the ref', async () => {
+  const f = fixture({ dirtyAfterSuccess: true });
+  await assert.rejects(f.start(), /untracked source files/);
+  assert.equal(f.result().status, 'failed');
+  assert.ok(
+    f.calls.some(
+      ({ command, args }) => command === 'gh' && args[0] === 'workflow',
+    ),
+    'the green remote run must have been dispatched before the second dirty check',
+  );
+  assert.ok(
+    !f.calls.some(({ args }) => args.includes(`:refs/heads/${branch}`)),
+    'the temporary ref must be retained when the checkout changes during validation',
+  );
 });
 
 test('failed, cancelled, unrelated, skipped and incomplete native runs never produce a pass', async () => {

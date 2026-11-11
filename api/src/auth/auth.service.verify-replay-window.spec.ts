@@ -181,6 +181,23 @@ describe('AuthService verify OTP replay window and request fingerprint', () => {
     expect(jwt.signAsync).not.toHaveBeenCalled();
   });
 
+  it('rejects replay when the stored winner is missing verifiedAt', async () => {
+    const otp = '123456';
+    prisma.otpCode.findUnique.mockResolvedValue(
+      await storedWinner(otp, { verifiedAt: null }),
+    );
+
+    await expect(verify(otp)).rejects.toEqual(
+      expect.objectContaining({
+        message: 'The OTP verification replay window has expired.',
+      }),
+    );
+    await expect(verify(otp)).rejects.toBeInstanceOf(ConflictException);
+
+    expect(prisma.otpCode.findFirst).not.toHaveBeenCalled();
+    expect(jwt.signAsync).not.toHaveBeenCalled();
+  });
+
   it('rejects replay when the stored winner is missing its encrypted session', async () => {
     const otp = '123456';
     prisma.otpCode.findUnique.mockResolvedValue(
