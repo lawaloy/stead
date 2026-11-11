@@ -272,6 +272,59 @@ test('iOS-only preflight rejects a matrix run that executed Android jobs', () =>
   );
 });
 
+test('iOS-only preflight does not trust workflow success when a required job failed', () => {
+  const sha = 'a'.repeat(40);
+  const jobs = [
+    configurationJob,
+    'build-ios',
+    'native-ios',
+    'Native Readiness',
+    'build-android',
+    'native-android',
+  ].map((name) => ({
+    name,
+    status: 'completed',
+    conclusion: name.includes('android') ? 'skipped' : 'success',
+  }));
+  const failedRequiredJob = jobs.map((job) =>
+    job.name === 'build-ios' ? { ...job, conclusion: 'failure' } : job,
+  );
+  assert.throws(
+    () =>
+      assertIosRun(
+        {
+          headSha: sha,
+          headBranch: branch,
+          event: 'workflow_dispatch',
+          status: 'completed',
+          conclusion: 'success',
+          jobs: failedRequiredJob,
+        },
+        { testedCommit: sha, remoteBranch: branch },
+      ),
+    /Required job build-ios did not pass/,
+  );
+});
+
+test('an invalid git SHA is rejected before any remote upload', async () => {
+  const f = fixture({
+    executeGit: async (args) => {
+      if (args[0] === 'status') return '';
+      if (args[0] === 'rev-parse') return 'not-a-commit-sha\n';
+      throw new Error(`unexpected git ${args[0]}`);
+    },
+  });
+  await assert.rejects(f.start(), /invalid commit\/tree SHA/);
+  assert.ok(
+    !f.calls.some(
+      ({ command, args }) =>
+        (command === 'git' && args[0] === 'push') ||
+        (command === 'gh' && args[0] === 'workflow'),
+    ),
+    'an invalid SHA must not upload source or dispatch a workflow',
+  );
+});
+
 test('a dispatched iOS run that never appears for the uploaded SHA is a failed preflight', async () => {
   const f = fixture({ missingDispatchedRun: true });
   await assert.rejects(f.start(), /Timed out finding the dispatched workflow/);

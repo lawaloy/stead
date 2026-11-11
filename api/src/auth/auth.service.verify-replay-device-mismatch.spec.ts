@@ -202,4 +202,45 @@ describe('AuthService verify OTP replay device fingerprint', () => {
     expect(prisma.otpCode.updateMany).not.toHaveBeenCalled();
     expect(jwt.signAsync).not.toHaveBeenCalled();
   });
+
+  it('rejects replay when device fingerprint presence changes', async () => {
+    const otp = '123456';
+    const verificationKeyHash = hashOtpVerificationKey(IDEMPOTENCY_KEY);
+    const unboundRequestHash = hashOtpVerificationRequest(VERIFICATION_SECRET, {
+      deviceHash: null,
+    });
+    prisma.otpCode.findUnique.mockResolvedValue({
+      codeHash: await bcrypt.hash(otp, 1),
+      verificationRequestHash: unboundRequestHash,
+      verificationResponseJson: encryptOtpVerificationResponse(
+        VERIFICATION_SECRET,
+        verificationKeyHash,
+        unboundRequestHash,
+        WINNER_SESSION,
+      ),
+      verifiedAt: new Date(),
+      user: { phone: '+2348012345678' },
+    });
+
+    await expect(
+      service.verifyOtp('08012345678', 'NG', otp, {
+        idempotencyKey: IDEMPOTENCY_KEY,
+        deviceId: DEVICE_A,
+      }),
+    ).rejects.toBeInstanceOf(ConflictException);
+
+    prisma.otpCode.findUnique.mockResolvedValue(
+      await storedWinner(otp, DEVICE_A),
+    );
+
+    await expect(
+      service.verifyOtp('08012345678', 'NG', otp, {
+        idempotencyKey: IDEMPOTENCY_KEY,
+      }),
+    ).rejects.toBeInstanceOf(ConflictException);
+
+    expect(prisma.otpCode.findFirst).not.toHaveBeenCalled();
+    expect(prisma.otpCode.updateMany).not.toHaveBeenCalled();
+    expect(jwt.signAsync).not.toHaveBeenCalled();
+  });
 });

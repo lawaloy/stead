@@ -156,4 +156,30 @@ describe('ObservabilityMetrics', () => {
       histograms.get('stead.alert.scheduler.run.duration'),
     ).toHaveBeenCalledWith(0, { 'stead.outcome': 'error' });
   });
+
+  it('records SMS provider attempts with kind, provider, and outcome', () => {
+    const metrics = new ObservabilityMetrics(meter);
+
+    metrics.recordProviderRequest({
+      provider: 'termii',
+      kind: 'otp',
+      outcome: 'error',
+      durationMs: 400,
+    });
+
+    expect(
+      counters.get('stead.sms.provider.request.count'),
+    ).toHaveBeenCalledWith(1, {
+      'notification.kind': 'otp',
+      'sms.provider': 'termii',
+      'stead.outcome': 'error',
+    });
+    expect(
+      histograms.get('stead.sms.provider.request.duration'),
+    ).toHaveBeenCalledWith(0.4, {
+      'notification.kind': 'otp',
+      'sms.provider': 'termii',
+      'stead.outcome': 'error',
+    });
+  });
 });
