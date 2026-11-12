@@ -4,9 +4,16 @@ run-name: >-
   ${{ github.event.pull_request.number && format('PR #{0}', github.event.pull_request.number) || github.ref_name }}
 
 # Every PR and main-branch push produces a stable native-ci readiness signal.
-# The config job skips expensive native jobs when they are irrelevant.
+# The config job skips expensive native jobs when they are irrelevant,
+# including draft pull requests. Native Readiness still passes on drafts,
+# and the jobs run when the PR is marked ready for review.
 # IOS_NATIVE_ENABLED is an emergency switch; native-readiness fails relevant
 # PRs when iOS is disabled so missing coverage cannot look green.
+# Simulator app artifacts are deleted when both journey jobs succeed or
+# are skipped, including after a later successful rerun. They are kept
+# for 1 day when a journey fails or is cancelled so "Re-run failed jobs"
+# can still download the apps. Journey logs are uploaded only when a
+# test fails.
 # Manual runs can select a platform. Native binaries are
 # built in dedicated jobs and handed to Maestro jobs as artifacts (build once
 # → test). Android boots a dedicated AVD from checksum-locked SDK archives;
@@ -32,6 +39,7 @@ on:
         default: '1'
   pull_request:
     branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
   push:
     branches: [main]
 
@@ -82,12 +90,15 @@ jobs:
           EVENT_NAME: ${{ github.event_name }}
           SCENARIO: ${{ inputs.scenario || 'journey' }}
           PLATFORM: ${{ inputs.platform || 'all' }}
+          DRAFT: ${{ github.event.pull_request.draft }}
         run: |
           if [[ "$SCENARIO" != "journey" && "$PLATFORM" != "ios" ]]; then
             echo "Diagnostic probes require platform=ios." >&2
             exit 1
           fi
-          if [[ "$EVENT_NAME" == "pull_request" || "$EVENT_NAME" == "push" ]]; then
+          if [[ "$EVENT_NAME" == "pull_request" && "$DRAFT" == "true" ]]; then
+            echo "run_native=false" >> "$GITHUB_OUTPUT"
+          elif [[ "$EVENT_NAME" == "pull_request" || "$EVENT_NAME" == "push" ]]; then
             echo "run_native=$CHANGED" >> "$GITHUB_OUTPUT"
           else
             echo "run_native=true" >> "$GITHUB_OUTPUT"
@@ -382,7 +393,7 @@ jobs:
           STEAD_ANDROID_BUILDKIT_CACHE: ${{ github.workspace }}/.tmp/android-buildkit-cache
         run: npm run native -- test --platform android --android-runner container --database-ready --app mobile/.ci/android/stead-debug.apk
       - uses: actions/upload-artifact@v4
-        if: always()
+        if: failure()
         with:
           name: android-native-journey-logs
           include-hidden-files: true
@@ -401,7 +412,7 @@ jobs:
   native-ios:
     name: ${{ matrix.sample == 1 && 'native-ios' || format('native-ios-{0}', matrix.sample) }}
     needs: [config, build-ios]
-    if: needs.config.outputs.ios_enabled == 'true'
+    if: needs.config.outputs.run_native == 'true' && needs.config.outputs.ios_enabled == 'true' && inputs.platform != 'android'
     runs-on: ${{ needs.config.outputs.ios_runner }}
     strategy:
       fail-fast: false
@@ -492,7 +503,7 @@ jobs:
           npm run native -- setup --platform ios
           npm run native -- test --platform ios --database-ready --app mobile/.ci/ios/mobile.app --scenario "$STEAD_NATIVE_SCENARIO"
       - uses: actions/upload-artifact@v4
-        if: always()
+        if: failure()
         with:
           name: ${{ matrix.sample == 1 && 'ios-native-journey-logs' || format('ios-native-journey-logs-{0}', matrix.sample) }}
           include-hidden-files: true
@@ -511,6 +522,10 @@ jobs:
     if: always()
     needs: [config, build-android, build-ios, native-android, native-ios]
     runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      pull-requests: read
+      actions: write
     steps:
       - name: Require every applicable native platform
         env:
@@ -522,11 +537,18 @@ jobs:
           BUILD_IOS: ${{ needs.build-ios.result }}
           NATIVE_ANDROID: ${{ needs.native-android.result }}
           NATIVE_IOS: ${{ needs.native-ios.result }}
+          DRAFT: ${{ github.event.pull_request.draft }}
         run: |
           set -eu
           if [[ "$CONFIG_RESULT" != "success" ]]; then
             echo "Native configuration failed: $CONFIG_RESULT" >&2
             exit 1
+          fi
+          if [[ "$DRAFT" == "true" ]]; then
+            message='Draft PR: native jobs skipped; they run when marked ready for review'
+            echo "$message"
+            echo "$message" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
           fi
           if [[ "$RUN_NATIVE" != "true" ]]; then
             if [[ "$RUN_NATIVE" != "false" ]]; then
@@ -556,3 +578,39 @@ jobs:
           fi
 
           exit "$failed"
+      - name: Delete simulator app artifacts
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          GH_RUN_ID: ${{ github.run_id }}
+          NATIVE_ANDROID: ${{ needs.native-android.result }}
+          NATIVE_IOS: ${{ needs.native-ios.result }}
+        run: |
+          set -eu
+          keep=0
+          for result in "$NATIVE_ANDROID" "$NATIVE_IOS"; do
+            if [[ "$result" != "success" && "$result" != "skipped" ]]; then
+              keep=1
+            fi
+          done
+          if [[ "$keep" -eq 1 ]]; then
+            echo "Keeping simulator app artifacts because a journey job did not succeed (android=$NATIVE_ANDROID ios=$NATIVE_IOS). They expire in 1 day so Re-run failed jobs can download them."
+            exit 0
+          fi
+          if ! ids="$(gh api "repos/${GH_REPO}/actions/runs/${GH_RUN_ID}/artifacts" --paginate --jq '.artifacts[] | select(.name == "android-simulator-app" or .name == "ios-simulator-app") | .id')"; then
+            echo "Warning: could not list simulator app artifacts for run ${GH_RUN_ID}." >&2
+            exit 0
+          fi
+          if [[ -z "$ids" ]]; then
+            echo "No simulator app artifacts to delete."
+            exit 0
+          fi
+          while IFS= read -r id; do
+            [[ -z "$id" ]] && continue
+            if gh api --method DELETE "repos/${GH_REPO}/actions/artifacts/${id}"; then
+              echo "Deleted simulator app artifact ${id}."
+            else
+              echo "Warning: failed to delete simulator app artifact ${id}." >&2
+            fi
+          done <<< "$ids"

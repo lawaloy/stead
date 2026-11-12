@@ -63,7 +63,9 @@ job reports on every pull request and `main` push; Android Maestro runs
 when the shared native path policy detects relevant mobile, API, contract, or CI
 changes, and iOS runs the same complete journey. `Native Readiness` requires
 both applicable platforms and fails rather than treating disabled iOS as
-success. The suite also supports an explicit `workflow_dispatch`; there is no
+success. Draft pull requests skip the expensive native jobs; `Native Readiness`
+still passes, and the jobs run when the PR is marked ready for review. The
+suite also supports an explicit `workflow_dispatch`; there is no
 separate nightly or release variant. Earlier successful runs covered a narrower flow: they did
 not exercise transaction editing or signed-in iOS cold-start restoration.
 Evidence for those cases must come from runs of the expanded flow. Dedicated `build-android` /
@@ -78,8 +80,11 @@ builds restore source mtimes and use inode-aware DerivedData
 plus Pods caches. Metro transforms and the Maestro CLI are cached per platform.
 Android CI also restores BuildKit dependency layers across hosted runners, but
 always rebuilds the source and transferred-APK layers and verifies their image
-identity. Both platform jobs retain journey evidence for seven days whether the
-journey succeeds or fails.
+identity. Both platform jobs retain journey evidence for three days when a
+journey fails. Simulator app artifacts are deleted when both journey jobs
+succeed or are skipped, including after a later successful rerun, and are
+kept for one day when a journey fails or is cancelled so Re-run failed jobs
+can still download them.
 The iOS build embeds JavaScript so its journey runner does not install mobile
 dependencies or run Metro alongside PostgreSQL, the API, Maestro, and the
 simulator.

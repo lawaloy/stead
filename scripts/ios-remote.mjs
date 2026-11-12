@@ -226,31 +226,29 @@ export const remoteIos = async ({
     }
     evidence.jobs = run.jobs;
     evidence.conclusion = run.conclusion;
-    // Collect evidence on failures too. Failed builds may have no journey artifact.
+    // Workflow logs are required. Journey artifacts exist only on test failure.
     const collectionErrors = [];
-    for (const collect of [
-      async () =>
-        save(
-          directory,
-          'workflow.log',
-          await ghRead('run', 'view', String(evidence.runId), '--log'),
-        ),
-      async () =>
-        gh(
-          'run',
-          'download',
-          String(evidence.runId),
-          '--name',
-          'ios-native-journey-logs',
-          '--dir',
-          join(directory, 'journey'),
-        ),
-    ]) {
-      try {
-        await collect();
-      } catch (error) {
-        collectionErrors.push(error.message);
-      }
+    try {
+      save(
+        directory,
+        'workflow.log',
+        await ghRead('run', 'view', String(evidence.runId), '--log'),
+      );
+    } catch (error) {
+      collectionErrors.push(error.message);
+    }
+    try {
+      await gh(
+        'run',
+        'download',
+        String(evidence.runId),
+        '--name',
+        'ios-native-journey-logs',
+        '--dir',
+        join(directory, 'journey'),
+      );
+    } catch (error) {
+      evidence.journeyLogError = error.message;
     }
     evidence.collectionErrors = collectionErrors;
     assertIosRun(run, evidence);
