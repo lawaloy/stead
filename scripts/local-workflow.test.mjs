@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import {
+  existsSync,
   mkdtempSync,
   mkdirSync,
   readFileSync,
@@ -65,6 +66,56 @@ test('renderApiEnvironment replaces all placeholders with distinct secrets', () 
     rendered,
     /AUTH_OTP_VERIFICATION_ENCRYPTION_KEY="verification-secret"/,
   );
+});
+
+test('renderApiEnvironment refuses colliding generated secrets', () => {
+  assert.throws(
+    () => renderApiEnvironment(API_EXAMPLE, () => 'same-secret'),
+    /Generated local secrets must be distinct/,
+  );
+});
+
+test('renderApiEnvironment refuses an example that is not exactly four replaceable secrets', () => {
+  const tooFew = ['jwt', 'notification', 'device', 'verification'];
+  assert.throws(
+    () =>
+      renderApiEnvironment('JWT_SECRET="__REPLACE_ME__"\n', () =>
+        tooFew.shift(),
+      ),
+    /Expected exactly 4 replaceable API secrets/,
+  );
+  const tooMany = ['jwt', 'notification', 'device', 'verification'];
+  assert.throws(
+    () =>
+      renderApiEnvironment(`${API_EXAMPLE}EXTRA="__REPLACE_ME__"\n`, () =>
+        tooMany.shift(),
+      ),
+    /Expected exactly 4 replaceable API secrets/,
+  );
+});
+
+test('initializeLocalEnvironment does not write an API env when generated secrets collide', () => {
+  const root = mkdtempSync(join(tmpdir(), 'stead-local-secret-collision-'));
+  const apiDir = join(root, 'api');
+  const mobileDir = join(root, 'mobile');
+  mkdirSync(apiDir);
+  mkdirSync(mobileDir);
+  writeFileSync(join(apiDir, '.env.example'), API_EXAMPLE);
+  writeFileSync(
+    join(mobileDir, '.env.example'),
+    'EXPO_PUBLIC_API_URL=http://localhost:3000\n',
+  );
+
+  try {
+    assert.throws(
+      () => initializeLocalEnvironment(root, () => 'same-secret'),
+      /Generated local secrets must be distinct/,
+    );
+    assert.equal(existsSync(join(apiDir, '.env')), false);
+    assert.equal(existsSync(join(mobileDir, '.env')), false);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
 });
 
 test('the repository API example stays compatible with secure generation', () => {
