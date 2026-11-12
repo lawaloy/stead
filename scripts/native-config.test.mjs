@@ -584,6 +584,22 @@ test('iOS journey artifacts must match their embedded API and fixture configurat
       () => assertIosArtifactConfig(app, { ...options, apiPort: 3001 }),
       /was built for.*run requires/,
     );
+    assert.throws(
+      () => assertIosArtifactConfig(app, { ...options, phone: '08030000002' }),
+      /was built for.*08030000001.*08030000002/,
+    );
+    writeFileSync(
+      join(directory, 'stead-native-config.json'),
+      JSON.stringify({
+        apiUrl: 'http://127.0.0.1:3000',
+        apiTimeoutMs: Number(TOOLCHAIN.NATIVE_API_TIMEOUT_MS) + 1,
+        phone: '08030000001',
+      }),
+    );
+    assert.throws(
+      () => assertIosArtifactConfig(app, options),
+      /was built for.*run requires/,
+    );
     writeFileSync(
       join(directory, 'stead-native-config.json'),
       JSON.stringify({
@@ -732,6 +748,27 @@ test('schema cleanup errors cannot erase a failed journey', async () => {
   );
 });
 
+test('a successful journey still fails when schema cleanup fails', async () => {
+  let queries = 0;
+  await assert.rejects(
+    withOwnedSchema(
+      {
+        query: async () => {
+          if (++queries === 2) throw new Error('drop failed');
+        },
+      },
+      newSchema(),
+      async () => 'passed',
+    ),
+    (error) => {
+      assert.equal(error.message, 'drop failed');
+      assert.equal(error.errors, undefined);
+      return true;
+    },
+  );
+  assert.equal(queries, 2);
+});
+
 test('repeated runs retain failures and allocate independent operations rather than turning a retry into success', async () => {
   const calls = [];
   const results = await repeatJourneys(3, async (attempt) => {
@@ -774,6 +811,7 @@ test('arguments reject unsupported platforms, ambiguous artifacts, and unsafe po
     ['test', '--repeat', '21'],
     ['test', '--api-port', '3001oops'],
     ['test', '--api-port', '8081'],
+    ['test', '--metro-port', '8082'],
     ['test', '--app'],
     ['test', '--mystery'],
     ['test', '--platform', 'all', '--app', 'app.apk'],

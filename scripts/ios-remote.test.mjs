@@ -59,7 +59,15 @@ const fixture = (overrides = {}) => {
     calls.push({ command, args, options });
     if (command === 'git') {
       if (overrides.executeGit) return overrides.executeGit(args, options);
-      if (args[0] === 'status') return overrides.dirty ? ' M source.js' : '';
+      if (args[0] === 'status') {
+        if (overrides.untracked) return '?? scripts/new-file.mjs\n';
+        const statusCount = calls.filter(
+          (item) => item.command === 'git' && item.args[0] === 'status',
+        ).length;
+        if (overrides.dirtyAfterSuccess && statusCount > 1)
+          return ' M source.js';
+        return overrides.dirty ? ' M source.js' : '';
+      }
       if (args[0] === 'remote') return 'https://github.com/owner/repo.git';
       if (args[0] === 'rev-parse') {
         if (args[1].endsWith('^{tree}')) return tree;
@@ -96,7 +104,10 @@ const fixture = (overrides = {}) => {
               },
             ],
       );
-    if (args.includes('--log')) return 'Assert dashboard visible ... COMPLETED';
+    if (args.includes('--log')) {
+      if (overrides.workflowLogFailure) throw new Error('workflow log missing');
+      return 'Assert dashboard visible ... COMPLETED';
+    }
     if (args[1] === 'view') {
       if (runViews++ < (overrides.transientRunViews ?? 0))
         throw new Error('TLS handshake timeout');
@@ -196,6 +207,38 @@ test('dirty checkouts and private repositories never upload source', async () =>
   }
 });
 
+test('untracked source files never upload a remote iOS checkout', async () => {
+  const f = fixture({ untracked: true });
+  await assert.rejects(f.start(), /untracked source files/);
+  assert.ok(
+    f.calls.some(
+      ({ command, args }) =>
+        command === 'git' &&
+        args[0] === 'status' &&
+        args.includes('--untracked-files=all'),
+    ),
+  );
+  assert.ok(
+    !f.calls.some(({ args }) => ['push', 'workflow'].includes(args[0])),
+  );
+});
+
+test('a checkout that becomes dirty after a green iOS run fails closed and retains the ref', async () => {
+  const f = fixture({ dirtyAfterSuccess: true });
+  await assert.rejects(f.start(), /untracked source files/);
+  assert.equal(f.result().status, 'failed');
+  assert.ok(
+    f.calls.some(
+      ({ command, args }) => command === 'gh' && args[0] === 'workflow',
+    ),
+    'the green remote run must have been dispatched before the second dirty check',
+  );
+  assert.ok(
+    !f.calls.some(({ args }) => args.includes(`:refs/heads/${branch}`)),
+    'the temporary ref must be retained when the checkout changes during validation',
+  );
+});
+
 test('failed, cancelled, unrelated, skipped and incomplete native runs never produce a pass', async () => {
   for (const run of [
     { conclusion: 'failure' },
@@ -235,6 +278,32 @@ test('changed source and missing evidence fail and retain the remote ref', async
   }
 });
 
+test('a successful iOS run still fails closed when evidence collection fails', async () => {
+  for (const scenario of [
+    {
+      artifactFailure: true,
+      message: /iOS passed, but evidence collection failed: artifact missing/,
+      retainsWorkflowLog: true,
+    },
+    {
+      workflowLogFailure: true,
+      message:
+        /iOS passed, but evidence collection failed: workflow log missing/,
+      retainsWorkflowLog: false,
+    },
+  ]) {
+    const f = fixture(scenario);
+    await assert.rejects(f.start(), scenario.message);
+    assert.equal(f.result().status, 'failed');
+    assert.equal(f.saved.has('workflow.log'), scenario.retainsWorkflowLog);
+    assert.ok(f.result().collectionErrors.length > 0);
+    assert.ok(
+      !f.calls.some(({ args }) => args.includes(`:refs/heads/${branch}`)),
+      'the temporary ref must be retained when evidence is incomplete',
+    );
+  }
+});
+
 test('remote polling is bounded and a timed-out remote run is never treated as passed', async () => {
   const f = fixture({ run: { status: 'in_progress', conclusion: '' } });
   await assert.rejects(f.start(), /Timed out waiting/);
@@ -269,6 +338,36 @@ test('iOS-only preflight rejects a matrix run that executed Android jobs', () =>
         { testedCommit: sha, remoteBranch: branch },
       ),
     /Expected build-android to be skipped/,
+  );
+});
+
+test('iOS-only preflight does not trust workflow success when a required job is missing', () => {
+  const sha = 'a'.repeat(40);
+  const jobs = [
+    configurationJob,
+    'build-ios',
+    'native-ios',
+    'build-android',
+    'native-android',
+  ].map((name) => ({
+    name,
+    status: 'completed',
+    conclusion: name.includes('android') ? 'skipped' : 'success',
+  }));
+  assert.throws(
+    () =>
+      assertIosRun(
+        {
+          headSha: sha,
+          headBranch: branch,
+          event: 'workflow_dispatch',
+          status: 'completed',
+          conclusion: 'success',
+          jobs,
+        },
+        { testedCommit: sha, remoteBranch: branch },
+      ),
+    /Required job Native Readiness did not pass/,
   );
 });
 
@@ -360,6 +459,17 @@ test('read-only GitHub queries retry transient transport failures without repeat
     }),
     /permission denied/,
   );
+  const exhausted = [];
+  await assert.rejects(
+    retryGitHubRead(
+      async () => {
+        throw new Error('TLS handshake timeout');
+      },
+      { sleep: async (milliseconds) => exhausted.push(milliseconds) },
+    ),
+    /TLS handshake timeout/,
+  );
+  assert.deepEqual(exhausted, [1_000, 2_000, 4_000]);
 
   const f = fixture({ transientRunViews: 1 });
   assert.equal((await f.start()).status, 'passed');

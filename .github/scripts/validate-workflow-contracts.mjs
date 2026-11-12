@@ -448,6 +448,16 @@ assert.match(
   /uses: actions\/upload-artifact@v4\n\s+if: always\(\)[\s\S]*name: android-native-journey-logs[\s\S]*\.tmp\/native-container\/\*\*\/attempts\.json/,
   'Android CI must retain journey evidence on successful and failed runs.',
 );
+assert.equal(
+  TOOLCHAIN.NATIVE_EVIDENCE_RETENTION_DAYS,
+  '3',
+  'Native journey evidence must retain a three-day debugging window.',
+);
+assert.match(
+  nativeAndroidJob,
+  /!\.tmp\/native-container\/\*\*\/\*\.bundle[\s\S]*retention-days: \$\{\{ needs\.config\.outputs\.native_evidence_retention_days \}\}/,
+  'Android evidence must exclude generated bundles and use shared retention.',
+);
 assert.match(
   nativeAndroidJob,
   /uses: docker\/setup-buildx-action@v4[\s\S]*path: \.tmp\/android-buildkit-cache[\s\S]*STEAD_ANDROID_BUILDKIT_CACHE: \$\{\{ github\.workspace \}\}\/\.tmp\/android-buildkit-cache/,
@@ -499,6 +509,28 @@ for (const job of ['build-ios', 'native-ios']) {
     `The iOS enable switch must gate ${job}.`,
   );
 }
+const nativeIosJob =
+  nativeWorkflow.split('  native-ios:\n')[1]?.split(/\n  [a-z][\w-]*:/)[0] ??
+  '';
+const iosEvidenceUpload = nativeIosJob.split(
+  '      - uses: actions/upload-artifact@v4\n',
+)[1];
+assert.ok(iosEvidenceUpload, 'Native iOS CI must upload journey evidence.');
+assert.match(
+  iosEvidenceUpload,
+  /if: always\(\)[\s\S]*\.tmp\/native-validation[\s\S]*~\/\.maestro\/tests[\s\S]*mobile\/\.expo\/\*\*\/\*\.log/,
+  'iOS CI must retain focused logs and native journey evidence.',
+);
+assert.doesNotMatch(
+  iosEvidenceUpload,
+  /mobile\/\.ci\/ios|\*\.app|\*\.zip/,
+  'iOS journey evidence must not duplicate simulator application artifacts.',
+);
+assert.match(
+  iosEvidenceUpload,
+  /retention-days: \$\{\{ needs\.config\.outputs\.native_evidence_retention_days \}\}/,
+  'iOS evidence must use shared retention.',
+);
 const iosAppCacheKey =
   nativeWorkflow.match(/key: ios-simulator-app-[^\n]+/)?.[0] ?? '';
 for (const path of [

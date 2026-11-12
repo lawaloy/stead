@@ -192,6 +192,36 @@ test('caller cancellation remains cancellation even when the driver fails simult
   );
 });
 
+test('command summaries read evaluatedCommand and notVisible selectors without publishing input', (t) => {
+  const directory = fixture(t);
+  const flow = join(directory, 'sign-in');
+  mkdirSync(flow);
+  writeFileSync(
+    join(flow, 'commands.json'),
+    JSON.stringify([
+      {
+        command: { applyAssertionCommand: { condition: { visible: true } } },
+        metadata: {
+          sequenceNumber: 3,
+          status: 'FAILED',
+          duration: 12_000,
+          evaluatedCommand: {
+            assertConditionCommand: {
+              condition: {
+                notVisible: { idRegex: 'loading-spinner' },
+              },
+            },
+          },
+        },
+      },
+    ]),
+  );
+  const [summary] = summarizeMaestro(directory);
+  assert.equal(summary.failedCommands[0].type, 'assertConditionCommand');
+  assert.equal(summary.failedCommands[0].fieldId, 'loading-spinner');
+  assert.doesNotMatch(JSON.stringify(summary), /sensitive|otp|password/i);
+});
+
 test('command summaries identify a failed field and slow steps without publishing input or credentials', (t) => {
   const directory = fixture(t);
   const flow = join(directory, 'critical-native-journey');
