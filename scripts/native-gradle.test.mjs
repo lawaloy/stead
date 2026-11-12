@@ -56,6 +56,35 @@ test('native startup waits for an outliving build process to actually exit', asy
   }
 });
 
+test('Gradle does not start without a checked SDK and fails closed when the build JVM is unrecorded', async () => {
+  let started = false;
+  await assert.rejects(
+    buildAndroidGradle({
+      directory: '/unused',
+      execute: async () => {
+        started = true;
+      },
+    }),
+    /checked Android SDK is required/,
+  );
+  assert.equal(started, false);
+
+  const root = mkdtempSync(join(tmpdir(), 'stead gradle pid '));
+  try {
+    await assert.rejects(
+      buildAndroidGradle({
+        directory: root,
+        sdk: join(root, 'sdk'),
+        env: {},
+        execute: async () => {},
+      }),
+      /Gradle did not record its build JVM/,
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test('a stuck build blocks startup and invalid process identifiers are rejected', async () => {
   for (const pid of [0, 1, -1, NaN, 1.5, process.pid])
     await assert.rejects(waitForBuildExit(pid), /Invalid Gradle build JVM/);
