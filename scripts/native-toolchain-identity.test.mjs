@@ -69,3 +69,87 @@ test('iOS source-build preflight rejects a CocoaPods version that does not match
     false,
   );
 });
+
+test('iOS source-build preflight rejects a Ruby version that does not match CI', async () => {
+  const commands = [];
+  await assert.rejects(
+    checkNativeToolchain('ios', {
+      host: 'darwin',
+      requireDevice: false,
+      requireBuild: true,
+      requireMaestro: false,
+      env: {
+        DEVELOPER_DIR: '/Applications/Xcode.app/Contents/Developer',
+      },
+      exists: (path) => path === join(ROOT, 'mobile', 'node_modules'),
+      execute: async (command, args = []) => {
+        commands.push([command, ...args]);
+        if (command === 'npm') return TOOLCHAIN.NPM_VERSION;
+        if (command === 'xcodebuild')
+          return `Xcode ${TOOLCHAIN.XCODE_VERSION}\nBuild version ${TOOLCHAIN.XCODE_BUILD}`;
+        if (command === 'ruby') return '1.0.0';
+        throw new Error(`Unexpected ${command} ${args.join(' ')}`);
+      },
+    }),
+    new RegExp(`Use Ruby ${TOOLCHAIN.RUBY_VERSION} to match CI`),
+  );
+  assert.equal(
+    commands.some(([command]) => command === 'ruby'),
+    true,
+  );
+  assert.equal(
+    commands.some(([command]) => command === 'bundle'),
+    false,
+  );
+  assert.equal(
+    commands.some(([command]) => command === 'xcrun'),
+    false,
+  );
+});
+
+test('iOS source-build preflight rejects a Bundler version that does not match CI', async () => {
+  const commands = [];
+  await assert.rejects(
+    checkNativeToolchain('ios', {
+      host: 'darwin',
+      requireDevice: false,
+      requireBuild: true,
+      requireMaestro: false,
+      env: {
+        DEVELOPER_DIR: '/Applications/Xcode.app/Contents/Developer',
+      },
+      exists: (path) => path === join(ROOT, 'mobile', 'node_modules'),
+      execute: async (command, args = []) => {
+        commands.push([command, ...args]);
+        if (command === 'npm') return TOOLCHAIN.NPM_VERSION;
+        if (command === 'xcodebuild')
+          return `Xcode ${TOOLCHAIN.XCODE_VERSION}\nBuild version ${TOOLCHAIN.XCODE_BUILD}`;
+        if (command === 'ruby') return TOOLCHAIN.RUBY_VERSION;
+        if (command === 'bundle' && args.includes('pod'))
+          throw new Error(
+            'CocoaPods must not be queried after a Bundler mismatch',
+          );
+        if (command === 'bundle') return 'Bundler version 1.0.0';
+        throw new Error(`Unexpected ${command} ${args.join(' ')}`);
+      },
+    }),
+    new RegExp(`Use Bundler ${TOOLCHAIN.BUNDLER_VERSION} to match CI`),
+  );
+  assert.equal(
+    commands.some(
+      ([command, ...args]) =>
+        command === 'bundle' && args.includes('--version'),
+    ),
+    true,
+  );
+  assert.equal(
+    commands.some(
+      ([command, ...args]) => command === 'bundle' && args.includes('pod'),
+    ),
+    false,
+  );
+  assert.equal(
+    commands.some(([command]) => command === 'xcrun'),
+    false,
+  );
+});
