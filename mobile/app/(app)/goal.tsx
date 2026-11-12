@@ -202,6 +202,7 @@ export default function GoalScreen() {
             </Text>
             <Pressable
               accessibilityRole="button"
+              accessibilityState={{ disabled: activeGoalQuery.isFetching }}
               disabled={activeGoalQuery.isFetching}
               style={styles.secondaryButton}
               onPress={() => void activeGoalQuery.refetch()}
