@@ -445,8 +445,8 @@ const nativeAndroidJob =
 assert.ok(nativeAndroidJob, 'Native CI must define the Android journey job.');
 assert.match(
   nativeAndroidJob,
-  /uses: actions\/upload-artifact@v4\n\s+if: always\(\)[\s\S]*name: android-native-journey-logs[\s\S]*\.tmp\/native-container\/\*\*\/attempts\.json/,
-  'Android CI must retain journey evidence on successful and failed runs.',
+  /uses: actions\/upload-artifact@v4\n\s+if: failure\(\)[\s\S]*name: android-native-journey-logs[\s\S]*\.tmp\/native-container\/\*\*\/attempts\.json/,
+  'Android CI must retain journey evidence when a run fails.',
 );
 assert.equal(
   TOOLCHAIN.NATIVE_EVIDENCE_RETENTION_DAYS,
@@ -540,8 +540,8 @@ const iosEvidenceUpload = nativeIosJob.split(
 assert.ok(iosEvidenceUpload, 'Native iOS CI must upload journey evidence.');
 assert.match(
   iosEvidenceUpload,
-  /if: always\(\)[\s\S]*\.tmp\/native-validation[\s\S]*~\/\.maestro\/tests[\s\S]*mobile\/\.expo\/\*\*\/\*\.log/,
-  'iOS CI must retain focused logs and native journey evidence.',
+  /if: failure\(\)[\s\S]*\.tmp\/native-validation[\s\S]*~\/\.maestro\/tests[\s\S]*mobile\/\.expo\/\*\*\/\*\.log/,
+  'iOS CI must retain focused logs and native journey evidence when a run fails.',
 );
 assert.doesNotMatch(
   iosEvidenceUpload,
@@ -610,6 +610,36 @@ assert.match(
   ciWorkflow,
   /image: \$\{\{ needs.config.outputs.postgres_image \}\}/,
   'API CI must use the shared immutable PostgreSQL image.',
+);
+assert.match(
+  nativeWorkflow,
+  /pull_request:\n\s+branches: \[main\]\n\s+types: \[opened, synchronize, reopened, ready_for_review\]/,
+  'Native CI must rerun when a draft PR is marked ready for review.',
+);
+assert.match(
+  nativeWorkflow,
+  /EVENT_NAME" == "pull_request" && "\$DRAFT" == "true"[\s\S]*run_native=false/,
+  'Draft pull requests must skip expensive native jobs.',
+);
+assert.match(
+  nativeIosJob,
+  /if: needs\.config\.outputs\.run_native == 'true' && needs\.config\.outputs\.ios_enabled == 'true' && inputs\.platform != 'android'/,
+  'The iOS journey job must skip drafts, path-filtered runs, and Android-only dispatch.',
+);
+assert.match(
+  readiness ?? '',
+  /Draft PR: native jobs skipped; they run when marked ready for review/,
+  'Native Readiness must pass draft PRs with an explicit skip message.',
+);
+assert.match(
+  readiness ?? '',
+  /permissions:\n\s+contents: read\n\s+pull-requests: read\n\s+actions: write/,
+  'Native Readiness must keep its existing permissions and be able to delete artifacts.',
+);
+assert.match(
+  readiness ?? '',
+  /Delete simulator app artifacts[\s\S]*if: always\(\)[\s\S]*android-simulator-app[\s\S]*ios-simulator-app[\s\S]*Warning: failed to delete simulator app artifact/,
+  'Native Readiness must delete simulator app artifacts without failing the check.',
 );
 
 console.log('Workflow contracts are synchronized.');
