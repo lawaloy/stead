@@ -638,8 +638,8 @@ assert.match(
 );
 assert.match(
   readiness ?? '',
-  /Delete simulator app artifacts[\s\S]*if: always\(\)[\s\S]*android-simulator-app[\s\S]*ios-simulator-app[\s\S]*Warning: failed to delete simulator app artifact/,
-  'Native Readiness must delete simulator app artifacts without failing the check.',
+  /Delete simulator app artifacts[\s\S]*if: always\(\)[\s\S]*NATIVE_ANDROID[\s\S]*NATIVE_IOS[\s\S]*result" != "success" && "\$result" != "skipped"[\s\S]*Keeping simulator app artifacts because a journey job did not succeed[\s\S]*android-simulator-app[\s\S]*ios-simulator-app[\s\S]*Warning: failed to delete simulator app artifact/,
+  'Native Readiness must delete simulator app artifacts after successful or skipped journeys, keep them when a journey fails or is cancelled, and never fail the check if cleanup fails.',
 );
 
 console.log('Workflow contracts are synchronized.');
