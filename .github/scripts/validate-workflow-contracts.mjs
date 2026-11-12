@@ -454,9 +454,31 @@ assert.equal(
   'Native journey evidence must retain a three-day debugging window.',
 );
 assert.match(
-  nativeAndroidJob,
-  /!\.tmp\/native-container\/\*\*\/\*\.bundle[\s\S]*retention-days: \$\{\{ needs\.config\.outputs\.native_evidence_retention_days \}\}/,
-  'Android evidence must exclude generated bundles and use shared retention.',
+  nativeWorkflow,
+  /native_evidence_retention_days: \$\{\{ steps\.versions\.outputs\.native_evidence_retention_days \}\}/,
+  'Native CI must expose the shared evidence retention setting as a config output.',
+);
+assert.match(
+  nativeWorkflow,
+  /echo "native_evidence_retention_days=\$NATIVE_EVIDENCE_RETENTION_DAYS"/,
+  'Native CI must read evidence retention from the shared toolchain pin.',
+);
+const androidEvidenceUpload = nativeAndroidJob.split(
+  '      - uses: actions/upload-artifact@v4\n',
+)[1];
+assert.ok(
+  androidEvidenceUpload,
+  'Native Android CI must upload journey evidence.',
+);
+assert.match(
+  androidEvidenceUpload,
+  /!\.tmp\/native-container\/\*\*\/\*\.bundle[\s\S]*!\.tmp\/native-container\/\*\*\/\*\.apk[\s\S]*!\.tmp\/native-container\/\*\*\/\*\.aab[\s\S]*!\.tmp\/native-container\/\*\*\/\*\.zip/,
+  'Android evidence must exclude generated bundles and application archives.',
+);
+assert.match(
+  androidEvidenceUpload,
+  /if-no-files-found: error[\s\S]*retention-days: \$\{\{ needs\.config\.outputs\.native_evidence_retention_days \}\}/,
+  'Android evidence must fail closed when empty and use shared retention.',
 );
 assert.match(
   nativeAndroidJob,
@@ -528,8 +550,13 @@ assert.doesNotMatch(
 );
 assert.match(
   iosEvidenceUpload,
-  /retention-days: \$\{\{ needs\.config\.outputs\.native_evidence_retention_days \}\}/,
-  'iOS evidence must use shared retention.',
+  /!\.tmp\/native-validation\/\*\*\/\*\.bundle/,
+  'iOS evidence must exclude generated JavaScript bundles.',
+);
+assert.match(
+  iosEvidenceUpload,
+  /if-no-files-found: error[\s\S]*retention-days: \$\{\{ needs\.config\.outputs\.native_evidence_retention_days \}\}/,
+  'iOS evidence must fail closed when empty and use shared retention.',
 );
 const iosAppCacheKey =
   nativeWorkflow.match(/key: ios-simulator-app-[^\n]+/)?.[0] ?? '';
