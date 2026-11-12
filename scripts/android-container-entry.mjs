@@ -79,26 +79,36 @@ export const forwardLocalDatabase = async (
   }
 };
 
-const main = async () => {
-  const source = JSON.parse(
-    readFileSync(join(ROOT, '.stead-source.json'), 'utf8'),
-  );
+export const assertContainerSourceIdentity = (source) => {
   if (
-    !/^[a-f0-9]{40}$/.test(source.commit) ||
-    typeof source.workingTreeClean !== 'boolean' ||
-    typeof source.providedApp !== 'boolean'
+    !/^[a-f0-9]{40}$/.test(source?.commit) ||
+    typeof source?.workingTreeClean !== 'boolean' ||
+    typeof source?.providedApp !== 'boolean'
   )
     throw new Error('Container source identity is missing or invalid.');
-  const options = parseNativeArguments([
-    'test',
-    '--platform',
-    'android',
-    ...process.argv.slice(2),
-  ]);
+  return source;
+};
+
+export const assertContainerOwnedRun = (options) => {
   if (options.device || options.app || options.repeat !== 1)
     throw new Error(
       'The container entry owns one fresh emulator and its image-built APK.',
     );
+  return options;
+};
+
+const main = async () => {
+  const source = assertContainerSourceIdentity(
+    JSON.parse(readFileSync(join(ROOT, '.stead-source.json'), 'utf8')),
+  );
+  const options = assertContainerOwnedRun(
+    parseNativeArguments([
+      'test',
+      '--platform',
+      'android',
+      ...process.argv.slice(2),
+    ]),
+  );
   await withCleanup(
     () =>
       forwardLocalDatabase(() =>

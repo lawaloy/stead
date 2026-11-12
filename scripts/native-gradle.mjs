@@ -10,13 +10,17 @@ import { setTimeout as delay } from 'node:timers/promises';
 import { ROOT, TOOLCHAIN } from './toolchain.mjs';
 import { runCommand, withCleanup } from './process-utils.mjs';
 
-export const waitForBuildExit = async (pid, timeout = 30_000) => {
+export const waitForBuildExit = async (
+  pid,
+  timeout = 30_000,
+  kill = process.kill,
+) => {
   if (!Number.isSafeInteger(pid) || pid <= 1 || pid === process.pid)
     throw new Error('Invalid Gradle build JVM process identifier.');
   const deadline = Date.now() + timeout;
   while (true) {
     try {
-      process.kill(pid, 0);
+      kill(pid, 0);
     } catch (error) {
       if (error.code === 'ESRCH') return;
       throw error;
