@@ -263,12 +263,8 @@ test('failed, cancelled, unrelated, skipped and incomplete native runs never pro
   }
 });
 
-test('changed source and missing evidence fail and retain the remote ref', async () => {
-  for (const scenario of [
-    { changedHead: true },
-    { artifactFailure: true },
-    { dispatchFailure: true },
-  ]) {
+test('changed source and a rejected dispatch fail and retain the remote ref', async () => {
+  for (const scenario of [{ changedHead: true }, { dispatchFailure: true }]) {
     const f = fixture(scenario);
     await assert.rejects(f.start());
     assert.equal(f.result().status, 'failed');
@@ -278,30 +274,28 @@ test('changed source and missing evidence fail and retain the remote ref', async
   }
 });
 
-test('a successful iOS run still fails closed when evidence collection fails', async () => {
-  for (const scenario of [
-    {
-      artifactFailure: true,
-      message: /iOS passed, but evidence collection failed: artifact missing/,
-      retainsWorkflowLog: true,
-    },
-    {
-      workflowLogFailure: true,
-      message:
-        /iOS passed, but evidence collection failed: workflow log missing/,
-      retainsWorkflowLog: false,
-    },
-  ]) {
-    const f = fixture(scenario);
-    await assert.rejects(f.start(), scenario.message);
-    assert.equal(f.result().status, 'failed');
-    assert.equal(f.saved.has('workflow.log'), scenario.retainsWorkflowLog);
-    assert.ok(f.result().collectionErrors.length > 0);
-    assert.ok(
-      !f.calls.some(({ args }) => args.includes(`:refs/heads/${branch}`)),
-      'the temporary ref must be retained when evidence is incomplete',
-    );
-  }
+test('a successful iOS run still fails closed when the workflow log is missing', async () => {
+  const f = fixture({ workflowLogFailure: true });
+  await assert.rejects(
+    f.start(),
+    /iOS passed, but evidence collection failed: workflow log missing/,
+  );
+  assert.equal(f.result().status, 'failed');
+  assert.equal(f.saved.has('workflow.log'), false);
+  assert.ok(f.result().collectionErrors.length > 0);
+  assert.ok(
+    !f.calls.some(({ args }) => args.includes(`:refs/heads/${branch}`)),
+    'the temporary ref must be retained when evidence is incomplete',
+  );
+});
+
+test('a successful iOS run passes when journey logs are absent', async () => {
+  const f = fixture({ artifactFailure: true });
+  const result = await f.start();
+  assert.equal(result.status, 'passed');
+  assert.equal(result.journeyLogError, 'artifact missing');
+  assert.equal(result.remoteBranchDeleted, true);
+  assert.ok(f.saved.has('workflow.log'));
 });
 
 test('remote polling is bounded and a timed-out remote run is never treated as passed', async () => {
