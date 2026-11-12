@@ -1,17 +1,36 @@
 describe('env', () => {
-  const originalUrl = process.env.EXPO_PUBLIC_API_URL;
+  const originalEnv = {
+    EXPO_PUBLIC_API_URL: process.env.EXPO_PUBLIC_API_URL,
+    EXPO_PUBLIC_APP_ENV: process.env.EXPO_PUBLIC_APP_ENV,
+    EXPO_PUBLIC_SENTRY_TRACES_SAMPLE_RATE:
+      process.env.EXPO_PUBLIC_SENTRY_TRACES_SAMPLE_RATE,
+  };
+
+  const restoreEnv = (
+    key: keyof typeof originalEnv,
+    value: string | undefined,
+  ) => {
+    if (value === undefined) {
+      delete process.env[key];
+    } else {
+      process.env[key] = value;
+    }
+  };
 
   beforeEach(() => {
     delete process.env.EXPO_PUBLIC_API_URL;
+    delete process.env.EXPO_PUBLIC_APP_ENV;
+    delete process.env.EXPO_PUBLIC_SENTRY_TRACES_SAMPLE_RATE;
     jest.resetModules();
   });
 
   afterAll(() => {
-    if (originalUrl === undefined) {
-      delete process.env.EXPO_PUBLIC_API_URL;
-    } else {
-      process.env.EXPO_PUBLIC_API_URL = originalUrl;
-    }
+    restoreEnv('EXPO_PUBLIC_API_URL', originalEnv.EXPO_PUBLIC_API_URL);
+    restoreEnv('EXPO_PUBLIC_APP_ENV', originalEnv.EXPO_PUBLIC_APP_ENV);
+    restoreEnv(
+      'EXPO_PUBLIC_SENTRY_TRACES_SAMPLE_RATE',
+      originalEnv.EXPO_PUBLIC_SENTRY_TRACES_SAMPLE_RATE,
+    );
   });
 
   it('accepts a valid EXPO_PUBLIC_API_URL', async () => {
@@ -28,5 +47,25 @@ describe('env', () => {
   it('rejects a non-URL EXPO_PUBLIC_API_URL at module load', async () => {
     process.env.EXPO_PUBLIC_API_URL = 'not-a-url';
     await expect(import('../lib/env')).rejects.toThrow();
+  });
+
+  it('rejects an unknown EXPO_PUBLIC_APP_ENV at module load', async () => {
+    process.env.EXPO_PUBLIC_APP_ENV = 'preview';
+    await expect(import('../lib/env')).rejects.toThrow(/EXPO_PUBLIC_APP_ENV/);
+  });
+
+  it('rejects a traces sample rate outside 0..1 at module load', async () => {
+    process.env.EXPO_PUBLIC_SENTRY_TRACES_SAMPLE_RATE = '1.5';
+    await expect(import('../lib/env')).rejects.toThrow(
+      /EXPO_PUBLIC_SENTRY_TRACES_SAMPLE_RATE/,
+    );
+  });
+
+  it('accepts a bounded traces sample rate in a known app env', async () => {
+    process.env.EXPO_PUBLIC_APP_ENV = 'test';
+    process.env.EXPO_PUBLIC_SENTRY_TRACES_SAMPLE_RATE = '0.25';
+    const { env } = await import('../lib/env');
+    expect(env.EXPO_PUBLIC_APP_ENV).toBe('test');
+    expect(env.EXPO_PUBLIC_SENTRY_TRACES_SAMPLE_RATE).toBe(0.25);
   });
 });
