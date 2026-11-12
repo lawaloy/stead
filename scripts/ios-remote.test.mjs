@@ -371,6 +371,42 @@ test('iOS-only preflight does not trust workflow success when a required job is 
   );
 });
 
+test('iOS-only preflight does not trust workflow success when a required job is still running', () => {
+  const sha = 'a'.repeat(40);
+  const jobs = [
+    configurationJob,
+    'build-ios',
+    'native-ios',
+    'Native Readiness',
+    'build-android',
+    'native-android',
+  ].map((name) => ({
+    name,
+    status: 'completed',
+    conclusion: name.includes('android') ? 'skipped' : 'success',
+  }));
+  const runningRequiredJob = jobs.map((job) =>
+    job.name === 'native-ios'
+      ? { ...job, status: 'in_progress', conclusion: null }
+      : job,
+  );
+  assert.throws(
+    () =>
+      assertIosRun(
+        {
+          headSha: sha,
+          headBranch: branch,
+          event: 'workflow_dispatch',
+          status: 'completed',
+          conclusion: 'success',
+          jobs: runningRequiredJob,
+        },
+        { testedCommit: sha, remoteBranch: branch },
+      ),
+    /Required job native-ios did not pass/,
+  );
+});
+
 test('iOS-only preflight does not trust workflow success when a required job failed', () => {
   const sha = 'a'.repeat(40);
   const jobs = [
@@ -421,6 +457,28 @@ test('an invalid git SHA is rejected before any remote upload', async () => {
         (command === 'gh' && args[0] === 'workflow'),
     ),
     'an invalid SHA must not upload source or dispatch a workflow',
+  );
+});
+
+test('an invalid tree SHA is rejected before any remote upload', async () => {
+  const f = fixture({
+    executeGit: async (args) => {
+      if (args[0] === 'status') return '';
+      if (args[0] === 'remote') return 'https://github.com/owner/repo.git';
+      if (args[0] === 'rev-parse' && args[1]?.endsWith('^{tree}'))
+        return 'not-a-tree-sha\n';
+      if (args[0] === 'rev-parse') return `${feature}\n`;
+      throw new Error(`unexpected git ${args[0]}`);
+    },
+  });
+  await assert.rejects(f.start(), /invalid commit\/tree SHA/);
+  assert.ok(
+    !f.calls.some(
+      ({ command, args }) =>
+        (command === 'git' && args[0] === 'push') ||
+        (command === 'gh' && args[0] === 'workflow'),
+    ),
+    'an invalid tree SHA must not upload source or dispatch a workflow',
   );
 });
 
