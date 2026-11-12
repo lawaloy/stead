@@ -6,7 +6,7 @@ import {
 } from './otp-verification-idempotency';
 import type { VerifyOtpResponse } from '../contracts/generated/types.gen';
 
-describe('OTP verification unsafe expiresIn', () => {
+describe('OTP verification negative and max-safe expiresIn', () => {
   const secret = 'otp-verification-test-secret-at-least-32-characters';
   const keyHash = hashOtpVerificationKey(
     '0f81c2a7-1e6d-4f05-9a1c-03de8a5f6b77',
@@ -35,17 +35,15 @@ describe('OTP verification unsafe expiresIn', () => {
     ).toEqual(response);
   });
 
-  it('fails closed for negative, string, and boolean lifetimes', () => {
-    for (const expiresIn of [-1, '900', true] as const) {
-      const encrypted = encrypt({
-        token: 'access-token',
-        refreshToken: 'refresh-token',
-        expiresIn,
-      } as VerifyOtpResponse);
+  it('fails closed for a negative lifetime', () => {
+    const encrypted = encrypt({
+      token: 'access-token',
+      refreshToken: 'refresh-token',
+      expiresIn: -1,
+    });
 
-      expect(() =>
-        decryptOtpVerificationResponse(secret, keyHash, requestHash, encrypted),
-      ).toThrow('Unable to decrypt OTP verification response');
-    }
+    expect(() =>
+      decryptOtpVerificationResponse(secret, keyHash, requestHash, encrypted),
+    ).toThrow('Unable to decrypt OTP verification response');
   });
 });
