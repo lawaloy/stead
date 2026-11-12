@@ -2,6 +2,7 @@ import {
   getCorrelationId,
   getOperationId,
   getOperationName,
+  runWithCorrelationId,
   runWithOperation,
   runWithRequestId,
 } from './request-context';
@@ -42,5 +43,35 @@ describe('request context', () => {
     expect(getCorrelationId()).toBeUndefined();
     expect(getOperationId()).toBeUndefined();
     expect(getOperationName()).toBeUndefined();
+  });
+
+  it('binds a job correlation id without replacing an outer operation', () => {
+    expect(
+      runWithOperation('poll_123', 'notifications.poll', () =>
+        runWithCorrelationId('job-corr', () => ({
+          correlationId: getCorrelationId(),
+          operationId: getOperationId(),
+          operationName: getOperationName(),
+        })),
+      ),
+    ).toEqual({
+      correlationId: 'job-corr',
+      operationId: 'poll_123',
+      operationName: 'notifications.poll',
+    });
+  });
+
+  it('does not invent an operation when only a correlation id is bound', () => {
+    expect(
+      runWithCorrelationId('job-corr', () => ({
+        correlationId: getCorrelationId(),
+        operationId: getOperationId(),
+        operationName: getOperationName(),
+      })),
+    ).toEqual({
+      correlationId: 'job-corr',
+      operationId: undefined,
+      operationName: undefined,
+    });
   });
 });

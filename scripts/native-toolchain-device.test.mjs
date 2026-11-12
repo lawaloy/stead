@@ -37,6 +37,7 @@ const androidToolchain = ({
   qemu = '1',
   apiLevel = TOOLCHAIN.ANDROID_API_LEVEL,
   bootCompleted = '1',
+  fingerprint = FINGERPRINT,
   getprops = [],
 } = {}) =>
   checkNativeToolchain('android', {
@@ -64,7 +65,7 @@ const androidToolchain = ({
           const key = args.at(-1);
           getprops.push(key);
           if (key === 'ro.kernel.qemu') return qemu;
-          if (key === 'ro.build.fingerprint') return FINGERPRINT;
+          if (key === 'ro.build.fingerprint') return fingerprint;
           if (key === 'ro.product.cpu.abi') return TOOLCHAIN.ANDROID_ARCH;
           if (key === 'ro.build.version.sdk') return apiLevel;
           if (key === 'sys.boot_completed') return bootCompleted;
@@ -108,6 +109,35 @@ test('native Android preflight waits when the emulator has not finished booting'
     await assert.rejects(
       androidToolchain({ sdk, bootCompleted: '0' }),
       /finish booting/,
+    );
+  } finally {
+    rmSync(sdk, { recursive: true, force: true });
+  }
+});
+
+test('native Android preflight refuses an emulator before the pinned system image is installed', async () => {
+  const sdk = mkdtempSync(join(tmpdir(), 'stead-android-image-'));
+  const getprops = [];
+  try {
+    await assert.rejects(
+      androidToolchain({ sdk, getprops }),
+      new RegExp(
+        `Install system-images;android-${TOOLCHAIN.ANDROID_API_LEVEL};${TOOLCHAIN.ANDROID_IMAGE_TARGET};${TOOLCHAIN.ANDROID_ARCH}`,
+      ),
+    );
+    assert.deepEqual(getprops, ['ro.kernel.qemu']);
+  } finally {
+    rmSync(sdk, { recursive: true, force: true });
+  }
+});
+
+test('native Android preflight rejects an emulator whose system image fingerprint does not match the SDK', async () => {
+  const sdk = mkdtempSync(join(tmpdir(), 'stead-android-fingerprint-'));
+  try {
+    writePinnedSdk(sdk);
+    await assert.rejects(
+      androidToolchain({ sdk, fingerprint: 'other-emulator-fingerprint' }),
+      /Android system image fingerprint/,
     );
   } finally {
     rmSync(sdk, { recursive: true, force: true });

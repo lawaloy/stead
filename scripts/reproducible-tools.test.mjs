@@ -147,6 +147,20 @@ test('system UI crashes fail preflight instead of masquerading as login failures
       ),
     /system dialog/,
   );
+  assert.throws(
+    () =>
+      assertAndroidUiHealthy(
+        'mCurrentFocus=Window{abc Application Not Responding: com.android.systemui}',
+      ),
+    /system dialog/,
+  );
+  assert.throws(
+    () =>
+      assertAndroidUiHealthy(
+        'mCurrentFocus=Window{abc ANR in com.android.systemui}',
+      ),
+    /system dialog/,
+  );
   assert.equal(assertAndroidUiHealthy('mCurrentFocus=null'), false);
   assert.equal(
     assertAndroidUiHealthy('mCurrentFocus=Window{abc com.android.launcher3}'),
