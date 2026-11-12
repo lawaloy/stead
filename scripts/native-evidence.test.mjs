@@ -321,6 +321,17 @@ test('Maestro summaries fail closed on unreadable command evidence', (t) => {
   assert.throws(() => summarizeMaestro(directory), SyntaxError);
 });
 
+test('Maestro summaries fail closed when command evidence is not a JSON array', (t) => {
+  const directory = fixture(t);
+  const flow = join(directory, 'flow');
+  mkdirSync(flow);
+  writeFileSync(
+    join(flow, 'commands.json'),
+    JSON.stringify({ commands: [{ status: 'COMPLETED' }] }),
+  );
+  assert.throws(() => summarizeMaestro(directory));
+});
+
 test('diagnostic scenarios cannot substitute for the full verify gate or select arbitrary flows', () => {
   assert.equal(
     parseNativeArguments(['test', '--platform', 'ios', '--scenario', 'input'])
