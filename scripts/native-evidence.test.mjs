@@ -82,6 +82,38 @@ test('driver failure classification requires a failed HTTP-server test, not a pr
   assert.equal(findXCTestFailure(directory).kind, 'xctest-server-failed');
 });
 
+test('a harvested device-xctest.log screenshot timeout is classified', (t) => {
+  const directory = fixture(t);
+  const log = join(directory, 'device-xctest.log');
+  writeFileSync(log, screenshotFailure);
+  assert.equal(findXCTestFailure(directory).kind, 'xctest-screenshot-timeout');
+  assert.equal(findXCTestFailure(directory).log, log);
+});
+
+test('a successful Maestro exit still fails when device-xctest.log harvested a screenshot timeout', async (t) => {
+  const directory = fixture(t);
+  const log = join(directory, 'device-xctest.log');
+  await assert.rejects(
+    runMaestroCommand(
+      'unused',
+      [],
+      {},
+      {
+        xctestOutput: directory,
+        pollIntervalMs: 5,
+        timeoutMs: 5_000,
+        execute: async () => {
+          writeFileSync(log, screenshotFailure);
+        },
+      },
+    ),
+    (error) =>
+      error.nativeFailure?.kind === 'xctest-screenshot-timeout' &&
+      error.nativeFailure.log === log &&
+      /will not be retried/.test(error.message),
+  );
+});
+
 test('nested Maestro debug paths still classify a current XCTest screenshot failure', (t) => {
   const directory = fixture(t);
   const nested = join(directory, 'invocation-2', 'debug-output');
@@ -190,6 +222,30 @@ test('caller cancellation remains cancellation even when the driver fails simult
     ),
     (error) => error === cancelled,
   );
+});
+
+test('command summaries read tap and input selector ids without publishing entered text', (t) => {
+  const directory = fixture(t);
+  const flow = join(directory, 'sign-in');
+  mkdirSync(flow);
+  writeFileSync(
+    join(flow, 'commands.json'),
+    JSON.stringify([
+      {
+        command: {
+          inputTextCommand: {
+            selector: { idRegex: 'verify-otp-code' },
+            text: 'sensitive-otp-123456',
+          },
+        },
+        metadata: { sequenceNumber: 4, status: 'FAILED', duration: 8_000 },
+      },
+    ]),
+  );
+  const [summary] = summarizeMaestro(directory);
+  assert.equal(summary.failedCommands[0].type, 'inputTextCommand');
+  assert.equal(summary.failedCommands[0].fieldId, 'verify-otp-code');
+  assert.doesNotMatch(JSON.stringify(summary), /sensitive-otp|123456/);
 });
 
 test('command summaries read evaluatedCommand and notVisible selectors without publishing input', (t) => {
