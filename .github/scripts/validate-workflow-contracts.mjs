@@ -638,8 +638,32 @@ assert.match(
 );
 assert.match(
   readiness ?? '',
-  /Delete simulator app artifacts[\s\S]*if: always\(\)[\s\S]*NATIVE_ANDROID[\s\S]*NATIVE_IOS[\s\S]*result" != "success" && "\$result" != "skipped"[\s\S]*Keeping simulator app artifacts because a journey job did not succeed[\s\S]*android-simulator-app[\s\S]*ios-simulator-app[\s\S]*Warning: failed to delete simulator app artifact/,
-  'Native Readiness must delete simulator app artifacts after successful or skipped journeys, keep them when a journey fails or is cancelled, and never fail the check if cleanup fails.',
+  /Delete simulator app artifacts[\s\S]*if: always\(\)[\s\S]*NATIVE_ANDROID[\s\S]*NATIVE_IOS[\s\S]*result" != "success" && "\$result" != "skipped" && "\$result" != "cancelled"[\s\S]*Keeping simulator app artifacts because a journey job failed[\s\S]*android-simulator-app[\s\S]*ios-simulator-app[\s\S]*Warning: failed to delete simulator app artifact/,
+  'Native Readiness must delete simulator app artifacts after successful, skipped, or cancelled journeys, keep them when a journey fails, and never fail the check if cleanup fails.',
+);
+const nativeArtifactCleanup = await readFile(
+  '.github/workflows/native-artifact-cleanup.yml',
+  'utf8',
+);
+assert.match(
+  nativeArtifactCleanup,
+  /on:\n\s+workflow_run:\n\s+workflows: \['native-ci'\]\n\s+types: \[completed\]/,
+  'Cancelled simulator app cleanup must run after native-ci completes, including cancellation.',
+);
+assert.match(
+  nativeArtifactCleanup,
+  /if: github\.event\.workflow_run\.conclusion == 'cancelled'[\s\S]*permissions:\n\s+actions: write[\s\S]*GH_RUN_ID: \$\{\{ github\.event\.workflow_run\.id \}\}/,
+  'Cancelled simulator app cleanup must run only for cancelled native-ci runs with actions: write and the originating run id.',
+);
+assert.match(
+  nativeArtifactCleanup,
+  /test\("\^native-\(android\|ios\)\(-\[0-9\]\+\)\?\$"\)[\s\S]*Keeping simulator app artifacts because a journey job failed[\s\S]*android-simulator-app[\s\S]*ios-simulator-app[\s\S]*Warning: failed to delete simulator app artifact/,
+  'Cancelled simulator app cleanup must keep artifacts when a journey failed, delete otherwise, and only warn if cleanup fails.',
+);
+assert.doesNotMatch(
+  nativeArtifactCleanup,
+  /checkout@|secrets\.|workflow_run\.head_sha|workflow_run\.head_branch/,
+  'Cancelled simulator app cleanup must not check out untrusted workflow_run code or use repository secrets.',
 );
 
 console.log('Workflow contracts are synchronized.');

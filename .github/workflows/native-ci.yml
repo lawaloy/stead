@@ -10,10 +10,12 @@ run-name: >-
 # IOS_NATIVE_ENABLED is an emergency switch; native-readiness fails relevant
 # PRs when iOS is disabled so missing coverage cannot look green.
 # Simulator app artifacts are deleted when both journey jobs succeed or
-# are skipped, including after a later successful rerun. They are kept
-# for 1 day when a journey fails or is cancelled so "Re-run failed jobs"
-# can still download the apps. Journey logs are uploaded only when a
-# test fails.
+# are skipped, including after a later successful rerun, and when a run
+# is cancelled. They are kept for 1 day when a journey fails so
+# "Re-run failed jobs" can still download the apps. Cancelled runs are
+# cleaned up by native-artifact-cleanup because native-readiness usually
+# has not started yet when GitHub cancels the workflow. Journey logs are
+# uploaded only when a test fails.
 # Manual runs can select a platform. Native binaries are
 # built in dedicated jobs and handed to Maestro jobs as artifacts (build once
 # → test). Android boots a dedicated AVD from checksum-locked SDK archives;
@@ -590,12 +592,12 @@ jobs:
           set -eu
           keep=0
           for result in "$NATIVE_ANDROID" "$NATIVE_IOS"; do
-            if [[ "$result" != "success" && "$result" != "skipped" ]]; then
+            if [[ "$result" != "success" && "$result" != "skipped" && "$result" != "cancelled" ]]; then
               keep=1
             fi
           done
           if [[ "$keep" -eq 1 ]]; then
-            echo "Keeping simulator app artifacts because a journey job did not succeed (android=$NATIVE_ANDROID ios=$NATIVE_IOS). They expire in 1 day so Re-run failed jobs can download them."
+            echo "Keeping simulator app artifacts because a journey job failed (android=$NATIVE_ANDROID ios=$NATIVE_IOS). They expire in 1 day so Re-run failed jobs can download them."
             exit 0
           fi
           if ! ids="$(gh api "repos/${GH_REPO}/actions/runs/${GH_RUN_ID}/artifacts" --paginate --jq '.artifacts[] | select(.name == "android-simulator-app" or .name == "ios-simulator-app") | .id')"; then

@@ -82,9 +82,9 @@ Android CI also restores BuildKit dependency layers across hosted runners, but
 always rebuilds the source and transferred-APK layers and verifies their image
 identity. Both platform jobs retain journey evidence for three days when a
 journey fails. Simulator app artifacts are deleted when both journey jobs
-succeed or are skipped, including after a later successful rerun, and are
-kept for one day when a journey fails or is cancelled so Re-run failed jobs
-can still download them.
+succeed or are skipped, including after a later successful rerun, and when
+a run is cancelled. They are kept for one day when a journey fails so
+Re-run failed jobs can still download them.
 The iOS build embeds JavaScript so its journey runner does not install mobile
 dependencies or run Metro alongside PostgreSQL, the API, Maestro, and the
 simulator.

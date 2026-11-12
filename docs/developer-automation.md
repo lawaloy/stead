@@ -110,9 +110,11 @@ when a journey fails. The evidence includes logs, screenshots, videos,
 and JSON failure metadata; it excludes simulator applications, generated
 JavaScript bundles, and build caches. The separately transferred simulator
 applications are deleted when both journey jobs succeed or are skipped,
-including after a later successful rerun. If a journey fails or is
-cancelled, they remain for one day so Re-run failed jobs can download
-them without rerunning a successful build.
+including after a later successful rerun, and when a run is cancelled.
+If a journey fails, they remain for one day so Re-run failed jobs can
+download them without rerunning a successful build. Cancelled runs are
+cleaned up by the native-artifact-cleanup workflow because Native
+Readiness usually has not started yet when GitHub cancels the workflow.
 
 ## Local Validation
 

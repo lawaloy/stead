@@ -1,0 +1,64 @@
+name: native-artifact-cleanup
+
+# native-readiness uses if: always(), but GitHub only re-evaluates
+# conditions for jobs that are already running. A cancelled run almost
+# never starts native-readiness because that job waits on the build and
+# journey jobs. This follow-up workflow runs after native-ci completes,
+# including cancellation, and deletes the simulator apps unless a
+# journey failed.
+
+on:
+  workflow_run:
+    workflows: ['native-ci']
+    types: [completed]
+
+permissions:
+  contents: read
+
+jobs:
+  delete-cancelled-simulator-apps:
+    name: Delete cancelled simulator apps
+    if: github.event.workflow_run.conclusion == 'cancelled'
+    runs-on: ubuntu-24.04
+    permissions:
+      actions: write
+    steps:
+      - name: Delete simulator app artifacts
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          GH_RUN_ID: ${{ github.event.workflow_run.id }}
+        run: |
+          set -eu
+          echo "Cleaning simulator app artifacts from cancelled native-ci run ${GH_RUN_ID}."
+          if ! conclusions="$(gh api "repos/${GH_REPO}/actions/runs/${GH_RUN_ID}/jobs" --paginate --jq '.jobs[] | select(.name | test("^native-(android|ios)(-[0-9]+)?$")) | .conclusion')"; then
+            echo "Warning: could not list jobs for run ${GH_RUN_ID}; leaving simulator app artifacts in place." >&2
+            exit 0
+          fi
+          keep=0
+          while IFS= read -r conclusion; do
+            [[ -z "$conclusion" ]] && continue
+            if [[ "$conclusion" == "failure" ]]; then
+              keep=1
+            fi
+          done <<< "$conclusions"
+          if [[ "$keep" -eq 1 ]]; then
+            echo "Keeping simulator app artifacts because a journey job failed. They expire in 1 day so Re-run failed jobs can download them."
+            exit 0
+          fi
+          if ! ids="$(gh api "repos/${GH_REPO}/actions/runs/${GH_RUN_ID}/artifacts" --paginate --jq '.artifacts[] | select(.name == "android-simulator-app" or .name == "ios-simulator-app") | .id')"; then
+            echo "Warning: could not list simulator app artifacts for run ${GH_RUN_ID}." >&2
+            exit 0
+          fi
+          if [[ -z "$ids" ]]; then
+            echo "No simulator app artifacts to delete."
+            exit 0
+          fi
+          while IFS= read -r id; do
+            [[ -z "$id" ]] && continue
+            if gh api --method DELETE "repos/${GH_REPO}/actions/artifacts/${id}"; then
+              echo "Deleted simulator app artifact ${id}."
+            else
+              echo "Warning: failed to delete simulator app artifact ${id}." >&2
+            fi
+          done <<< "$ids"
