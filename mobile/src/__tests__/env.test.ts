@@ -82,6 +82,20 @@ describe('env', () => {
     );
   });
 
+  it('rejects a negative traces sample rate at module load', async () => {
+    process.env.EXPO_PUBLIC_SENTRY_TRACES_SAMPLE_RATE = '-0.1';
+    await expect(import('../lib/env')).rejects.toThrow(
+      /EXPO_PUBLIC_SENTRY_TRACES_SAMPLE_RATE/,
+    );
+  });
+
+  it('rejects a non-numeric traces sample rate at module load', async () => {
+    process.env.EXPO_PUBLIC_SENTRY_TRACES_SAMPLE_RATE = 'abc';
+    await expect(import('../lib/env')).rejects.toThrow(
+      /EXPO_PUBLIC_SENTRY_TRACES_SAMPLE_RATE/,
+    );
+  });
+
   it('rejects a non-URL EXPO_PUBLIC_SENTRY_DSN at module load', async () => {
     process.env.EXPO_PUBLIC_SENTRY_DSN = 'not-a-url';
     await expect(import('../lib/env')).rejects.toThrow(
