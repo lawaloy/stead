@@ -8,6 +8,7 @@ import {
   saveContainerMemory,
 } from './android-container-entry.mjs';
 import {
+  containerAndroidWorkflow,
   containerRunArguments,
   containerBuildArguments,
   resolveContainerBuildCache,
@@ -327,4 +328,43 @@ test('container builds use an explicit repository cache only when CI provides on
   ]);
   assert.ok(cached.includes('type=local,src=/cache/current'));
   assert.ok(cached.includes('type=local,dest=/cache/next,mode=max'));
+});
+
+test('the container runner rejects iOS, host devices, doctor, project-ready, and a custom database URL', async () => {
+  const previous = process.env.STEAD_NATIVE_DATABASE_URL;
+  delete process.env.STEAD_NATIVE_DATABASE_URL;
+  try {
+    await assert.rejects(
+      containerAndroidWorkflow({ platform: 'ios', command: 'test' }),
+      /requires Android and owns its emulator/,
+    );
+    await assert.rejects(
+      containerAndroidWorkflow({
+        platform: 'android',
+        command: 'test',
+        device: 'emulator-5554',
+      }),
+      /requires Android and owns its emulator/,
+    );
+    await assert.rejects(
+      containerAndroidWorkflow({ platform: 'android', command: 'doctor' }),
+      /requires Android and owns its emulator/,
+    );
+    await assert.rejects(
+      containerAndroidWorkflow({
+        platform: 'android',
+        command: 'build',
+        projectReady: true,
+      }),
+      /omit --project-ready/,
+    );
+    process.env.STEAD_NATIVE_DATABASE_URL = 'postgresql://example/e2e';
+    await assert.rejects(
+      containerAndroidWorkflow({ platform: 'android', command: 'test' }),
+      /remove STEAD_NATIVE_DATABASE_URL/,
+    );
+  } finally {
+    if (previous === undefined) delete process.env.STEAD_NATIVE_DATABASE_URL;
+    else process.env.STEAD_NATIVE_DATABASE_URL = previous;
+  }
 });
