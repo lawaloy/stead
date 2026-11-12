@@ -59,11 +59,15 @@ export const waitForAndroidHostMemory = async (
 const androidAvdHome = (sdk) =>
   join(ROOT, '.tmp/android-avds', sdkReceipt(sdk).digest.slice(0, 16));
 
-export const androidSdkEnvironment = () => {
-  const sdk = repositorySdk();
-  const home = androidAvdHome(sdk);
+export const androidSdkEnvironment = ({
+  env = process.env,
+  sdk = repositorySdk(),
+  digest = sdkReceipt(sdk).digest,
+  root = ROOT,
+} = {}) => {
+  const home = join(root, '.tmp/android-avds', digest.slice(0, 16));
   return {
-    ...process.env,
+    ...env,
     ANDROID_HOME: sdk,
     ANDROID_SDK_ROOT: sdk,
     ANDROID_AVD_HOME: home,
@@ -76,7 +80,7 @@ export const androidSdkEnvironment = () => {
         TOOLCHAIN.ANDROID_CMDLINE_TOOLS_VERSION,
         'bin',
       ),
-      process.env.PATH || process.env.Path || '',
+      env.PATH || env.Path || '',
     ].join(delimiter),
   };
 };
