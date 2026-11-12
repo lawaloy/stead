@@ -6,6 +6,7 @@ describe('env', () => {
     EXPO_PUBLIC_SENTRY_TRACES_SAMPLE_RATE:
       process.env.EXPO_PUBLIC_SENTRY_TRACES_SAMPLE_RATE,
   };
+  const originalNodeEnv = process.env.NODE_ENV;
 
   const restoreEnv = (
     key: keyof typeof originalEnv,
@@ -18,11 +19,16 @@ describe('env', () => {
     }
   };
 
+  const restoreNodeEnv = () => {
+    process.env.NODE_ENV = originalNodeEnv ?? 'test';
+  };
+
   beforeEach(() => {
     delete process.env.EXPO_PUBLIC_API_URL;
     delete process.env.EXPO_PUBLIC_APP_ENV;
     delete process.env.EXPO_PUBLIC_SENTRY_DSN;
     delete process.env.EXPO_PUBLIC_SENTRY_TRACES_SAMPLE_RATE;
+    restoreNodeEnv();
     jest.resetModules();
   });
 
@@ -34,6 +40,7 @@ describe('env', () => {
       'EXPO_PUBLIC_SENTRY_TRACES_SAMPLE_RATE',
       originalEnv.EXPO_PUBLIC_SENTRY_TRACES_SAMPLE_RATE,
     );
+    restoreNodeEnv();
   });
 
   it('accepts a valid EXPO_PUBLIC_API_URL', async () => {
@@ -55,6 +62,17 @@ describe('env', () => {
   it('rejects an unknown EXPO_PUBLIC_APP_ENV at module load', async () => {
     process.env.EXPO_PUBLIC_APP_ENV = 'preview';
     await expect(import('../lib/env')).rejects.toThrow(/EXPO_PUBLIC_APP_ENV/);
+  });
+
+  it('defaults APP_ENV to development when it is omitted outside production', async () => {
+    const { env } = await import('../lib/env');
+    expect(env.EXPO_PUBLIC_APP_ENV).toBe('development');
+  });
+
+  it('defaults APP_ENV to production when NODE_ENV is production', async () => {
+    process.env.NODE_ENV = 'production';
+    const { env } = await import('../lib/env');
+    expect(env.EXPO_PUBLIC_APP_ENV).toBe('production');
   });
 
   it('rejects a traces sample rate outside 0..1 at module load', async () => {
