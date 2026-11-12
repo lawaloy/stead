@@ -181,6 +181,21 @@ describe('AuthService verify OTP replay window and request fingerprint', () => {
     expect(jwt.signAsync).not.toHaveBeenCalled();
   });
 
+  it('replays a stored winner at the inclusive replay-window bound', async () => {
+    const otp = '123456';
+    prisma.otpCode.findUnique.mockResolvedValue(
+      await storedWinner(otp, {
+        verifiedAt: new Date(NOW.getTime() - REPLAY_WINDOW_MS),
+      }),
+    );
+
+    await expect(verify(otp)).resolves.toEqual(WINNER_SESSION);
+
+    expect(prisma.user.findUnique).not.toHaveBeenCalled();
+    expect(prisma.otpCode.findFirst).not.toHaveBeenCalled();
+    expect(jwt.signAsync).not.toHaveBeenCalled();
+  });
+
   it('rejects replay when the stored winner is missing verifiedAt', async () => {
     const otp = '123456';
     prisma.otpCode.findUnique.mockResolvedValue(
