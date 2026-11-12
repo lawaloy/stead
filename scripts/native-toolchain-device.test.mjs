@@ -8,7 +8,10 @@ import { checkNativeToolchain } from './native-toolchain.mjs';
 
 const FINGERPRINT = 'stead-emulator-fingerprint';
 
-const writePinnedSdk = (sdk) => {
+const writePinnedSdk = (
+  sdk,
+  { revision = TOOLCHAIN.ANDROID_IMAGE_REVISION } = {},
+) => {
   const image = join(
     sdk,
     'system-images',
@@ -20,7 +23,7 @@ const writePinnedSdk = (sdk) => {
   mkdirSync(join(sdk, 'emulator'), { recursive: true });
   writeFileSync(
     join(image, 'package.xml'),
-    `<revision>\n  <major>${TOOLCHAIN.ANDROID_IMAGE_REVISION}</major>\n</revision>\n`,
+    `<revision>\n  <major>${revision}</major>\n</revision>\n`,
   );
   writeFileSync(
     join(image, 'build.prop'),
@@ -139,6 +142,35 @@ test('native Android preflight rejects an emulator whose system image fingerprin
       androidToolchain({ sdk, fingerprint: 'other-emulator-fingerprint' }),
       /Android system image fingerprint/,
     );
+  } finally {
+    rmSync(sdk, { recursive: true, force: true });
+  }
+});
+
+test('native Android preflight fails closed when ANDROID_HOME is missing', async () => {
+  const commands = [];
+  await assert.rejects(
+    androidToolchain({
+      sdk: join(tmpdir(), `stead-missing-android-sdk-${Date.now()}`),
+      getprops: commands,
+    }),
+    /Android SDK is missing/,
+  );
+  assert.deepEqual(commands, []);
+});
+
+test('native Android preflight rejects an installed system image whose revision does not match CI', async () => {
+  const sdk = mkdtempSync(join(tmpdir(), 'stead-android-revision-'));
+  const getprops = [];
+  try {
+    writePinnedSdk(sdk, { revision: '0' });
+    await assert.rejects(
+      androidToolchain({ sdk, getprops }),
+      new RegExp(
+        `Use Android system image revision ${TOOLCHAIN.ANDROID_IMAGE_REVISION} to match CI`,
+      ),
+    );
+    assert.deepEqual(getprops, ['ro.kernel.qemu']);
   } finally {
     rmSync(sdk, { recursive: true, force: true });
   }
