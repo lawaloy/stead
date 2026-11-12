@@ -142,6 +142,27 @@ describe('OTP verification idempotency crypto', () => {
     ).toThrow('Unable to decrypt OTP verification response');
   });
 
+  it('fails closed when a structurally valid envelope has a tampered IV', () => {
+    const envelope = JSON.parse(
+      encryptOtpVerificationResponse(secret, keyHash, requestHash, response),
+    ) as { v: number; iv: string; tag: string; ciphertext: string };
+
+    const tamperedIv = Buffer.from(envelope.iv, 'base64url');
+    tamperedIv[0] = tamperedIv[0] ^ 0xff;
+
+    expect(() =>
+      decryptOtpVerificationResponse(
+        secret,
+        keyHash,
+        requestHash,
+        JSON.stringify({
+          ...envelope,
+          iv: tamperedIv.toString('base64url'),
+        }),
+      ),
+    ).toThrow('Unable to decrypt OTP verification response');
+  });
+
   it('fails closed for a malformed envelope or non-JSON wrapper', () => {
     for (const invalid of [
       'not-json',
