@@ -14,6 +14,31 @@ import {
   withCleanup,
 } from './process-utils.mjs';
 
+test('successful operations still fail when cleanup rejects', async () => {
+  const cleaned = [];
+  await assert.rejects(
+    withCleanup(
+      async () => 'ok',
+      [
+        () => {
+          cleaned.push('first');
+          throw new Error('cleanup failure');
+        },
+        async () => {
+          cleaned.push('second');
+        },
+      ],
+    ),
+    (error) => {
+      assert.equal(error.name, 'AggregateError');
+      assert.equal(error.errors.length, 1);
+      assert.match(error.message, /cleanup failure/);
+      return true;
+    },
+  );
+  assert.deepEqual(cleaned, ['first', 'second']);
+});
+
 test('all cleanup actions run and preserve the original failure plus cleanup failures', async () => {
   const cleaned = [];
   await assert.rejects(

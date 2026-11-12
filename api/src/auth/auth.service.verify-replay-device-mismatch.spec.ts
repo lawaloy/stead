@@ -243,4 +243,28 @@ describe('AuthService verify OTP replay device fingerprint', () => {
     expect(prisma.otpCode.updateMany).not.toHaveBeenCalled();
     expect(jwt.signAsync).not.toHaveBeenCalled();
   });
+
+  it('rejects a concurrent recheck when the stored winner is bound to another device', async () => {
+    const otp = '123456';
+    prisma.user.findUnique.mockResolvedValue({
+      id: 'user_1',
+      phone: '+2348012345678',
+    });
+    prisma.otpCode.findFirst.mockResolvedValue(null);
+    prisma.otpCode.findUnique
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(await storedWinner(otp, DEVICE_A));
+
+    await expect(
+      service.verifyOtp('08012345678', 'NG', otp, {
+        idempotencyKey: IDEMPOTENCY_KEY,
+        deviceId: DEVICE_B,
+      }),
+    ).rejects.toBeInstanceOf(ConflictException);
+
+    expect(prisma.otpCode.findUnique).toHaveBeenCalledTimes(2);
+    expect(prisma.otpCode.findFirst).toHaveBeenCalled();
+    expect(prisma.otpCode.updateMany).not.toHaveBeenCalled();
+    expect(jwt.signAsync).not.toHaveBeenCalled();
+  });
 });
