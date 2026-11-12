@@ -441,6 +441,69 @@ test('iOS-only preflight does not trust workflow success when a required job fai
   );
 });
 
+test('iOS-only preflight does not trust workflow success when a required job was skipped', () => {
+  const sha = 'a'.repeat(40);
+  const jobs = [
+    configurationJob,
+    'build-ios',
+    'native-ios',
+    'Native Readiness',
+    'build-android',
+    'native-android',
+  ].map((name) => ({
+    name,
+    status: 'completed',
+    conclusion: name.includes('android') ? 'skipped' : 'success',
+  }));
+  const skippedRequiredJob = jobs.map((job) =>
+    job.name === 'Native Readiness' ? { ...job, conclusion: 'skipped' } : job,
+  );
+  assert.throws(
+    () =>
+      assertIosRun(
+        {
+          headSha: sha,
+          headBranch: branch,
+          event: 'workflow_dispatch',
+          status: 'completed',
+          conclusion: 'success',
+          jobs: skippedRequiredJob,
+        },
+        { testedCommit: sha, remoteBranch: branch },
+      ),
+    /Required job Native Readiness did not pass/,
+  );
+});
+
+test('iOS-only preflight fails closed when Android jobs are omitted from the payload', () => {
+  const sha = 'a'.repeat(40);
+  const jobs = [
+    configurationJob,
+    'build-ios',
+    'native-ios',
+    'Native Readiness',
+  ].map((name) => ({
+    name,
+    status: 'completed',
+    conclusion: 'success',
+  }));
+  assert.throws(
+    () =>
+      assertIosRun(
+        {
+          headSha: sha,
+          headBranch: branch,
+          event: 'workflow_dispatch',
+          status: 'completed',
+          conclusion: 'success',
+          jobs,
+        },
+        { testedCommit: sha, remoteBranch: branch },
+      ),
+    /Expected build-android to be skipped/,
+  );
+});
+
 test('an invalid git SHA is rejected before any remote upload', async () => {
   const f = fixture({
     executeGit: async (args) => {
