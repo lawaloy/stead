@@ -44,9 +44,14 @@ jobs:
                       per_page: 100,
                     },
                   );
-                  const matching = associated.filter(
-                    (pull) => pull.head.sha === run.head_sha,
-                  );
+                  const matching = associated.filter((pull) => {
+                    const sameBranch = pull.head.ref === run.head_branch;
+                    const sameRepository = run.head_repository?.id
+                      ? pull.head.repo?.id === run.head_repository.id
+                      : pull.head.repo?.full_name ===
+                        run.head_repository?.full_name;
+                    return sameBranch && sameRepository;
+                  });
                   pullNumber =
                     matching.find((pull) => pull.state === 'open')?.number ??
                     matching[0]?.number;

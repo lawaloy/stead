@@ -26,8 +26,19 @@ const cancelledRun = (overrides = {}) => ({
   id: 101,
   event: 'pull_request',
   head_branch: 'feature/native-cleanup',
+  head_repository: { id: 23, full_name: 'lawaloy/stead' },
   head_sha: sha('a'),
   pull_requests: [{ number: 17 }],
+  ...overrides,
+});
+
+const pullHead = (run, overrides = {}) => ({
+  ref: run.head_branch,
+  repo: {
+    id: run.head_repository.id,
+    full_name: run.head_repository.full_name,
+  },
+  sha: run.head_sha,
   ...overrides,
 });
 
@@ -111,13 +122,43 @@ test('missing workflow payload metadata prefers an associated open PR', async ()
   const { calls, execute } = fixture({
     run,
     associated: [
-      { number: 16, state: 'closed', head: { sha: run.head_sha } },
-      { number: 17, state: 'open', head: { sha: run.head_sha } },
+      {
+        number: 15,
+        state: 'open',
+        head: pullHead(run, {
+          repo: { id: 99, full_name: 'someone-else/stead' },
+        }),
+      },
+      { number: 16, state: 'closed', head: pullHead(run) },
+      { number: 17, state: 'open', head: pullHead(run) },
     ],
   });
   await execute();
   assert.equal(calls.pullGets[0].pull_number, 17);
   assert.deepEqual(calls.artifactLists, []);
+});
+
+test('an associated PR that advanced still resolves by repository and branch', async () => {
+  const run = cancelledRun({ pull_requests: [] });
+  const advancedSha = sha('b');
+  const { calls, execute } = fixture({
+    run,
+    associated: [
+      {
+        number: 17,
+        state: 'open',
+        head: pullHead(run, { sha: advancedSha }),
+      },
+    ],
+    pull: { state: 'open', head: { sha: advancedSha } },
+    artifacts: [{ id: 9, name: 'ios-simulator-app', expired: false }],
+  });
+  await execute();
+  assert.equal(calls.pullGets[0].pull_number, 17);
+  assert.deepEqual(
+    calls.deletes.map(({ artifact_id }) => artifact_id),
+    [9],
+  );
 });
 
 test('an advanced PR deletes only live simulator applications from its cancelled run', async () => {
