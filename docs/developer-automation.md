@@ -111,8 +111,13 @@ and JSON failure metadata; it excludes simulator applications, generated
 JavaScript bundles, and build caches. The separately transferred simulator
 applications are deleted when both journey jobs succeed or are skipped,
 including after a later successful rerun. If a journey fails or is
-cancelled, they remain for one day so Re-run failed jobs can download
-them without rerunning a successful build.
+cancelled, they remain available to reruns without rebuilding a successful
+app. Failure cleanup keeps them for one day. Cancellation skips readiness
+cleanup, so an uploaded app expires automatically at its GitHub `expires_at`,
+one day after upload. The independent native artifact cleanup deletes it sooner
+when the originating PR or branch has closed, been deleted, or advanced beyond
+the cancelled commit. It deliberately retains a cancelled current-head app for
+rerun; a successful rerun deletes it sooner.
 
 ## Local Validation
 
@@ -143,6 +148,12 @@ switch, not a normal optimization. The aggregate `Native Readiness` job fails a
 native-impacting PR when iOS is disabled or either applicable platform does not
 complete. Each PR execution runs the complete financial and signed-in
 cold-start journey once; repetition is not additional functional coverage.
+Test-only changes run the matching unit, integration, or e2e suites without
+replaying an unchanged native app. Runtime API/mobile code, contracts,
+dependencies, packaging, native tooling, and Maestro flow changes still trigger
+both applicable native journeys. Native app caches use selected build inputs
+and toolchain fingerprints; bump `NATIVE_BUILD_CACHE_SCHEMA` only when an
+incompatible build-recipe change is not already represented by those inputs.
 
 To investigate iOS without the financial journey, use `native test --platform
 ios --scenario sign-in` or `--scenario input` through `npm run native --`.

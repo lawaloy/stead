@@ -27,6 +27,8 @@ const [
   prepareEntrypoint,
   prepareReusable,
   nativeWorkflow,
+  nativeArtifactCleanupWorkflow,
+  nativePathPolicy,
   ciWorkflow,
   dependencyAuditWorkflow,
   dependencyMaintenanceWorkflow,
@@ -43,6 +45,8 @@ const [
   readFile('.github/workflows/dependency-auto-prepare.yml', 'utf8'),
   readFile('.github/workflows/pr-auto-prepare-reusable.yml', 'utf8'),
   readFile('.github/workflows/native-ci.yml', 'utf8'),
+  readFile('.github/workflows/native-artifact-cleanup.yml', 'utf8'),
+  readFile('.github/native-ci-paths.yml', 'utf8'),
   readFile('.github/workflows/ci.yml', 'utf8'),
   readFile('.github/workflows/dependency-audit.yml', 'utf8'),
   readFile('.github/workflows/deps-maintenance.yml', 'utf8'),
@@ -179,8 +183,63 @@ assert.match(
 );
 assert.match(
   nativeWorkflow,
-  /filters: \.github\/native-ci-paths\.yml/,
-  'native-ci must use the shared native path policy.',
+  /predicate-quantifier: some-with-excludes\n\s+filters: \.github\/native-ci-paths\.yml/,
+  'native-ci must apply final test exclusions from the shared native path policy.',
+);
+assert.match(
+  nativeArtifactCleanupWorkflow,
+  /workflow_run:\n\s+workflows: \['native-ci'\]\n\s+types: \[completed\]/,
+  'Native artifact cleanup must run only after native-ci reaches a terminal result.',
+);
+assert.match(
+  nativeArtifactCleanupWorkflow,
+  /permissions:\n\s+actions: write\n\s+contents: read\n\s+pull-requests: read/,
+  'Native artifact cleanup must keep the least privileges needed to inspect heads and delete artifacts.',
+);
+assert.match(
+  nativeArtifactCleanupWorkflow,
+  /if: github\.event\.workflow_run\.conclusion == 'cancelled'/,
+  'Native artifact cleanup must ignore non-cancelled runs.',
+);
+assert.doesNotMatch(
+  nativeArtifactCleanupWorkflow,
+  /actions\/checkout/,
+  'Privileged workflow-run cleanup must never check out or execute pull-request code.',
+);
+assert.match(
+  nativeArtifactCleanupWorkflow,
+  /run\.event === 'pull_request'[\s\S]*github\.rest\.pulls\.get[\s\S]*pull\.state !== 'open'[\s\S]*pull\.head\.sha !== run\.head_sha[\s\S]*retaining its applications for rerun/,
+  'Cancelled PR applications must be deleted only after the PR closes or advances.',
+);
+assert.match(
+  nativeArtifactCleanupWorkflow,
+  /github\.rest\.repos\.getBranch[\s\S]*branch\.commit\.sha === run\.head_sha[\s\S]*error\.status === 404/,
+  'Cancelled branch applications must be retained at the current head and deleted after advancement or deletion.',
+);
+assert.match(
+  nativeArtifactCleanupWorkflow,
+  /appArtifactNames = new Set\(\[[\s\S]*'android-simulator-app'[\s\S]*'ios-simulator-app'[\s\S]*github\.rest\.actions\.listWorkflowRunArtifacts[\s\S]*run_id: run\.id[\s\S]*github\.rest\.actions\.deleteArtifact/,
+  'Cleanup must target only simulator applications from the cancelled workflow run.',
+);
+assert.match(
+  nativePathPolicy,
+  /- 'api\/\*\*'[\s\S]*- '!api\/\*\*\/\*\.spec\.ts'[\s\S]*- '!api\/\*\*\/\*\.test\.ts'[\s\S]*- '!api\/test\/\*\*'[\s\S]*- '!api\/\*\*\/__tests__\/\*\*'/,
+  'Native path policy must include API runtime changes while excluding API test-only changes.',
+);
+assert.match(
+  nativePathPolicy,
+  /- 'mobile\/src\/\*\*'[\s\S]*- '!mobile\/src\/__tests__\/\*\*'[\s\S]*- '!mobile\/src\/\*\*\/\*\.test\.\*'[\s\S]*- '!mobile\/src\/\*\*\/\*\.spec\.\*'/,
+  'Native path policy must include mobile runtime changes while excluding mobile component tests.',
+);
+assert.match(
+  ciWorkflow,
+  /test:\n\s+name: api-test[\s\S]*name: Unit tests[\s\S]*npm run test -- --ci --runInBand[\s\S]*name: Database-backed API end-to-end tests/,
+  'API test-only native exclusions require unit and database-backed e2e coverage on every PR.',
+);
+assert.match(
+  ciWorkflow,
+  /mobile-api-journey:[\s\S]*name: Exercise live mobile API client journey[\s\S]*mobile-test:[\s\S]*name: Unit tests\n\s+run: npm test -- --runInBand/,
+  'Mobile test-only native exclusions require API-client journey and component coverage on every PR.',
 );
 assert.match(
   nativeWorkflow,
@@ -296,6 +355,16 @@ assert.match(
   nativeWorkflow,
   /scripts\/native-\*\.mjs/,
   'App caches must include the shared native build recipe.',
+);
+assert.match(
+  TOOLCHAIN.NATIVE_BUILD_CACHE_SCHEMA,
+  /^[1-9]\d*$/,
+  'Native application cache schema must be an explicit positive integer.',
+);
+assert.match(
+  nativeWorkflow,
+  /android_build_fingerprint: \$\{\{ steps\.versions\.outputs\.android_build_fingerprint \}\}[\s\S]*ios_build_fingerprint: \$\{\{ steps\.versions\.outputs\.ios_build_fingerprint \}\}/,
+  'Native CI must publish platform-specific build fingerprints.',
 );
 assert.match(
   nativeWorkflow,
@@ -558,8 +627,40 @@ assert.match(
   /if-no-files-found: error[\s\S]*retention-days: \$\{\{ needs\.config\.outputs\.native_evidence_retention_days \}\}/,
   'iOS evidence must fail closed when empty and use shared retention.',
 );
+const androidAppCacheKey =
+  nativeWorkflow.match(/key: android-simulator-app-[^\n]+/)?.[0] ?? '';
 const iosAppCacheKey =
   nativeWorkflow.match(/key: ios-simulator-app-[^\n]+/)?.[0] ?? '';
+assert.ok(
+  androidAppCacheKey.includes(
+    '${{ needs.config.outputs.android_build_fingerprint }}',
+  ),
+  'The Android app cache must include its selected toolchain fingerprint.',
+);
+assert.ok(
+  iosAppCacheKey.includes('${{ needs.config.outputs.ios_build_fingerprint }}'),
+  'The iOS app cache must include its selected toolchain fingerprint.',
+);
+for (const cacheKey of [androidAppCacheKey, iosAppCacheKey]) {
+  for (const excludedPath of [
+    '!mobile/src/__tests__/**',
+    '!mobile/src/**/*.test.*',
+    '!mobile/src/**/*.spec.*',
+    '!scripts/*.test.mjs',
+  ])
+    assert.ok(
+      cacheKey.includes(`'${excludedPath}'`),
+      `Native app caches must exclude ${excludedPath}.`,
+    );
+  for (const operationalPath of [
+    '.github/ci.env',
+    '.github/workflows/native-ci.yml',
+  ])
+    assert.ok(
+      !cacheKey.includes(`'${operationalPath}'`),
+      `Native app caches must not hash all of ${operationalPath}.`,
+    );
+}
 for (const path of [
   'mobile/package.json',
   'mobile/babel.config.js',
@@ -573,8 +674,8 @@ for (const path of [
 const readiness = nativeWorkflow.split('  native-readiness:\n')[1];
 assert.match(
   readiness ?? '',
-  /name: .*'iOS Diagnostic Probe' \|\| 'Native Readiness'[\s\S]*if: always\(\)[\s\S]*needs: \[config, build-android, build-ios, native-android, native-ios\]/,
-  'Native CI must expose one stable aggregate result across conditional platform jobs.',
+  /name: .*'iOS Diagnostic Probe' \|\| 'Native Readiness'[\s\S]*if: \$\{\{ always\(\) && !cancelled\(\) \}\}[\s\S]*needs: \[config, build-android, build-ios, native-android, native-ios\]/,
+  'Native CI must expose one stable aggregate result without resisting workflow cancellation.',
 );
 assert.match(
   readiness ?? '',
@@ -639,7 +740,7 @@ assert.match(
 assert.match(
   readiness ?? '',
   /Delete simulator app artifacts[\s\S]*if: always\(\)[\s\S]*NATIVE_ANDROID[\s\S]*NATIVE_IOS[\s\S]*result" != "success" && "\$result" != "skipped"[\s\S]*Keeping simulator app artifacts because a journey job did not succeed[\s\S]*android-simulator-app[\s\S]*ios-simulator-app[\s\S]*Warning: failed to delete simulator app artifact/,
-  'Native Readiness must delete simulator app artifacts after successful or skipped journeys, keep them when a journey fails or is cancelled, and never fail the check if cleanup fails.',
+  'Native Readiness must delete simulator app artifacts after successful or skipped journeys, keep them after a failure, and never fail the check if cleanup fails.',
 );
 
 console.log('Workflow contracts are synchronized.');

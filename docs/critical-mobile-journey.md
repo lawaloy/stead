@@ -63,7 +63,11 @@ job reports on every pull request and `main` push; Android Maestro runs
 when the shared native path policy detects relevant mobile, API, contract, or CI
 changes, and iOS runs the same complete journey. `Native Readiness` requires
 both applicable platforms and fails rather than treating disabled iOS as
-success. Draft pull requests skip the expensive native jobs; `Native Readiness`
+success. API and mobile test-only changes run their matching automated suites
+without rebuilding or replaying an unchanged native application. Runtime API
+or mobile code, contracts, dependencies, packaging, native tooling, and Maestro
+flow changes remain native-impacting. Draft pull requests skip the expensive
+native jobs; `Native Readiness`
 still passes, and the jobs run when the PR is marked ready for review. The
 suite also supports an explicit `workflow_dispatch`; there is no
 separate nightly or release variant. Earlier successful runs covered a narrower flow: they did
@@ -78,13 +82,23 @@ persistence required by the signed-in cold-start check. Android cold-boots a
 dedicated emulator from the checksum-locked SDK without snapshots; iOS miss
 builds restore source mtimes and use inode-aware DerivedData
 plus Pods caches. Metro transforms and the Maestro CLI are cached per platform.
+Application cache keys include application sources, build recipes, lockfiles,
+and a selected toolchain fingerprint. Test sources and operational workflow or
+evidence settings do not invalidate an otherwise identical native app. Bump
+`NATIVE_BUILD_CACHE_SCHEMA` in `.github/ci.env` when an incompatible recipe
+change is not represented by those inputs.
 Android CI also restores BuildKit dependency layers across hosted runners, but
 always rebuilds the source and transferred-APK layers and verifies their image
 identity. Both platform jobs retain journey evidence for three days when a
 journey fails. Simulator app artifacts are deleted when both journey jobs
 succeed or are skipped, including after a later successful rerun, and are
-kept for one day when a journey fails or is cancelled so Re-run failed jobs
-can still download them.
+kept for one day when a journey fails so Re-run failed jobs can download them.
+A cancelled workflow does not run readiness cleanup: any simulator app already
+uploaded expires automatically at its GitHub `expires_at`, one day after
+upload. `native-artifact-cleanup.yml` deletes it sooner when the originating PR
+or branch has closed, been deleted, or advanced beyond the cancelled commit.
+It retains a cancelled run that still matches the current head so the app
+remains available to a rerun. A successful rerun deletes it sooner.
 The iOS build embeds JavaScript so its journey runner does not install mobile
 dependencies or run Metro alongside PostgreSQL, the API, Maestro, and the
 simulator.
