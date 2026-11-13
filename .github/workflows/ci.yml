@@ -168,6 +168,8 @@ jobs:
         run: npx prisma generate
 
       - name: Unit tests
+        env:
+          NODE_OPTIONS: --max-old-space-size=5120
         run: npm run test -- --ci --runInBand
 
       - name: Install shared runner dependencies
