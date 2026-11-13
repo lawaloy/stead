@@ -5,6 +5,8 @@ native:
   - 'mobile/app/**'
   - 'mobile/src/**'
   - '!mobile/src/__tests__/**'
+  - '!mobile/src/**/*.test.*'
+  - '!mobile/src/**/*.spec.*'
   - 'mobile/assets/**'
   - 'mobile/app.json'
   - 'mobile/babel.config.js'
@@ -15,6 +17,12 @@ native:
   - 'mobile/Gemfile'
   - 'mobile/Gemfile.lock'
   - 'api/**'
+  # API tests validate the API boundary directly and do not change the app
+  # exercised by the native customer journey.
+  - '!api/**/*.spec.ts'
+  - '!api/**/*.test.ts'
+  - '!api/test/**'
+  - '!api/**/__tests__/**'
   - 'contracts/**'
   - '.github/native-ci-paths.yml'
   - '.github/workflows/native-ci.yml'
