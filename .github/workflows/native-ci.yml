@@ -11,9 +11,10 @@ run-name: >-
 # PRs when iOS is disabled so missing coverage cannot look green.
 # Simulator app artifacts are deleted when both journey jobs succeed or
 # are skipped, including after a later successful rerun. They are kept
-# for 1 day when a journey fails or is cancelled so "Re-run failed jobs"
-# can still download the apps. Journey logs are uploaded only when a
-# test fails.
+# for 1 day when a journey fails or a current-head run is cancelled so
+# "Re-run failed jobs" can still download the apps. The completion cleanup
+# deletes applications from cancelled runs once their PR or branch advances.
+# Journey logs are uploaded only when a test fails.
 # Manual runs can select a platform. Native binaries are
 # built in dedicated jobs and handed to Maestro jobs as artifacts (build once
 # → test). Android boots a dedicated AVD from checksum-locked SDK archives;
@@ -74,6 +75,8 @@ jobs:
       android_arch: ${{ steps.versions.outputs.android_arch }}
       android_profile: ${{ steps.versions.outputs.android_profile }}
       native_evidence_retention_days: ${{ steps.versions.outputs.native_evidence_retention_days }}
+      android_build_fingerprint: ${{ steps.versions.outputs.android_build_fingerprint }}
+      ios_build_fingerprint: ${{ steps.versions.outputs.ios_build_fingerprint }}
     steps:
       - uses: actions/checkout@v4
       - name: Detect native-impacting changes
@@ -107,6 +110,25 @@ jobs:
         run: |
           set -eu
           source .github/ci.env
+          android_build_fingerprint="$(
+            printf '%s\0' \
+              "$NATIVE_BUILD_CACHE_SCHEMA" \
+              "$NODE_VERSION" "$NPM_VERSION" "$NATIVE_API_TIMEOUT_MS" \
+              "$JAVA_DISTRIBUTION" "$JAVA_VERSION" \
+              "$ANDROID_BUILD_TOOLS_VERSION" \
+              "$ANDROID_MODULE_BUILD_TOOLS_VERSION" "$ANDROID_COMPILE_SDK" \
+              "$ANDROID_NDK_VERSION" "$ANDROID_CMAKE_VERSION" "$GRADLE_VERSION" \
+              | sha256sum | cut -d ' ' -f 1
+          )"
+          ios_build_fingerprint="$(
+            printf '%s\0' \
+              "$NATIVE_BUILD_CACHE_SCHEMA" \
+              "$NODE_VERSION" "$NPM_VERSION" "$NATIVE_API_TIMEOUT_MS" \
+              "$IOS_RUNNER" "$XCODE_VERSION" "$XCODE_BUILD" \
+              "$RUBY_VERSION" "$BUNDLER_VERSION" "$COCOAPODS_VERSION" \
+              "$REACT_NATIVE_MAVEN_REPOSITORY" \
+              | sha256sum | cut -d ' ' -f 1
+          )"
           {
             echo "node_version=$NODE_VERSION"
             echo "npm_version=$NPM_VERSION"
@@ -125,6 +147,8 @@ jobs:
             echo "android_arch=$ANDROID_ARCH"
             echo "android_profile=$ANDROID_PROFILE"
             echo "native_evidence_retention_days=$NATIVE_EVIDENCE_RETENTION_DAYS"
+            echo "android_build_fingerprint=$android_build_fingerprint"
+            echo "ios_build_fingerprint=$ios_build_fingerprint"
           } >> "$GITHUB_OUTPUT"
           if [[ "$IOS_NATIVE_ENABLED" != "true" ]]; then
             echo "Native iOS builds and journeys are disabled by the emergency switch. Native Readiness will reject applicable changes." >> "$GITHUB_STEP_SUMMARY"
@@ -142,10 +166,9 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: mobile/.ci/android/stead-debug.apk
-          # The shared build recipe, dependency lockfiles, and toolchain
-          # pins are part of the key: a build-only change
-          # must not reuse an APK produced by the old recipe.
-          key: android-simulator-app-v3-${{ hashFiles('package.json', 'package-lock.json', 'mobile/package-lock.json', 'mobile/app.json', 'mobile/assets/**', 'mobile/app/**', 'mobile/src/**', '.github/ci.env', '.github/workflows/native-ci.yml', 'scripts/native-*.mjs', 'scripts/android-*.mjs', 'scripts/archive-utils.mjs', '.github/android-sdk-lock.json', 'scripts/ios-setup.mjs', 'scripts/process-utils.mjs', 'scripts/local-workflow.mjs', 'scripts/ios-simulator-entitlements.mjs', 'scripts/toolchain.mjs', 'mobile/Gemfile', 'mobile/Gemfile.lock') }}
+          # Hash application/build inputs only. Test files, evidence settings,
+          # and workflow orchestration cannot change the produced APK.
+          key: android-simulator-app-${{ needs.config.outputs.android_build_fingerprint }}-${{ hashFiles('package.json', 'package-lock.json', 'mobile/package.json', 'mobile/package-lock.json', 'mobile/app.json', 'mobile/babel.config.js', 'mobile/metro.config.js', 'mobile/tsconfig.json', 'mobile/assets/**', 'mobile/app/**', 'mobile/src/**', '!mobile/src/__tests__/**', '!mobile/src/**/*.test.*', '!mobile/src/**/*.spec.*', 'scripts/native-*.mjs', 'scripts/android-*.mjs', '!scripts/*.test.mjs', 'scripts/archive-utils.mjs', '.github/android-sdk-lock.json', 'scripts/process-utils.mjs', 'scripts/local-workflow.mjs', 'scripts/toolchain.mjs') }}
       - uses: actions/setup-node@v4
         if: steps.android-app-cache.outputs.cache-hit != 'true'
         with:
@@ -227,9 +250,9 @@ jobs:
           path: |
             mobile/.ci/ios/mobile.app
             mobile/.ci/ios/stead-native-config.json
-          # Include the build script, toolchain pins, and this workflow so a
-          # build-only change must rebuild instead of reusing a stale .app.
-          key: ios-simulator-app-${{ needs.config.outputs.ios_runner }}-${{ steps.xcode.outputs.version }}-v4-${{ hashFiles('package.json', 'package-lock.json', 'mobile/package.json', 'mobile/package-lock.json', 'mobile/app.json', 'mobile/babel.config.js', 'mobile/metro.config.js', 'mobile/tsconfig.json', 'mobile/assets/**', 'mobile/app/**', 'mobile/src/**', '.github/scripts/build-ios-simulator-app.sh', '.github/ci.env', '.github/workflows/native-ci.yml', 'scripts/native-*.mjs', 'scripts/android-*.mjs', 'scripts/archive-utils.mjs', '.github/android-sdk-lock.json', 'scripts/ios-setup.mjs', 'scripts/process-utils.mjs', 'scripts/local-workflow.mjs', 'scripts/ios-simulator-entitlements.mjs', 'scripts/toolchain.mjs', 'mobile/Gemfile', 'mobile/Gemfile.lock') }}
+          # Hash application/build inputs only. Test files, evidence settings,
+          # and workflow orchestration cannot change the produced app.
+          key: ios-simulator-app-${{ needs.config.outputs.ios_runner }}-${{ steps.xcode.outputs.version }}-${{ needs.config.outputs.ios_build_fingerprint }}-${{ hashFiles('package.json', 'package-lock.json', 'mobile/package.json', 'mobile/package-lock.json', 'mobile/app.json', 'mobile/babel.config.js', 'mobile/metro.config.js', 'mobile/tsconfig.json', 'mobile/assets/**', 'mobile/app/**', 'mobile/src/**', '!mobile/src/__tests__/**', '!mobile/src/**/*.test.*', '!mobile/src/**/*.spec.*', '.github/scripts/build-ios-simulator-app.sh', 'scripts/native-*.mjs', '!scripts/*.test.mjs', 'scripts/archive-utils.mjs', 'scripts/ios-setup.mjs', 'scripts/process-utils.mjs', 'scripts/local-workflow.mjs', 'scripts/ios-simulator-entitlements.mjs', 'scripts/toolchain.mjs', 'mobile/Gemfile', 'mobile/Gemfile.lock') }}
       - uses: ruby/setup-ruby@v1
         if: steps.ios-app-cache.outputs.cache-hit != 'true'
         with:
@@ -519,7 +542,9 @@ jobs:
     # A skipped required check counts as passing in GitHub. Give diagnostic
     # runs a different check name instead of skipping Native Readiness.
     name: ${{ inputs.scenario && inputs.scenario != 'journey' && 'iOS Diagnostic Probe' || 'Native Readiness' }}
-    if: always()
+    # Aggregate failures and ordinary skips, but do not keep an obsolete or
+    # manually cancelled workflow alive through an always() job.
+    if: ${{ always() && !cancelled() }}
     needs: [config, build-android, build-ios, native-android, native-ios]
     runs-on: ubuntu-24.04
     permissions:
