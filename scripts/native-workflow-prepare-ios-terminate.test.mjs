@@ -39,7 +39,7 @@ test('iOS preparation terminates a successful first launch so Maestro starts col
     'com.test.app',
   ]);
   assert.equal(commands.filter((args) => args[1] === 'launch').length, 1);
-  assert.equal(commands.filter((args) => args[1] === 'erase').length, 0);
+  assert.equal(commands.filter((args) => args[1] === 'erase').length, 1);
 });
 
 test('iOS preparation still terminates after erase-and-reboot recovery', async () => {

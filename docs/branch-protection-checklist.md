@@ -5,7 +5,7 @@
 
 Target branch: `main`
 
-Active ruleset last verified: 2026-10-10 through the GitHub repository ruleset
+Active ruleset last verified: 2026-11-13 through the GitHub repository ruleset
 API.
 
 `main` is governed by the active `Stead Rules` repository ruleset. This
@@ -40,6 +40,8 @@ These are the exact contexts stored in the active ruleset:
 - [x] `mobile-api-journey` — live mobile API client against NestJS + PostgreSQL
 - [x] `CodeQL`
 - [x] `dependency-review` — blocks high-severity or critical runtime dependency findings
+- [x] `Native Readiness` — runs both native journeys for applicable paths and
+      reports an explicit successful skip for unrelated paths
 
 The Dependency Review workflow is required and its scan step propagates
 failures, so a newly introduced high-severity or critical runtime dependency
@@ -57,11 +59,9 @@ though its job contexts are not stored as required ruleset checks.
 3. Review the repository-role bypass actors and retain only intentional
    emergency access.
 4. Re-run this audit after each ruleset change and update the verification date.
-5. Require `Native Readiness`, the stable aggregate job that depends on the
-   conditional Android/iOS jobs. It succeeds when native paths legitimately do
-   not apply and fails when an applicable platform is disabled, missing, or
-   unsuccessful. Do not require `native-android` or `native-ios` directly;
-   unrelated PRs do not run those jobs.
+
+`Native Readiness` is the required stable aggregate. Do not require
+`native-android` or `native-ios` directly; unrelated PRs do not run those jobs.
 
 ## Merge Queue (Optional)
 

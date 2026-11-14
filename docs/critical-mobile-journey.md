@@ -54,9 +54,13 @@ execute both restart checks; iOS restoration has no skip or login fallback.
 It uses visible development OTP, so it does **not** require a
 Twilio or Termii account. It requires a disposable API database schema and
 `SMS_PROVIDER=dev`, `DEV_EXPOSE_OTP=true`; never use a real customer account or
-production API. The flow clears the app's local state at the beginning and
-uses a dedicated test phone supplied by the runner. Each attempt gets a fresh
-database schema so a repeated run does not inherit the previous account.
+production API. Android clears application state when the flow launches. The
+iOS runner erases and reboots its simulator before Maestro starts XCTest, then
+installs the app and launches it without another state or keychain reset. This
+keeps the test isolated without uninstalling the app underneath Maestro's live
+XCTest hierarchy server. The journey uses a dedicated test phone supplied by
+the runner. Each attempt gets a fresh database schema so a repeated run does
+not inherit the previous account.
 
 Native simulator jobs live in `.github/workflows/native-ci.yml`. Its `config`
 job reports on every pull request and `main` push; Android Maestro runs
