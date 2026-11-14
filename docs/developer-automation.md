@@ -81,6 +81,10 @@ process watchdog allows that startup budget plus `MAESTRO_FLOW_TIMEOUT_MS` for
 the journey; app assertions keep their own limits.
 `IOS_SIMULATOR_PREPARATION_TIMEOUT_MS` bounds
 the complete boot/install/warm-up sequence, including its one recovery.
+Before an iOS journey, the runner erases and reboots the simulator, installs
+the app, verifies one launch, and terminates it before Maestro starts XCTest.
+The Maestro flow must not clear iOS state or the keychain after that point:
+doing so reinstalls the app underneath the live XCTest hierarchy server.
 
 Use `--platform ios` for iOS or `--platform all` where both pinned environments
 are available. Omitting the platform from `validate` requires both.
@@ -97,6 +101,9 @@ Each attempt records its duration and a `maestro-summary.json` containing the
 failed field/command and slowest steps, without copying input or environment
 values. A failed XCTest HTTP server stops the owned Maestro process promptly;
 the attempt remains failed, with the driver log path in `results.json`.
+Simulator preparation may recover one failed pre-Maestro app launch by erasing
+and rebooting again, but product assertions and driver failures after the
+journey starts are not suppressed or replaced by a whole-journey retry.
 Evidence stays in ignored directories:
 
 - `.tmp/native-validation/`: service logs, bundle, Maestro command results and

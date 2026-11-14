@@ -113,7 +113,15 @@ export const prepareIosSimulator = async (
     ),
   );
   const current = selectIosDevice(listing, id);
-  if (current.state !== 'Booted')
+  if (appId) {
+    // Reset the simulator before Maestro starts its XCTest driver. Clearing
+    // state from launchApp makes Maestro uninstall/reinstall the application
+    // underneath a live XCTest runner, which can strand its hierarchy server.
+    if (current.state === 'Booted')
+      await execute('xcrun', ['simctl', 'shutdown', id]);
+    await execute('xcrun', ['simctl', 'erase', id]);
+    await execute('xcrun', ['simctl', 'boot', id]);
+  } else if (current.state !== 'Booted')
     await execute('xcrun', ['simctl', 'boot', id]);
   await execute('xcrun', ['simctl', 'bootstatus', id, '-b']);
   await execute('xcrun', ['simctl', 'install', id, app]);

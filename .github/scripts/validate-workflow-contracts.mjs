@@ -34,6 +34,7 @@ const [
   dependencyMaintenanceWorkflow,
   codeqlWorkflow,
   criticalNativeJourney,
+  signInJourney,
   iosCharacterInput,
   androidJourney,
   iosBuild,
@@ -52,6 +53,7 @@ const [
   readFile('.github/workflows/deps-maintenance.yml', 'utf8'),
   readFile('.github/workflows/codeql.yml', 'utf8'),
   readFile('mobile/.maestro/critical-native-journey.yaml', 'utf8'),
+  readFile('mobile/.maestro/sign-in.yaml', 'utf8'),
   readFile('mobile/.maestro/input-text-character-by-character.yaml', 'utf8'),
   readFile('.github/scripts/run-android-native-journey.sh', 'utf8'),
   readFile('.github/scripts/build-ios-simulator-app.sh', 'utf8'),
@@ -288,6 +290,21 @@ assert.ok(
   Number(TOOLCHAIN.IOS_SIMULATOR_PREPARATION_TIMEOUT_MS) >=
     Number(TOOLCHAIN.IOS_DRIVER_STARTUP_TIMEOUT_MS),
   'Simulator preparation must allow at least the full iOS driver startup budget.',
+);
+assert.match(
+  nativeRunner,
+  /if \(appId\) \{[\s\S]*simctl', 'shutdown'[\s\S]*simctl', 'erase'[\s\S]*simctl', 'boot'[\s\S]*simctl', 'bootstatus'[\s\S]*simctl', 'install'/,
+  'iOS journeys must erase and reboot the simulator before Maestro starts XCTest.',
+);
+assert.match(
+  signInJourney,
+  /platform: Android[\s\S]*launchApp:\n\s+clearState: true[\s\S]*platform: iOS[\s\S]*launchApp:\n\s+clearState: false\n\s+clearKeychain: false/,
+  'The shared sign-in flow must clear Android state but preserve pre-reset iOS state after XCTest starts.',
+);
+assert.doesNotMatch(
+  signInJourney,
+  /platform: iOS[\s\S]*launchApp:\n\s+clearState: true/,
+  'iOS flows must not reinstall the application underneath a live XCTest driver.',
 );
 assert.match(
   androidJourney,

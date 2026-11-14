@@ -493,7 +493,7 @@ test('iOS preparation recovers one failed app launch before handing the simulato
     { recovered: true },
   );
   assert.equal(launches, 2);
-  assert.equal(erases, 1);
+  assert.equal(erases, 2);
   assert.equal(installs, 2);
 });
 
@@ -545,7 +545,7 @@ test('iOS preparation fails closed when erase-and-reboot recovery still cannot l
     },
   );
   assert.equal(launches, 2);
-  assert.equal(erases, 1);
+  assert.equal(erases, 2);
   assert.equal(installs, 2);
 });
 

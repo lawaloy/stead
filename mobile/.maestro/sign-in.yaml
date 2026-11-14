@@ -5,9 +5,23 @@ env:
 # Run only against an isolated API schema with SMS_PROVIDER=dev,
 # DEV_EXPOSE_OTP=true, and EXPO_PUBLIC_E2E_PHONE set to a unique disposable
 # NG number (Maestro cannot reliably type into the RN phone field on iOS).
-- launchApp:
-    clearState: true
-    clearKeychain: true
+# Android can clear application state after its driver starts. The native
+# runner erases the iOS simulator before Maestro starts XCTest; asking Maestro
+# to clear iOS state here would uninstall/reinstall the app under the live
+# XCTest hierarchy server.
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - launchApp:
+          clearState: true
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - launchApp:
+          clearState: false
+          clearKeychain: false
 - extendedWaitUntil:
     visible: Stead Login
     timeout: 240000

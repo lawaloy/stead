@@ -104,10 +104,6 @@ unit coverage is not the same as a full mobile-to-database acceptance test.
 - Physical-device acceptance remains separate from the passing Android/iOS
   simulator journeys, including carrier SMS, secure storage, background/restart
   behavior, TalkBack, and VoiceOver.
-- Require the aggregate `Native Readiness` check on `main`; it succeeds for
-  unrelated paths but refuses missing, disabled, or failed applicable platform
-  coverage. See
-  [Branch Protection Checklist](branch-protection-checklist.md#urgent-follow-up).
 - There is no live Twilio or Termii integration test.
 - There are no load, soak, failover, broad accessibility-audit, or
   security-penetration suites, and no enforced code-coverage threshold. The
