@@ -22,7 +22,10 @@ const unsafeCharMap = {
 };
 
 function escapeUnsafeChars(str) {
-  return str.replace(/[<>/\\\b\f\n\r\t\0\u2028\u2029]/g, (char) => unsafeCharMap[char]);
+  return str.replace(
+    /[<>/\\\b\f\n\r\t\0\u2028\u2029]/g,
+    (char) => unsafeCharMap[char],
+  );
 }
 
 test('spawnOwned and runCommand do not start a child when the signal is already aborted', async () => {
