@@ -6,6 +6,25 @@ import { join } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 import { runCommand, spawnOwned } from './process-utils.mjs';
 
+const unsafeCharMap = {
+  '<': '\\u003C',
+  '>': '\\u003E',
+  '/': '\\u002F',
+  '\\': '\\\\',
+  '\b': '\\b',
+  '\f': '\\f',
+  '\n': '\\n',
+  '\r': '\\r',
+  '\t': '\\t',
+  '\0': '\\0',
+  '\u2028': '\\u2028',
+  '\u2029': '\\u2029',
+};
+
+function escapeUnsafeChars(str) {
+  return str.replace(/[<>/\\\b\f\n\r\t\0\u2028\u2029]/g, (char) => unsafeCharMap[char]);
+}
+
 test('spawnOwned and runCommand do not start a child when the signal is already aborted', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'stead abort before spawn '));
   const marker = join(directory, 'ran');
@@ -18,7 +37,7 @@ test('spawnOwned and runCommand do not start a child when the signal is already 
           process.execPath,
           [
             '-e',
-            `require('node:fs').writeFileSync(${JSON.stringify(marker)}, 'ran')`,
+            `require('node:fs').writeFileSync(${escapeUnsafeChars(JSON.stringify(marker))}, 'ran')`,
           ],
           { signal: controller.signal },
         ),
@@ -29,7 +48,7 @@ test('spawnOwned and runCommand do not start a child when the signal is already 
         process.execPath,
         [
           '-e',
-          `require('node:fs').writeFileSync(${JSON.stringify(marker)}, 'ran')`,
+          `require('node:fs').writeFileSync(${escapeUnsafeChars(JSON.stringify(marker))}, 'ran')`,
         ],
         { quiet: true, signal: controller.signal },
       ),
@@ -53,7 +72,7 @@ test(
         process.execPath,
         [
           '-e',
-          `process.on('SIGTERM',()=>process.exit(0));require('node:fs').writeFileSync(${JSON.stringify(ready)},'1');setTimeout(()=>{},30000)`,
+          `process.on('SIGTERM',()=>process.exit(0));require('node:fs').writeFileSync(${escapeUnsafeChars(JSON.stringify(ready))},'1');setTimeout(()=>{},30000)`,
         ],
         { quiet: true, signal: controller.signal },
       );
