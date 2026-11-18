@@ -41,16 +41,21 @@ has a near-term expiry. The machine-readable allowlist is
 accepts only the exact advisory, workspace, propagated package names, and date
 recorded there. Every other finding at the configured severity still fails CI.
 
-As of October 31, 2026, Expo 57's build toolchain has one temporary exception:
+The allowlist retains the expired `braces` exception below for audit history and
+has a time-limited `picomatch` exception while upstream has no patched release:
 
-| Advisory                                                                 | Package        | Exposure in Stead                                                                                                                               | Expiry / removal condition                                                                            |
-| ------------------------------------------------------------------------ | -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
-| [GHSA-vfj7-8cjw-p6xm](https://github.com/advisories/GHSA-vfj7-8cjw-p6xm) | `braces` 3.0.3 | Used through Metro to match repository/build paths. Stead does not pass customer input to Metro or ship Metro in the native application bundle. | November 6, 2026; remove immediately when a patched `braces` release is available through Expo/Metro. |
+| Advisory                                                                 | Package        | Exposure in Stead                                                                                                                                                                      | Expiry / removal condition                                                                            |
+| ------------------------------------------------------------------------ | -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| [GHSA-vfj7-8cjw-p6xm](https://github.com/advisories/GHSA-vfj7-8cjw-p6xm) | `braces` 3.0.3 | Used through Metro to match repository/build paths. Stead does not pass customer input to Metro or ship Metro in the native application bundle.                                        | November 6, 2026; remove immediately when a patched `braces` release is available through Expo/Metro. |
+| [GHSA-fc5q-39xc-vjpf](https://github.com/advisories/GHSA-fc5q-39xc-vjpf) | `picomatch`    | Used by Expo/Metro and test tooling for repository/build path matching. The app source does not call `picomatch`, accept customer glob patterns, or ship Metro/Jest in native bundles. | December 17, 2026; remove immediately when a patched release is available through Expo/Metro.         |
 
 The mobile entries reported by npm are propagation through Expo, Metro, React
-Native, and packages that peer on Expo from this source advisory; the count
-reflects dependency paths rather than independent defects. GitHub currently
-lists no patched release for this source advisory.
+Native, Jest, and packages that peer on Expo from this source advisory; the
+count reflects dependency paths rather than independent defects. GitHub and npm
+currently list no patched `picomatch` release (4.0.7 is the latest published
+version). The exception is limited to this advisory, the mobile workspace, the
+enumerated affected package paths, and its expiry; remove it as soon as Expo or
+Metro ships a patched dependency.
 
 Do not run `npm audit fix --force`: its suggested Expo 44 / React Native 0.72
 downgrades are incompatible with the supported Expo 57 stack and do not
