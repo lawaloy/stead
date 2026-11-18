@@ -76,4 +76,18 @@ tooling via `babel-plugin-istanbul`). Its `js-yaml` 3 range pulled in `argparse`
 [GHSA-hp3w-g68c-fv3c](https://github.com/advisories/GHSA-hp3w-g68c-fv3c);
 the package only calls `load()`, which `js-yaml` 4 keeps.
 
+The mobile CocoaPods toolchain still depends on `activesupport` 7.2.4
+through `cocoapods-core`, which requires `activesupport >= 5.0, < 8`.
+[GHSA-8474-xrp6-wh69](https://github.com/advisories/GHSA-8474-xrp6-wh69)
+is patched only in 8.0.5.2 and 8.1.4.1; Rails did not ship a 7.2 patch,
+and CocoaPods 1.17.0 still has the `< 8` constraint. This is build-time
+only (pod install), is not shipped in the app, and is not reachable from
+customer input. Remove the limitation when CocoaPods allows Active
+Support 8 or when a patched 7.2 release exists.
+
+Mobile pins the CocoaPods `addressable` dependency to 2.9.2, which
+patches [GHSA-8gmh-2hhj-2hv9](https://github.com/advisories/GHSA-8gmh-2hhj-2hv9)
+and the related Addressable advisories. The `~> 2.8` range from CocoaPods
+allows that release.
+
 </details>
