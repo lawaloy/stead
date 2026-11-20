@@ -471,6 +471,10 @@ jobs:
         run: |
           npm install --global npm@${{ needs.config.outputs.npm_version }}
           npm ci
+      - name: Create and warm job-owned iOS simulator
+        env:
+          STEAD_IOS_WARM_BOOT: 'true'
+        run: npm run native -- setup --platform ios
       - name: Download iOS simulator app
         uses: actions/download-artifact@v4
         with:
@@ -522,9 +526,7 @@ jobs:
       - name: Install Maestro
         run: bash .github/scripts/install-maestro.sh
       - name: Run iOS native journey
-        run: |
-          npm run native -- setup --platform ios
-          npm run native -- test --platform ios --database-ready --app mobile/.ci/ios/mobile.app --scenario "$STEAD_NATIVE_SCENARIO"
+        run: npm run native -- test --platform ios --database-ready --app mobile/.ci/ios/mobile.app --scenario "$STEAD_NATIVE_SCENARIO"
       - uses: actions/upload-artifact@v4
         if: failure()
         with:

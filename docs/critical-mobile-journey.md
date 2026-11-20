@@ -55,10 +55,16 @@ It uses visible development OTP, so it does **not** require a
 Twilio or Termii account. It requires a disposable API database schema and
 `SMS_PROVIDER=dev`, `DEV_EXPOSE_OTP=true`; never use a real customer account or
 production API. Android clears application state when the flow launches. The
-iOS runner erases and reboots its simulator before Maestro starts XCTest, then
-installs the app and launches it without another state or keychain reset. This
-keeps the test isolated without uninstalling the app underneath Maestro's live
-XCTest hierarchy server. The journey uses a dedicated test phone supplied by
+iOS hosted job creates and starts a fresh simulator early, while the remaining
+runner setup proceeds. A receipt tied to the current Actions run and simulator
+allows the journey to reuse only that job-owned state without a second erase.
+The receipt is consumed by the first attempt; repeated attempts receive a full
+reset so prior application and keychain state cannot contaminate their evidence.
+Local or pre-existing simulators still receive a full shutdown and erase before
+Maestro starts XCTest. The runner then installs and preflights the app without
+another state or keychain reset. This keeps the test isolated without
+uninstalling the app underneath Maestro's live XCTest hierarchy server. The
+journey uses a dedicated test phone supplied by
 the runner. Each attempt gets a fresh database schema so a repeated run does
 not inherit the previous account.
 

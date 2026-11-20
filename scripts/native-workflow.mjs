@@ -27,7 +27,7 @@ import {
   assertAndroidUiHealthy,
   managedAndroidWorkflow,
 } from './android-emulator.mjs';
-import { iosEnvironment } from './ios-setup.mjs';
+import { IOS_SIMULATOR_RECEIPT_ENV, iosEnvironment } from './ios-setup.mjs';
 import { buildAndroidGradle } from './native-gradle.mjs';
 import {
   repeatJourneys,
@@ -104,31 +104,38 @@ export const prepareIosSimulator = async (
   app,
   execute = runCommand,
   appId,
+  { resetState = true } = {},
 ) => {
+  const simctl = async (stage, args, config) => {
+    try {
+      return await execute('xcrun', ['simctl', ...args], config);
+    } catch (error) {
+      throw new Error(`iOS simulator ${stage} failed: ${error.message}`, {
+        cause: error,
+      });
+    }
+  };
   const listing = JSON.parse(
-    await execute(
-      'xcrun',
-      ['simctl', 'list', 'devices', 'available', '--json'],
-      { quiet: true, stdoutOnly: true },
-    ),
+    await simctl('discovery', ['list', 'devices', 'available', '--json'], {
+      quiet: true,
+      stdoutOnly: true,
+    }),
   );
   const current = selectIosDevice(listing, id);
-  if (appId) {
+  if (appId && resetState) {
     // Reset the simulator before Maestro starts its XCTest driver. Clearing
     // state from launchApp makes Maestro uninstall/reinstall the application
     // underneath a live XCTest runner, which can strand its hierarchy server.
     if (current.state === 'Booted')
-      await execute('xcrun', ['simctl', 'shutdown', id]);
-    await execute('xcrun', ['simctl', 'erase', id]);
-    await execute('xcrun', ['simctl', 'boot', id]);
-  } else if (current.state !== 'Booted')
-    await execute('xcrun', ['simctl', 'boot', id]);
-  await execute('xcrun', ['simctl', 'bootstatus', id, '-b']);
-  await execute('xcrun', ['simctl', 'install', id, app]);
+      await simctl('shutdown before reset', ['shutdown', id]);
+    await simctl('state reset', ['erase', id]);
+    await simctl('boot after reset', ['boot', id]);
+  } else if (current.state !== 'Booted') await simctl('boot', ['boot', id]);
+  await simctl('boot readiness', ['bootstatus', id, '-b']);
+  await simctl('app installation', ['install', id, app]);
   if (!appId) return { recovered: false };
   try {
-    await execute('xcrun', [
-      'simctl',
+    await simctl('app preflight launch', [
       'launch',
       '--terminate-running-process',
       id,
@@ -138,14 +145,13 @@ export const prepareIosSimulator = async (
     // bootstatus can report ready while SpringBoard/FBS is still unhealthy.
     // Recreate simulator state once before Maestro so an infrastructure-only
     // launch failure does not consume the customer-journey attempt.
-    await execute('xcrun', ['simctl', 'shutdown', id]).catch(() => {});
-    await execute('xcrun', ['simctl', 'erase', id]);
-    await execute('xcrun', ['simctl', 'boot', id]);
-    await execute('xcrun', ['simctl', 'bootstatus', id, '-b']);
-    await execute('xcrun', ['simctl', 'install', id, app]);
+    await simctl('recovery shutdown', ['shutdown', id]).catch(() => {});
+    await simctl('recovery state reset', ['erase', id]);
+    await simctl('recovery boot', ['boot', id]);
+    await simctl('recovery boot readiness', ['bootstatus', id, '-b']);
+    await simctl('recovery app installation', ['install', id, app]);
     try {
-      await execute('xcrun', [
-        'simctl',
+      await simctl('recovery app preflight launch', [
         'launch',
         '--terminate-running-process',
         id,
@@ -157,11 +163,36 @@ export const prepareIosSimulator = async (
         'The iOS simulator could not launch the app before Maestro, including after one erase-and-reboot recovery.',
       );
     }
-    await execute('xcrun', ['simctl', 'terminate', id, appId]).catch(() => {});
+    await simctl('app preflight termination', ['terminate', id, appId]).catch(
+      () => {},
+    );
     return { recovered: true };
   }
-  await execute('xcrun', ['simctl', 'terminate', id, appId]).catch(() => {});
+  await simctl('app preflight termination', ['terminate', id, appId]).catch(
+    () => {},
+  );
   return { recovered: false };
+};
+
+export const canReuseJobOwnedIosSimulator = (env = process.env, simulatorId) =>
+  env.GITHUB_ACTIONS === 'true' &&
+  Boolean(env.GITHUB_RUN_ID) &&
+  env[IOS_SIMULATOR_RECEIPT_ENV.created] === 'true' &&
+  env[IOS_SIMULATOR_RECEIPT_ENV.owner] === env.GITHUB_RUN_ID &&
+  env[IOS_SIMULATOR_RECEIPT_ENV.udid] === simulatorId;
+
+const consumedIosSimulatorReceipts = new Set();
+
+export const consumeJobOwnedIosSimulatorReceipt = (
+  env = process.env,
+  simulatorId,
+  consumed = consumedIosSimulatorReceipts,
+) => {
+  if (!canReuseJobOwnedIosSimulator(env, simulatorId)) return false;
+  const receipt = `${env.GITHUB_RUN_ID}:${simulatorId}`;
+  if (consumed.has(receipt)) return false;
+  consumed.add(receipt);
+  return true;
 };
 
 export const hasEmbeddedIosBundle = (app, exists = existsSync) =>
@@ -361,6 +392,7 @@ const runAttempt = async (platform, options, tools, app, pool, directory) => {
         platform === 'android' ? 'package' : 'bundleIdentifier'
       ];
       let iosPreparation;
+      let reuseJobOwnedSimulator = false;
       if (platform === 'android') {
         metro = logService(
           process.execPath,
@@ -438,6 +470,7 @@ const runAttempt = async (platform, options, tools, app, pool, directory) => {
         await adb(['install', '-r', app]);
       } else {
         const id = tools.simulator.udid;
+        reuseJobOwnedSimulator = consumeJobOwnedIosSimulatorReceipt(env, id);
         const simulatorDeadline = AbortSignal.timeout(
           Number(TOOLCHAIN.IOS_SIMULATOR_PREPARATION_TIMEOUT_MS),
         );
@@ -451,6 +484,7 @@ const runAttempt = async (platform, options, tools, app, pool, directory) => {
               signal: AbortSignal.any([options.signal, simulatorDeadline]),
             }),
           appId,
+          { resetState: !reuseJobOwnedSimulator },
         );
         if (iosPreparation.recovered)
           console.warn(
@@ -532,6 +566,13 @@ const runAttempt = async (platform, options, tools, app, pool, directory) => {
           : {}),
         ...(iosPreparation?.recovered
           ? { iosSimulatorRecovery: 'erase-and-reboot-before-maestro' }
+          : {}),
+        ...(platform === 'ios'
+          ? {
+              iosSimulatorStateIsolation: reuseJobOwnedSimulator
+                ? 'job-owned-fresh'
+                : 'full-reset',
+            }
           : {}),
       };
     }, [
