@@ -58,6 +58,8 @@ production API. Android clears application state when the flow launches. The
 iOS hosted job creates and starts a fresh simulator early, while the remaining
 runner setup proceeds. A receipt tied to the current Actions run and simulator
 allows the journey to reuse only that job-owned state without a second erase.
+The receipt is consumed by the first attempt; repeated attempts receive a full
+reset so prior application and keychain state cannot contaminate their evidence.
 Local or pre-existing simulators still receive a full shutdown and erase before
 Maestro starts XCTest. The runner then installs and preflights the app without
 another state or keychain reset. This keeps the test isolated without

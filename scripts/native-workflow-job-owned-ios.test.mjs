@@ -1,7 +1,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { IOS_SIMULATOR_RECEIPT_ENV } from './ios-setup.mjs';
-import { canReuseJobOwnedIosSimulator } from './native-workflow.mjs';
+import {
+  canReuseJobOwnedIosSimulator,
+  consumeJobOwnedIosSimulatorReceipt,
+} from './native-workflow.mjs';
 
 const receipt = (overrides = {}) => ({
   GITHUB_ACTIONS: 'true',
@@ -36,4 +39,18 @@ test('only the fresh simulator created by the current Actions run is reusable', 
     ),
     false,
   );
+});
+
+test('a job-owned fresh simulator receipt can be consumed only once', () => {
+  const consumed = new Set();
+
+  assert.equal(
+    consumeJobOwnedIosSimulatorReceipt(receipt(), 'fresh-udid', consumed),
+    true,
+  );
+  assert.equal(
+    consumeJobOwnedIosSimulatorReceipt(receipt(), 'fresh-udid', consumed),
+    false,
+  );
+  assert.equal(consumed.size, 1);
 });

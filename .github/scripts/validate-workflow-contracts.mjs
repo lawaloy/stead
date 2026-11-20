@@ -302,6 +302,11 @@ assert.match(
   'Skipping the iOS reset must require a fresh simulator receipt owned by the current Actions run.',
 );
 assert.match(
+  nativeRunner,
+  /consumeJobOwnedIosSimulatorReceipt[\s\S]*consumed\.has\(receipt\)[\s\S]*consumed\.add\(receipt\)[\s\S]*consumeJobOwnedIosSimulatorReceipt\(\s*env,\s*id/,
+  'A job-owned iOS simulator receipt must be consumed before preparation so repeat attempts reset state.',
+);
+assert.match(
   signInJourney,
   /platform: Android[\s\S]*launchApp:\n\s+clearState: true[\s\S]*platform: iOS[\s\S]*launchApp:\n\s+clearState: false\n\s+clearKeychain: false/,
   'The shared sign-in flow must clear Android state but preserve pre-reset iOS state after XCTest starts.',

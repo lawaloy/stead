@@ -181,6 +181,20 @@ export const canReuseJobOwnedIosSimulator = (env = process.env, simulatorId) =>
   env[IOS_SIMULATOR_RECEIPT_ENV.owner] === env.GITHUB_RUN_ID &&
   env[IOS_SIMULATOR_RECEIPT_ENV.udid] === simulatorId;
 
+const consumedIosSimulatorReceipts = new Set();
+
+export const consumeJobOwnedIosSimulatorReceipt = (
+  env = process.env,
+  simulatorId,
+  consumed = consumedIosSimulatorReceipts,
+) => {
+  if (!canReuseJobOwnedIosSimulator(env, simulatorId)) return false;
+  const receipt = `${env.GITHUB_RUN_ID}:${simulatorId}`;
+  if (consumed.has(receipt)) return false;
+  consumed.add(receipt);
+  return true;
+};
+
 export const hasEmbeddedIosBundle = (app, exists = existsSync) =>
   exists(join(app, 'main.jsbundle'));
 
@@ -378,6 +392,7 @@ const runAttempt = async (platform, options, tools, app, pool, directory) => {
         platform === 'android' ? 'package' : 'bundleIdentifier'
       ];
       let iosPreparation;
+      let reuseJobOwnedSimulator = false;
       if (platform === 'android') {
         metro = logService(
           process.execPath,
@@ -455,7 +470,7 @@ const runAttempt = async (platform, options, tools, app, pool, directory) => {
         await adb(['install', '-r', app]);
       } else {
         const id = tools.simulator.udid;
-        const reuseJobOwnedSimulator = canReuseJobOwnedIosSimulator(env, id);
+        reuseJobOwnedSimulator = consumeJobOwnedIosSimulatorReceipt(env, id);
         const simulatorDeadline = AbortSignal.timeout(
           Number(TOOLCHAIN.IOS_SIMULATOR_PREPARATION_TIMEOUT_MS),
         );
@@ -554,10 +569,7 @@ const runAttempt = async (platform, options, tools, app, pool, directory) => {
           : {}),
         ...(platform === 'ios'
           ? {
-              iosSimulatorStateIsolation: canReuseJobOwnedIosSimulator(
-                env,
-                tools.simulator.udid,
-              )
+              iosSimulatorStateIsolation: reuseJobOwnedSimulator
                 ? 'job-owned-fresh'
                 : 'full-reset',
             }
