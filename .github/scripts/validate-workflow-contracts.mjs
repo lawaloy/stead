@@ -293,8 +293,13 @@ assert.ok(
 );
 assert.match(
   nativeRunner,
-  /if \(appId\) \{[\s\S]*simctl', 'shutdown'[\s\S]*simctl', 'erase'[\s\S]*simctl', 'boot'[\s\S]*simctl', 'bootstatus'[\s\S]*simctl', 'install'/,
-  'iOS journeys must erase and reboot the simulator before Maestro starts XCTest.',
+  /\{ resetState = true \}[\s\S]*if \(appId && resetState\)[\s\S]*shutdown before reset[\s\S]*state reset[\s\S]*boot after reset[\s\S]*boot readiness[\s\S]*app installation/,
+  'iOS journeys must reset persistent simulators before Maestro starts XCTest.',
+);
+assert.match(
+  nativeRunner,
+  /canReuseJobOwnedIosSimulator[\s\S]*GITHUB_ACTIONS === 'true'[\s\S]*GITHUB_RUN_ID[\s\S]*IOS_SIMULATOR_RECEIPT_ENV\.created[\s\S]*IOS_SIMULATOR_RECEIPT_ENV\.owner[\s\S]*IOS_SIMULATOR_RECEIPT_ENV\.udid/,
+  'Skipping the iOS reset must require a fresh simulator receipt owned by the current Actions run.',
 );
 assert.match(
   signInJourney,
@@ -620,6 +625,33 @@ for (const job of ['build-ios', 'native-ios']) {
 const nativeIosJob =
   nativeWorkflow.split('  native-ios:\n')[1]?.split(/\n  [a-z][\w-]*:/)[0] ??
   '';
+const warmIosSimulator = nativeIosJob.indexOf(
+  'name: Create and warm job-owned iOS simulator',
+);
+const startIosPostgres = nativeIosJob.indexOf(
+  'name: Start isolated PostgreSQL',
+);
+const runIosJourney = nativeIosJob.indexOf('name: Run iOS native journey');
+assert.ok(
+  warmIosSimulator >= 0 &&
+    warmIosSimulator < startIosPostgres &&
+    startIosPostgres < runIosJourney,
+  'Native iOS CI must start its job-owned simulator before database and journey setup.',
+);
+assert.match(
+  nativeIosJob,
+  /name: Create and warm job-owned iOS simulator[\s\S]*STEAD_IOS_WARM_BOOT: 'true'[\s\S]*npm run native -- setup --platform ios/,
+  'Native iOS CI must request an early boot and persist its simulator receipt.',
+);
+const iosJourneyStep =
+  nativeIosJob
+    .split('      - name: Run iOS native journey\n')[1]
+    ?.split('\n      - ')[0] ?? '';
+assert.doesNotMatch(
+  iosJourneyStep,
+  /setup --platform ios/,
+  'Native iOS CI must not reset or recreate its warmed simulator on the journey critical path.',
+);
 const iosEvidenceUpload = nativeIosJob.split(
   '      - uses: actions/upload-artifact@v4\n',
 )[1];
