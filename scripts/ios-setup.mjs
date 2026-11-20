@@ -4,6 +4,12 @@ import { fileURLToPath } from 'node:url';
 import { TOOLCHAIN, assertToolVersion } from './toolchain.mjs';
 import { runCommand } from './process-utils.mjs';
 
+export const IOS_SIMULATOR_RECEIPT_ENV = Object.freeze({
+  created: 'STEAD_IOS_SIMULATOR_CREATED',
+  owner: 'STEAD_IOS_SIMULATOR_OWNER',
+  udid: 'STEAD_IOS_SIMULATOR_UDID',
+});
+
 export const iosEnvironment = (env = process.env) => ({
   ...env,
   // Cold hosted simulators can finish launching XCTest after Maestro's
@@ -69,24 +75,39 @@ export const prepareIos = async ({
       { env: selected, quiet: true, stdoutOnly: true },
     ),
   );
-  if (
-    !(devices[TOOLCHAIN.IOS_RUNTIME] || []).some(
-      (device) =>
-        device.isAvailable && device.name === 'Stead Native iPhone 17',
-    )
-  )
-    await execute(
-      'xcrun',
-      [
-        'simctl',
-        'create',
-        'Stead Native iPhone 17',
-        'com.apple.CoreSimulator.SimDeviceType.iPhone-17',
-        TOOLCHAIN.IOS_RUNTIME,
-      ],
-      { env: selected },
-    );
-  return selected;
+  const existing = (devices[TOOLCHAIN.IOS_RUNTIME] || []).find(
+    (device) => device.isAvailable && device.name === 'Stead Native iPhone 17',
+  );
+  const created = !existing;
+  const udid = existing
+    ? existing.udid
+    : (
+        await execute(
+          'xcrun',
+          [
+            'simctl',
+            'create',
+            'Stead Native iPhone 17',
+            'com.apple.CoreSimulator.SimDeviceType.iPhone-17',
+            TOOLCHAIN.IOS_RUNTIME,
+          ],
+          { env: selected, stdoutOnly: true },
+        )
+      ).trim();
+  if (env.STEAD_IOS_WARM_BOOT === 'true') {
+    if (!udid)
+      throw new Error(
+        'The iOS simulator could not be identified for early boot.',
+      );
+    if (existing?.state !== 'Booted')
+      await execute('xcrun', ['simctl', 'boot', udid], { env: selected });
+  }
+  return {
+    ...selected,
+    [IOS_SIMULATOR_RECEIPT_ENV.created]: String(created),
+    [IOS_SIMULATOR_RECEIPT_ENV.owner]: env.GITHUB_RUN_ID ?? '',
+    [IOS_SIMULATOR_RECEIPT_ENV.udid]: udid ?? '',
+  };
 };
 
 if (resolve(process.argv[1] ?? '') === fileURLToPath(import.meta.url))
@@ -95,7 +116,13 @@ if (resolve(process.argv[1] ?? '') === fileURLToPath(import.meta.url))
       if (process.env.GITHUB_ENV)
         appendFileSync(
           process.env.GITHUB_ENV,
-          `DEVELOPER_DIR=${env.DEVELOPER_DIR}\n`,
+          [
+            `DEVELOPER_DIR=${env.DEVELOPER_DIR}`,
+            `${IOS_SIMULATOR_RECEIPT_ENV.created}=${env[IOS_SIMULATOR_RECEIPT_ENV.created]}`,
+            `${IOS_SIMULATOR_RECEIPT_ENV.owner}=${env[IOS_SIMULATOR_RECEIPT_ENV.owner]}`,
+            `${IOS_SIMULATOR_RECEIPT_ENV.udid}=${env[IOS_SIMULATOR_RECEIPT_ENV.udid]}`,
+            '',
+          ].join('\n'),
         );
       console.log(
         `Selected Xcode ${TOOLCHAIN.XCODE_VERSION} (${TOOLCHAIN.XCODE_BUILD}) and ${TOOLCHAIN.IOS_RUNTIME}.`,

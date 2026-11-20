@@ -73,3 +73,29 @@ test('a failed pre-Maestro erase stops before installation', async () => {
   assert.equal(operations.includes('install'), false);
   assert.equal(operations.includes('launch'), false);
 });
+
+test('a proven job-owned fresh simulator is not erased a second time', async () => {
+  const commands = [];
+  const execute = async (_command, args) => {
+    commands.push(args);
+    if (args[1] === 'list') return listing('Booted');
+    return '';
+  };
+
+  assert.deepEqual(
+    await prepareIosSimulator('test', 'mobile.app', execute, 'com.test.app', {
+      resetState: false,
+    }),
+    { recovered: false },
+  );
+  assert.deepEqual(
+    commands.map((args) => args.slice(1)),
+    [
+      ['list', 'devices', 'available', '--json'],
+      ['bootstatus', 'test', '-b'],
+      ['install', 'test', 'mobile.app'],
+      ['launch', '--terminate-running-process', 'test', 'com.test.app'],
+      ['terminate', 'test', 'com.test.app'],
+    ],
+  );
+});
