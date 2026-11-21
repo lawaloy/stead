@@ -24,6 +24,12 @@ The selectors leave legacy `minimatch` 3 consumers on their compatible API.
 Lockfile guards check every resolved copy, and compatibility checks exercise
 the glob and instrumentation APIs used by the tooling.
 
+Prisma 7.10.1 exact-pins `effect` 3.20.0 through `@prisma/config`. Stead
+overrides it to the same-major 3.22.5 release, which includes the fix for
+[GHSA-7589-6fvf-x4pw](https://github.com/advisories/GHSA-7589-6fvf-x4pw).
+The API lockfile test keeps this pin synchronized. Remove the override when a
+stable Prisma release depends on an `effect` version newer than 3.22.0.
+
 Dependabot alerts #140 and #141 reference `deepmerge` advisory
 GHSA-gcqx-w48m-w2h4 / CVE-2026-93753. On November 2, 2026, its assigning
 authority rejected the CVE because it does not describe a security vulnerability;

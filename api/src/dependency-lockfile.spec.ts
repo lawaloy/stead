@@ -28,6 +28,11 @@ type PackageLock = {
 
 const auditRemediationPins = [
   {
+    packageName: 'effect',
+    version: '3.22.5',
+    lockfilePath: 'node_modules/effect',
+  },
+  {
     packageName: 'js-yaml',
     version: '4.3.2',
     lockfilePath: 'node_modules/js-yaml',
